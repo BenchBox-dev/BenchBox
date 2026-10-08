@@ -11,6 +11,7 @@ from _project.scripts.oracle_reviewers.verdict import (
     REDACTED,
     VERDICT_SCHEMA,
     VerdictError,
+    comment_span,
     parse_output,
     place,
     sanitize,
@@ -69,9 +70,28 @@ def test_schema_is_strict() -> None:
     assert VERDICT_SCHEMA["additionalProperties"] is False
     item = VERDICT_SCHEMA["properties"]["findings"]["items"]
     assert item["additionalProperties"] is False
-    assert item["required"] == ["severity", "file", "line", "title", "detail"]
+    assert item["required"] == ["severity", "file", "line", "end_line", "title", "detail"]
+    assert set(item["required"]) == set(item["properties"])
+    assert item["properties"]["end_line"]["type"] == ["integer", "null"]
     assert item["properties"]["severity"]["enum"] == ["Critical", "High", "Medium", "Low"]
     assert "head_sha" not in VERDICT_SCHEMA["properties"]
+
+
+def test_end_line_is_optional_and_normalised() -> None:
+    plain = validate(_verdict(_finding()))
+    assert plain.findings[0].end_line is None
+    assert validate(_verdict(_finding(end_line=None))).findings[0].end_line is None
+    assert validate(_verdict(_finding(line=11, end_line=11))).findings[0].end_line is None
+    ranged = validate(_verdict(_finding(line=11, end_line=14)))
+    assert (ranged.findings[0].line, ranged.findings[0].end_line) == (11, 14)
+    assert validate(ranged.to_json()) == ranged
+    assert validate(plain.to_json()) == plain
+
+
+@pytest.mark.parametrize("end_line", [10, 0, -1, True, "14", 14.0])
+def test_invalid_end_lines_are_rejected(end_line: Any) -> None:
+    with pytest.raises(VerdictError):
+        validate(_verdict(_finding(line=11, end_line=end_line)))
 
 
 def test_valid_verdict_round_trips() -> None:
@@ -183,6 +203,27 @@ def test_findings_split_into_inline_and_summary() -> None:
         ("benchbox/core/equivalence/checker.py", 30),
         ("benchbox/other.py", 1),
     ]
+
+
+def test_place_keeps_non_thread_severities_in_the_summary() -> None:
+    verdict = validate(_verdict(_finding(line=12), _finding(severity="Low", line=13), _finding(line=30)))
+    placement = place(verdict.findings, commentable_lines(DIFF), ("Critical", "High"))
+    assert [(finding.severity, finding.line) for finding in placement.inline] == [("High", 12)]
+    assert [(finding.severity, finding.line) for finding in placement.summary] == [("Low", 13), ("High", 30)]
+    everything = place(verdict.findings, commentable_lines(DIFF), None)
+    assert [finding.line for finding in everything.inline] == [12, 13]
+
+
+def test_comment_span_needs_every_line_of_the_range_in_the_diff() -> None:
+    lines = commentable_lines(DIFF)
+    inside = validate(_verdict(_finding(line=10, end_line=13))).findings[0]
+    assert comment_span(inside, lines) == (10, 13)
+    across_hunks = validate(_verdict(_finding(line=13, end_line=42))).findings[0]
+    assert comment_span(across_hunks, lines) is None
+    past_end = validate(_verdict(_finding(line=42, end_line=44))).findings[0]
+    assert comment_span(past_end, lines) is None
+    single = validate(_verdict(_finding(line=11))).findings[0]
+    assert comment_span(single, lines) is None
 
 
 def test_select_files_keeps_only_the_named_file_sections() -> None:

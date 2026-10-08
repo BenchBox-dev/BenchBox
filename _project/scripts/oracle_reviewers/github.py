@@ -4,7 +4,9 @@ import json
 import re
 import subprocess
 import tempfile
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -103,15 +105,88 @@ def on_develop(repo: str, sha: str) -> bool:
     return comparison.get("status") in ("ahead", "identical")
 
 
-def trusted_run(run: dict[str, Any], repo: str, is_on_develop: Callable[[str, str], bool] = on_develop) -> bool:
-    head_sha = str(run.get("head_sha", ""))
+def _targets_develop(run: dict[str, Any], pr: int) -> bool:
+    pulls = [pull for pull in run.get("pull_requests") or [] if isinstance(pull, dict)]
     return (
+        bool(pulls)
+        and all((pull.get("base") or {}).get("ref") == "develop" for pull in pulls)
+        and any(pull.get("number") == pr for pull in pulls)
+    )
+
+
+def _parse_time(value: Any) -> datetime | None:
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+@dataclass(frozen=True)
+class HeadPull:
+    number: int
+    created_at: datetime
+    base_ref: str
+    base_changed_at: datetime | None
+
+
+def head_pulls(repo: str, run: dict[str, Any]) -> list[HeadPull]:
+    owner = (((run.get("head_repository") or {}).get("owner")) or {}).get("login")
+    branch = run.get("head_branch")
+    if not owner or not branch:
+        raise GitHubError("the run does not name its head branch")
+    found: list[HeadPull] = []
+    for pull in get_paginated(f"repos/{repo}/pulls?state=all&head={owner}:{branch}&per_page=100"):
+        created_at = _parse_time(pull.get("created_at"))
+        if created_at is None or not isinstance(pull.get("number"), int):
+            raise GitHubError("a pull request for the head branch has no readable creation time")
+        changes = [
+            _parse_time(event.get("created_at"))
+            for event in get_paginated(f"repos/{repo}/issues/{pull['number']}/timeline?per_page=100")
+            if event.get("event") == "base_ref_changed"
+        ]
+        if any(moment is None for moment in changes):
+            raise GitHubError(f"a base change on #{pull['number']} has no readable time")
+        found.append(
+            HeadPull(
+                pull["number"],
+                created_at,
+                str((pull.get("base") or {}).get("ref", "")),
+                max(filter(None, changes), default=None),
+            )
+        )
+    return found
+
+
+def _pull_request_target_trusted(run: dict[str, Any], pr: int, pulls: Sequence[HeadPull] | None) -> bool:
+    started = _parse_time(run.get("created_at"))
+    if started is None or pulls is None or not _targets_develop(run, pr):
+        return False
+    open_then = [pull for pull in pulls if pull.created_at <= started]
+    return any(pull.number == pr for pull in open_then) and all(
+        pull.base_ref == "develop" and (pull.base_changed_at is None or pull.base_changed_at < started)
+        for pull in open_then
+    )
+
+
+def trusted_run(
+    run: dict[str, Any],
+    repo: str,
+    pr: int,
+    is_on_develop: Callable[[str, str], bool] = on_develop,
+    pulls: Sequence[HeadPull] | None = None,
+) -> bool:
+    head_sha = str(run.get("head_sha", ""))
+    event = run.get("event")
+    if not (
         str(run.get("path", "")).split("@", 1)[0] == WORKFLOW_PATH
         and (run.get("repository") or {}).get("full_name") == repo
-        and run.get("event") in TRUSTED_EVENTS
+        and event in TRUSTED_EVENTS
         and re.fullmatch(r"[0-9a-f]{40}", head_sha) is not None
-        and is_on_develop(repo, head_sha)
-    )
+    ):
+        return False
+    if event == "pull_request_target":
+        return _pull_request_target_trusted(run, pr, pulls)
+    return is_on_develop(repo, head_sha)
 
 
 def latest_state(repo: str, pr: int) -> State | None:
@@ -124,7 +199,14 @@ def latest_state(repo: str, pr: int) -> State | None:
     )
     for candidate in candidates:
         run_id = str(candidate["workflow_run"]["id"])
-        if not trusted_run(get_json(f"repos/{repo}/actions/runs/{run_id}"), repo):
+        run = get_json(f"repos/{repo}/actions/runs/{run_id}")
+        pulls: list[HeadPull] | None = None
+        if run.get("event") == "pull_request_target":
+            try:
+                pulls = head_pulls(repo, run)
+            except GitHubError:
+                continue
+        if not trusted_run(run, repo, pr, pulls=pulls):
             continue
         with tempfile.TemporaryDirectory() as directory:
             result = subprocess.run(

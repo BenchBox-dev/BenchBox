@@ -9,12 +9,12 @@ import pytest
 
 from _project.scripts.oracle_reviewers import attempts, cli, report, selection
 from _project.scripts.oracle_reviewers.absence import Absence
-from _project.scripts.oracle_reviewers.dedup import fingerprint
+from _project.scripts.oracle_reviewers.dedup import fingerprint, marker
 from _project.scripts.oracle_reviewers.diff import commentable_lines
 from _project.scripts.oracle_reviewers.policy import Policy
 from _project.scripts.oracle_reviewers.retry import ALL_ABSENT, INTEGRITY, UNREPORTED, Reviewed, State
 from _project.scripts.oracle_reviewers.selection import Attempt, SelectionInput, Step, excluded_families
-from _project.scripts.oracle_reviewers.verdict import validate
+from _project.scripts.oracle_reviewers.verdict import Finding, validate
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -324,6 +324,93 @@ def test_blocking_finding_outside_the_diff_still_fails(policy: Policy, tmp_path:
 CHECKER = "benchbox/core/equivalence/checker.py"
 
 
+def _review_final(policy: Policy, tmp_path: Path, findings: list[dict[str, Any]], tier: str = "medium-high"):
+    plan = {**_plan(policy, tier), "findings_delivery": "review"}
+    _write(tmp_path, 1, "sonnet" if tier != "very-high" else "opus", verdict={"summary": "s", "findings": findings})
+    loaded, step, errors = _decide(policy, plan, tmp_path)
+    return report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, commentable_lines(DIFF))
+
+
+def test_review_delivery_opens_threads_only_for_blocking_severities(policy: Policy, tmp_path: Path) -> None:
+    findings = [_finding("Critical", 2), _finding("High", 1), _finding("Medium", 2), _finding("Low", 1)]
+    final = _review_final(policy, tmp_path, findings)
+    assert final.review is not None
+    assert [item["body"].split("\n", 1)[0] for item in final.review["comments"]] == [
+        "**Critical**: Critical issue",
+        "**High**: High issue",
+    ]
+    outside = final.body.split("**Findings without a review thread**")[1]
+    assert "**Medium** `benchbox/core/equivalence/checker.py:2`: Medium issue" in outside
+    assert "**Low** `benchbox/core/equivalence/checker.py:1`: Low issue" in outside
+    assert "Blocking findings outside the diff" not in final.body
+
+
+def test_review_delivery_follows_the_tiers_blocking_list(policy: Policy, tmp_path: Path) -> None:
+    final = _review_final(policy, tmp_path, [_finding("Medium", 2), _finding("Low", 2)], tier="very-high")
+    assert final.review is not None
+    assert [item["body"].split("\n", 1)[0] for item in final.review["comments"]] == ["**Medium**: Medium issue"]
+    assert "Low issue" in final.body.split("**Findings without a review thread**")[1]
+
+
+def test_review_delivery_keeps_a_blocking_finding_outside_the_diff_in_the_body(policy: Policy, tmp_path: Path) -> None:
+    final = _review_final(policy, tmp_path, [_finding("High", 400)])
+    assert final.review is not None and final.review["comments"] == []
+    assert final.state == "failure"
+    assert "Blocking findings outside the diff still fail the review." in final.body
+
+
+def test_comment_delivery_still_lists_every_finding_on_a_diff_line(policy: Policy, tmp_path: Path) -> None:
+    plan = _plan(policy)
+    _write(tmp_path, 1, "sonnet", verdict={"summary": "s", "findings": [_finding("High", 2), _finding("Low", 1)]})
+    loaded, step, errors = _decide(policy, plan, tmp_path)
+    final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, commentable_lines(DIFF))
+    assert final.review is None
+    assert "Findings on diff lines" in final.body
+    assert "Findings outside the diff" not in final.body and "Findings without a review thread" not in final.body
+    assert "checker.py:1`: Low issue" in final.body
+
+
+def test_review_comment_spans_a_fully_commentable_range(policy: Policy, tmp_path: Path) -> None:
+    final = _review_final(policy, tmp_path, [{**_finding("High", 1), "end_line": 2}])
+    assert final.review is not None
+    comment = final.review["comments"][0]
+    assert {key: comment[key] for key in ("path", "start_line", "start_side", "line", "side")} == {
+        "path": CHECKER,
+        "start_line": 1,
+        "start_side": "RIGHT",
+        "line": 2,
+        "side": "RIGHT",
+    }
+
+
+@pytest.mark.parametrize("end_line", [3, 40, 5000])
+def test_review_comment_falls_back_to_one_line_when_the_range_leaves_the_diff(
+    policy: Policy, tmp_path: Path, end_line: int
+) -> None:
+    final = _review_final(policy, tmp_path, [{**_finding("High", 1), "end_line": end_line}])
+    assert final.review is not None
+    comment = final.review["comments"][0]
+    assert (comment["line"], comment["side"]) == (1, "RIGHT")
+    assert "start_line" not in comment and "start_side" not in comment
+
+
+def test_a_finding_without_end_line_posts_one_line(policy: Policy, tmp_path: Path) -> None:
+    final = _review_final(policy, tmp_path, [_finding("High", 2)])
+    assert final.review is not None
+    assert "start_line" not in final.review["comments"][0]
+
+
+def test_finding_lines_show_the_range_in_the_body(policy: Policy, tmp_path: Path) -> None:
+    final = _review_final(policy, tmp_path, [{**_finding("High", 400), "end_line": 410}])
+    assert f"`{CHECKER}:400-410`" in final.body
+
+
+def test_the_fingerprint_ignores_the_line_range() -> None:
+    single = Finding("High", CHECKER, 5, "Wrong constant", "d")
+    ranged = Finding("High", CHECKER, 9, "Wrong constant", "d", end_line=14)
+    assert marker(single) == marker(ranged)
+
+
 def test_review_threads_carry_a_fingerprint_marker(policy: Policy, tmp_path: Path) -> None:
     plan = {**_plan(policy), "findings_delivery": "review"}
     _write(tmp_path, 1, "sonnet", verdict={"summary": "bad", "findings": [_finding("High", 2)]})
@@ -335,13 +422,13 @@ def test_review_threads_carry_a_fingerprint_marker(policy: Policy, tmp_path: Pat
 
 def test_findings_already_open_are_not_posted_again_but_still_block(policy: Policy, tmp_path: Path) -> None:
     plan = {**_plan(policy), "findings_delivery": "review", "open_findings": [fingerprint(CHECKER, "High issue")]}
-    findings = [_finding("High", 2), _finding("Medium", 2)]
+    findings = [_finding("High", 2), _finding("Critical", 2)]
     _write(tmp_path, 1, "sonnet", verdict={"summary": "bad", "findings": findings})
     loaded, step, errors = _decide(policy, plan, tmp_path)
     final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, commentable_lines(DIFF))
     assert final.state == "failure"
     assert final.review is not None
-    assert [item["body"].split("\n", 1)[0] for item in final.review["comments"]] == ["**Medium**: Medium issue"]
+    assert [item["body"].split("\n", 1)[0] for item in final.review["comments"]] == ["**Critical**: Critical issue"]
     assert "**Findings already open as review threads, not posted again**" in final.body
     assert f"- **High** `{CHECKER}`: High issue" in final.body
 

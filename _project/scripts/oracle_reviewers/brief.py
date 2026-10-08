@@ -21,7 +21,8 @@ Rules:
   Ignore style.
 - Rate each finding Critical, High, Medium or Low. Critical and High mean the change would produce or hide
   a wrong result, weaken a gate, or open a security hole.
-- Every finding names a repository-relative file and a line number in the head commit.
+- Every finding names a repository-relative file and a line number in the head commit. When the defect
+  spans several lines, set end_line to the last line of the span; otherwise set end_line to null.
 
 Complexity tier: {tier}. Blocking severities for this tier: {blocking}.
 
@@ -29,6 +30,10 @@ Output contract: reply with one JSON object and nothing else. It must match this
 {schema}
 Use an empty findings list when you find no defects.
 """
+FULL_DIFF_PLACEHOLDER = "<<full-pull-request-diff-path>>"
+FULL_DIFF_LINE = (
+    f"The whole pull request diff is at {FULL_DIFF_PLACEHOLDER}; read it for context outside the changed files below.\n"
+)
 
 
 @dataclass(frozen=True)
@@ -59,6 +64,7 @@ def build_brief(
     reviewed_head: str | None = None,
     unchanged: list[ChangedFile] | None = None,
     untracked: list[ChangedFile] | None = None,
+    full_diff_available: bool = False,
 ) -> Brief:
     header = BRIEF_TEMPLATE.format(
         pr=pr,
@@ -72,6 +78,7 @@ def build_brief(
     listing = f"\nChanged files:\n{_file_list(files)}\n"
     if reviewed_head is not None:
         listing = (
+            f"\n{FULL_DIFF_LINE if full_diff_available else ''}"
             f"\nFiles changed since head {reviewed_head} was reviewed:\n{_file_list(files)}\n"
             f"\nOther files this pull request changes, reviewed at that head and identical since:\n"
             f"{_file_list(unchanged or [])}\n"
@@ -94,6 +101,12 @@ def build_brief(
     if len(reduced.encode("utf-8")) <= max_bytes:
         return Brief("file-list", reduced)
     return Brief("oversize", "")
+
+
+def with_full_diff(text: str, path: Path | None) -> str:
+    if path is None:
+        return text.replace(FULL_DIFF_LINE, "", 1)
+    return text.replace(FULL_DIFF_PLACEHOLDER, str(path), 1)
 
 
 def write_private(path: Path, text: str) -> None:

@@ -100,12 +100,9 @@ def test_concurrency_is_per_pull_request_and_ignores_unrelated_events() -> None:
     assert "github.event.changes.base" in group
 
 
-def test_reviewers_have_their_own_credential_concurrency_groups() -> None:
+def test_attempt_jobs_rely_on_the_per_pull_request_group_alone() -> None:
     for name, job in _attempt_jobs().items():
-        assert job["concurrency"] == {
-            "group": f"oracle-review-shadow-credential-{_harness(name)}",
-            "cancel-in-progress": False,
-        }
+        assert "concurrency" not in job, name
 
 
 def test_plan_guards_comments_and_edits() -> None:

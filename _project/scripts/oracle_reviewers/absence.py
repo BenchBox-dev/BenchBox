@@ -18,15 +18,15 @@ KINDS = (OK, QUOTA, AUTH, TIMEOUT, INVALID, EMPTY, ERROR)
 
 CALIBRATED_QUOTA_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
     "agy": (re.compile(r"RESOURCE_EXHAUSTED \(code 429\)"),),
-    "claude": (),
-    "codex": (),
+    "claude": (re.compile(r"You[\u2019']ve hit your session limit"),),
+    "codex": (re.compile(r"^ERROR: You[\u2019']ve hit your usage limit", re.MULTILINE),),
     "muse": (),
 }
 CALIBRATED_AUTH_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
     "agy": (),
-    "claude": (),
-    "codex": (),
-    "muse": (),
+    "claude": (re.compile(r"Failed to authenticate\. API Error: 401[^\"\n]*"),),
+    "codex": (re.compile(r"^ERROR: unexpected status 401 Unauthorized", re.MULTILINE),),
+    "muse": (re.compile(r"authentication failed: your API key from META_API_KEY was rejected"),),
 }
 CALIBRATED_EMPTY_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
     "agy": (re.compile(r"no output (?:was )?produced.*auto-denied", re.IGNORECASE | re.DOTALL),),
@@ -82,10 +82,11 @@ def classify(
         return Absence(TIMEOUT, "the reviewer did not finish within its timeout")
     if _first(CALIBRATED_EMPTY_PATTERNS.get(harness, ()), combined) is not None:
         return Absence(EMPTY, "the reviewer produced no output because tool use was denied")
-    quota = _first(CALIBRATED_QUOTA_PATTERNS.get(harness, ()), combined)
+    failed = exit_code not in (0, None)
+    quota = _first(CALIBRATED_QUOTA_PATTERNS.get(harness, ()), combined) if failed else None
     if quota is not None:
         return Absence(QUOTA, quota.group(0), parse_reset(combined, now))
-    auth = _first(CALIBRATED_AUTH_PATTERNS.get(harness, ()), combined)
+    auth = _first(CALIBRATED_AUTH_PATTERNS.get(harness, ()), combined) if failed else None
     if auth is not None:
         return Absence(AUTH, auth.group(0))
     if exit_code is None:

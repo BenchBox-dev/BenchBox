@@ -13,7 +13,7 @@ from typing import Any
 
 from . import attempts as attempt_files, dedup, github, report, retry, runner, selection
 from .absence import ERROR, Absence
-from .brief import BRIEF_TEMPLATE, build_brief, write_private
+from .brief import BRIEF_TEMPLATE, build_brief, with_full_diff, write_private
 from .classifier import ChangedFile, classify
 from .diff import commentable_lines, select_files
 from .policy import Policy, Reviewer, Tier, load_policy
@@ -313,6 +313,7 @@ def command_plan(args: argparse.Namespace) -> int:
         reviewed_head=reviewed.head_sha if partial and reviewed else None,
         unchanged=[item for item in scoped if item not in changed] if partial else [],
         untracked=[item for item in files if item not in scoped] if partial else [],
+        full_diff_available=bool(full_diff),
     )
     write_private(out_dir / BRIEF_FILE, brief.text)
     write_private(out_dir / DIFF_FILE, full_diff or "")
@@ -373,9 +374,12 @@ def command_review(args: argparse.Namespace) -> int:
     brief_path = plan_path.parent / BRIEF_FILE
     brief_path.chmod(0o600)
     prompt = brief_path.read_text(encoding="utf-8") if plan["brief_mode"] != "oversize" else ""
+    workspace = Path(args.workspace)
+    if prompt and plan.get("scope") == "changed":
+        prompt = with_full_diff(prompt, runner.stage_pull_request_diff(plan_path.parent / DIFF_FILE, workspace))
     outcome = runner.review(
         reviewer,
-        workspace=Path(args.workspace),
+        workspace=workspace,
         head_sha=plan["head_sha"],
         prompt=prompt,
         scratch=Path(args.scratch),
