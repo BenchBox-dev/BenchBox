@@ -2,6 +2,7 @@
   "acceptance": [
     "Decision recorded and applied in both renderers (Astro converter and Sphinx)"
   ],
+  "context": "2026-10-08: owner chose split. Done in branch docs/split-contract-pages (worktree /Users/joe/Developer/BenchBox.wt-docs-remediation, uncommitted; patch ~/.agents/handoffs/benchbox-docs-cleanup-patches/3-split-contract-pages.patch). Moves Phase 3 open questions, phase appendix and the \"only built if\" note to docs/internal/hosted-results-planning.md, and the SQL-compat governance and DataFrame runner lifecycle sections to docs/internal/implementation-decisions.md; the rest of both pages is public contract and stays. Commits are blocked until #2773 clears develop's comment-policy findings. Then rebase onto docs/close-completion-review-gaps once merged (both edit scripts/check_decision_records.py), commit, pr-open, @codex review, arm, finish.",
   "description": "docs/reference/public-contracts.md and docs/reference/hosted-results-contract.md were trimmed of internal material but still mix a public contract with maintainer governance or rollout planning. Keep, split into a short public page plus an internal page, or unpublish.",
   "sessions": [
     {
@@ -19,6 +20,14 @@
       "generation": "39d8982a11c94c72ac438847252fd436",
       "op": "take",
       "op_id": "2c8bf66fbc284c8c8b325fcad7d3235f",
+      "session_id": "bcebd139f88a4c38a6dc9549b9b03523"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:667f75493d6fbd10b32fdee5",
+      "at": "2026-10-08T13:41:53Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "7b9011bc41e24a7ca1a0b8da490d1637",
       "session_id": "bcebd139f88a4c38a6dc9549b9b03523"
     }
   ]
