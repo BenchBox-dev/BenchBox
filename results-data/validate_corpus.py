@@ -312,9 +312,6 @@ def _tuning_applied(payload: dict) -> bool:
 
 
 def _power_score(payload: dict) -> float | None:
-    # Power@Size only: QphH/QphDS are non-spec exports the driver no longer
-    # validates, and the explorer ranks TPC-H/TPC-DS on power_score derived
-    # from power_at_size alone, so the validator must agree here.
     metrics = _mapping(_mapping(payload.get("summary")).get("tpc_metrics"))
     value = metrics.get("power_at_size")
     if value is not None:

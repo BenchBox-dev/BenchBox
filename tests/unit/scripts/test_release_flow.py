@@ -56,6 +56,10 @@ LANDING = """<a
 """
 
 
+def write_page(path: Path, text: str) -> None:
+    path.write_text(text, encoding="utf-8")
+
+
 def write_tree(root: Path, version: str = VERSION) -> Path:
 
     (root / "scripts").mkdir(parents=True, exist_ok=True)
@@ -75,7 +79,7 @@ def write_tree(root: Path, version: str = VERSION) -> Path:
     (root / "benchbox" / "utils" / "VERSION_MANAGEMENT.md").write_text(
         f"Current release: `v{version}`.\n", encoding="utf-8"
     )
-    (root / "landing" / "index.html").write_text(LANDING.format(version=version), encoding="utf-8")
+    write_page(root / "landing" / "index.html", LANDING.format(version=version))
     (root / "CHANGELOG.md").write_text(CHANGELOG, encoding="utf-8")
     (root / "uv.lock").write_text(LOCK.format(version=version), encoding="utf-8")
     return root
@@ -524,7 +528,7 @@ def test_candidate_selection_cli_is_stdlib_only_and_preserves_lock(
             sys.executable,
             "-I",
             "-S",
-            str(root / "scripts/release_flow.py"),
+            str(Path(root).resolve() / "scripts/release_flow.py"),
             "select",
             "--base-sha",
             base,

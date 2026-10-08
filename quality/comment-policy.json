@@ -38101,6 +38101,17 @@
       "removal": "Remove when the UAT lifecycle classification moves out of the header comment into structured config."
     },
     {
+      "path": "tests/uat/configs/uat-throughput-cedardb-nightly.yaml",
+      "symbol": "",
+      "text": "# TEMPLATE — canonical nightly-CI CedarDB throughput config; edited in",
+      "kind": "notice",
+      "consumer": "tests/uat/test_config.py",
+      "necessity": "The UAT config lifecycle header classifies the file as an editable template or an immutable historical record. tests/uat/test_config.py requires the first line to start with a recognized marker, and _project/specs/uat-framework.md Section 9 defines the header and its edit protocol.",
+      "alternative": "A top-level YAML lifecycle key would need a loader schema change and a coordinated spec, README and test update; the header is the documented contract today.",
+      "owner": "BenchBox maintainers",
+      "removal": "Remove when the UAT lifecycle classification moves out of the header comment into structured config."
+    },
+    {
       "path": "tests/uat/configs/release-gate-01-native-dataframe.yaml",
       "symbol": "",
       "text": "# place across releases (e.g. cross_scale_coverage_min_pairs re-derivation),",

@@ -67,16 +67,15 @@ jobs:
 
       - name: Require the expected architecture
         shell: bash
-        run: |
-          uv run ${{ matrix.uv_run_args }} -- python - <<'PY'
-          import platform
-          import sys
-          families = {"x64": {"x86_64", "amd64"}, "arm64": {"arm64", "aarch64"}}
-          expected_name = "${{ matrix.expected_arch }}"
-          machine = platform.machine()
-          if machine.lower() not in families[expected_name]:
-              sys.exit(f"expected {expected_name} Python, got {machine}")
-          PY
+        env:
+          EXPECTED_ARCH: ${{ matrix.expected_arch }}
+        run: >-
+          uv run ${{ matrix.uv_run_args }} -- python -c
+          'import os, platform, sys;
+          families = {"x64": {"x86_64", "amd64"}, "arm64": {"arm64", "aarch64"}};
+          expected = os.environ["EXPECTED_ARCH"];
+          machine = platform.machine();
+          sys.exit(None if machine.lower() in families[expected] else f"expected {expected} Python, got {machine}")'
 
       - name: Build the manifest
         run: uv run ${{ matrix.uv_run_args }} -- python scripts/tpcds_platform_identity.py manifest --out "manifest-${{ runner.os }}-${{ runner.arch }}.json"

@@ -1,10 +1,3 @@
-"""Snowflake already-present clustering counts as satisfied, not dropped.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
-
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -55,8 +48,6 @@ def test_already_present_clustering_key_is_recorded_satisfied_not_dropped():
     adapter.resolve_physical_table = Mock(return_value="LINEITEM")
 
     cursor = Mock()
-    # Catalog already holds the requested key; automatic clustering is on so
-    # no resume-recluster bookkeeping interferes with the assertion.
     cursor.fetchone.return_value = ("(L_ORDERKEY)", True)
     connection = Mock()
     connection.cursor.return_value = cursor

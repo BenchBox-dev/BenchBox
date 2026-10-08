@@ -1,11 +1,3 @@
-"""Fail-closed tuned-run marker: a notuning run never reuses a tuned database.
-
-Decision D1: before applying any physical tuning, a tuned run writes a
-run-kind marker row into the existing ``benchbox_tuning_metadata`` table; a
-notuning run refuses any database carrying it. When the marker cannot be
-written, the tuned run fails before applying tuning. Baselines write nothing.
-"""
-
 from __future__ import annotations
 
 import sqlite3
@@ -60,13 +52,11 @@ def _fresh_benchmark(tmp_path: Path) -> types.SimpleNamespace:
 
 
 def test_failed_metadata_save_still_refuses_notuning_reuse(tmp_path, monkeypatch):
-    """A tuned run whose metadata save fails leaves refusal evidence."""
     db = _db_path(tmp_path)
     tuned = _tuned_adapter(db, _column_tuned_config())
     conn = tuned.create_connection()
     try:
         assert tuned.ensure_tuned_run_marker(conn) is True
-        # The post-apply metadata save fails (non-fatal warning in production).
         monkeypatch.setattr(TuningMetadataManager, "save_unified_tunings", lambda self, config: False)
         assert tuned.save_tuning_metadata(conn) is False
     finally:
@@ -78,7 +68,6 @@ def test_failed_metadata_save_still_refuses_notuning_reuse(tmp_path, monkeypatch
 
 
 def test_crash_between_apply_and_save_refuses_notuning_reuse(tmp_path):
-    """A marker-only database (crash after apply, before save) is refused."""
     db = _db_path(tmp_path)
     tuned = _tuned_adapter(db, _column_tuned_config())
     conn = tuned.create_connection()
@@ -93,7 +82,6 @@ def test_crash_between_apply_and_save_refuses_notuning_reuse(tmp_path):
 
 
 def test_notuning_handle_existing_database_recreates_marker_db(tmp_path):
-    """End to end: the reuse decision recreates, never reuses, a marker DB."""
     db = _db_path(tmp_path)
     tuned = _tuned_adapter(db, _column_tuned_config())
     conn = tuned.create_connection()
@@ -108,18 +96,17 @@ def test_notuning_handle_existing_database_recreates_marker_db(tmp_path):
 
 
 def test_native_fresh_path_writes_marker_before_apply(tmp_path):
-    """The native tuned path marks the DB before apply_unified_tuning runs."""
     db = _db_path(tmp_path)
     tuned = _tuned_adapter(db, _column_tuned_config())
     conn = tuned.create_connection()
-    tuned.create_schema = lambda benchmark, connection: 0.0  # type: ignore[method-assign]
-    tuned.load_data = lambda benchmark, connection, data_dir: ({"orders": 5}, 0.0, None)  # type: ignore[method-assign]
+    tuned.create_schema = lambda benchmark, connection: 0.0
+    tuned.load_data = lambda benchmark, connection, data_dir: ({"orders": 5}, 0.0, None)
     seen: dict[str, bool] = {}
 
     def _fake_apply(config, connection):
         seen["marker_at_apply"] = TuningMetadataManager(tuned, connection=connection).has_tuned_run_marker()
 
-    tuned.apply_unified_tuning = _fake_apply  # type: ignore[method-assign]
+    tuned.apply_unified_tuning = _fake_apply
     try:
         tuned._setup_fresh_database_phases(_fresh_benchmark(tmp_path), conn, tuned.get_effective_tuning_configuration())
     finally:
@@ -128,14 +115,13 @@ def test_native_fresh_path_writes_marker_before_apply(tmp_path):
 
 
 def test_marker_write_failure_fails_tuned_run_before_apply(tmp_path):
-    """A tuned run that cannot write the marker fails without applying tuning."""
     db = _db_path(tmp_path)
     tuned = _tuned_adapter(db, _column_tuned_config())
     conn = tuned.create_connection()
-    tuned.create_schema = lambda benchmark, connection: 0.0  # type: ignore[method-assign]
+    tuned.create_schema = lambda benchmark, connection: 0.0
     applied: list[bool] = []
-    tuned.apply_unified_tuning = lambda config, connection: applied.append(True)  # type: ignore[method-assign]
-    tuned.ensure_tuned_run_marker = lambda connection: False  # type: ignore[method-assign]
+    tuned.apply_unified_tuning = lambda config, connection: applied.append(True)
+    tuned.ensure_tuned_run_marker = lambda connection: False
     try:
         with pytest.raises(RuntimeError, match="tuned-run marker"):
             tuned._setup_fresh_database_phases(
@@ -147,15 +133,15 @@ def test_marker_write_failure_fails_tuned_run_before_apply(tmp_path):
 
 
 def test_external_tuned_path_writes_marker_first(tmp_path):
-    """A tuned external-table run marks the DB before creating references."""
     db = _db_path(tmp_path)
     tuned = _tuned_adapter(db, _column_tuned_config())
     tuned.table_mode = "external"
     tuned.supports_external_tables = True
     created: list[bool] = []
-    tuned.create_external_tables = (  # type: ignore[method-assign]
-        lambda benchmark, connection, data_dir: (created.append(True), ({"orders": 5}, 0.0, None))[1]
-    )
+    tuned.create_external_tables = lambda benchmark, connection, data_dir: (
+        created.append(True),
+        ({"orders": 5}, 0.0, None),
+    )[1]
     conn = tuned.create_connection()
     try:
         tuned._setup_fresh_database_phases(_fresh_benchmark(tmp_path), conn, tuned.get_effective_tuning_configuration())
@@ -174,16 +160,16 @@ def test_external_tuned_path_writes_marker_first(tmp_path):
 
 
 def test_external_tuned_path_marker_failure_blocks_run(tmp_path):
-    """A tuned external run that cannot write the marker fails before creating."""
     db = _db_path(tmp_path)
     tuned = _tuned_adapter(db, _column_tuned_config())
     tuned.table_mode = "external"
     tuned.supports_external_tables = True
     created: list[bool] = []
-    tuned.create_external_tables = (  # type: ignore[method-assign]
-        lambda benchmark, connection, data_dir: (created.append(True), ({"orders": 5}, 0.0, None))[1]
-    )
-    tuned.ensure_tuned_run_marker = lambda connection: False  # type: ignore[method-assign]
+    tuned.create_external_tables = lambda benchmark, connection, data_dir: (
+        created.append(True),
+        ({"orders": 5}, 0.0, None),
+    )[1]
+    tuned.ensure_tuned_run_marker = lambda connection: False
     conn = tuned.create_connection()
     try:
         with pytest.raises(RuntimeError, match="tuned-run marker"):
@@ -196,9 +182,8 @@ def test_external_tuned_path_marker_failure_blocks_run(tmp_path):
 
 
 def test_constraints_only_config_refused_when_section_markers_swallowed(tmp_path, monkeypatch):
-    """Constraints-only tuned configs refuse reuse even with markers swallowed."""
     db = _db_path(tmp_path)
-    config = UnifiedTuningConfiguration()  # constraints on, no table tunings
+    config = UnifiedTuningConfiguration()
     assert config.get_enabled_tuning_types()
     tuned = _tuned_adapter(db, config)
     conn = tuned.create_connection()
@@ -220,16 +205,8 @@ def test_constraints_only_config_refused_when_section_markers_swallowed(tmp_path
 
 
 def test_committed_clear_plus_failed_section_markers_rewrites_marker(tmp_path, monkeypatch):
-    """A durable wipe plus failed markers still leaves refusal evidence.
-
-    On SQLite the column-save clear runs uncommitted on the shared connection
-    and rolls back, so the pre-apply marker is never really at risk there.
-    Commit the clear explicitly to emulate a durable engine, then fail the
-    section-marker batch: without a rewrite the marker is gone and notuning
-    reuse is allowed.
-    """
     db = _db_path(tmp_path)
-    config = UnifiedTuningConfiguration()  # constraints on, no table tunings
+    config = UnifiedTuningConfiguration()
     tuned = _tuned_adapter(db, config)
     conn = tuned.create_connection()
     try:
@@ -256,7 +233,6 @@ def test_committed_clear_plus_failed_section_markers_rewrites_marker(tmp_path, m
 
 
 def test_sorted_ingestion_only_config_infers_tuned_and_refuses_reuse(tmp_path):
-    """A sorted-ingestion-only wizard config counts as tuned, never baseline."""
     config = _sorted_ingestion_only_config()
     assert not config.get_enabled_tuning_types()
 
@@ -278,7 +254,6 @@ def test_sorted_ingestion_only_config_infers_tuned_and_refuses_reuse(tmp_path):
 
 
 def test_baseline_needs_no_metadata_table(tmp_path):
-    """A baseline run writes no marker and creates no metadata table."""
     db = _db_path(tmp_path)
     baseline = SQLiteAdapter(database_path=db, tuning_enabled=False, tuning_config=build_baseline_unified_config())
     conn = baseline.create_connection()
@@ -300,7 +275,6 @@ def test_baseline_needs_no_metadata_table(tmp_path):
 
 
 def test_tuned_with_full_metadata_refusal_unchanged(tmp_path):
-    """The prior gate still refuses a fully saved tuned database."""
     db = _db_path(tmp_path)
     tuned = _tuned_adapter(db, _column_tuned_config())
     conn = tuned.create_connection()
