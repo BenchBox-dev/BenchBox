@@ -2,11 +2,12 @@
   "acceptance": [
     "All listed workflows and unused scripts deleted; surviving importers listed and tested",
     "Ledger shows the covering check for corpus-cutover's property",
+    "publication/ledger-seed.json kept, or its dispositions re-homed; a local make site-inputs run after the change passes every attestation",
     "No reference to deleted publication names outside CHANGELOG.md, _project/ and ADRs",
     "Core CI green"
   ],
-  "context": "Owner decision D12 (2026-10-06): all of dlv2-62 is in this batch. muse AR-22 (accepted). The repo-level secrets are PUBLICATION_APP_ID and PUBLICATION_APP_PRIVATE_KEY; the GitHub-side clean-up is site-split-54.",
-  "description": "PR group C2: shares one core PR with site-split-50 (separate commits allowed). The dlv2-62 scope, adjusted for what site-split-50 removes.\n\n1. Workflows: delete publication-deploy, -transaction, -preview-deploy, -preview-soak, -soak-monitor, -recover, -canaries, -corpus-cutover and rehearse-release-isolation.\n   - Before deleting -corpus-cutover, show in dev-loop-property-ledger.md which check covers its property.\n   - The availability probe is now the site nightly's (site-split-21).\n2. Scripts: delete every scripts/publication/* file that no surviving workflow or module imports, including pages.cjs and tests/unit/scripts/publication/pages_adapter_harness.cjs. Also delete publication/ledger-seed.json (site-split-10 re-homed corpus_bijection off it) and the related tests.\n   - Keep and test what the corpus workflows and verify_corpus_promotion.py import; check_explorer_compat is lazily imported at :166.\n   - List every surviving importer in the PR body.\n3. Docs:\n   - mark adr-independent-publication-authorities.md superseded by adr-site-repo-split.md;\n   - delete or rewrite docs/operations/{publication-*,independent-publication-*} and docs/development/independent-publication-threat-model.md;\n   - update the ledger rows and soundness-paths file entries for the deleted files.",
+  "context": "Owner decision D12 (2026-10-06): all of dlv2-62 is in this batch. muse AR-22 (accepted). The repo-level secrets are PUBLICATION_APP_ID and PUBLICATION_APP_PRIVATE_KEY; the GitHub-side clean-up is site-split-54.\n2026-10-08: owner approved D-C in chat: the bundle build keeps requiring publication/ledger-seed.json. The earlier text (\"site-split-10 re-homed corpus_bijection off it\") was wrong; description and acceptance updated.",
+  "description": "PR group C2: shares one core PR with site-split-50 (separate commits allowed). The dlv2-62 scope, adjusted for what site-split-50 removes.\n\n1. Workflows: delete publication-deploy, -transaction, -preview-deploy, -preview-soak, -soak-monitor, -recover, -canaries, -corpus-cutover and rehearse-release-isolation.\n   - Before deleting -corpus-cutover, show in dev-loop-property-ledger.md which check covers its property.\n   - The availability probe is now the site nightly's (site-split-21).\n2. Scripts: delete every scripts/publication/* file that no surviving workflow or module imports, including pages.cjs and tests/unit/scripts/publication/pages_adapter_harness.cjs.\n   - The core site-inputs bundle build runs corpus_bijection with `--ledger-seed publication/ledger-seed.json` and refuses to run without it (owner D-C, 2026-10-08). Keep the seed, or re-home its dispositions into a surviving file first; either way, prove with a local `make site-inputs` run that the bundle still builds and its attestations pass.\n   - check_corpus_bijection.py and validator_parity.py are imported by the bundle build; keep them.\n   - Keep and test what the corpus workflows and verify_corpus_promotion.py import; check_explorer_compat is lazily imported at :166.\n   - List every surviving importer in the PR body.\n3. Docs:\n   - mark adr-independent-publication-authorities.md superseded by adr-site-repo-split.md;\n   - delete or rewrite docs/operations/{publication-*,independent-publication-*} and docs/development/independent-publication-threat-model.md;\n   - update the ledger rows and soundness-paths file entries for the deleted files.",
   "sessions": [
     {
       "actor": "mcp:claude-code:joe@joe-mac-mini.local:ce6e60d02a558a65c61d0c88",
@@ -15,6 +16,14 @@
       "op": "create",
       "op_id": "41cbe8f742a7489cabbf14702904d92a",
       "session_id": "2d03f81d904c4b488222c4b6be81ba33"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de",
+      "at": "2026-10-08T20:49:14Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "ecfcf00c7af8496a85837581f7cf34a4",
+      "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
     }
   ]
 }
