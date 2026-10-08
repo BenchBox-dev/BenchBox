@@ -2,6 +2,7 @@
   "acceptance": [
     "Script passes and is wired into CI, or is removed with its soundness-path entry"
   ],
+  "context": "2026-10-08 owner decision: do not repair or wire into CI. Branch docs/close-completion-review-gaps (patch in ~/.agents/handoffs/benchbox-docs-cleanup-patches/) removes this effort's miss; the two older failures stay. The script retires with site-split-51. Drop this item after that branch merges.",
   "description": "It fails on develop (two phrases missing from docs/operations/independent-publication-contract.md) and is not run by CI. It also requires the unpublished independent-publication ADR in the published ADR index. It is a soundness path.",
   "sessions": [
     {
@@ -11,6 +12,14 @@
       "op": "create",
       "op_id": "2ba949df9ffc40f7a7a0740445b1c64f",
       "session_id": "43d3dfd590314e7ebb852ac2f70db5c9"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:667f75493d6fbd10b32fdee5",
+      "at": "2026-10-08T13:40:14Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "1f125a1c0c3b47a183a7718d18e3a1f7",
+      "session_id": "bcebd139f88a4c38a6dc9549b9b03523"
     }
   ]
 }
