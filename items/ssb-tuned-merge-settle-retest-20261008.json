@@ -1,0 +1,14 @@
+{
+  "context": "Source: tuning-followups handoff decision D3 (owner 2026-10-08): keep SSB tuned template with documented negative verdict; retest once merge-settle exists. Predecessor evidence: post-merge ssb-tuned PASS but ~4.6x slower than notuning (bundles ssb_sf1_clickhouse_server_sql_20261007_183153_f2b246d4.json vs ..._182634_97178a0b.json); #2766 tier remediation (merge-settle wait) now merged.",
+  "description": "Re-run SSB tuned cells with merge-settle from the merged tier remediation and decide the template's fate from measured numbers: keep, adjust, or disable. Report negative results as such; single-shot SF1 cells are sufficient for the verdict.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:154ae91a481281d11ac2019e",
+      "at": "2026-10-08T20:44:39Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "88b787a371ca4bc282bed492d86b1bdc",
+      "session_id": "0b049bb7b35344849c3bc1ea57ed95a2"
+    }
+  ]
+}
