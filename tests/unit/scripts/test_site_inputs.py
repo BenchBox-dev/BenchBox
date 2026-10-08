@@ -126,11 +126,12 @@ def test_member_digest_raises_on_missing_path(tmp_path: Path) -> None:
 
 
 def test_build_refuses_foreign_core_sha(tmp_path: Path) -> None:
-    args = argparse.Namespace(
-        out=str(tmp_path / "out"), core_sha="d076a974d", parent_core_sha=None, certified_by=None, cmd="build"
-    )
-    with pytest.raises(RuntimeError, match="not the bundle core_sha"):
-        site_inputs.cmd_build(args)
+    for sha in ("d076a974d", "0" * 40):
+        args = argparse.Namespace(
+            out=str(tmp_path / "out"), core_sha=sha, parent_core_sha=None, certified_by=None, cmd="build"
+        )
+        with pytest.raises(RuntimeError, match="not the bundle core_sha"):
+            site_inputs.cmd_build(args)
 
 
 def _gen_data(tmp_path: Path, payload: dict | None = None) -> Path:
