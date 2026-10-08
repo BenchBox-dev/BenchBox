@@ -146,9 +146,11 @@ checkout before it records it; a failed check records the reviewer as absent
   reviewer's trace must show it read each one. Claude runs with
   `--output-format stream-json`, and each file needs a successful Read or Grep
   that names it; the structured-output call does not count. Codex runs with
-  `--json`, and each file needs a successful command whose text names that exact
-  path; a listing, a search of a directory or a read of the staged diff does
-  not count.
+  `--json`, and each file needs a successful content-reading command (`cat`,
+  `sed`, `head`, `tail`, `nl`, `awk`, `grep` or `rg` on the file, or `git
+  show`, `git diff` or `git blame`) with that exact path as an operand. A
+  listing, an existence check, `echo`, a search of a directory, a path used as
+  a search pattern and a read of the staged diff do not count.
 - An inline brief carries the diff, so no read is required there.
 
 The brief no longer forbids running commands. Its `<<read-rule>>` slot is

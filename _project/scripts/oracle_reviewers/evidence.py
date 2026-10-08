@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -82,10 +83,62 @@ def trace(harness: str, stdout: str) -> Trace:
     return Trace()
 
 
-def _names(command: str, path: str, workspace: Path) -> bool:
+READERS = frozenset({"cat", "sed", "head", "tail", "nl", "less", "more", "awk", "bat", "grep", "rg"})
+GIT_READERS = frozenset({"show", "diff", "blame"})
+PATTERN_FIRST = frozenset({"grep", "rg"})
+STAGED_DIFF = ".oracle-pull-request.diff"
+_SHELL = re.compile(r"^\S*sh\s+-l?c\s+(?P<script>.+)$", re.DOTALL)
+
+
+def _names(argument: str, path: str, workspace: Path) -> bool:
     root = re.escape(os.path.realpath(workspace) + os.sep)
     pattern = rf"(?:(?<![\w./-])(?:\./)?|{root}){re.escape(path)}(?![\w./-])"
-    return re.search(pattern, command) is not None
+    return re.search(pattern, argument) is not None
+
+
+def _tokens(script: str) -> list[str]:
+    lexer = shlex.shlex(script, posix=True, punctuation_chars=";&|")
+    lexer.whitespace_split = True
+    return list(lexer)
+
+
+def _segments(command: str) -> list[list[str]]:
+    match = _SHELL.match(command.strip())
+    script = match.group("script") if match else command
+    try:
+        tokens = _tokens(script)
+        if match and len(tokens) == 1:
+            tokens = _tokens(tokens[0])
+    except ValueError:
+        return []
+    segments: list[list[str]] = [[]]
+    for token in tokens:
+        if set(token) <= set(";&|"):
+            segments.append([])
+        else:
+            segments[-1].append(token)
+    return [segment for segment in segments if segment]
+
+
+def _operands(segment: list[str]) -> list[str]:
+    verb = os.path.basename(segment[0])
+    if verb == "git":
+        return segment[2:] if len(segment) > 1 and segment[1] in GIT_READERS else []
+    if verb not in READERS:
+        return []
+    arguments = [argument for argument in segment[1:] if not argument.startswith("-")]
+    explicit = any(argument in ("-e", "-f", "--regexp", "--file") for argument in segment[1:])
+    return arguments[1:] if verb in PATTERN_FIRST and not explicit else arguments
+
+
+def reads_file(command: str, path: str, workspace: Path) -> bool:
+    for segment in _segments(command):
+        operands = _operands(segment)
+        if any(STAGED_DIFF in operand for operand in operands):
+            continue
+        if any(_names(operand, path, workspace) for operand in operands):
+            return True
+    return False
 
 
 def unread(harness: str, required: Iterable[str], run: Trace, workspace: Path) -> list[str]:
@@ -93,7 +146,7 @@ def unread(harness: str, required: Iterable[str], run: Trace, workspace: Path) -
         read = {relative(target, workspace) for target in run.reads}
         return [path for path in required if path not in read]
     if harness == "codex":
-        return [path for path in required if not any(_names(command, path, workspace) for command in run.reads)]
+        return [path for path in required if not any(reads_file(command, path, workspace) for command in run.reads)]
     return []
 
 

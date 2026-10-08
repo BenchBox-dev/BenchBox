@@ -47,8 +47,9 @@ Two defects showed up in the shadow period.
   no defect must name every changed soundness file that exists at the head, and
   the reviewer's trace must show a successful read of each: a Read or Grep
   naming it in Claude's `stream-json` events (a turn count is not evidence,
-  because the structured-output call is itself a turn), or a Codex command whose
-  text names the exact path (command output, listings and the staged diff do not
+  because the structured-output call is itself a turn), or a Codex
+  content-reading command with the exact path as an operand (command output,
+  listings, existence checks, search patterns and the staged diff do not
   count). Inline briefs carry the diff, so no read is required. muse and agy
   leave no read trace; only the citation check and their own report apply to
   them. A failed check records the reviewer as absent (`incomplete`), never as
