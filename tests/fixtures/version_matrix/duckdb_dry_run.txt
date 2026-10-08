@@ -1,0 +1,124 @@
+$ uv run --no-sync -- benchbox run --non-interactive --quiet --compression zstd:3 --phases generate --benchmark tpch --scale 10
+$ uv run --no-sync -- benchbox run --non-interactive --quiet --compression zstd:3 --phases generate --benchmark tpcds --scale 10
+$ uv run --no-sync -- benchbox run --non-interactive --quiet --compression zstd:3 --phases generate --benchmark clickbench --scale 10
+$ uv run --no-sync -- benchbox run --non-interactive --quiet --compression zstd:3 --phases generate --benchmark ssb --scale 10
+$ uv pip install --prerelease=allow --python {python} duckdb==1.0.0
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark tpch --scale 10 --platform-option driver_version=1.0.0
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpch --scale 10 --platform-option driver_version=1.0.0
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpch --scale 10 --platform-option driver_version=1.0.0
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpch --scale 10 --platform-option driver_version=1.0.0
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark tpcds --scale 10 --platform-option driver_version=1.0.0
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpcds --scale 10 --platform-option driver_version=1.0.0
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpcds --scale 10 --platform-option driver_version=1.0.0
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpcds --scale 10 --platform-option driver_version=1.0.0
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark clickbench --scale 10 --platform-option driver_version=1.0.0
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark clickbench --scale 10 --platform-option driver_version=1.0.0
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark clickbench --scale 10 --platform-option driver_version=1.0.0
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark clickbench --scale 10 --platform-option driver_version=1.0.0
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark ssb --scale 10 --platform-option driver_version=1.0.0
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark ssb --scale 10 --platform-option driver_version=1.0.0
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark ssb --scale 10 --platform-option driver_version=1.0.0
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark ssb --scale 10 --platform-option driver_version=1.0.0
+$ uv pip install --prerelease=allow --python {python} duckdb==1.1.3
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark tpch --scale 10 --platform-option driver_version=1.1.3
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpch --scale 10 --platform-option driver_version=1.1.3
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpch --scale 10 --platform-option driver_version=1.1.3
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpch --scale 10 --platform-option driver_version=1.1.3
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark tpcds --scale 10 --platform-option driver_version=1.1.3
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpcds --scale 10 --platform-option driver_version=1.1.3
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpcds --scale 10 --platform-option driver_version=1.1.3
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpcds --scale 10 --platform-option driver_version=1.1.3
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark clickbench --scale 10 --platform-option driver_version=1.1.3
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark clickbench --scale 10 --platform-option driver_version=1.1.3
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark clickbench --scale 10 --platform-option driver_version=1.1.3
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark clickbench --scale 10 --platform-option driver_version=1.1.3
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark ssb --scale 10 --platform-option driver_version=1.1.3
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark ssb --scale 10 --platform-option driver_version=1.1.3
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark ssb --scale 10 --platform-option driver_version=1.1.3
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark ssb --scale 10 --platform-option driver_version=1.1.3
+$ uv pip install --prerelease=allow --python {python} duckdb==1.2.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark tpch --scale 10 --platform-option driver_version=1.2.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpch --scale 10 --platform-option driver_version=1.2.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpch --scale 10 --platform-option driver_version=1.2.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpch --scale 10 --platform-option driver_version=1.2.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark tpcds --scale 10 --platform-option driver_version=1.2.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpcds --scale 10 --platform-option driver_version=1.2.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpcds --scale 10 --platform-option driver_version=1.2.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpcds --scale 10 --platform-option driver_version=1.2.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark clickbench --scale 10 --platform-option driver_version=1.2.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark clickbench --scale 10 --platform-option driver_version=1.2.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark clickbench --scale 10 --platform-option driver_version=1.2.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark clickbench --scale 10 --platform-option driver_version=1.2.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark ssb --scale 10 --platform-option driver_version=1.2.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark ssb --scale 10 --platform-option driver_version=1.2.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark ssb --scale 10 --platform-option driver_version=1.2.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark ssb --scale 10 --platform-option driver_version=1.2.2
+$ uv pip install --prerelease=allow --python {python} duckdb==1.3.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark tpch --scale 10 --platform-option driver_version=1.3.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpch --scale 10 --platform-option driver_version=1.3.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpch --scale 10 --platform-option driver_version=1.3.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpch --scale 10 --platform-option driver_version=1.3.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark tpcds --scale 10 --platform-option driver_version=1.3.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpcds --scale 10 --platform-option driver_version=1.3.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpcds --scale 10 --platform-option driver_version=1.3.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpcds --scale 10 --platform-option driver_version=1.3.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark clickbench --scale 10 --platform-option driver_version=1.3.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark clickbench --scale 10 --platform-option driver_version=1.3.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark clickbench --scale 10 --platform-option driver_version=1.3.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark clickbench --scale 10 --platform-option driver_version=1.3.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark ssb --scale 10 --platform-option driver_version=1.3.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark ssb --scale 10 --platform-option driver_version=1.3.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark ssb --scale 10 --platform-option driver_version=1.3.2
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark ssb --scale 10 --platform-option driver_version=1.3.2
+$ uv pip install --prerelease=allow --python {python} duckdb==1.4.4
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark tpch --scale 10 --platform-option driver_version=1.4.4
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpch --scale 10 --platform-option driver_version=1.4.4
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpch --scale 10 --platform-option driver_version=1.4.4
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpch --scale 10 --platform-option driver_version=1.4.4
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark tpcds --scale 10 --platform-option driver_version=1.4.4
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpcds --scale 10 --platform-option driver_version=1.4.4
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpcds --scale 10 --platform-option driver_version=1.4.4
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpcds --scale 10 --platform-option driver_version=1.4.4
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark clickbench --scale 10 --platform-option driver_version=1.4.4
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark clickbench --scale 10 --platform-option driver_version=1.4.4
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark clickbench --scale 10 --platform-option driver_version=1.4.4
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark clickbench --scale 10 --platform-option driver_version=1.4.4
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark ssb --scale 10 --platform-option driver_version=1.4.4
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark ssb --scale 10 --platform-option driver_version=1.4.4
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark ssb --scale 10 --platform-option driver_version=1.4.4
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark ssb --scale 10 --platform-option driver_version=1.4.4
+$ uv pip install --prerelease=allow --python {python} duckdb==1.5.5
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark tpch --scale 10 --platform-option driver_version=1.5.5
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpch --scale 10 --platform-option driver_version=1.5.5
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpch --scale 10 --platform-option driver_version=1.5.5
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpch --scale 10 --platform-option driver_version=1.5.5
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark tpcds --scale 10 --platform-option driver_version=1.5.5
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpcds --scale 10 --platform-option driver_version=1.5.5
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpcds --scale 10 --platform-option driver_version=1.5.5
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpcds --scale 10 --platform-option driver_version=1.5.5
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark clickbench --scale 10 --platform-option driver_version=1.5.5
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark clickbench --scale 10 --platform-option driver_version=1.5.5
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark clickbench --scale 10 --platform-option driver_version=1.5.5
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark clickbench --scale 10 --platform-option driver_version=1.5.5
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark ssb --scale 10 --platform-option driver_version=1.5.5
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark ssb --scale 10 --platform-option driver_version=1.5.5
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark ssb --scale 10 --platform-option driver_version=1.5.5
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark ssb --scale 10 --platform-option driver_version=1.5.5
+$ uv pip install --prerelease=allow --python {python} duckdb==1.6.0.dev365
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark tpch --scale 10
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpch --scale 10
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpch --scale 10
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpch --scale 10
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark tpcds --scale 10
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpcds --scale 10
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpcds --scale 10
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark tpcds --scale 10
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark clickbench --scale 10
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark clickbench --scale 10
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark clickbench --scale 10
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark clickbench --scale 10
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases load --benchmark ssb --scale 10
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark ssb --scale 10
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark ssb --scale 10
+$ uv run --no-sync -- benchbox run --non-interactive --platform duckdb --quiet --compression zstd:3 --phases power --benchmark ssb --scale 10
+DuckDB matrix planned: 116 runs

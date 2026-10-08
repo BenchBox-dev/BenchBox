@@ -126,8 +126,10 @@ Operator-run version matrices may repeat a platform name at several versions. Th
 DuckDB matrix is segregated under `results-data/bundles/duckdb-version-matrix/`, which is
 the only corpus location where the depth gate counts versions as distinct identities.
 Results Explorer disambiguates their rows by engine and resolved driver versions. The runner is
-`scripts/run_duckdb_version_matrix.py`, and its median analyzer is
-`scripts/analyze_duckdb_version_matrix.py`. The analyzer emits one median bundle per
+`scripts/run_version_matrix.py`, and its median analyzer is
+`scripts/analyze_version_matrix.py`; both take an engine spec from
+`scripts/version_matrix_specs.py`. `scripts/run_duckdb_version_matrix.py` and
+`scripts/analyze_duckdb_version_matrix.py` run the DuckDB spec. The analyzer emits one median bundle per
 version/benchmark cell for promotion; raw repetitions stay outside the checkout. The
 current DuckDB matrix is documented in `results-data/CORPUS_NOTES.md` when its bundles
 are promoted.
