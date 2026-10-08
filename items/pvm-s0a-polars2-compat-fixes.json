@@ -2,13 +2,14 @@
   "acceptance": [
     "On Polars 2.0.0 and on 1.44.2, benchbox run --platform polars-df at SF 0.01 completes for tpch, tpcds, ssb and clickbench with zero failed queries and the expected query count per benchmark (no zero-query runs)",
     "python -m benchbox.core.equivalence.cross_surface --benchmark <b> reports no divergences beyond cross_surface_baseline.yaml for all four benchmarks on both 2.0.0 and 1.44.2",
-    "cast_date uses an API available from Polars 1.0.0 onwards, and a unit test covers a String input",
-    "The PR body lists every 2.0 removal or default change checked against BenchBox code with file:line, and every added deterministic sort per query",
-    "A CI job installs polars==2.0.0 over the locked environment and runs the polars-df SF 0.01 smoke and the four cross-surface gates; it passes alongside the existing locked-version (1.44.2) jobs",
+    "Both cast_date implementations (adapter and unified_frame) use an API available on every supported version, and unit tests cover String, Date, Datetime, null and invalid input on 1.44.2 and 2.0.0, plus an AMPLab DataFrame query case",
+    "Readers pass no removed keyword on 2.0 (rechunk, missing_utf8_is_empty_string); any capability-detected keyword translation is tested on both sides and listed in the PR body",
+    "The PR body lists every 2.0 removal or default change checked against BenchBox code with file:line, and every added sort per query",
+    "A CI job installs exactly polars==2.0.0 over the locked environment and runs the polars-df SF 0.01 smoke and the four cross-surface gates; it is wired into the required core aggregate and passes alongside the existing locked-version (1.44.2) jobs",
     "uv.lock, the pyproject polars floor and the main checkout's environment are unchanged; existing CI is green"
   ],
   "context": "Evidence (HEAD d076a974d): polars_df.py:241 cast_date returns column.cast(pl.Date). PyPI: polars 2.0.0 requires_python >=3.10 and depends on polars-runtime-32==2.0.0; wheels are abi3. Cross-surface gates for ssb, clickbench, tpcds and tpch are defined at cross_surface.py:1917-2075; EQUIVALENCE_SCALE = 0.1 (cross_surface.py:162).",
-  "description": "Polars 2.0.0 (released 2026-10-06) is a breaking release, and BenchBox's polars-df surface has only been exercised on 1.x (uv.lock 1.44.2, floor polars>=1.35.2). Make TPC-H, TPC-DS, SSB and ClickBench run and match their SQL reference on 2.0.0 while still passing on 1.44.2.\n\nKnown 2.0 changes that affect us (Polars 2 upgrade guide, docs.pola.rs/releases/upgrade/2/):\n- String-to-temporal cast via cast(pl.Date) is rejected; use str.to_date(). This breaks polars_df.py cast_date (column.cast(pl.Date)).\n- collect() defaults to the streaming engine, which does not guarantee row order for joins, group_by or unpivot.\n- profile() removed; read_csv n_threads, batch_size, sample_size and rechunk removed; horizontal concat requires equal heights; Int+UInt64 supertype becomes Int128; decimal round, ceil and floor widen precision.\n- Out-of-core spilling is on by default, at 80% of RAM.\n\nGuardrails:\n- Work in a separate git worktree with its own virtual environment. Never install Polars 2.0 into the main checkout's environment, and do not change uv.lock or the pyproject polars floor in this item.\n- One code path for every version: no `if pl.__version__ ...` branches. Every replacement API must exist in every version the matrix may measure, down to 1.0.0; record that check per API in the PR body.\n- Only change query semantics where a result is order-dependent and needs a deterministic sort; such a sort applies to every version and must be listed per query in the PR body.\n- Read the full upgrade guide and the deprecation-removal table before editing; record any other call sites found.",
+  "description": "Polars 2.0.0 (released 2026-10-06) is a breaking release, and BenchBox's polars-df surface has only been exercised on 1.x (uv.lock 1.44.2, floor polars>=1.35.2). Make TPC-H, TPC-DS, SSB and ClickBench run and match their SQL reference on 2.0.0 while still passing on 1.44.2.\n\nKnown 2.0 changes that affect us (Polars 2 upgrade guide, docs.pola.rs/releases/upgrade/2/; source docs/source/releases/upgrade/2.md at py-2.0.0):\n- String-to-temporal cast via cast(pl.Date) is rejected; use str.to_date(). This breaks polars_df.py cast_date AND unified_frame.py UnifiedExpr.cast_date (both column.cast(pl.Date)).\n- scan_csv/scan_parquet rechunk= removed (polars_df.py read_csv/read_parquet pass it). scan_csv missing_utf8_is_empty_string= removed; replacement empty_string_is_null= (inverted) exists only from 1.44.x, so no common keyword covers 1.35.2-2.0.0.\n- collect() defaults to the streaming engine, which does not guarantee row order for joins, group_by or unpivot.\n- profile() removed; read_csv n_threads, batch_size, sample_size and rechunk removed; horizontal concat requires equal heights; Int+UInt64 supertype becomes Int128; decimal round, ceil and floor widen precision.\n- Out-of-core spilling is on by default, at 80% of RAM.\n\nGuardrails:\n- Work in a separate git worktree with its own virtual environment. Never install Polars 2.0 into the main checkout's environment, and do not change uv.lock or the pyproject polars floor in this item.\n- One code path for every version: no `if pl.__version__ ...` branches. Where no API exists in every supported version (verified: the CSV empty-string keyword), a capability-detected keyword translation (inspect the function signature) is allowed; each one is listed in the PR body with a test on both sides. rechunk= is dropped from the readers on every version.\n- Prefer order-insensitive comparison in harnesses. Add a sort to a query only where the benchmark's SQL text has ORDER BY (specification semantics), for every version, listed per query in the PR body.\n- Read the full upgrade guide and the deprecation-removal table before editing; record any other call sites found.\n\nReview amendments (D0 2026-10-07): codex C1, C13; agy A8, A12 (see pvm-d0 context).",
   "links": [
     "https://docs.pola.rs/releases/upgrade/2/",
     "https://github.com/pola-rs/polars/releases/tag/py-2.0.0",
@@ -31,6 +32,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "beb7f5826be040ae98fb31905b1a4c57",
+      "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:92b9e135d2dfcf93e45171b1",
+      "at": "2026-10-08T03:28:47Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "c15467af71b54bb78145d19a1ba0f2cf",
       "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
     }
   ]
