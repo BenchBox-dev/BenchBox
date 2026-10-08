@@ -20498,6 +20498,13 @@
       "status": "dropped",
       "title": "test_export_with_invalid_output_dir cannot pass in a root container"
     },
+    "test-init-default-path-fails-on-develop": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "tests/unit/core/results/test_database.py::test_init_default_path fails on develop"
+    },
     "test-leak-guard-snowflake-arrow-env": {
       "claim": null,
       "needs": [],

@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "The failure is root-caused and recorded in this item",
+    "test_init_default_path passes on develop, or is corrected or removed with a stated reason"
+  ],
+  "description": "test_init_default_path fails on develop with no change applied. It was found on 2026-10-08 while verifying the Polars engine option and confirmed to fail on the base commit as well, so it is not caused by that work. The cause has not been investigated.",
+  "links": [
+    "tests/unit/core/results/test_database.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c",
+      "at": "2026-10-08T23:28:25Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "a1a984801fe34c3da7af51f0fd06bc78",
+      "session_id": "1f74fac6df92445cbacc470514ed2645"
+    }
+  ]
+}
