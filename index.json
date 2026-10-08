@@ -19248,6 +19248,15 @@
       "status": "open",
       "title": "Make core produce and attest the versioned site-inputs bundle and dispatch it to the site repo"
     },
+    "site-split-11-bundle-failure-alert": {
+      "claim": null,
+      "needs": [
+        "site-split-10-core-site-inputs"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Open a site-bundle-failed issue when the core site-inputs bundle build fails"
+    },
     "site-split-20-seed-site-repo": {
       "claim": null,
       "needs": [
