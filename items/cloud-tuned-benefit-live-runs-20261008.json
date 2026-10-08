@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Owner approvals (command, runtime, cost cap, log path, stop condition) are recorded in context before each run.",
+    "Each platform and template has harness output with clustering state, settle condition, load and maintenance time, cost and CIs (paths in context).",
+    "Each template has a benefit-rule verdict, and its evidence state is updated in a merged PR.",
+    "Any template change the verdict calls for is filed, or made through the profile and generator."
+  ],
+  "context": "Source: tuning-evidence plan (2026-10-08), plan step 9. Split from cloud-tuned-benefit-measurement-20261008 so the code can land without live spend. Deliberately outside the 2026-10-08 tuning-evidence batch: live-cloud spend is an owner-only stop under AGENTS.md WRITE-CLOSEOUT-001, and snowflake-tuned-live-certification-20261001 still has unmet needs.",
+  "description": "## Problem\nThe Databricks and Snowflake tuned templates have no benefit evidence. The harness gains cloud support in `cloud-tuned-benefit-measurement-20261008`; this item runs it.\n\n## Change\n- Once both live certifications have passed, run the harness for TPC-H on Databricks and Snowflake, and TPC-DS if the approved budget allows. Use arms `notuning` and tuned, with both arms settled.\n- Record clustering state, settle condition, load and maintenance time, cost and CIs.\n- Apply the benefit rule, record a verdict per template and tier, and update the evidence states in `benchbox/core/tuning/profiles/template_evidence.yaml`.\n\n## Decision gates\n- Each live run needs explicit owner approval naming the command, maximum runtime, maximum cost (the harness `--max-cost`), log path and stop condition. Without it, do not start.\n- The owner picks the scale factor(s). The evidence records that they are far below the vendors' 1 TB / multi-TB guidance.\n\n## Guardrails (must preserve)\n- Use dedicated database names; never shared ones.\n- Never relax a certification assertion.\n- Stop at the approved cost cap.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit owner approval stating the command, maximum runtime, log path and stop condition.",
+  "links": [
+    "https://docs.snowflake.com/en/user-guide/tables-clustering-keys",
+    "https://docs.databricks.com/aws/en/delta/clustering"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T23:42:01Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "6547d6db171a494695450cd02d4d59c7",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
+    }
+  ]
+}
