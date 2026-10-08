@@ -43,8 +43,8 @@ Two defects showed up in the shadow period.
   json --json-schema` and muse with the schema in the prompt.
 - **Evidence.** A defect must cite a real file and line in the head commit; a
   defect that does not is kept and marked, so it still fails the change rather
-  than handing it to the next reviewer. Under a file-list brief, a verdict with
-  no defect must name every changed soundness file that exists at the head, and
+  than handing it to the next reviewer. Under a file-list brief, a verdict that
+  would ship must name every changed soundness file that exists at the head, and
   the reviewer's trace must show a successful read of each: a Read or Grep
   naming it in Claude's `stream-json` events (a turn count is not evidence,
   because the structured-output call is itself a turn), or a Codex

@@ -530,3 +530,20 @@ def test_a_file_list_review_stages_the_whole_diff(
     )
     assert "+whole" in staged.read_text(encoding="utf-8")
     assert artifact["outcome"] == "verdict"
+
+
+@pytest.mark.parametrize("reviewer", ["sol", "sonnet", "muse"])
+def test_a_do_not_ship_is_never_discarded_for_missing_read_evidence(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reviewer: str
+) -> None:
+    workspace, head = _workspace(tmp_path)
+    rework = {"decision": "DO_NOT_SHIP", "summary": "rework", "files_examined": []}
+    if reviewer == "sol":
+        _codex_says(tmp_path, monkeypatch, [], **rework)
+    elif reviewer == "sonnet":
+        _claude_says(tmp_path, monkeypatch, [], **rework)
+    else:
+        _muse_says(tmp_path, monkeypatch, **rework)
+    outcome = _review(policy, tmp_path, workspace, head, reviewer=reviewer, brief_mode="file-list", required=("a.txt",))
+    assert outcome.missing is None and outcome.verdict is not None
+    assert outcome.verdict["decision"] == "DO_NOT_SHIP"

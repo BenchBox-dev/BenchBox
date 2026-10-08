@@ -8,7 +8,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from .verdict import Finding, Verdict
+from .verdict import DO_NOT_SHIP, Finding, Verdict
 
 INLINE = "inline"
 _LINE_SUFFIX = re.compile(r":\d+(?:-\d+)?$")
@@ -203,7 +203,7 @@ def check(
     required: Iterable[str],
     run: Trace,
 ) -> str | None:
-    if brief_mode == INLINE or verdict.defects:
+    if brief_mode == INLINE or verdict.defects or verdict.decision == DO_NOT_SHIP:
         return None
     needed = sorted(set(required))
     if harness in TRACED:

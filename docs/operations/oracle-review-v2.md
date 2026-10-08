@@ -141,7 +141,8 @@ checkout before it records it; a failed check records the reviewer as absent
   not found, so it still fails the change; discarding the verdict would hand the
   change to the next reviewer, which might pass it.
 - When the brief lists files instead of carrying the diff (`file-list` mode),
-  a verdict with no defect must name, in `files_examined`, every soundness-path
+  a verdict that would ship (no defect and not DO NOT SHIP) must name, in
+  `files_examined`, every soundness-path
   file the pull request changes that still exists at the head, and the
   reviewer's trace must show it read each one. Claude runs with
   `--output-format stream-json`, and each file needs a successful Read or Grep
