@@ -1,8 +1,3 @@
-"""Default-compression TPC-DS generation records every chunk in the manifest.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
-
 from __future__ import annotations
 
 import json
@@ -79,7 +74,6 @@ main()
 
 @pytest.fixture
 def fake_dsdgen(tmp_path: Path) -> Path:
-    """Deterministic stand-in for dsdgen that honors TABLE/CHILD/PARALLEL/FILTER."""
     script = tmp_path / "fake_dsdgen.py"
     script.write_text(FAKE_DSDGEN, encoding="utf-8")
     os.chmod(script, 0o755)
@@ -87,7 +81,6 @@ def fake_dsdgen(tmp_path: Path) -> Path:
 
 
 def _compressed_generator(tmp_path: Path, fake_dsdgen: Path, parallel: int) -> TPCDSDataGenerator:
-    """Build a real generator with default (zstd) compression and a fake dsdgen binary."""
     with patch.object(TPCDSDataGenerator, "_find_or_build_dsdgen", return_value=fake_dsdgen):
         return TPCDSDataGenerator(
             scale_factor=1.0,
@@ -101,7 +94,6 @@ def _compressed_generator(tmp_path: Path, fake_dsdgen: Path, parallel: int) -> T
 
 
 def _rebuild_manifest_from_scan(gen: TPCDSDataGenerator, output_dir: Path) -> tuple[dict[str, list[Path]], dict]:
-    """Rebuild the manifest purely from files on disk, as a directory scan would."""
     gen._manifest_entries.clear()
     table_paths = gen._gather_existing_table_files(output_dir)
     gen._write_manifest(output_dir, table_paths)
@@ -110,7 +102,6 @@ def _rebuild_manifest_from_scan(gen: TPCDSDataGenerator, output_dir: Path) -> tu
 
 
 def test_write_manifest_counts_zstd_rows_without_streaming_entries(tmp_path: Path) -> None:
-    """Fallback row counting reads zstd files instead of recording zero rows."""
     import zstandard as zstd
 
     gen = TPCDSDataGenerator.__new__(TPCDSDataGenerator)
@@ -130,14 +121,12 @@ def test_write_manifest_counts_zstd_rows_without_streaming_entries(tmp_path: Pat
 
 
 def test_parallel_default_compression_records_every_chunk(tmp_path: Path, fake_dsdgen: Path) -> None:
-    """Parallel default-compression generation writes and records every chunk."""
     gen = _compressed_generator(tmp_path, fake_dsdgen, parallel=3)
     output_dir = tmp_path / "data"
     output_dir.mkdir()
 
     gen._run_parallel_streaming_dsdgen(output_dir)
 
-    # Only compressed chunk files remain; no raw .dat files are left behind.
     assert list(output_dir.glob("*.dat")) == []
     table_paths, manifest = _rebuild_manifest_from_scan(gen, output_dir)
 
@@ -153,7 +142,6 @@ def test_parallel_default_compression_records_every_chunk(tmp_path: Path, fake_d
 
 
 def test_single_threaded_default_compression_records_every_table(tmp_path: Path, fake_dsdgen: Path) -> None:
-    """Single-threaded default-compression generation writes and records every table."""
     gen = _compressed_generator(tmp_path, fake_dsdgen, parallel=1)
     output_dir = tmp_path / "data"
     output_dir.mkdir()

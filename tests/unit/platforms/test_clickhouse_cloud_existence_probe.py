@@ -1,10 +1,3 @@
-"""ClickHouse Cloud existing-database probe and force_recreate drop tests.
-
-Uses stub admin clients (no live service): the probe must report the real
-existence of the database, and force_recreate must drop it at the first
-connection instead of silently keeping it.
-"""
-
 from __future__ import annotations
 
 from unittest.mock import patch

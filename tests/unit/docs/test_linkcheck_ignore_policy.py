@@ -55,7 +55,6 @@ def ablog_catalog_patterns() -> list[re.Pattern[str]]:
 
 @pytest.mark.parametrize("uri", ["archive.html", "tag.html", "author.html"])
 def test_ablog_catalog_exception_matches_builder_generated_pages(uri: str) -> None:
-    # Mirrors sphinx linkcheck semantics (re.match against the link URI).
     assert any(pattern.match(uri) for pattern in ablog_catalog_patterns())
 
 

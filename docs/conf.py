@@ -123,9 +123,6 @@ if not _publish_exclusions.exists():
     raise FileNotFoundError(f"{_publish_exclusions} is missing; it lists the paths that must not be published")
 exclude_patterns += [entry.rstrip("/") for entry in _read_path_list(_publish_exclusions)]
 
-# Pages under these directories are published only when publish-allowlist.txt
-# lists them, so a new maintainer document stays off the site until someone
-# decides it is for users. website/src/converter/sources.ts reads the same list.
 PUBLISH_LIST_ROOTS = ("development", "operations")
 
 

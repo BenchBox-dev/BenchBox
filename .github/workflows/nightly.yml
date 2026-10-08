@@ -931,7 +931,7 @@ jobs:
 
       - name: Upload throughput UAT logs and results
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: throughput-uat-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -942,7 +942,7 @@ jobs:
 
       - name: Upload Throughput@Size baseline record
         if: ${{ !cancelled() && steps.duckdb-sweep.outcome == 'success' }}
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: throughput-baseline-duckdb-tpch-sf1-${{ github.run_id }}-${{ github.run_attempt }}
           path: ~/Developer/benchmark_runs/throughput-baseline/

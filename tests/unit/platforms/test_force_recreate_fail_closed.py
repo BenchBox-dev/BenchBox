@@ -1,12 +1,3 @@
-"""Fail-closed --force-recreate for adapters without an automatic drop path.
-
-Velox, Firebolt Core, Snowpark Connect, and MotherDuck accept --force-recreate but cannot recreate
-the database automatically (InfluxDB is covered alongside its setup mixin in
-tests/unit/platforms/influxdb/test_setup_mixin.py). Each adapter must raise a clear error naming the
-platform with a manual-drop path instead of silently reusing the database, while normal runs without
-the flag still connect. All doubles are local fakes; no live services are touched.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -22,7 +13,6 @@ pytestmark = [
 
 
 def assert_manual_drop_error(excinfo: pytest.ExceptionInfo, platform_label: str) -> None:
-    """The error must name the platform and tell the user to drop the database manually."""
     message = str(excinfo.value)
     assert platform_label in message
     assert "manually" in message.lower()
@@ -124,7 +114,6 @@ def test_firebolt_cloud_force_recreate_drops_database(monkeypatch):
 
 @pytest.fixture()
 def snowpark_session():
-    """Mock the Snowpark client the same way the adapter's own test module does."""
     mock_session = MagicMock()
     mock_session_builder = MagicMock()
     mock_session_builder.configs.return_value = mock_session_builder
