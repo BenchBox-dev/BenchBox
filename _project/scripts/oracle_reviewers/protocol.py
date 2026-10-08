@@ -32,6 +32,8 @@ _MARKER = re.compile(r"<!-- oracle-protocol: v1 (?P<data>[A-Za-z0-9_-]+) -->\s*\
 _HUNK = re.compile(r"^@@ [^@]* @@")
 _DEFECT_ID = re.compile(r"D([1-9][0-9]{0,3})")
 NOT_COUNTED_LIMIT = 5
+PATCH_HEX = 16
+MISSING = "missing"
 RECORD_KEYS = frozenset(
     {
         "v",
@@ -120,17 +122,22 @@ def file_patches(diff_text: str) -> dict[str, str]:
 
 
 def patch_map(patches: Mapping[str, str], paths: Iterable[str]) -> dict[str, str]:
-    return {_short(path): patches[path][:8] if path in patches else "missing" for path in sorted(set(paths))}
+    return {_short(path): patches[path][:PATCH_HEX] if path in patches else MISSING for path in sorted(set(paths))}
 
 
-def patch_digest(mapping: Mapping[str, str]) -> str:
-    return hashlib.sha256(json.dumps(mapping, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+def patch_digest(patches: Mapping[str, str], paths: Iterable[str]) -> str | None:
+    wanted = sorted(set(paths))
+    if any(path not in patches for path in wanted):
+        return None
+    full = {path: patches[path] for path in wanted}
+    return hashlib.sha256(json.dumps(full, sort_keys=True).encode("utf-8")).hexdigest()[:32]
 
 
 def changed_paths(previous: Mapping[str, str] | None, current: Mapping[str, str], paths: Iterable[str]) -> frozenset:
-    if previous is None:
-        return frozenset(paths)
-    return frozenset(path for path in paths if previous.get(_short(path)) != current.get(_short(path)))
+    every = frozenset(paths)
+    if previous is None or MISSING in previous.values() or MISSING in current.values() or set(previous) - set(current):
+        return every
+    return frozenset(path for path in every if previous.get(_short(path)) != current.get(_short(path)))
 
 
 def encode_marker(record: Mapping[str, Any], patches: Mapping[str, str] | None = None) -> str:

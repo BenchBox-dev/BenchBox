@@ -646,7 +646,7 @@ def _refusal_body() -> str:
             "round": 0,
             "base_ref": "develop",
             "patch_map": patches,
-            "patch_digest": protocol.patch_digest(patches),
+            "patch_digest": "d" * 32,
             "strikes": 3,
             "max_do_not_ship": 3,
             "next_id": 1,

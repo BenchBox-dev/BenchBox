@@ -292,7 +292,8 @@ OLD_HEAD = "c" * 40
 def _record(diff: str, decision: str, **over: Any) -> dict[str, Any]:
     paths = over.pop("paths", None)
     patches = protocol.file_patches(diff)
-    current = protocol.patch_map(patches, paths if paths is not None else sorted(patches))
+    chosen = paths if paths is not None else sorted(patches)
+    current = protocol.patch_map(patches, chosen)
     record = {
         "v": 1,
         "cycle": 1,
@@ -306,7 +307,7 @@ def _record(diff: str, decision: str, **over: Any) -> dict[str, Any]:
         "strikes_after": 1 if decision == "DO_NOT_SHIP" else 0,
         "open_defects": [],
         "next_id": 1,
-        "patch_digest": protocol.patch_digest(current),
+        "patch_digest": protocol.patch_digest(patches, chosen) or f"unread-{OLD_HEAD}",
         "carried": False,
         "summary": "",
         **over,
@@ -370,16 +371,27 @@ def test_an_unchanged_patch_carries_the_decision_without_a_reviewer(
     assert not (tmp_path / "plan" / "brief.md").exists()
 
 
-def test_a_file_leaving_the_pull_request_carries_when_nothing_else_changed(
+def test_a_file_leaving_the_pull_request_gets_a_full_follow_up_not_a_carry(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     gone = "benchbox/core/equivalence/gone.py"
     section = f"diff --git a/{gone} b/{gone}\n--- a/{gone}\n+++ b/{gone}\n@@ -1 +1 @@\n-a\n+b\n"
     record = _record(TWO_FILE_DIFF + section, "SHIP_WITH_FIXES", open_defects=[DEFECT], next_id=2)
     _, values, plan = _plan(monkeypatch, tmp_path, _fake(_review(record)))
-    assert values["decision"] == "carry"
-    assert plan["protocol"]["patch_digest"] != record["patch_digest"]
-    assert "no reviewed file changed" in plan["decision_reason"]
+    assert values["decision"] == "review" and plan["scope"] == "full"
+    assert plan["protocol"]["kind"] == "follow-up" and plan["protocol"]["changed"] == sorted([CHECKER, CAPTURE])
+
+
+def test_two_unreadable_diffs_in_a_row_never_carry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    unread = _record("", "SHIP", paths=[CHECKER, CAPTURE])
+    assert unread["patch_digest"] == f"unread-{OLD_HEAD}"
+    assert set(unread["patch_map"].values()) == {"missing"}
+    fake = _fake(_review(unread), changed_files=3001)
+    fake.diff = None
+    _, values, plan = _plan(monkeypatch, tmp_path, fake)
+    assert values["decision"] == "review" and plan["protocol"]["kind"] == "follow-up"
+    assert plan["protocol"]["patch_digest"] == f"unread-{HEAD}"
+    assert plan["protocol"]["changed"] == sorted([CHECKER, CAPTURE])
 
 
 def test_a_follow_up_after_ship_with_fixes_reviews_only_the_changed_file(

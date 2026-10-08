@@ -75,8 +75,9 @@ a hidden marker, `<!-- oracle-protocol: v1 ... -->`, written by code after the
 sanitised model text, which cannot contain an HTML comment. It records the
 cycle and round, the kind of round, the decision, the head, the base branch,
 the reviewer, the tier, the strike count, the open defects with their ids, and
-a hash of each changed file's patch (path and patch hashes of 8 hex characters;
-a marker over 4 KB keeps only the aggregate digest). `plan` reads every review
+a hash of each changed file's patch (an 8-hex path hash and a 16-hex patch hash;
+a marker over 4 KB keeps only the aggregate digest, which is computed from the
+full-length patch hashes). `plan` reads every review
 from the App's Bot account, page by page, and ignores dismissed reviews and
 reviews without a marker. A review with more than one marker, or a marker that
 does not decode, holds the result pending, as does a review list that cannot be
@@ -97,7 +98,9 @@ every hash. Prose files outside soundness paths are left out.
 | Latest DO NOT SHIP, patch changed | new cycle with a full review that quotes the previous summary |
 
 A move of the base commit alone does not restart a cycle. A diff that cannot be
-read, or a file list that is truncated, never carries a decision.
+read, a file list that is truncated, or a file missing from the diff never
+carries a decision, and neither does a file leaving the pull request: each
+gives a follow-up on every file instead.
 
 A follow-up brief lists the earlier defects with their ids (D1, D2, ...,
 numbered by code within a cycle) and asks the reviewer to mark each one fixed,

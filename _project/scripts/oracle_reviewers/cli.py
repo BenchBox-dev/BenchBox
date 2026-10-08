@@ -243,8 +243,9 @@ def _protocol_round(
     strike_count: int,
 ) -> protocol.Round:
     paths = sorted(item.path for item in scoped)
-    current = protocol.patch_map(protocol.file_patches(full_diff or ""), paths)
-    digest = protocol.patch_digest(current) if full_diff is not None else f"unread-{plan['head_sha']}"
+    patches = protocol.file_patches(full_diff or "")
+    current = protocol.patch_map(patches, paths)
+    digest = (protocol.patch_digest(patches, paths) if full_diff is not None else None) or f"unread-{plan['head_sha']}"
     base_ref = plan["base_ref"]
     step = protocol.plan_round(
         found,

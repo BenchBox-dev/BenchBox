@@ -17,7 +17,8 @@ from .test_attempts import CHECKER, DIFF, HEAD, _decide, _finding, _plan, _run_c
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 OTHER = "benchbox/core/equivalence/other.py"
-PATCHES = {"aaaaaaaa": "11111111"}
+PATCHES = {"aaaaaaaa": "1111111111111111"}
+DIGEST = "d" * 32
 
 
 def _rules(**over: Any) -> dict[str, Any]:
@@ -28,7 +29,7 @@ def _rules(**over: Any) -> dict[str, Any]:
         "round": 1,
         "base_ref": "develop",
         "patch_map": PATCHES,
-        "patch_digest": protocol.patch_digest(PATCHES),
+        "patch_digest": DIGEST,
         "strikes": 0,
         "max_do_not_ship": 3,
         "prior": [],
@@ -211,7 +212,7 @@ def _big_record(patches: dict[str, str]) -> dict[str, Any]:
         "strikes_after": 2,
         "open_defects": [{**_prior(f"D{index}"), "title": "t" * 200} for index in range(1, 11)],
         "next_id": 11,
-        "patch_digest": protocol.patch_digest(patches),
+        "patch_digest": DIGEST,
         "carried": False,
         "summary": "",
     }
@@ -222,8 +223,8 @@ def _hashed(count: int) -> dict[str, str]:
     return protocol.patch_map({path: hashlib.sha256(path.encode()).hexdigest() for path in paths}, paths)
 
 
-def test_a_three_hundred_file_marker_fits_with_its_patch_map() -> None:
-    patches = _hashed(300)
+def test_a_hundred_file_marker_fits_with_its_patch_map() -> None:
+    patches = _hashed(100)
     marker = protocol.encode_marker(_big_record(patches), patches)
     assert len(marker) <= protocol.MARKER_LIMIT
     decoded = protocol.decode_marker(f"body\n\n{marker}\n")
@@ -256,7 +257,7 @@ def test_carry_records_the_previous_decision_without_a_reviewer(policy: Policy) 
         "strikes_after": 1,
         "open_defects": [_prior("D4")],
         "next_id": 5,
-        "patch_digest": protocol.patch_digest(PATCHES),
+        "patch_digest": DIGEST,
         "carried": False,
         "summary": "",
     }
@@ -383,7 +384,7 @@ def test_replaying_the_real_pr_2769_history_reviews_each_patch_once_and_scopes_f
     for entry in history["rounds"]:
         paths = sorted(path for path in entry["patches"] if not path.endswith(".md"))
         current = protocol.patch_map(entry["patches"], paths)
-        digest = protocol.patch_digest(current)
+        digest = protocol.patch_digest(entry["patches"], paths)
         step = protocol.plan_round(
             protocol.History(list(records)),
             head_sha=entry["head_sha"],
@@ -437,3 +438,25 @@ def test_replaying_the_real_pr_2769_history_reviews_each_patch_once_and_scopes_f
     assert len(reviewed) < len(history["rounds"])
     original = sum(len(entry["defects"]) for entry in history["rounds"])
     assert threads < original
+
+
+def test_the_carry_digest_uses_full_patch_hashes_not_the_truncated_map() -> None:
+    reviewed = {"a.py": "1" * 16 + "2" * 48}
+    forged = {"a.py": "1" * 16 + "3" * 48}
+    assert protocol.patch_map(reviewed, ["a.py"]) == protocol.patch_map(forged, ["a.py"])
+    assert protocol.patch_digest(reviewed, ["a.py"]) != protocol.patch_digest(forged, ["a.py"])
+    assert len(next(iter(protocol.patch_map(reviewed, ["a.py"]).values()))) == 16
+    assert protocol.patch_digest(reviewed, ["a.py", "b.py"]) is None
+
+
+@pytest.mark.parametrize(
+    ("previous", "current"),
+    [
+        ({"x": "missing"}, {"x": "missing"}),
+        ({"x": "1" * 16}, {"x": "missing"}),
+        ({"x": "1" * 16, "y": "2" * 16}, {"x": "1" * 16}),
+    ],
+    ids=["both-unread", "now-unread", "file-left"],
+)
+def test_changed_paths_treat_unread_or_departed_files_as_a_full_change(previous: dict, current: dict) -> None:
+    assert protocol.changed_paths(previous, current, ["p.py", "q.py"]) == {"p.py", "q.py"}
