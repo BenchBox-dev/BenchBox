@@ -14456,6 +14456,13 @@
       "status": "done",
       "title": "Clean up three defects introduced by the PR 1644 fix commits"
     },
+    "pr-2761-hollow-success-post-merge-review-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "#2761 merged while its head carried a hollow oracle success; review it after merge"
+    },
     "pr-followup-resumable-ownership": {
       "claim": null,
       "needs": [
