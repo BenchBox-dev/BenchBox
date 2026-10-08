@@ -508,7 +508,7 @@ def command_guard(args: argparse.Namespace) -> int:
     except (github.GitHubError, KeyError, TypeError, ValueError) as exc:
         _summary(f"oracle-review-shadow: the review list could not be re-read before posting: {exc}")
         found = protocol.History()
-    done = any(record["head_sha"] == plan["head_sha"] for record in found.records)
+    done = found.latest is not None and found.latest["head_sha"] == plan["head_sha"]
     _output({"skip": "true" if done else "false"})
     if done:
         _summary(f"oracle-review-shadow: head {plan['head_sha']} already has a decision; this run posts nothing")

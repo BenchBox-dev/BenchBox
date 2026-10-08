@@ -304,8 +304,8 @@ def test_strikes_ignore_carried_and_refused_records() -> None:
 
 @pytest.mark.parametrize(
     ("heads", "skip"),
-    [([HEAD], "true"), (["c" * 40], "false"), (None, "false")],
-    ids=["already-decided", "other-head", "unreadable"],
+    [([HEAD], "true"), (["c" * 40], "false"), ([HEAD, "c" * 40], "false"), (None, "false")],
+    ids=["already-decided", "other-head", "revert-to-an-older-head", "unreadable"],
 )
 def test_the_post_guard_skips_a_head_that_already_has_a_decision(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, heads: list[str] | None, skip: str
@@ -317,11 +317,20 @@ def test_the_post_guard_skips_a_head_that_already_has_a_decision(
     def reviews(repo: str, pr: int) -> list[dict[str, Any]]:
         if heads is None:
             raise github.GitHubError("down")
-        final = _final(policy, tmp_path / "attempts", {**plan, "head_sha": heads[0]}, _v("fine"))
-        assert final.review is not None
-        return [
-            {"login": "benchbox-oracle[bot]", "user_type": "Bot", "state": "COMMENTED", "body": final.review["body"]}
-        ]
+        posted = []
+        for index, head in enumerate(heads):
+            record = {**_latest({}).records[0], "head_sha": head}
+            record.pop("patch_map")
+            posted.append(
+                {
+                    "login": "benchbox-oracle[bot]",
+                    "user_type": "Bot",
+                    "state": "COMMENTED",
+                    "body": f"### oracle-review-shadow: success for `{head}`\n\n{protocol.encode_marker(record)}",
+                    "submitted_at": f"2026-10-08T1{index}:00:00Z",
+                }
+            )
+        return posted
 
     monkeypatch.setattr(github, "oracle_reviews", reviews)
     out = _run_cli(monkeypatch, tmp_path, "guard", "--plan", str(plan_path))
