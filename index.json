@@ -22290,7 +22290,8 @@
     "tuning-corpus-rerun-duckdb-tuned-bundles-20261001": {
       "claim": null,
       "needs": [
-        "tuning-liveness-e2e-gates-20261001"
+        "tuning-liveness-e2e-gates-20261001",
+        "duckdb-tuned-template-ablation-20261008"
       ],
       "priority": "medium",
       "status": "open",
