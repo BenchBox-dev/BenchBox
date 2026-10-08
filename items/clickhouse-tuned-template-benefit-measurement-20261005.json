@@ -3,6 +3,16 @@
     "Recorded tuned-vs-untuned timings for the three curated templates and for optimize_after_load, and a decision on each."
   ],
   "context": "Source: PR #2677 close-out. Depends on a working ClickHouse engine for the machine used (see chdb-4x-native-load-and-old-engine-hang-20261005) or a server.",
+  "deferrals": [
+    {
+      "created_at": "2026-10-08T11:35:54Z",
+      "from_item": "clickhouse-tuned-template-benefit-measurement-20261005",
+      "id": 1,
+      "reason": "finish needs a registered batch; serial mode has none and this session holds no owner_generation.",
+      "resolution": "open",
+      "summary": "Measurement done (matrix + SSB/TPC-H reruns + Q10 envelope series); evidence in closeout; needs batch owner to finish."
+    }
+  ],
   "description": "## Problem\nThe curated ClickHouse templates (TPC-H, SSB, TPC-DS) and the opt-in `optimize_after_load` option were verified for correctness (they reach `applied_verified` at scale factor 0.01), not for benefit. The tuning coverage matrix previously waived ClickHouse \"until measured benefit justifies a template\"; the templates now exist without that measurement. TPC-DS `inventory` and the other benchmarks (ClickBench, TPC-DI, and so on) still have no ClickHouse template.\n\n## Change\n- Run tuned vs untuned (and tuned with `optimize_after_load`) on ClickHouse local/server at SF 1 or larger for TPC-H, SSB and TPC-DS, with the loading time excluding maintenance as designed, and record query-time and load-time results.\n- If a template does not help or hurts, adjust or document it; decide which other benchmarks deserve a template.\n\n## Guardrails\n- Report negative results as such; no live cloud run without owner approval.",
   "links": [
     "examples/tunings/clickhouse",
@@ -42,6 +52,14 @@
       "generation": "52e3a0065e5d43c8ba223b66d687be9f",
       "op": "take",
       "op_id": "4a8106406e4847cfa734f2f9725ff444",
+      "session_id": "0b049bb7b35344849c3bc1ea57ed95a2"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:154ae91a481281d11ac2019e",
+      "at": "2026-10-08T11:35:54Z",
+      "client": "tbh",
+      "op": "defer",
+      "op_id": "f8beb1d67a7c422181ec5d4510d7cdef",
       "session_id": "0b049bb7b35344849c3bc1ea57ed95a2"
     }
   ]
