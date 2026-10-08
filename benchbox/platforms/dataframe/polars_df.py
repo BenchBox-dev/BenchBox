@@ -23,12 +23,12 @@ from benchbox.platforms.dataframe.expression_family import (
 from benchbox.platforms.dataframe.shared_loading import dialect_preserves_empty_strings
 from benchbox.platforms.polars_compat import (
     OBSERVED_EXECUTION_NOT_CAPTURED,
+    active_runtime,
     collect_engine_option,
     collect_frame,
     csv_empty_string_option,
     reader_rechunk_effective,
     reader_rechunk_option,
-    runtime_package_version,
     validate_collect_engine,
 )
 
@@ -261,7 +261,7 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
 
         if POLARS_AVAILABLE:
             info["version"] = pl.__version__
-            info["polars_runtime_version"] = runtime_package_version()
+            info["polars_runtime_package"], info["polars_runtime_version"] = active_runtime()
 
         return info
 

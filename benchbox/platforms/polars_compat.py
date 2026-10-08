@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import inspect
+import sys
 from functools import cache
 from importlib import metadata
 from typing import Any
 
 COLLECT_ENGINES = ("default", "in-memory", "streaming")
-RUNTIME_PACKAGE = "polars-runtime-32"
+RUNTIME_MODULE_PREFIX = "_polars_runtime_"
 RUNTIME_PACKAGE_ABSENT = "absent"
 OBSERVED_EXECUTION_NOT_CAPTURED = "not_captured"
 
@@ -78,8 +79,16 @@ def collect_frame(frame: Any, engine: str = "default") -> Any:
     return frame.collect(**collect_engine_option(engine))
 
 
-def runtime_package_version() -> str:
-    try:
-        return metadata.version(RUNTIME_PACKAGE)
-    except metadata.PackageNotFoundError:
-        return RUNTIME_PACKAGE_ABSENT
+def active_runtime() -> tuple[str, str]:
+    plr = sys.modules.get("polars._plr")
+    module_name = getattr(plr, "__name__", "")
+    if not module_name.startswith(RUNTIME_MODULE_PREFIX):
+        return RUNTIME_PACKAGE_ABSENT, RUNTIME_PACKAGE_ABSENT
+    package = module_name.split(".", 1)[0].removeprefix("_").replace("_", "-")
+    version = getattr(plr, "__version__", None)
+    if version is None:
+        try:
+            version = metadata.version(package)
+        except metadata.PackageNotFoundError:
+            version = RUNTIME_PACKAGE_ABSENT
+    return package, str(version)

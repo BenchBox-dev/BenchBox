@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import ast
 import functools
+import sys
+import types
 from datetime import date
-from importlib import metadata
 from pathlib import Path
 
 import pytest
@@ -234,25 +235,55 @@ class TestEngineValidation:
 
 class TestEngineMetadata:
     @pytest.mark.parametrize(
-        ("runtime_version", "expected"),
-        [(None, "absent"), ("1.44.2", "1.44.2")],
-        ids=["pre-1.35-layout", "post-1.35-layout"],
+        ("module_name", "module_version", "package", "version"),
+        [
+            ("polars.polars", None, "absent", "absent"),
+            ("_polars_runtime_32._polars_runtime", "1.44.2", "polars-runtime-32", "1.44.2"),
+            ("_polars_runtime_64._polars_runtime", "1.44.2", "polars-runtime-64", "1.44.2"),
+            ("_polars_runtime_compat._polars_runtime", "1.44.2", "polars-runtime-compat", "1.44.2"),
+        ],
+        ids=["pre-1.35-layout", "rt32", "rt64", "rtcompat"],
     )
-    def test_platform_info_records_engine_and_runtime_package(self, monkeypatch, runtime_version, expected):
-        def fake_version(name):
-            if name == "polars-runtime-32" and runtime_version is not None:
-                return runtime_version
-            raise metadata.PackageNotFoundError(name)
-
-        monkeypatch.setattr(polars_compat.metadata, "version", fake_version)
+    def test_platform_info_records_the_active_runtime_package(
+        self, monkeypatch, module_name, module_version, package, version
+    ):
+        loaded = types.ModuleType(module_name)
+        if module_version is not None:
+            loaded.__version__ = module_version
+        monkeypatch.setitem(sys.modules, "polars._plr", loaded)
 
         info = PolarsDataFrameAdapter(engine="in-memory").get_platform_info()
 
         assert info["version"] == pl.__version__
-        assert info["polars_runtime_version"] == expected
+        assert info["polars_runtime_package"] == package
+        assert info["polars_runtime_version"] == version
         assert info["engine_requested"] == "in-memory"
         assert info["collect_engine_argument"] == "in-memory"
         assert info["observed_execution"] == "not_captured"
+
+    def test_active_runtime_ignores_other_installed_runtime_distributions(self, monkeypatch):
+        loaded = types.ModuleType("_polars_runtime_64._polars_runtime")
+        loaded.__version__ = "1.44.2"
+        monkeypatch.setitem(sys.modules, "polars._plr", loaded)
+        monkeypatch.setattr(polars_compat.metadata, "version", lambda name: "0.0.1")
+
+        assert polars_compat.active_runtime() == ("polars-runtime-64", "1.44.2")
+
+    def test_active_runtime_falls_back_to_distribution_metadata_without_a_module_version(self, monkeypatch):
+        monkeypatch.setitem(sys.modules, "polars._plr", types.ModuleType("_polars_runtime_32._polars_runtime"))
+        monkeypatch.setattr(polars_compat.metadata, "version", lambda name: f"{name}-metadata")
+
+        assert polars_compat.active_runtime() == ("polars-runtime-32", "polars-runtime-32-metadata")
+
+    def test_active_runtime_matches_the_loaded_module(self):
+        package, version = polars_compat.active_runtime()
+        loaded = sys.modules["polars._plr"].__name__
+
+        if loaded.startswith("_polars_runtime_"):
+            assert package == loaded.split(".", 1)[0].removeprefix("_").replace("_", "-")
+            assert version == sys.modules["polars._plr"].__version__
+        else:
+            assert (package, version) == ("absent", "absent")
 
     @pytest.mark.parametrize(
         ("kwargs", "requested", "argument"),
@@ -276,6 +307,7 @@ class TestEngineMetadata:
         assert platform_info.config["collect_engine_argument"] == "in-memory"
         assert platform_info.config["observed_execution"] == "not_captured"
         assert "polars_runtime_version" in platform_info.config
+        assert "polars_runtime_package" in platform_info.config
 
 
 class TestEngineOption:
