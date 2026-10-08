@@ -14438,6 +14438,13 @@
       "status": "done",
       "title": "Decision: should cloud-only platforms such as Snowflake and Databricks accept a ':local' selector suffix?"
     },
+    "polars-2-lock-and-floor-decision": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Decide whether to move the Polars lock to 2.0 and raise the supported floor"
+    },
     "polars-maintenance-collect-bypasses-engine-option": {
       "claim": null,
       "needs": [],

@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A recorded decision on the lock version and the floor, citing the version-matrix results",
+    "If changed, the lock and floor change in a PR that keeps the polars-2-compat job meaningful"
+  ],
+  "description": "BenchBox runs on Polars 1.35.2 through 2.0.0, with the lock at 1.44.2 and the pyproject floor at 1.35.2. A required polars-2-compat CI job covers 2.0. After the Polars version matrix results exist, decide whether to move uv.lock to 2.0 and whether to raise the floor. This is a decision, not an implementation; the matrix work deliberately changes neither.",
+  "links": [
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c",
+      "at": "2026-10-08T23:31:13Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "64782e54ed0f49c1a56f5bcd9ed3dcd9",
+      "session_id": "1f74fac6df92445cbacc470514ed2645"
+    }
+  ]
+}
