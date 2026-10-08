@@ -3,7 +3,7 @@
     "A merge-blocking review path exists that does not depend on Codex connector availability",
     "Documented in the review protocol which fallback applies and who can invoke it"
   ],
-  "context": "On 2026-10-06 PR #2721 (portable metadata store) was blocked: the Codex connector posted a usage-limit notice instead of a review, and oracle-review accepts only its review or a stand-in attestation from a listed attester (joeharris76). The only unblock path required the owner personally. Observed during the tuning-followups batch.",
+  "context": "On 2026-10-06 PR #2721 (portable metadata store) was blocked: the Codex connector posted a usage-limit notice instead of a review, and oracle-review accepts only its review or a stand-in attestation from a listed attester (joeharris76). The only unblock path required the owner personally. Observed during the tuning-followups batch.\n2026-10-08: a second failure mode. On PR #2751, `@codex review` comments at 21:23 and about 22:05 UTC got no response at all: no review, no limit notice, no reaction. The connector last reviewed that PR on 2026-10-07 (a78cdb8db). The PR was a draft at the first request; it was ready at the second. A silent connector is harder to detect than a limit notice, so the fallback should also cover \"no response within N minutes\".",
   "description": "Decide and document a fallback when the Codex connector is at its usage limit: e.g. limit monitoring/alerting before it blocks merges, a second eligible reviewer, or widening stand-in attester rules. Goal is that no PR sits unmergeable waiting on an external quota reset.",
   "sessions": [
     {
@@ -13,6 +13,14 @@
       "op": "create",
       "op_id": "28d1dc2e5eb14335a5f188c1e5590331",
       "session_id": "5709cef75a584579a236033476a263ba"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de",
+      "at": "2026-10-08T23:26:00Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "df06023842bc4d13ab892482a60773a9",
+      "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
     }
   ]
 }
