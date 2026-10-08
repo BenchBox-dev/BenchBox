@@ -19268,7 +19268,8 @@
       "claim": null,
       "needs": [
         "site-split-00-adr-soundness-scope",
-        "site-split-10-core-site-inputs"
+        "site-split-10-core-site-inputs",
+        "site-split-11-bundle-failure-alert"
       ],
       "priority": "high",
       "status": "open",
