@@ -3,7 +3,7 @@
     "A merge-blocking review path exists that does not depend on Codex connector availability",
     "Documented in the review protocol which fallback applies and who can invoke it"
   ],
-  "context": "On 2026-10-06 PR #2721 (portable metadata store) was blocked: the Codex connector posted a usage-limit notice instead of a review, and oracle-review accepts only its review or a stand-in attestation from a listed attester (joeharris76). The only unblock path required the owner personally. Observed during the tuning-followups batch.\n2026-10-08: a second failure mode. On PR #2751, `@codex review` comments at 21:23 and about 22:05 UTC got no response at all: no review, no limit notice, no reaction. The connector last reviewed that PR on 2026-10-07 (a78cdb8db). The PR was a draft at the first request; it was ready at the second. A silent connector is harder to detect than a limit notice, so the fallback should also cover \"no response within N minutes\".\n2026-10-08, third occurrence: PR #2781 (Polars engine option, soundness path) got three `@codex review` requests (16:02Z, 16:43Z, 18:46Z) and no response of any kind for over 4 hours; no other open PR (#2775, #2776, #2777, #2780, #2782) had connector activity either. The connector's last review was 2026-10-08 05:47Z. The PR sat unmergeable until the owner approved a stand-in review (20:53Z); the batch it belonged to was blocked for about 4 hours, and the oracle-review failure text gave no sign that the connector was unresponsive rather than slow.",
+  "context": "On 2026-10-06 PR #2721 (portable metadata store) was blocked: the Codex connector posted a usage-limit notice instead of a review, and oracle-review accepts only its review or a stand-in attestation from a listed attester (joeharris76). The only unblock path required the owner personally. Observed during the tuning-followups batch.\n2026-10-08: a second failure mode. On PR #2751, `@codex review` comments at 21:23 and about 22:05 UTC got no response at all: no review, no limit notice, no reaction. The connector last reviewed that PR on 2026-10-07 (a78cdb8db). The PR was a draft at the first request; it was ready at the second. A silent connector is harder to detect than a limit notice, so the fallback should also cover \"no response within N minutes\".\n2026-10-08, third occurrence: PR #2781 (Polars engine option, soundness path) got three `@codex review` requests (16:02Z, 16:43Z, 18:46Z) and no response of any kind for over 4 hours; no other open PR (#2775, #2776, #2777, #2780, #2782) had connector activity either. The connector's last review was 2026-10-08 05:47Z. The PR sat unmergeable until the owner approved a stand-in review (20:53Z); the batch it belonged to was blocked for about 4 hours, and the oracle-review failure text gave no sign that the connector was unresponsive rather than slow.\n2026-10-08 (closeout): tried rebasing feat/oracle-review-app-fallbacks (16c4ba79, 2 commits, cut 2026-10-05) onto develop 5ca12e6ca: 29 conflict hunks across oracle_review_check.py, soundness_merge_digest.py, dev-loop-property-ledger.md and two test files. Develop gained an oracle reviewer signal (benchbox-oracle verdict; #2750, #2769, #2784) after the branch was cut, and open PR #2758 (feat/oracle-review-cutover) continues it. The branch instead adds claude-review and Gemini fallbacks and retires the stand-in marker, which develop and docs/operations/merge-queue-governance.md still rely on. Needs an owner decision: (a) the oracle signal satisfies this item's acceptance and the branch is discarded, or (b) the branch is reworked on top of #2758 after it lands. Rebase aborted; branch and worktree unchanged.",
   "description": "Decide and document a fallback when the Codex connector is at its usage limit: e.g. limit monitoring/alerting before it blocks merges, a second eligible reviewer, or widening stand-in attester rules. Goal is that no PR sits unmergeable waiting on an external quota reset.",
   "sessions": [
     {
@@ -37,6 +37,14 @@
       "generation": "0b57ceb44924484bb4728de862942623",
       "op": "take",
       "op_id": "453165ef36984afc87ee6d59ef0c22bc",
+      "session_id": "07e731a8e8c94b759ae340cfc0a08f20"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:f696675eed34999feaff728a",
+      "at": "2026-10-08T23:52:18Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "8ffabf7d568145e0830c0d3997336e5b",
       "session_id": "07e731a8e8c94b759ae340cfc0a08f20"
     }
   ]
