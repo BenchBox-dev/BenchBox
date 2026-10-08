@@ -5,6 +5,7 @@
     "If bundles were promoted: validate_corpus.py passes, the allowlist test covers both folders and rejects other *-version-matrix folders, every bundle has a sidecar with a matching SHA-256, and corpus-inventory.json is regenerated",
     "The PR is merged through the repo's normal checks"
   ],
+  "context": "2026-10-08 BLOCKED: needs pvm-s5 analysis; chain starts at pvm-s0b merging (PR #2781, waiting on the Codex connector review; owner: Codex connector / repository owner). Publication scope is decision D4: analysis plus blog draft only.",
   "description": "Publish the results as decided in pvm-d1-publication-scope-decision.\n\nDefault scope (option a): make the analysis durable and reviewable without touching the ranked corpus. Commit the findings summary, the analysis CSV and the methodology (versions, setups, controls, correctness rule, abort rule, disclosures) to a documented location agreed in review. The raw repetitions stay external.\n\nIf option (b) was chosen, also:\n- Write setup A median bundles to results-data/bundles/polars-version-matrix/, each with a .manifest.json sidecar carrying a SHA-256 hash and the operator CPU attestation.\n- Replace the hard-coded duckdb-version-matrix check in validate_corpus.py with an explicit allowlist (duckdb-version-matrix, polars-version-matrix), and update SEED_CORPUS_SPEC.md and tests/unit/scripts/test_corpus_cohort_depth.py in the same change.\n- Add a CORPUS_NOTES.md section and regenerate corpus-inventory.json.\n- Run validate_corpus.py.\n\nGuardrails:\n- Bundles are anonymized like the DuckDB matrix (no local paths or hostnames).\n- No setup B or C bundles enter the corpus, because they would share an identity with setup A.\n- Stage files explicitly by path; follow the repo PR workflow.\n- Commit text describes results and methods, not session process.",
   "links": [
     "results-data/validate_corpus.py",
@@ -29,6 +30,14 @@
       "op": "update",
       "op_id": "34f09e88d31e423e9f0b7ebb0c18f232",
       "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c",
+      "at": "2026-10-08T18:47:24Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "d4163522d1a74444862cba0fc95b6367",
+      "session_id": "1f74fac6df92445cbacc470514ed2645"
     }
   ]
 }
