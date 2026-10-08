@@ -1,5 +1,3 @@
-"""Tests for TPC-DS-OBT DataFrame query implementations."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -153,8 +151,7 @@ def test_query_outputs_match_sql_reference() -> None:
         sql_result = conn.execute(query.sql_equivalent).fetchdf().sort_index(axis=1).reset_index(drop=True)
         assert list(pandas_result.columns) == list(sql_result.columns)
         assert len(pandas_result) == len(sql_result)
-        # Values, not just shapes: proves the COALESCE contract and catches
-        # wrong aliases/columns/aggregates in the specs.
+
         left = pandas_result.sort_values(by=list(pandas_result.columns)).reset_index(drop=True)
         right = sql_result.sort_values(by=list(sql_result.columns)).reset_index(drop=True)
         pd.testing.assert_frame_equal(left, right, check_dtype=False, check_exact=False, rtol=1e-9, atol=1e-9)
@@ -162,7 +159,7 @@ def test_query_outputs_match_sql_reference() -> None:
 
 @pytest.mark.skipif(not DUCKDB_AVAILABLE, reason="duckdb not installed")
 def test_empty_filter_reports_zero_not_null() -> None:
-    """The Q10/Q15/Q16 COALESCE claim: empty sets report 0.0, matching SQL."""
+
     from benchbox.core.tpcds_obt.dataframe_queries import REGISTRY
 
     sample = _sample_pandas()

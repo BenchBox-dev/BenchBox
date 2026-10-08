@@ -24,12 +24,12 @@ pg_duckdb is a PostgreSQL extension that embeds DuckDB's columnar-vectorized ana
 pg_duckdb supports two deployment modes, selectable via the colon syntax:
 
 ```bash
-# Self-hosted (default) - PostgreSQL with pg_duckdb extension
 benchbox run --platform pg-duckdb --benchmark tpch --scale 1.0
 
-# MotherDuck mode - hybrid local+cloud queries
 benchbox run --platform pg-duckdb:motherduck --benchmark tpch --scale 1.0
 ```
+
+The first command uses self-hosted mode, the default: PostgreSQL with the pg_duckdb extension. The second uses MotherDuck mode for hybrid local and cloud queries.
 
 ### Self-Hosted Mode (Default)
 
@@ -48,35 +48,29 @@ Connect pg_duckdb to MotherDuck for hybrid queries:
 **MotherDuck Configuration:**
 
 ```bash
-# Set MotherDuck token
 export MOTHERDUCK_TOKEN=your-token-here
 
-# Run benchmark with MotherDuck hybrid mode
 benchbox run --platform pg-duckdb:motherduck --benchmark tpch --scale 1.0
 ```
+
+Set the MotherDuck token, then run the benchmark in MotherDuck hybrid mode.
 
 ## Data Lake Support Status
 
 Parquet loads work through the inherited PostgreSQL path: the Parquet file
-is streamed client-side via pyarrow into `COPY`, exactly like `postgresql`
-(which is why `pg_duckdb` is registered for Parquet at the same
-`EXTENSION` level). The embedded DuckDB engine is not used for file reads.
+is streamed client-side via pyarrow into `COPY`, exactly like `postgresql`.
+The embedded DuckDB engine is not used for file reads.
 Native loads stay tbl-first like `postgresql`.
 
-BenchBox has no Delta Lake or Iceberg read path for pg_duckdb today, so
-neither format is registered in
-`benchbox/platforms/base/format_capabilities.py` - an explicit `--format
-delta` request fails fast with a platform-named error instead of a late
-load failure. The embedded engine could read both via DuckDB extensions in
-the future; that needs adapter-side extension/secret setup first.
+BenchBox has no Delta Lake or Iceberg read path for pg_duckdb. An explicit
+`--format delta` request fails immediately with an error that names the
+platform.
 
 Cloud reads need credentials at query time, never in code or committed
 config. MotherDuck mode remains the supported cloud variant (token via the
 `MOTHERDUCK_TOKEN` environment variable). Direct S3 Parquet reads
 additionally need object-storage credentials and Parquet file management,
-and live verification is still pending - that is tracked separately and
-requires explicit approval for live cloud tests before any S3 read path is
-claimed as supported.
+and are not verified as supported.
 
 ## Installation
 
@@ -101,29 +95,28 @@ docker run -d --name pg-duckdb \
   -p 5432:5432 \
   pgduckdb/pgduckdb:18-v1.1.1
 
-# Verify extension
 psql -h localhost -U postgres -c "CREATE EXTENSION pg_duckdb;"
 ```
+
+The `psql` command creates the extension, which also verifies it.
 
 ## Quick Start
 
 ```bash
-# Basic TPC-H benchmark
 benchbox run --platform pg-duckdb --benchmark tpch --scale 0.01
 
-# With custom connection
 benchbox run --platform pg-duckdb --benchmark tpch --scale 1.0 \
   --platform-option host=pgduckdb.example.com \
   --platform-option password=secret
 
-# Disable force execution (let PostgreSQL choose when to use DuckDB)
 benchbox run --platform pg-duckdb --benchmark tpch --scale 1.0 \
   --platform-option force_execution=false
 
-# Configure parallel scan threads
 benchbox run --platform pg-duckdb --benchmark tpch --scale 1.0 \
   --platform-option postgres_scan_threads=8
 ```
+
+The four commands run, in order: a basic TPC-H benchmark, a benchmark with a custom connection, a benchmark with `force_execution=false` (lets PostgreSQL choose when to use DuckDB), and a benchmark that configures parallel scan threads with `postgres_scan_threads`.
 
 ## Configuration Options
 

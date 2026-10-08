@@ -1,15 +1,3 @@
-"""BigQuery DDL rewrite rules for Phase.DDL_OPTIMIZE.
-
-BigQueryAdapter._convert_to_bigquery_table() is the local runtime path. It
-converts DuckDB-style CREATE TABLE statements to BigQuery DDL by making table
-creation idempotent, qualifying the target table with project and dataset, and
-adding optional partitioning or clustering clauses.
-
-This rule registers the REWRITE_DDL intent for governance and compat_lint. The
-adapter does not inherit BaseDdlOptimizer, so transformer_id is documentary and
-governance_only=True.
-"""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.rules._registration import register_ddl_rewrite

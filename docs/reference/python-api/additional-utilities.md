@@ -46,17 +46,17 @@ from benchbox.utils.scale_factor import (
     format_schema_name
 )
 
-# Format scale factors
-print(format_scale_factor(1.0))    # "sf1"
-print(format_scale_factor(0.1))    # "sf01"
-print(format_scale_factor(0.01))   # "sf001"
-print(format_scale_factor(10.0))   # "sf10"
+print(format_scale_factor(1.0))
+print(format_scale_factor(0.1))
+print(format_scale_factor(0.01))
+print(format_scale_factor(10.0))
 
-# Format names
-print(format_benchmark_name("tpch", 1.0))      # "tpch_sf1"
-print(format_data_directory("tpcds", 0.1))     # "tpcds_sf01_data"
-print(format_schema_name("ssb", 10.0))         # "ssb_sf10"
+print(format_benchmark_name("tpch", 1.0))
+print(format_data_directory("tpcds", 0.1))
+print(format_schema_name("ssb", 10.0))
 ```
+
+The scale factors print as `sf1`, `sf01`, `sf001` and `sf10`. The names print as `tpch_sf1` (benchmark name), `tpcds_sf01_data` (data directory) and `ssb_sf10` (schema name).
 
 ### API Reference
 
@@ -98,10 +98,12 @@ The token is not unique: `1.5` and `15` both return `sf15`.
 ```python
 from benchbox.utils.scale_factor import format_scale_factor
 
-format_scale_factor(1)      # 'sf1'
-format_scale_factor(0.01)   # 'sf001'
-format_scale_factor(2.25)   # 'sf225'
+format_scale_factor(1)
+format_scale_factor(0.01)
+format_scale_factor(2.25)
 ```
+
+These return `sf1`, `sf001` and `sf225`.
 
 #### `benchbox.utils.scale_factor.format_benchmark_name`
 
@@ -250,6 +252,8 @@ True
 
 #### Consistent File Naming
 
+This creates the data directory with consistent naming and prints `Data directory: data/tpch_sf1_data`.
+
 ```python
 from pathlib import Path
 from benchbox.utils.scale_factor import format_data_directory
@@ -257,23 +261,22 @@ from benchbox.utils.scale_factor import format_data_directory
 benchmark = "tpch"
 scale_factor = 1.0
 
-# Create data directory with consistent naming
 data_dir = Path("data") / format_data_directory(benchmark, scale_factor)
 data_dir.mkdir(parents=True, exist_ok=True)
 
 print(f"Data directory: {data_dir}")
-# Output: data/tpch_sf1_data
 ```
 
 #### Database Schema Naming
 
 `USE SCHEMA` is Snowflake and Databricks syntax; use your platform's statement for selecting a schema.
 
+The function creates the schema with consistent naming. This call prints `Created schema: tpch_sf1`.
+
 ```python
 from benchbox.utils.scale_factor import format_schema_name
 
 def create_benchmark_schema(conn, benchmark, scale_factor):
-    """Create database schema with consistent naming."""
     schema_name = format_schema_name(benchmark, scale_factor)
 
     conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
@@ -282,17 +285,17 @@ def create_benchmark_schema(conn, benchmark, scale_factor):
     print(f"Created schema: {schema_name}")
 
 create_benchmark_schema(conn, "tpch", 1.0)
-# Output: Created schema: tpch_sf1
 ```
 
 #### Result File Naming
+
+The function saves results with consistent naming. This call prints `Saved results to: results_tpcds_sf01.json`.
 
 ```python
 import json
 from benchbox.utils.scale_factor import format_benchmark_name
 
 def save_results(results, benchmark, scale_factor):
-    """Save results with consistent naming."""
     name = format_benchmark_name(benchmark, scale_factor)
     filename = f"results_{name}.json"
 
@@ -302,7 +305,6 @@ def save_results(results, benchmark, scale_factor):
     print(f"Saved results to: {filename}")
 
 save_results(benchmark_results, "tpcds", 0.1)
-# Output: Saved results to: results_tpcds_sf01.json
 ```
 
 ## Dependency Validation Utilities
@@ -311,7 +313,7 @@ Utilities for validating BenchBox dependency definitions.
 
 ### Overview
 
-The dependency validation utilities verify that all declared dependencies in `pyproject.toml` have corresponding locked versions in `uv.lock` that satisfy the declared specifiers. This ensures dependency consistency and helps catch dependency issues early.
+The dependency validation utilities verify that all declared dependencies in `pyproject.toml` have corresponding locked versions in `uv.lock` that satisfy the declared specifiers. Both files are part of a BenchBox source checkout, not the installed package, so these utilities need a source checkout (or your own `pyproject.toml` and `uv.lock`).
 
 **Key Features**:
 
@@ -329,11 +331,8 @@ import tomllib
 from pathlib import Path
 from benchbox.utils.dependency_validation import validate_dependency_versions
 
-# Load dependency files
 pyproject_data = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
 lock_data = tomllib.loads(Path("uv.lock").read_text(encoding="utf-8"))
-
-# Validate dependencies
 problems = validate_dependency_versions(pyproject_data, lock_data)
 
 if problems:
@@ -476,19 +475,16 @@ print(build_matrix_summary(pyproject, lock))
 The dependency validation utilities include a CLI tool for CI/CD integration:
 
 ```bash
-# Validate dependencies
 python -m benchbox.utils.dependency_validation
 
-# Display compatibility matrix
 python -m benchbox.utils.dependency_validation --matrix
 
-# Use custom paths
 python -m benchbox.utils.dependency_validation \
     --pyproject path/to/pyproject.toml \
     --lock path/to/uv.lock
 ```
 
-By default it reads `pyproject.toml` and `uv.lock` in the current directory. With `--matrix` the summary is printed only after validation passes. Problems are written to standard error, one per line.
+The first command validates dependencies, the second displays the compatibility matrix, and the third uses custom file paths. By default it reads `pyproject.toml` and `uv.lock` in the current directory, so run it from the root of a source checkout or pass both paths. With `--matrix` the summary is printed only after validation passes. Problems are written to standard error, one per line.
 
 **Exit Codes**:
 
@@ -499,15 +495,15 @@ By default it reads `pyproject.toml` and `uv.lock` in the current directory. Wit
 
 #### CI/CD Integration
 
+Save this script as `ci_check_dependencies.py`. It validates dependencies in a CI/CD pipeline and returns exit code 1 on failure.
+
 ```python
-# ci_check_dependencies.py
 import sys
 import tomllib
 from pathlib import Path
 from benchbox.utils.dependency_validation import validate_dependency_versions
 
 def check_dependencies():
-    """Validate dependencies in CI/CD pipeline."""
     try:
         pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
         lock = tomllib.loads(Path("uv.lock").read_text(encoding="utf-8"))
@@ -533,10 +529,9 @@ if __name__ == "__main__":
 
 #### Pre-commit Hook
 
-```bash
-#!/bin/bash
-# .git/hooks/pre-commit
+Save this script as `.git/hooks/pre-commit` and start it with the `#!/bin/bash` line.
 
+```bash
 echo "Validating dependencies..."
 python -m benchbox.utils.dependency_validation
 
@@ -550,13 +545,14 @@ echo "✅ Dependencies validated"
 
 #### Documentation Generation
 
+This function generates dependency documentation from the validated data.
+
 ```python
 import tomllib
 from pathlib import Path
 from benchbox.utils.dependency_validation import build_matrix_summary
 
 def generate_dependency_docs():
-    """Generate dependency documentation."""
     pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
     lock = tomllib.loads(Path("uv.lock").read_text(encoding="utf-8"))
 
@@ -597,7 +593,6 @@ The system information utilities provide standardized access to system, CPU, and
 ```python
 from benchbox.utils.system_info import get_system_info
 
-# Get system information
 info = get_system_info()
 
 print(f"OS: {info.os_name} {info.os_version}")
@@ -606,6 +601,8 @@ print(f"Memory: {info.total_memory_gb:.1f} GB total, "
       f"{info.available_memory_gb:.1f} GB available")
 print(f"Python: {info.python_version}")
 ```
+
+This collects the system information first and then prints the OS, CPU, memory and Python version.
 
 Output on a 4-core Linux host (values vary by machine):
 
@@ -765,16 +762,81 @@ print(round(time.time() - start))
 2
 ```
 
+### CPU Identity Detection
+
+#### `benchbox.utils.environment.is_cpu_architecture_token`
+
+<span id="benchbox.utils.environment.is_cpu_architecture_token"></span>
+
+Tells whether a string is only an architecture label rather than a CPU model. Use it to reject architecture labels that stand in for CPU models. It does not identify arbitrary processor brands.
+
+**Import:** `from benchbox.utils.environment import is_cpu_architecture_token` · **Extras:** none
+
+```python
+def is_cpu_architecture_token(value: str, machine: str) -> bool: ...
+```
+
+{#is-cpu-architecture-token-parameters}
+
+##### Parameters
+
+| Name | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `value` | `str` | required | The candidate CPU model string. It is stripped and lowercased before the comparison. |
+| `machine` | `str` | required | The current machine architecture, such as `x86_64` or `arm64`. |
+
+{#is-cpu-architecture-token-returns}
+
+##### Returns
+
+`bool`: `True` when the cleaned value is empty, equals the machine architecture, equals that architecture followed by `CPU`, equals `unknown cpu`, or is a recognized architecture token. Otherwise `False`.
+
+#### `benchbox.utils.environment.detect_cpu_info`
+
+<span id="benchbox.utils.environment.detect_cpu_info"></span>
+
+Returns the CPU model and vendor of the current host. Either value can be unavailable.
+
+**Import:** `from benchbox.utils.environment import detect_cpu_info` · **Extras:** none
+
+```python
+def detect_cpu_info() -> tuple[str | None, str | None]: ...
+```
+
+{#detect-cpu-info-parameters}
+
+##### Parameters
+
+None.
+
+{#detect-cpu-info-returns}
+
+##### Returns
+
+`tuple[str | None, str | None]`: the CPU model and the CPU vendor. Each is `None` when it cannot be determined.
+
+The probe depends on the platform:
+
+- **Darwin:** reads the `sysctl` CPU brand string. The subprocess has a two-second timeout.
+- **Linux:** reads `/proc/cpuinfo`, and uses known ARM part mappings when no model string is present.
+- **Windows:** reads the first `Win32_Processor` through PowerShell CIM. The subprocess has a two-second timeout.
+- **Other platforms:** returns `(None, None)`.
+
+Probe errors return unavailable values. A detected architecture label is discarded as a model, and an available vendor is kept.
+
+The probes request processor identity, not host names or machine identifiers. `get_system_info()` separately includes a host name, so callers who publish host information still need the anonymization rules in {doc}`/development/result-execution-environment`.
+
 ### Usage Examples
 
 #### Benchmark Environment Documentation
+
+The `document_environment` function adds system information to the benchmark results.
 
 ```python
 import json
 from benchbox.utils.system_info import get_system_info
 
 def document_environment(benchmark_results):
-    """Add system information to benchmark results."""
     info = get_system_info()
 
     benchmark_results["environment"] = {
@@ -798,6 +860,8 @@ with open("results.json", "w") as f:
 
 #### Resource Monitoring
 
+The `monitor_resources` function monitors system resources during a benchmark. The script then calculates the average memory and CPU use from the samples.
+
 Each pass through the loop takes about three seconds: `get_cpu_info` blocks for two seconds, then the loop sleeps for one.
 
 ```python
@@ -805,7 +869,6 @@ import time
 from benchbox.utils.system_info import get_memory_info, get_cpu_info
 
 def monitor_resources(duration_seconds=60):
-    """Monitor system resources during benchmark."""
     samples = []
     end_time = time.time() + duration_seconds
 
@@ -824,10 +887,8 @@ def monitor_resources(duration_seconds=60):
 
     return samples
 
-# Monitor during benchmark
 samples = monitor_resources(duration_seconds=30)
 
-# Calculate statistics
 avg_memory = sum(s["memory_used_gb"] for s in samples) / len(samples)
 avg_cpu = sum(s["cpu_percent"] for s in samples) / len(samples)
 
@@ -837,11 +898,12 @@ print(f"Average CPU: {avg_cpu:.1f}%")
 
 #### System Requirements Check
 
+The function checks whether the system meets the benchmark requirements.
+
 ```python
 from benchbox.utils.system_info import get_system_info, get_memory_info
 
 def check_system_requirements(min_memory_gb=8, min_cores=4):
-    """Check if system meets benchmark requirements."""
     info = get_system_info()
     memory = get_memory_info()
 
@@ -891,13 +953,13 @@ Output on a 4-core host with 15.7 GB of memory:
 1. **Use Consistent Formatting**: Always use utility functions for naming
 
    ```python
-   # Good: Consistent naming
    from benchbox.utils.scale_factor import format_data_directory
-   data_dir = format_data_directory("tpch", 1.0)  # "tpch_sf1_data"
+   data_dir = format_data_directory("tpch", 1.0)
 
-   # Avoid: Manual formatting
-   data_dir = f"tpch_{1.0}_data"  # Inconsistent
+   data_dir = f"tpch_{1.0}_data"
    ```
+
+   The first form is consistent. Avoid the second form, which formats the name by hand and gives an inconsistent name.
 
 2. **Apply to All Artifacts**: Use for files, directories, schemas, results
 
@@ -905,8 +967,9 @@ Output on a 4-core host with 15.7 GB of memory:
 
 1. **Validate in CI/CD**: Run validation in continuous integration
 
+   Add this step to `.github/workflows/test.yml`.
+
    ```bash
-   # .github/workflows/test.yml
    - name: Validate dependencies
      run: python -m benchbox.utils.dependency_validation
    ```

@@ -1,5 +1,3 @@
-"""Document cloud TPC-Havoc query rewrites applied by the benchmark runtime."""
-
 from __future__ import annotations
 
 from benchbox.core.tpchavoc.cloud_compat import BIGQUERY_FILTER_IDS

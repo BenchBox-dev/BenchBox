@@ -88,8 +88,6 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
           )}
         </SummaryCard>
 
-        {/* The card label already names the run and the question, so the
-            value says the number and nothing else. */}
         <SummaryCard label={summary.winnerLabel ? `Where ${summary.winnerLabel} wins` : "Query comparison"}>
           {summary.claimSuppressed ? (
             <>

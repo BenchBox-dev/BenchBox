@@ -1,9 +1,3 @@
-"""Static build pipeline for the BenchBox results explorer.
-
-Transforms schema-v2 benchmark result bundles into the read model consumed
-by the results-explorer frontend.
-"""
-
 from __future__ import annotations
 
 from _project.scripts.explorer_pipeline.duckdb_builder import DuckDBSnapshotBuilder

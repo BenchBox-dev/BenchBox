@@ -1,12 +1,3 @@
-"""TPC-Havoc DataFrame variants for Q21.
-
-Q21 is an EXISTS / NOT EXISTS anti-join query: late lineitems from target
-suppliers on valid orders, keeping orders with multiple suppliers where no
-other supplier was late. The variants keep the canonical output while
-varying the anti-join structure around semi-vs-inner formulations,
-count ordering, filter pushdown, and column pruning.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -121,9 +112,6 @@ def _make_q21_expression_impl(variant: int) -> VariantImpl:
                 .agg(col("l_suppkey").n_unique().alias("num_suppliers"))
                 .select(col("l_orderkey").alias("supp_orderkey"), col("num_suppliers"))
             )
-            # NOT EXISTS as anti-join: a candidate (order, supplier) pair is
-            # bad when the same order joins to a LATE pair with a different
-            # supplier; good pairs are the anti-join remainder.
             late_pairs = (
                 lineitem.filter(late)
                 .join(cand_orders, left_on="l_orderkey", right_on="cand_orderkey", how="semi")
@@ -284,7 +272,6 @@ def _make_q21_expression_impl(variant: int) -> VariantImpl:
                 .limit(100)
             )
 
-        # variant 10: candidate orders narrowed to late multi-touch orders first
         late_orders = scoped.filter(late).select(col("l_orderkey").alias("late_cand_orderkey")).unique()
         narrowed = cand_orders.join(late_orders, left_on="cand_orderkey", right_on="late_cand_orderkey", how="semi")
         scoped_narrow = lineitem.join(narrowed, left_on="l_orderkey", right_on="cand_orderkey", how="semi")
@@ -351,8 +338,6 @@ def _make_q21_pandas_impl(variant: int) -> VariantImpl:
             )
 
         if variant == 2:
-            # Exists-via-inner: multi-supplier orders from an inner-joined,
-            # deduplicated pair set instead of a semi-join plus nunique.
             candidates = _candidates(lineitem)
             cand_orders = list(candidates["l_orderkey"].unique())
             scoped = lineitem[lineitem["l_orderkey"].isin(cand_orders)]
@@ -375,8 +360,6 @@ def _make_q21_pandas_impl(variant: int) -> VariantImpl:
             )
 
         if variant == 4:
-            # Counts-first-late: the late-supplier counts are aggregated
-            # before the total supplier counts instead of after them.
             candidates = _candidates(lineitem)
             cand_orders = list(candidates["l_orderkey"].unique())
             scoped = lineitem[lineitem["l_orderkey"].isin(cand_orders)]
@@ -405,7 +388,6 @@ def _make_q21_pandas_impl(variant: int) -> VariantImpl:
             )
 
         if variant == 7:
-            # Chained style: one continuous method chain, no named intermediates.
             chained = lineitem[lineitem["l_receiptdate"] > lineitem["l_commitdate"]].merge(
                 targets, left_on="l_suppkey", right_on="s_suppkey"
             )
@@ -415,9 +397,6 @@ def _make_q21_pandas_impl(variant: int) -> VariantImpl:
             return _finish(kept, scoped)
 
         if variant == 8:
-            # Combined predicates: the EXISTS (multi-supplier) and NOT EXISTS
-            # (no other late supplier) checks apply in a single compound
-            # filter instead of two staged filters.
             candidates = _candidates(lineitem)
             cand_orders = list(candidates["l_orderkey"].unique())
             scoped = lineitem[lineitem["l_orderkey"].isin(cand_orders)]
@@ -441,9 +420,6 @@ def _make_q21_pandas_impl(variant: int) -> VariantImpl:
             )
 
         if variant == 9:
-            # Late-join-order swap: the late-supplier counts are joined
-            # before the total supplier counts, mirroring the expression
-            # variant's join order.
             candidates = _candidates(lineitem)
             cand_orders = list(candidates["l_orderkey"].unique())
             scoped = lineitem[lineitem["l_orderkey"].isin(cand_orders)]
@@ -474,8 +450,6 @@ def _make_q21_pandas_impl(variant: int) -> VariantImpl:
             )
 
         if variant == 10:
-            # Candidate-narrowing: restrict candidate orders to late
-            # target-supplier touches before scoping the aggregation frame.
             late_targets = lineitem[
                 (lineitem["l_receiptdate"] > lineitem["l_commitdate"])
                 & (lineitem["l_suppkey"].isin(list(targets["s_suppkey"])))
@@ -493,8 +467,6 @@ def _make_q21_pandas_impl(variant: int) -> VariantImpl:
             candidates = _candidates(lineitem)
             cand_orders = list(candidates["l_orderkey"].unique())
             scoped = lineitem[lineitem["l_orderkey"].isin(cand_orders)]
-            # NOT EXISTS as anti-join: drop candidate pairs joinable to
-            # another late supplier on the same order.
             all_late = scoped[scoped["l_receiptdate"] > scoped["l_commitdate"]][
                 ["l_orderkey", "l_suppkey"]
             ].drop_duplicates()
@@ -521,7 +493,6 @@ def _make_q21_pandas_impl(variant: int) -> VariantImpl:
             cand_orders = list(candidates["l_orderkey"].unique())
             return _finish(candidates, li[li["l_orderkey"].isin(cand_orders)])
 
-        # variant 6: orders-first -- restrict lineitem to valid orders up front
         li = lineitem[lineitem["l_orderkey"].isin(valid_keys)]
         candidates = _candidates(li)
         cand_orders = list(candidates["l_orderkey"].unique())

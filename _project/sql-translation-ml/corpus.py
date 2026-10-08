@@ -1,5 +1,3 @@
-"""Source-native typed analytical query grammar with pre-label family splits."""
-
 from __future__ import annotations
 
 import hashlib
@@ -134,8 +132,6 @@ def render(form: int, expression: str, predicate: str) -> tuple[str, str]:
 
 def cases() -> list[dict[str, Any]]:
     result = []
-    # A family contains all expression variants of one feature class, predicate,
-    # and relational skeleton. Both translation directions are always together.
     for form, expr_index, pred_index in itertools.product(range(20), range(25), range(25)):
         feature = expressions("duckdb")[expr_index][0]
         family = digest([form, feature, pred_index])
@@ -161,7 +157,6 @@ def cases() -> list[dict[str, Any]]:
                     "held_out_workload": form == 18,
                 }
             )
-    # Merge families joined by a normalized structure before assigning any split.
     parents = {case["family_id"]: case["family_id"] for case in result}
 
     def root(key: str) -> str:

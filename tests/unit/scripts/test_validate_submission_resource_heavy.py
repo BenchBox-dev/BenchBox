@@ -1,5 +1,3 @@
-"""Resource-heavy public submission validator tests."""
-
 from __future__ import annotations
 
 import json
@@ -18,7 +16,6 @@ pytestmark = [
 
 
 def _minimal_bundle() -> dict:
-    """Return a minimal valid schema-v2 bundle dict."""
     return {
         "version": "2.1",
         "run": {
@@ -51,7 +48,6 @@ def _uv_executable() -> str:
 
 
 def _standalone_env() -> dict[str, str]:
-    """Remove environment paths that could expose installed project dependencies."""
     env = os.environ.copy()
     env.pop("PYTHONPATH", None)
     env.pop("VIRTUAL_ENV", None)
@@ -59,7 +55,6 @@ def _standalone_env() -> dict[str, str]:
 
 
 def _copy_slim_validator(repo_root: Path, slim_root: Path) -> None:
-    """Copy the complete stdlib-only validator surface to a slim checkout."""
     (slim_root / "scripts").mkdir(parents=True)
     (slim_root / "benchbox" / "validation").mkdir(parents=True)
     (slim_root / "benchbox" / "core" / "results").mkdir(parents=True)
@@ -80,14 +75,12 @@ def _copy_slim_validator(repo_root: Path, slim_root: Path) -> None:
 
 @pytest.fixture
 def valid_bundle_file(tmp_path: Path) -> Path:
-    """Write a valid bundle to a temp file."""
     p = tmp_path / "tpch_result.json"
     p.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
     return p
 
 
 def test_cli_runs_from_develop_checkout_without_project_install(valid_bundle_file: Path) -> None:
-    """The develop checkout CLI runs under uv --no-project."""
     repo_root = Path(__file__).resolve().parents[3]
     result = subprocess.run(
         [
@@ -96,7 +89,6 @@ def test_cli_runs_from_develop_checkout_without_project_install(valid_bundle_fil
             "--no-project",
             "--",
             "python",
-            # Ignore the checkout's .venv so this proves the stdlib-only path.
             "-S",
             "scripts/validate_submission.py",
             str(valid_bundle_file),
@@ -114,7 +106,6 @@ def test_cli_runs_from_develop_checkout_without_project_install(valid_bundle_fil
 
 
 def test_cli_runs_in_slim_no_project_checkout(tmp_path: Path) -> None:
-    """The published-results mirror runs without installing the BenchBox project."""
     repo_root = Path(__file__).resolve().parents[3]
     slim_root = tmp_path / "published-results"
     _copy_slim_validator(repo_root, slim_root)
@@ -145,7 +136,6 @@ def test_cli_runs_in_slim_no_project_checkout(tmp_path: Path) -> None:
 
 
 def test_slim_no_project_checkout_rejects_empty_public_result(tmp_path: Path) -> None:
-    """The mirrored stdlib-only validator enforces the zero-query invariant."""
     repo_root = Path(__file__).resolve().parents[3]
     slim_root = tmp_path / "published-results"
     _copy_slim_validator(repo_root, slim_root)
@@ -178,7 +168,6 @@ def test_slim_no_project_checkout_rejects_empty_public_result(tmp_path: Path) ->
 
 
 def test_slim_no_project_checkout_rejects_false_clean_measurement(tmp_path: Path) -> None:
-    """Slim validation uses the same failed-measurement policy as develop."""
     repo_root = Path(__file__).resolve().parents[3]
     slim_root = tmp_path / "published-results"
     _copy_slim_validator(repo_root, slim_root)

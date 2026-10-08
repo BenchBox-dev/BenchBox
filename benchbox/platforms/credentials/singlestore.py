@@ -1,16 +1,5 @@
-"""SingleStore credentials setup and validation.
-
-Persistence contract (deliberate, shared with athena/redshift/snowflake):
-credentials are saved to the 0600-permission store even when validation
-FAILS, marked CredentialStatus.INVALID, so the user can fix the reported
-problem and re-run ``--validate-only`` without re-entering every field.
-The password prompt never displays a stored value (``****SET****``).
-MotherDuck is the intentional exception: its token is never persisted.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import os
 from typing import Optional, Union
@@ -24,14 +13,6 @@ from benchbox.utils.printing import QuietConsoleProxy
 
 
 def setup_singlestore_credentials(cred_manager: CredentialManager, console: Union[Console, QuietConsoleProxy]) -> None:
-    """Interactive setup for SingleStore credentials.
-
-    Supports both SingleStore Helios (cloud) and self-managed deployments.
-
-    Args:
-        cred_manager: Credential manager instance
-        console: Rich console for output
-    """
     console.print("\n📋 [bold]You'll need:[/bold]")
     console.print("  • SingleStore hostname (Helios endpoint or self-managed host)")
     console.print("  • Port (default: 3306)")
@@ -148,14 +129,6 @@ def setup_singlestore_credentials(cred_manager: CredentialManager, console: Unio
 
 
 def validate_singlestore_credentials(cred_manager: CredentialManager) -> tuple[bool, Optional[str]]:
-    """Validate SingleStore credentials by testing connection.
-
-    Args:
-        cred_manager: Credential manager instance
-
-    Returns:
-        Tuple of (success, error_message)
-    """
     creds = cred_manager.get_platform_credentials("singlestore")
 
     if not creds:
@@ -207,14 +180,6 @@ def validate_singlestore_credentials(cred_manager: CredentialManager) -> tuple[b
 
 
 def _auto_detect_singlestore(console: Union[Console, QuietConsoleProxy]) -> Optional[dict]:
-    """Attempt to auto-detect SingleStore configuration from environment variables.
-
-    Args:
-        console: Rich console for output
-
-    Returns:
-        Dictionary with detected config or None
-    """
     env_vars = {
         "host": os.getenv("SINGLESTORE_HOST"),
         "port": os.getenv("SINGLESTORE_PORT", "3306"),

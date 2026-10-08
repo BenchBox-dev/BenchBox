@@ -1,9 +1,6 @@
-"""Tests for GPU metrics collection.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import time
 from datetime import datetime, timezone
@@ -25,10 +22,7 @@ pytestmark = [
 
 
 class TestGPUMetrics:
-    """Tests for GPUMetrics dataclass."""
-
     def test_basic_creation(self):
-        """Should create GPU metrics snapshot."""
         now = datetime.now(timezone.utc)
         metrics = GPUMetrics(
             timestamp=now,
@@ -42,7 +36,6 @@ class TestGPUMetrics:
         assert metrics.memory_total_mb == 16000
 
     def test_memory_utilization(self):
-        """Should calculate memory utilization."""
         metrics = GPUMetrics(
             timestamp=datetime.now(timezone.utc),
             device_index=0,
@@ -52,7 +45,6 @@ class TestGPUMetrics:
         assert metrics.memory_utilization == 0.5
 
     def test_memory_utilization_zero_total(self):
-        """Should handle zero total memory."""
         metrics = GPUMetrics(
             timestamp=datetime.now(timezone.utc),
             device_index=0,
@@ -62,7 +54,6 @@ class TestGPUMetrics:
         assert metrics.memory_utilization == 0.0
 
     def test_to_dict(self):
-        """Should convert to dictionary."""
         now = datetime.now(timezone.utc)
         metrics = GPUMetrics(
             timestamp=now,
@@ -84,10 +75,7 @@ class TestGPUMetrics:
 
 
 class TestGPUMetricsAggregate:
-    """Tests for GPUMetricsAggregate dataclass."""
-
     def test_basic_creation(self):
-        """Should create aggregate metrics."""
         start = datetime.now(timezone.utc)
         end = datetime.now(timezone.utc)
         agg = GPUMetricsAggregate(
@@ -103,7 +91,6 @@ class TestGPUMetricsAggregate:
         assert agg.avg_utilization_percent == 75.0
 
     def test_to_dict(self):
-        """Should convert to dictionary."""
         start = datetime.now(timezone.utc)
         end = datetime.now(timezone.utc)
         agg = GPUMetricsAggregate(
@@ -123,27 +110,21 @@ class TestGPUMetricsAggregate:
 
 
 class TestGPUMetricsCollector:
-    """Tests for GPUMetricsCollector class."""
-
     def test_basic_creation(self):
-        """Should create collector."""
         collector = GPUMetricsCollector()
         assert collector.sample_interval == 0.5
         assert collector.device_indices is None
 
     def test_with_device_filter(self):
-        """Should create collector with device filter."""
         collector = GPUMetricsCollector(device_indices=[0, 1])
         assert collector.device_indices == [0, 1]
 
     def test_with_custom_interval(self):
-        """Should create collector with custom interval."""
         collector = GPUMetricsCollector(sample_interval_seconds=0.1)
         assert collector.sample_interval == 0.1
 
     @patch.object(GPUMetricsCollector, "_collect_sample")
     def test_start_stop(self, mock_collect):
-        """Should start and stop collection."""
         mock_collect.return_value = [
             GPUMetrics(
                 timestamp=datetime.now(timezone.utc),
@@ -155,20 +136,18 @@ class TestGPUMetricsCollector:
 
         collector = GPUMetricsCollector(sample_interval_seconds=0.01)
         collector.start()
-        time.sleep(0.05)  # Allow some samples to be collected
+        time.sleep(0.05)
         collector.stop()
 
         samples = collector.get_samples()
-        assert len(samples) >= 0  # May have collected some samples
+        assert len(samples) >= 0
 
     @patch.object(GPUMetricsCollector, "_collect_sample")
     def test_get_aggregate(self, mock_collect):
-        """Should compute aggregate metrics."""
         collector = GPUMetricsCollector()
         collector._start_time = datetime.now(timezone.utc)
         collector._end_time = datetime.now(timezone.utc)
 
-        # Manually add samples
         for i in range(5):
             collector._samples.append(
                 GPUMetrics(
@@ -183,19 +162,17 @@ class TestGPUMetricsCollector:
         agg = collector.get_aggregate(0)
         assert agg is not None
         assert agg.sample_count == 5
-        assert agg.avg_utilization_percent == 70.0  # (50+60+70+80+90)/5
+        assert agg.avg_utilization_percent == 70.0
         assert agg.max_utilization_percent == 90.0
         assert agg.max_memory_used_mb == 12000
 
     def test_get_aggregate_no_samples(self):
-        """Should return None for no samples."""
         collector = GPUMetricsCollector()
         agg = collector.get_aggregate(0)
         assert agg is None
 
     @patch("subprocess.run")
     def test_collect_nvidia_smi(self, mock_run):
-        """Should collect metrics via nvidia-smi."""
         mock_run.return_value = MagicMock(
             returncode=0,
             stdout="0, 8000, 8000, 16000, 50, 40, 65, 200, 300, 1500, 5000\n",
@@ -210,16 +187,12 @@ class TestGPUMetricsCollector:
 
 
 class TestGPUMemoryTracker:
-    """Tests for GPUMemoryTracker class."""
-
     def test_basic_creation(self):
-        """Should create memory tracker."""
         tracker = GPUMemoryTracker(device_index=0)
         assert tracker.device_index == 0
 
     @patch.object(GPUMemoryTracker, "_get_current_memory_mb")
     def test_start(self, mock_get_memory):
-        """Should start tracking."""
         mock_get_memory.return_value = 4000
         tracker = GPUMemoryTracker()
         tracker.start()
@@ -227,7 +200,6 @@ class TestGPUMemoryTracker:
 
     @patch.object(GPUMemoryTracker, "_get_current_memory_mb")
     def test_record(self, mock_get_memory):
-        """Should record memory checkpoint."""
         mock_get_memory.side_effect = [4000, 6000, 8000]
         tracker = GPUMemoryTracker()
         tracker.start()
@@ -241,7 +213,6 @@ class TestGPUMemoryTracker:
 
     @patch.object(GPUMemoryTracker, "_get_current_memory_mb")
     def test_get_summary(self, mock_get_memory):
-        """Should return summary."""
         mock_get_memory.side_effect = [4000, 8000, 6000]
         tracker = GPUMemoryTracker(device_index=1)
         tracker.start()

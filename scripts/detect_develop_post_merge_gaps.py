@@ -1,42 +1,4 @@
 #!/usr/bin/env python3
-"""Detect develop commits that never got a develop-post-merge workflow run.
-
-GitHub has been observed to drop push delivery for consecutive develop merges
-(see docs/operations/develop-post-merge-gaps.md). When that happens, the
-push-triggered ``develop-post-merge.yml`` workflow never starts for those
-SHAs, so develop tip can sit un-gated until the next successful delivery or
-the scheduled sweep.
-
-This script is the instrumentation half of the fix:
-
-- given recent develop commit SHAs and recent ``develop-post-merge`` run
-  head SHAs, report which commits lack any run (any status/conclusion);
-- exit non-zero when gaps remain so a scheduled/canary workflow can fail
-  loudly instead of silently.
-
-It does **not** open PRs, re-run gates, or mutate repository state. The
-scheduled sweep in ``develop-post-merge.yml`` is the coverage half: it
-re-gates the current tip (slim gates on schedule) within a bounded window.
-
-Live mode paginates the run list until it has enough **unique** headShas to
-cover the commit lookback (plus margin). A fixed shallow limit is not safe:
-after the hourly schedule lands, the most-recent N runs can all share the
-same tip SHA and would otherwise "poison" the window so older push-covered
-commits look uncovered.
-
-Usage:
-    # Offline / unit-testable pure check:
-    python scripts/detect_develop_post_merge_gaps.py \\
-        --commits-file commits.txt --runs-file runs.txt
-
-    # Live check against origin/develop + GitHub Actions API via gh:
-    python scripts/detect_develop_post_merge_gaps.py --live
-
-Exit codes:
-    0 - every looked-up SHA has at least one develop-post-merge run
-    1 - one or more SHAs lack a run (gap class still present)
-    2 - usage / I/O error
-"""
 
 from __future__ import annotations
 
@@ -47,6 +9,46 @@ import sys
 from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
 
+CLI_DESCRIPTION = (
+    "Detect develop commits that never got a develop-post-merge workflow run.\n"
+    "\n"
+    "GitHub has been observed to drop push delivery for consecutive develop merges\n"
+    "(see docs/operations/develop-post-merge-gaps.md). When that happens, the\n"
+    "push-triggered ``develop-post-merge.yml`` workflow never starts for those\n"
+    "SHAs, so develop tip can sit un-gated until the next successful delivery or\n"
+    "the scheduled sweep.\n"
+    "\n"
+    "This script is the instrumentation half of the fix:\n"
+    "\n"
+    "- given recent develop commit SHAs and recent ``develop-post-merge`` run\n"
+    "  head SHAs, report which commits lack any run (any status/conclusion);\n"
+    "- exit non-zero when gaps remain so a scheduled/canary workflow can fail\n"
+    "  loudly instead of silently.\n"
+    "\n"
+    "It does **not** open PRs, re-run gates, or mutate repository state. The\n"
+    "scheduled sweep in ``develop-post-merge.yml`` is the coverage half: it\n"
+    "re-gates the current tip (slim gates on schedule) within a bounded window.\n"
+    "\n"
+    "Live mode paginates the run list until it has enough **unique** headShas to\n"
+    "cover the commit lookback (plus margin). A fixed shallow limit is not safe:\n"
+    "after the hourly schedule lands, the most-recent N runs can all share the\n"
+    'same tip SHA and would otherwise "poison" the window so older push-covered\n'
+    "commits look uncovered.\n"
+    "\n"
+    "Usage:\n"
+    "    # Offline / unit-testable pure check:\n"
+    "    python scripts/detect_develop_post_merge_gaps.py \\\n"
+    "        --commits-file commits.txt --runs-file runs.txt\n"
+    "\n"
+    "    # Live check against origin/develop + GitHub Actions API via gh:\n"
+    "    python scripts/detect_develop_post_merge_gaps.py --live\n"
+    "\n"
+    "Exit codes:\n"
+    "    0 - every looked-up SHA has at least one develop-post-merge run\n"
+    "    1 - one or more SHAs lack a run (gap class still present)\n"
+    "    2 - usage / I/O error\n"
+)
+
 DEFAULT_COMMIT_LIMIT = 20
 DEFAULT_UNIQUE_MARGIN = 10
 DEFAULT_PAGE_SIZE = 100
@@ -56,11 +58,7 @@ WORKFLOW_FILE = "develop-post-merge.yml"
 ListRunsFn = Callable[[int], list[dict]]
 
 
-# ---------------------------------------------------------------------------
-# Pure logic (unit-tested; no git/network)
-# ---------------------------------------------------------------------------
 def normalize_sha(value: str) -> str:
-    """Lowercase full/short SHA; reject empty tokens."""
     sha = value.strip().lower()
     if not sha:
         raise ValueError("empty SHA")
@@ -68,20 +66,17 @@ def normalize_sha(value: str) -> str:
 
 
 def parse_sha_lines(text: str) -> list[str]:
-    """Parse one SHA per line; ignore blanks and # comments."""
     out: list[str] = []
     for raw in text.splitlines():
         line = raw.split("#", 1)[0].strip()
         if not line:
             continue
-        # Allow "sha message..." lines from `git log --format=%H %s`.
         token = line.split()[0]
         out.append(normalize_sha(token))
     return out
 
 
 def extract_head_shas(rows: Sequence[object]) -> set[str]:
-    """Collect headSha values from a gh/api run-list payload."""
     shas: set[str] = set()
     for row in rows:
         if not isinstance(row, dict):
@@ -97,12 +92,6 @@ def accumulate_unique_head_shas(
     *,
     min_unique: int,
 ) -> set[str]:
-    """Fold run-list pages into a unique headSha set until ``min_unique`` or exhausted.
-
-    Stops early once enough distinct headShas are collected so a flood of
-    schedule runs for the same tip cannot hide older push-covered SHAs that
-    sit deeper in the run history.
-    """
     if min_unique < 1:
         raise ValueError("min_unique must be >= 1")
     unique: set[str] = set()
@@ -116,11 +105,6 @@ def accumulate_unique_head_shas(
 
 
 def find_uncovered(commit_shas: list[str], run_head_shas: set[str]) -> list[str]:
-    """Return commit SHAs (in order) that have no matching run headSha.
-
-    Matching is prefix-aware so a short run headSha can cover a full commit
-    SHA and vice versa (gh sometimes returns full SHAs; tests may use shorts).
-    """
     normalized_runs = {normalize_sha(s) for s in run_head_shas}
     uncovered: list[str] = []
     for commit in commit_shas:
@@ -138,7 +122,6 @@ def format_report(
     commit_limit: int,
     run_count: int,
 ) -> str:
-    """Human-readable summary for logs / job annotations."""
     lines = [
         "develop-post-merge gap detector",
         f"  commits checked: {len(commit_shas)} (limit {commit_limit})",
@@ -161,9 +144,6 @@ def format_report(
     return "\n".join(lines) + "\n"
 
 
-# ---------------------------------------------------------------------------
-# Live I/O (git + gh)
-# ---------------------------------------------------------------------------
 def _run(cmd: list[str]) -> str:
     try:
         completed = subprocess.run(
@@ -186,7 +166,6 @@ def live_commit_shas(limit: int, branch: str = "origin/develop") -> list[str]:
 
 
 def _gh_run_list(limit: int, workflow: str = WORKFLOW_FILE) -> list[dict]:
-    """Fetch the most recent ``limit`` runs as a list of dicts via gh."""
     raw = _run(
         [
             "gh",
@@ -213,13 +192,6 @@ def iter_growing_run_pages(
     page_size: int,
     max_rows: int,
 ) -> Iterable[list[dict]]:
-    """Yield successive run-list windows with a growing ``--limit``.
-
-    ``gh run list`` has no offset; each call returns the most recent N runs.
-    We grow N by page_size and yield only the *new* tail each time so
-    ``accumulate_unique_head_shas`` sees each run once while still being able
-    to dig past a tip-SHA flood.
-    """
     if page_size < 1 or max_rows < 1:
         raise ValueError("page_size and max_rows must be >= 1")
     seen_ids: set[object] = set()
@@ -228,7 +200,6 @@ def iter_growing_run_pages(
         rows = list_runs(limit)
         fresh = []
         for row in rows:
-            # Prefer stable run id when present; fall back to object identity.
             rid = row.get("databaseId", row.get("id"))
             key: object = rid if rid is not None else id(row)
             if key in seen_ids:
@@ -237,7 +208,6 @@ def iter_growing_run_pages(
             fresh.append(row)
         yield fresh
         if len(rows) < limit:
-            # API returned fewer than requested: no more history.
             break
         if limit >= max_rows:
             break
@@ -252,16 +222,6 @@ def live_run_head_shas(
     workflow: str = WORKFLOW_FILE,
     list_runs: ListRunsFn | None = None,
 ) -> set[str]:
-    """Collect unique run headShas until ``min_unique`` or history is exhausted.
-
-    Includes every status/conclusion: a queued or failed run still proves the
-    push (or schedule/dispatch) was not silently dropped for that SHA. Only a
-    total absence of runs for a SHA is a gap.
-
-    Pagination is unique-set driven: after many hourly schedule runs for the
-    same tip, a fixed shallow ``--limit`` would return only that tip SHA and
-    false-gap older commits that still have push runs deeper in history.
-    """
     if min_unique < 1:
         raise ValueError("min_unique must be >= 1")
 
@@ -275,7 +235,7 @@ def live_run_head_shas(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument(
         "--live",
         action="store_true",
@@ -360,11 +320,9 @@ def main(argv: list[str] | None = None) -> int:
         commit_limit=args.commit_limit if args.live else len(commit_shas),
         run_count=len(run_shas),
     )
-    # Human report on stderr so --json stdout stays pure.
     sys.stderr.write(report)
     if uncovered:
         for sha in uncovered:
-            # GitHub Actions annotation when running in CI.
             print(f"::error title=develop-post-merge gap::No develop-post-merge run for {sha}", file=sys.stderr)
 
     if args.json:

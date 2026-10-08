@@ -1,18 +1,4 @@
 #!/usr/bin/env python3
-"""Arm a pull request for its exact head after a live check that nothing holds it.
-
-The required status checks decide whether a PR merges; this helper only turns on
-auto-merge for the head the author pushed. It reads the live PR first and
-refuses, without merging, when a durable hold label, a requested change, an
-unresolved review thread, a draft or closed state, a base other than `develop`,
-unpublished local work, or a head other than local HEAD says the PR is not ready.
-Re-arming after auto-merge was disabled uses the same command, so a policy hold
-is never mistaken for a check failure.
-
-It enforces only what GitHub can state mechanically. A required external review
-that returned HOLD is not visible there; stopping for it stays the author's duty
-under `[WRITE-CLOSEOUT-001]`.
-"""
 
 from __future__ import annotations
 
@@ -26,7 +12,9 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import pr_landing  # noqa: E402
+import pr_landing
+
+CLI_DESCRIPTION = "Arm a pull request for its exact head after a live check that nothing holds it."
 
 HOLD_LABEL = pr_landing.HOLD_LABEL
 REPOSITORY = "BenchBox-dev/BenchBox"
@@ -37,7 +25,6 @@ Runner = Callable[[list[str]], tuple[int, str]]
 
 
 def refusals(view: dict, local_head: str, *, unpublished: Sequence[str], unresolved_threads: bool) -> list[str]:
-    """Return why the live PR must not be armed; an empty list means it may be."""
     reasons: list[str] = []
     if view.get("state") != "OPEN":
         reasons.append(f"PR is {view.get('state')!r}, not OPEN")
@@ -101,8 +88,6 @@ def arm(
             print(f"pr-arm: refusing: requested head {head[:9]} is not local HEAD {local_head[:9]}", file=sys.stderr)
             return 2
         if pr is not None and not re.fullmatch(r"[1-9][0-9]*", pr):
-            # gh treats a URL or owner/repo#N selector as that other repository's PR, so only a plain number
-            # may reach it; otherwise the PR checked and the PR armed could differ.
             print(f"pr-arm: refusing: --pr must be a plain PR number, got {pr!r}", file=sys.stderr)
             return 2
         number = pr or _current_branch_pr(run, repo)
@@ -143,7 +128,6 @@ def arm(
 
 
 def _environment_selection(env: Mapping[str, str]) -> dict[str, str | None]:
-    """Read the values `make pr-arm` exported; `_SET` distinguishes an omitted variable from an empty one."""
     return {
         name: env.get(f"PR_ARM_{name.upper()}") if env.get(f"PR_ARM_{name.upper()}_SET") == "1" else None
         for name in ("pr", "head", "repo")
@@ -152,7 +136,7 @@ def _environment_selection(env: Mapping[str, str]) -> dict[str, str | None]:
 
 def main(argv: Sequence[str] | None = None, env: Mapping[str, str] | None = None) -> int:
     selected = _environment_selection(os.environ if env is None else env)
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--pr", default=selected["pr"], help="pull request number; default: the current branch's PR")
     parser.add_argument("--head", default=selected["head"], help="expected head SHA; refused unless it is local HEAD")
     parser.add_argument("--repo", default=selected["repo"] if selected["repo"] is not None else REPOSITORY)

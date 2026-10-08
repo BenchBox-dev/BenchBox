@@ -1,15 +1,9 @@
-"""Unified configuration for TPC-DI benchmark implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides a single, simplified configuration class that consolidates
-all TPC-DI configuration options with sensible defaults and minimal complexity.
+# TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-DI specification.
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DI specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import logging
 import multiprocessing
@@ -20,52 +14,31 @@ from typing import Any, Optional
 
 @dataclass
 class TPCDIConfig:
-    """Unified configuration for TPC-DI benchmark with sensible defaults.
-
-    This class replaces multiple complex configuration classes with a single,
-    intuitive configuration that covers all TPC-DI operations with good defaults.
-    """
-
-    # Core settings
     scale_factor: float = 1.0
     output_dir: Optional[Path] = None
 
-    # Processing settings
-    enable_parallel: bool = False  # Parallel processing is opt-in
+    enable_parallel: bool = False
     max_workers: Optional[int] = None
     chunk_size: int = 10000
 
-    # Deterministic generation: explicit seed for per-record FactTrade
-    # randomness, reproducible across worker counts. The default (42)
-    # preserves the historical seed value for legacy callers; a different
-    # seed produces a demonstrably different dataset. Recorded in output
-    # metadata with the generation algorithm version.
     generation_seed: int = 42
 
-    # ETL settings
     enable_validation: bool = True
     strict_validation: bool = False
 
-    # Performance settings
     optimize_memory: bool = True
     log_level: str = "INFO"
 
     def __post_init__(self) -> None:
-        """Validate and set defaults for configuration."""
-        # Set default output directory
         if self.output_dir is None:
             from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
             self.output_dir = get_benchmark_runs_datagen_path("tpcdi", self.scale_factor)
         else:
-            # normalize_output_dir keeps a CloudStagingPath/DatabricksPath
-            # handler intact; Path(...) would stringify it to the local cache
-            # and drop the cloud upload target resolved at construction time.
             from benchbox.utils.cloud_storage import normalize_output_dir
 
             self.output_dir = normalize_output_dir(self.output_dir)
 
-        # Set sensible worker count
         if self.max_workers is None:
             cpu_count = multiprocessing.cpu_count()
             self.max_workers = min(8, cpu_count + 2) if self.enable_parallel else 1
@@ -74,17 +47,14 @@ class TPCDIConfig:
         elif self.max_workers > 16:
             self.max_workers = 16
 
-        # Validate chunk size
         if self.chunk_size < 1000:
             self.chunk_size = 1000
         elif self.chunk_size > 50000:
             self.chunk_size = 50000
 
-        # Validate scale factor
         if self.scale_factor <= 0:
             self.scale_factor = 1.0
 
-        # Configure logging
         log_levels = {
             "DEBUG": logging.DEBUG,
             "INFO": logging.INFO,
@@ -95,7 +65,6 @@ class TPCDIConfig:
         logging.basicConfig(level=log_levels.get(self.log_level.upper(), logging.INFO))
 
     def get_streaming_config(self) -> dict[str, Any]:
-        """Get streaming configuration parameters."""
         return {
             "chunk_size": self.chunk_size,
             "max_workers": self.max_workers,
@@ -104,7 +73,6 @@ class TPCDIConfig:
         }
 
     def get_validation_config(self) -> dict[str, Any]:
-        """Get validation configuration parameters."""
         return {
             "strict_mode": self.strict_validation,
             "max_violations_per_rule": 1000,
@@ -113,7 +81,6 @@ class TPCDIConfig:
         }
 
     def get_etl_config(self) -> dict[str, Any]:
-        """Get ETL configuration parameters."""
         return {
             "enable_parallel_extract": self.enable_parallel,
             "enable_parallel_transform": self.enable_parallel,
@@ -125,7 +92,6 @@ class TPCDIConfig:
         }
 
     def get_batch_config(self) -> dict[str, Any]:
-        """Get batch processing configuration parameters."""
         return {
             "parallel_processing": self.enable_parallel,
             "max_workers": self.max_workers,
@@ -136,25 +102,21 @@ class TPCDIConfig:
 
     @property
     def source_dir(self) -> Path:
-        """ETL source directory under the configured output root."""
-        assert self.output_dir is not None  # Set in __post_init__
+        assert self.output_dir is not None
         return self.output_dir / "source"
 
     @property
     def staging_dir(self) -> Path:
-        """ETL staging directory under the configured output root."""
-        assert self.output_dir is not None  # Set in __post_init__
+        assert self.output_dir is not None
         return self.output_dir / "staging"
 
     @property
     def warehouse_dir(self) -> Path:
-        """ETL warehouse directory under the configured output root."""
-        assert self.output_dir is not None  # Set in __post_init__
+        assert self.output_dir is not None
         return self.output_dir / "warehouse"
 
     def create_directories(self) -> None:
-        """Create necessary directories for TPC-DI processing."""
-        assert self.output_dir is not None  # Set in __post_init__
+        assert self.output_dir is not None
         directories = [
             self.output_dir,
             self.source_dir,
@@ -167,8 +129,7 @@ class TPCDIConfig:
             directory.mkdir(parents=True, exist_ok=True)
 
     def get_performance_profile(self) -> str:
-        """Get recommended performance profile based on settings."""
-        assert self.max_workers is not None  # Set in __post_init__
+        assert self.max_workers is not None
         if not self.enable_parallel:
             return "single_threaded"
         elif self.max_workers <= 2:
@@ -181,23 +142,18 @@ class TPCDIConfig:
             return "maximum"
 
     def adjust_for_scale_factor(self) -> None:
-        """Adjust configuration based on scale factor."""
         if self.scale_factor >= 10.0:
-            # Large scale - optimize for throughput
             self.chunk_size = min(25000, int(self.chunk_size * 1.5))
             self.max_workers = min(16, self.max_workers + 2)
             self.optimize_memory = True
         elif self.scale_factor >= 5.0:
-            # Medium scale - balance memory and performance
             self.chunk_size = min(20000, int(self.chunk_size * 1.2))
             self.max_workers = min(12, self.max_workers + 1)
         elif self.scale_factor <= 0.1:
-            # Small scale - optimize for speed
             self.chunk_size = max(1000, int(self.chunk_size * 0.5))
             self.max_workers = min(4, self.max_workers)
 
     def get_memory_settings(self) -> dict[str, Any]:
-        """Get memory optimization settings."""
         if self.optimize_memory:
             return {
                 "enable_chunked_processing": True,
@@ -214,7 +170,6 @@ class TPCDIConfig:
             }
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert configuration to dictionary."""
         return {
             "scale_factor": self.scale_factor,
             "output_dir": str(self.output_dir),
@@ -230,8 +185,6 @@ class TPCDIConfig:
 
     @classmethod
     def from_dict(cls, config_dict: dict[str, Any]) -> "TPCDIConfig":
-        """Create configuration from dictionary."""
-        # Filter out unknown keys
         valid_keys = {
             "scale_factor",
             "output_dir",
@@ -246,7 +199,6 @@ class TPCDIConfig:
 
         filtered_dict = {k: v for k, v in config_dict.items() if k in valid_keys}
 
-        # Convert output_dir back to Path if it's a string
         if "output_dir" in filtered_dict and isinstance(filtered_dict["output_dir"], str):
             filtered_dict["output_dir"] = Path(filtered_dict["output_dir"])
 
@@ -254,7 +206,6 @@ class TPCDIConfig:
 
     @classmethod
     def for_development(cls) -> "TPCDIConfig":
-        """Create configuration optimized for development/testing."""
         return cls(
             scale_factor=0.1,
             enable_parallel=False,
@@ -268,10 +219,9 @@ class TPCDIConfig:
 
     @classmethod
     def for_production(cls, scale_factor: float = 1.0) -> "TPCDIConfig":
-        """Create configuration optimized for production."""
         config = cls(
             scale_factor=scale_factor,
-            enable_parallel=False,  # Parallel processing is opt-in
+            enable_parallel=False,
             chunk_size=15000,
             enable_validation=True,
             strict_validation=True,
@@ -283,10 +233,9 @@ class TPCDIConfig:
 
     @classmethod
     def for_performance_testing(cls, scale_factor: float = 1.0) -> "TPCDIConfig":
-        """Create configuration optimized for performance testing."""
         return cls(
             scale_factor=scale_factor,
-            enable_parallel=False,  # Parallel processing is opt-in
+            enable_parallel=False,
             max_workers=multiprocessing.cpu_count(),
             chunk_size=25000,
             enable_validation=False,
@@ -296,18 +245,7 @@ class TPCDIConfig:
         )
 
 
-# Convenience functions for common configurations
 def get_simple_config(scale_factor: float = 1.0, parallel: bool = True, validation: bool = True) -> TPCDIConfig:
-    """Get a simple TPC-DI configuration with minimal options.
-
-    Args:
-        scale_factor: Scale factor for data generation
-        parallel: Whether to enable parallel processing
-        validation: Whether to enable data validation
-
-    Returns:
-        TPCDIConfig instance with simple settings
-    """
     return TPCDIConfig(
         scale_factor=scale_factor,
         enable_parallel=parallel,
@@ -316,17 +254,9 @@ def get_simple_config(scale_factor: float = 1.0, parallel: bool = True, validati
 
 
 def get_fast_config(scale_factor: float = 1.0) -> TPCDIConfig:
-    """Get a configuration optimized for speed over validation.
-
-    Args:
-        scale_factor: Scale factor for data generation
-
-    Returns:
-        TPCDIConfig instance optimized for speed
-    """
     return TPCDIConfig(
         scale_factor=scale_factor,
-        enable_parallel=False,  # Parallel processing is opt-in
+        enable_parallel=False,
         enable_validation=False,
         strict_validation=False,
         optimize_memory=False,
@@ -334,14 +264,6 @@ def get_fast_config(scale_factor: float = 1.0) -> TPCDIConfig:
 
 
 def get_safe_config(scale_factor: float = 1.0) -> TPCDIConfig:
-    """Get a configuration optimized for safety and validation.
-
-    Args:
-        scale_factor: Scale factor for data generation
-
-    Returns:
-        TPCDIConfig instance optimized for safety
-    """
     return TPCDIConfig(
         scale_factor=scale_factor,
         enable_parallel=False,

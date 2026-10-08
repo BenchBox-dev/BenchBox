@@ -19,19 +19,18 @@ PostgreSQL is a powerful open-source relational database that serves as an excel
 PostgreSQL support requires the `psycopg2` driver:
 
 ```bash
-# Install with pip
 pip install psycopg2-binary
 
-# Or with system psycopg2 (recommended for production)
 pip install psycopg2
 ```
+
+The first command installs the binary package. The second uses a system `psycopg2` build, which is recommended for production.
 
 ## Configuration
 
 ### Environment Variables
 
 ```bash
-# Connection configuration
 export PGHOST=localhost
 export PGPORT=5432
 export PGUSER=postgres
@@ -86,7 +85,6 @@ revert a manually-installed version and how to work around it.
 ### Basic Benchmark Run
 
 ```bash
-# Run TPC-H on PostgreSQL
 benchbox run --platform postgresql --benchmark tpch --scale 0.1 \
   --platform-option host=localhost \
   --platform-option database=tpch_benchmark
@@ -98,7 +96,6 @@ benchbox run --platform postgresql --benchmark tpch --scale 0.1 \
 from benchbox import TPCH
 from benchbox.platforms.postgresql import PostgreSQLAdapter
 
-# Initialize adapter
 adapter = PostgreSQLAdapter(
     host="localhost",
     port=5432,
@@ -107,7 +104,6 @@ adapter = PostgreSQLAdapter(
     password="password",
 )
 
-# Load and run benchmark
 benchmark = TPCH(scale_factor=0.1)
 benchmark.generate_data()
 adapter.load_benchmark(benchmark)
@@ -131,30 +127,30 @@ benchbox run --platform postgresql --benchmark tsbs-devops --scale 1.0 \
 For benchmark workloads, consider these PostgreSQL settings:
 
 ```sql
--- Connection-level settings (set via platform options)
 SET work_mem = '256MB';
 SET maintenance_work_mem = '1GB';
 SET effective_cache_size = '8GB';
 
--- Server-level settings (postgresql.conf)
 shared_buffers = 4GB
 effective_io_concurrency = 200
 random_page_cost = 1.1
 ```
+
+The three `SET` statements are connection-level settings, which you set through platform options. The last three lines (`shared_buffers`, `effective_io_concurrency` and `random_page_cost`) are server-level settings that belong in `postgresql.conf`.
 
 ### Tuning Mode
 
 BenchBox supports automatic tuning configuration:
 
 ```bash
-# Run with tuning enabled
 benchbox run --platform postgresql --benchmark tpch \
   --tuning tuned
 
-# Run baseline (no tuning)
 benchbox run --platform postgresql --benchmark tpch \
   --tuning notuning
 ```
+
+The first command runs with tuning enabled. The second runs the baseline with no tuning.
 
 ## Query Plan Capture
 
@@ -182,27 +178,28 @@ This captures EXPLAIN ANALYZE output including:
 ### Connection Refused
 
 ```bash
-# Verify PostgreSQL is running
 pg_isready -h localhost -p 5432
-
-# Check pg_hba.conf for access rules
 ```
+
+Verify that PostgreSQL is running, then check `pg_hba.conf` for access rules.
 
 ### Permission Denied
 
 ```sql
--- Grant necessary permissions
 GRANT CREATE ON DATABASE benchbox TO your_user;
 GRANT USAGE ON SCHEMA public TO your_user;
 ```
 
+Grant the necessary permissions.
+
 ### Memory Errors
 
 ```bash
-# Increase work_mem for complex queries
 benchbox run --platform postgresql --benchmark tpcds \
   --platform-option work_mem=512MB
 ```
+
+Increase `work_mem` for complex queries.
 
 ## Related Documentation
 

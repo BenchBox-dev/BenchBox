@@ -151,7 +151,6 @@ The implementation adds more than the initial report requested, especially aroun
 - JoinOrder benchmark docs: `docs/benchmarks/join-order.md`, `docs/reference/python-api/benchmarks/joinorder.md`
 - JoinOrder data manifest: `benchbox/core/joinorder/data_manifest.toml`
 - JoinOrder data license note: `benchbox/core/joinorder/DATA-LICENSE.md`
-- JoinOrder licensing decision: `_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md`
 - Release overview: [BenchBox v0.3.0: JoinOrder fix, approximate analytics, and agent prompt composer](./2026-05-18-v0-3-0-release-overview.md)
 
 [^issue-289]: GitHub issue #289, "[JOB] Uniformly random data generation undermines the benchmark's core motivation - real-world data correlations matter," filed by `@partychicken` on May 9, 2026. The issue asks BenchBox to remove synthetic scaling for JOB and use the original frozen IMDb dataset.

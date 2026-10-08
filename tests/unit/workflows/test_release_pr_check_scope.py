@@ -1,11 +1,3 @@
-"""Release PRs are gated by their release checks alone, and cleanup cannot fail a release.
-
-A release PR carries the curated release tree, which lacks the development
-files that the CI and oracle-review lanes read, so those workflows skip the
-release base. The release workflow's artifact cleanup queries artifacts by name
-because listing every repository artifact fails intermittently.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path

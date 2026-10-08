@@ -1,5 +1,3 @@
-"""Unit coverage for measured ClickHouse memory traces."""
-
 from __future__ import annotations
 
 import json

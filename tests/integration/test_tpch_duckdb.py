@@ -1,15 +1,9 @@
-"""Integration tests for TPC-H with DuckDB.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module tests the TPC-H implementation with a real DuckDB database.
-It verifies data generation, schema creation, and query execution.
+# TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-H specification.
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-H specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest import mock
 
@@ -27,34 +21,28 @@ pytestmark = [
 @pytest.mark.integration
 @pytest.mark.duckdb
 class TestTPCHDuckDBIntegration:
-    """Integration tests for TPC-H with DuckDB."""
-
     @pytest.fixture
     def tpch(self, small_scale_factor, temp_dir):
-        """Create a tiny TPC-H instance for testing."""
-        # Use a very small scale factor for quick testing
+
         with mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen") as mock_build:
             mock_build.return_value = temp_dir / "dbgen"
             return TPCH(scale_factor=small_scale_factor, output_dir=temp_dir)
 
     @pytest.fixture
     def duckdb_conn(self):
-        """Create a temporary DuckDB database."""
+
         conn = duckdb.connect(":memory:")
         yield conn
         conn.close()
 
     def test_create_schema(self, tpch, duckdb_conn):
-        """Test creating the TPC-H schema in DuckDB."""
-        # Get the SQL schema
+
         sql = tpch.get_create_tables_sql()
 
-        # Execute the schema creation
         for statement in sql.strip().split(";"):
             if statement.strip():
                 duckdb_conn.execute(statement.strip())
 
-        # Verify tables were created
         tables_result = duckdb_conn.execute("""
             SELECT table_name
             FROM information_schema.tables
@@ -74,14 +62,12 @@ class TestTPCHDuckDBIntegration:
             "supplier",
         ]
 
-        # Check that all expected tables exist (case-insensitive)
         table_names_lower = [t.lower() for t in table_names]
         for expected_table in expected_tables:
             assert expected_table in table_names_lower, (
                 f"Table {expected_table} not found in created tables: {table_names}"
             )
 
-        # Test that we can describe each table
         for table in expected_tables:
             try:
                 result = duckdb_conn.execute(f"DESCRIBE {table}").fetchall()
@@ -90,36 +76,28 @@ class TestTPCHDuckDBIntegration:
                 pytest.fail(f"Failed to describe table {table}: {e}")
 
     def test_load_sample_data(self, tpch, duckdb_conn):
-        """Test loading sample data into DuckDB."""
-        # Create schema first
+
         sql = tpch.get_create_tables_sql()
         for statement in sql.strip().split(";"):
             if statement.strip():
                 duckdb_conn.execute(statement.strip())
 
-        # Generate minimal sample data
         data_paths = tpch.generate_data()
         assert len(data_paths) > 0, "Should generate at least one data file"
 
-        # Verify the data files exist (data loading requires platform adapter)
         for path in data_paths:
             assert path.exists(), f"Data file {path} should exist"
 
     def test_sql_dialect_compatibility(self, tpch, duckdb_conn):
-        """Test that TPC-H SQL is compatible with DuckDB dialect."""
-        # Get a sample query and check for DuckDB compatibility
+
         queries = tpch.get_queries()
 
-        # Test that queries can be translated/adapted for DuckDB
-        for query_id, query_sql in list(queries.items())[:5]:  # Test first 5 queries
-            # Basic syntax checks
+        for query_id, query_sql in list(queries.items())[:5]:
             assert "SELECT" in query_sql.upper()
             assert "FROM" in query_sql.upper()
 
-            # Check for potential DuckDB compatibility issues
             upper_sql = query_sql.upper()
 
-            # These are generally supported by DuckDB
             duckdb_compatible_features = [
                 "JOIN",
                 "GROUP BY",
@@ -132,9 +110,6 @@ class TestTPCHDuckDBIntegration:
                 "LIKE",
             ]
 
-            # Just verify the queries contain standard SQL features
-            # (actual execution testing is done in other test methods)
             has_standard_sql = any(feature in upper_sql for feature in duckdb_compatible_features)
             if not has_standard_sql and "WHERE" not in upper_sql:
-                # Very simple queries might not have these features
                 assert len(query_sql.strip()) > 20, f"Query {query_id} seems too simple: {query_sql[:100]}"

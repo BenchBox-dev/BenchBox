@@ -1,5 +1,3 @@
-"""Exercise tag objects, isolated producer execution and fail-closed admission."""
-
 from __future__ import annotations
 
 import hashlib
@@ -246,7 +244,6 @@ def bind_admission_fixture(tagged_source, distributions, metadata, tmp_path, mon
 
 
 def commit_rejection_probe(root, script):
-    """Commit only a rejecting sentinel, never a substitute positive binary verifier."""
     verifier = root / "scripts/verify_distribution_binaries.py"
     verifier.parent.mkdir()
     verifier.write_text(script)
@@ -401,8 +398,6 @@ def test_atomic_output_publishes_whole_directory(tmp_path):
 @pytest.mark.parametrize("behavior", ["stall", "oversize", "failure"])
 def test_download_failure_reaps_real_child_and_removes_partial(tmp_path, monkeypatch, behavior):
     executable = tmp_path / "gh"
-    # A shell stub, not a Python one: a freshly created Python script occasionally takes about three
-    # seconds to start on macOS, which these process-lifetime tests must not depend on.
     executable.write_text(
         "#!/bin/sh\n"
         '[ "$1 $2 $3" = "api --hostname github.com" ] || exit 9\n'
@@ -414,8 +409,6 @@ def test_download_failure_reaps_real_child_and_removes_partial(tmp_path, monkeyp
     )
     executable.chmod(0o755)
     monkeypatch.setenv("PATH", str(tmp_path) + os.pathsep + os.environ.get("PATH", ""))
-    # Only the stall case needs a short deadline. The other two need the child to start and
-    # write before it, so a short deadline races process startup on a loaded machine.
     monkeypatch.setattr(consumer, "DOWNLOAD_TIMEOUT_SECONDS", 0.3 if behavior == "stall" else 30.0)
     monkeypatch.setattr(consumer, "MAX_PAYLOAD_BYTES", 16)
     real_popen = subprocess.Popen
@@ -525,13 +518,10 @@ def test_transient_git_replacement_cannot_replace_committed_verifier(
 
 @pytest.mark.parametrize("parent_exits", [False, True])
 def test_inherited_pipe_writer_cannot_hold_download_cleanup(tmp_path, monkeypatch, parent_exits):
-    """Outer owned supervisor bounds a predecessor hang without touching other owners."""
     from benchbox.utils.clock import elapsed_seconds, mono_time
 
     pidfile = tmp_path / "descendant.pid"
     executable = tmp_path / "gh"
-    # A shell stub, not a Python one, so its startup is deterministic; the background `sleep`
-    # inherits the stub's stdout pipe, which is exactly the descendant cleanup must not wait on.
     executable.write_text(
         "#!/bin/sh\n"
         '[ "$1 $2 $3" = "api --hostname github.com" ] || exit 9\n'
@@ -546,9 +536,6 @@ def test_inherited_pipe_writer_cannot_hold_download_cleanup(tmp_path, monkeypatc
         "import importlib.util,pathlib,sys\n"
         f"spec=importlib.util.spec_from_file_location('consumer',{str(ROOT / 'scripts/release_artifact_consumer.py')!r})\n"
         "module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)\n"
-        # Spawning a fresh script child has been measured to stall for about three seconds on a
-        # loaded macOS machine, before the script runs at all. The deadline needs margin over that
-        # so the child is up and has written its pid file, and is still far below its 30 second sleeps.
         "module.DOWNLOAD_TIMEOUT_SECONDS=8.0\n"
         f"archive=pathlib.Path({str(archive)!r})\n"
         "try:\n module._download(11,archive)\n"
@@ -570,7 +557,6 @@ def test_inherited_pipe_writer_cannot_hold_download_cleanup(tmp_path, monkeypatc
         started = mono_time()
         while True:
             if os.name == "nt":
-                # Windows descendant termination still needs its native CI leg.
                 break
             state = subprocess.run(["ps", "-p", str(descendant), "-o", "stat="], capture_output=True, text=True)
             if not state.stdout.strip() or state.stdout.strip().startswith("Z"):
@@ -594,7 +580,6 @@ def test_inherited_pipe_writer_cannot_hold_download_cleanup(tmp_path, monkeypatc
 
 
 def commit_snapshot_files(root: Path, files: dict[str, str]) -> str:
-    """Commit exactly these files as the tagged source and return the commit."""
     for name, text in files.items():
         path = root / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -618,8 +603,6 @@ sys.exit(0 if SOURCE == "committed snapshot" else 23)
 
 
 def test_verifier_runs_committed_package_without_site_or_package_init(tagged_source):
-    # The package __init__ files import third-party modules, so they must never run, and `-I`
-    # removes the script directory from sys.path, so the import must be mapped to the snapshot.
     commit = commit_snapshot_files(
         tagged_source,
         {
@@ -664,7 +647,6 @@ def test_verifier_and_git_children_inherit_no_credentials(tagged_source, monkeyp
         tagged_source,
         {"scripts/verify_distribution_binaries.py": probe, "benchbox/utils/binary_manifest.py": ""},
     )
-    # Set after the fixture commit so the test's own git calls do not inherit the injected config.
     for key, value in secrets.items():
         monkeypatch.setenv(key, value)
     consumer._verify_committed_binaries(tagged_source, commit, [])
@@ -685,7 +667,6 @@ def test_git_children_do_not_run_configured_filesystem_monitor(tagged_source, mo
         monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
         monkeypatch.setenv("GIT_CONFIG_KEY_0", "core.fsmonitor")
         monkeypatch.setenv("GIT_CONFIG_VALUE_0", str(helper))
-    # Control: plain Git runs the helper, so the scenario is real in this environment.
     subprocess.run(["git", "-C", str(tagged_source), "status", "--porcelain"], capture_output=True, check=False)
     assert marker.exists(), "control: configured helper should run under plain git"
     marker.unlink()
@@ -728,9 +709,6 @@ def test_cleanup_tolerates_an_exited_unreaped_group_leader():
     import threading
 
     process = subprocess.Popen(["/bin/sh", "-c", "exit 0"], stdout=subprocess.PIPE, bufsize=0, start_new_session=True)
-    # Wait for the exit without reaping, so the group holds only a zombie leader. macOS answers
-    # killpg on such a group with EPERM instead of ESRCH, which must not escape the cleanup.
-    # os.waitid is missing from some interpreters, so poll the process state like the other tests.
     for _ in range(500):
         state = subprocess.run(["ps", "-p", str(process.pid), "-o", "stat="], capture_output=True, text=True)
         if state.stdout.strip().startswith("Z"):
@@ -749,7 +727,6 @@ def test_git_children_do_not_run_repository_local_transport_helpers(tagged_sourc
     helper.write_text(f"#!/bin/sh\necho ran >> {marker}\nexit 1\n")
     helper.chmod(0o755)
     git(tagged_source, "config", "core.sshCommand", str(helper))
-    # Control: plain Git runs the configured helper for an ssh remote.
     subprocess.run(
         ["git", "-C", str(tagged_source), "ls-remote", "ssh://invalid.example/repository"],
         capture_output=True,
@@ -810,7 +787,6 @@ def test_swapped_staging_directory_is_refused_before_publication(
         result = real_resolve_tag(*args, **kwargs)
         calls.append(1)
         if len(calls) == 2:
-            # Verification is complete. Another writer now replaces the staging directory.
             stage = next(tmp_path.glob("release-admission-*"))
             stage.rename(tmp_path / "moved-away")
             stage.mkdir()
@@ -824,7 +800,6 @@ def test_swapped_staging_directory_is_refused_before_publication(
 
 def test_moved_hosted_tag_changes_the_local_tag_so_the_stale_checkout_is_refused(tagged_source, tmp_path):
     first = consumer.resolve_tag(tagged_source, "v0.4.2")
-    # The hosted repository moves v0.4.2 to a different commit that declares the same version.
     hosted = tmp_path / "hosted"
     subprocess.run(["git", "clone", "-q", str(tagged_source), str(hosted)], check=True)
     git(hosted, "config", "user.name", "Test Fixture")
@@ -834,10 +809,8 @@ def test_moved_hosted_tag_changes_the_local_tag_so_the_stale_checkout_is_refused
     git(hosted, "commit", "-m", "Commit the hosted tag now points at")
     git(hosted, "tag", "-d", "v0.4.2")
     git(hosted, "tag", "-a", "v0.4.2", "-m", "Moved hosted tag")
-    # Control: a fetch that ignores tags leaves the local tag, and the stale checkout still admits.
     subprocess.run(["git", "-C", str(tagged_source), "fetch", "-q", "--no-tags", str(hosted), "develop"], check=True)
     assert consumer.resolve_tag(tagged_source, "v0.4.2") == first
-    # The refspecs the consumer uses force the local tag to the hosted tag object.
     subprocess.run(
         ["git", "-C", str(tagged_source), "fetch", "-q", "--no-tags", str(hosted), *consumer.hosted_refspecs("v0.4.2")],
         check=True,
@@ -878,10 +851,8 @@ def test_local_url_rewrite_cannot_reach_an_ext_transport(tagged_source, tmp_path
     helper.write_text(f"#!/bin/sh\necho ran >> {marker}\nexit 1\n")
     helper.chmod(0o755)
     url = "https://github.com/BenchBox-dev/BenchBox.git"
-    # A specific `protocol.ext.allow` in repository config outranks the general default.
     git(tagged_source, "config", f"url.ext::{helper}.insteadOf", url)
     git(tagged_source, "config", "protocol.ext.allow", "always")
-    # Control: plain Git rewrites the URL and runs the helper.
     subprocess.run(["git", "-C", str(tagged_source), "ls-remote", url], capture_output=True, check=False, timeout=60)
     assert marker.exists(), "control: the rewritten ext transport should run under plain git"
     marker.unlink()
@@ -925,7 +896,6 @@ def test_cli_fetches_hosted_refs_before_it_admits(monkeypatch, tmp_path, capsys)
     monkeypatch.setattr(consumer, "admit", record_admission)
     argv = ["admit", "--source", str(tmp_path), "--tag", "v0.4.2", "--output", str(tmp_path / "admitted")]
     assert consumer.main(argv) == 0
-    # Without the fetch a stale local tag could admit the previous commit's artifact.
     assert order == [("fetch", tmp_path, "v0.4.2"), ("admit", tmp_path.resolve(), "v0.4.2")]
     assert '"tag": "v0.4.2"' in capsys.readouterr().out
 

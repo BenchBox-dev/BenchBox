@@ -1,27 +1,6 @@
-"""Metadata Primitives benchmark module.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides functionality to run metadata introspection benchmarks that test
-database catalog performance. Unlike Read/Write/Transaction primitives that test data
-operations, this benchmark focuses on metadata operations critical for:
-
-- Data catalog integration
-- Schema discovery tools
-- IDE autocomplete performance
-- BI tool connectivity
-- Data governance workflows
-
-The benchmark tests INFORMATION_SCHEMA views, SHOW commands, DESCRIBE operations,
-and query execution plans across multiple database platforms.
-
-Complexity Testing:
-The module also supports metadata complexity stress testing through the MetadataGenerator
-class, which creates complex metadata structures (wide tables, nested views, complex types)
-to measure how introspection performance scales with schema complexity.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from .benchmark import (
     AclBenchmarkResult,
@@ -62,7 +41,6 @@ from .generator import MetadataGenerator
 from .queries import MetadataPrimitivesQueryManager
 
 __all__ = [
-    # Benchmark classes
     "AclBenchmarkResult",
     "AclMutationResult",
     "ComplexityBenchmarkResult",
@@ -70,7 +48,6 @@ __all__ = [
     "MetadataPrimitivesBenchmark",
     "MetadataPrimitivesQueryManager",
     "MetadataQueryResult",
-    # Complexity testing
     "COMPLEXITY_PRESETS",
     "AclGrant",
     "ConstraintDensity",
@@ -81,7 +58,6 @@ __all__ = [
     "RoleHierarchyDepth",
     "TypeComplexity",
     "get_complexity_preset",
-    # DataFrame operations
     "DATAFUSION_METADATA_CAPABILITIES",
     "DataFrameMetadataCapabilities",
     "DataFrameMetadataOperationsManager",

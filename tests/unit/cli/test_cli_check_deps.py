@@ -1,11 +1,6 @@
-"""Tests for the CLI check-deps command.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the dependency checking CLI command functionality.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock, patch
 
@@ -21,10 +16,8 @@ pytestmark = [
 
 
 class TestCheckDepsCommand:
-    """Test the check-deps CLI command."""
-
     def test_check_deps_command_exists(self):
-        """Test that the check-deps command is available."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
 
@@ -32,7 +25,7 @@ class TestCheckDepsCommand:
         assert "check-deps" in result.output
 
     def test_check_deps_help(self):
-        """Test the check-deps help output."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["check-deps", "--help"])
 
@@ -45,17 +38,14 @@ class TestCheckDepsCommand:
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
     @patch("benchbox.utils.dependencies.list_available_dependency_groups")
     def test_check_deps_overview(self, mock_list_groups, mock_check_deps):
-        """Test check-deps without specific platform (overview mode)."""
-        # Mock dependency groups
         mock_groups = {
             "clickhouse": MagicMock(description="ClickHouse driver", packages=["clickhouse-driver"]),
             "databricks": MagicMock(description="Databricks connector", packages=["databricks-sql-connector"]),
-            "cloud": MagicMock(),  # Should be skipped in overview
-            "all": MagicMock(),  # Should be skipped in overview
+            "cloud": MagicMock(),
+            "all": MagicMock(),
         }
         mock_list_groups.return_value = mock_groups
 
-        # Mock dependency checking - clickhouse available, databricks not
         def mock_check(platform, packages):
             if platform == "clickhouse":
                 return True, []
@@ -70,14 +60,14 @@ class TestCheckDepsCommand:
 
         assert result.exit_code == 0
         assert "BenchBox Dependency Status" in result.output
-        assert "✅" in result.output  # Should show success for clickhouse
-        assert "❌" in result.output  # Should show failure for databricks
-        assert "Installation Guide" in result.output  # Decision tree
+        assert "✅" in result.output
+        assert "❌" in result.output
+        assert "Installation Guide" in result.output
 
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
     @patch("benchbox.utils.dependencies.list_available_dependency_groups")
     def test_check_deps_specific_platform_available(self, mock_list_groups, mock_check_deps):
-        """Test check-deps for specific platform that is available."""
+
         mock_groups = {
             "databricks": MagicMock(
                 description="Databricks connector",
@@ -87,7 +77,7 @@ class TestCheckDepsCommand:
             )
         }
         mock_list_groups.return_value = mock_groups
-        mock_check_deps.return_value = (True, [])  # Dependencies available
+        mock_check_deps.return_value = (True, [])
 
         runner = CliRunner()
         result = runner.invoke(cli, ["check-deps", "--platform", "databricks"])
@@ -99,14 +89,14 @@ class TestCheckDepsCommand:
     @patch("benchbox.utils.dependencies.list_available_dependency_groups")
     @patch("benchbox.utils.dependencies.get_dependency_error_message")
     def test_check_deps_specific_platform_missing(self, mock_error_msg, mock_list_groups, mock_check_deps):
-        """Test check-deps for specific platform with missing dependencies."""
+
         mock_groups = {
             "databricks": MagicMock(
                 install_command='uv pip install "benchbox[databricks]"',
             )
         }
         mock_list_groups.return_value = mock_groups
-        mock_check_deps.return_value = (False, ["databricks-sql-connector"])  # Missing deps
+        mock_check_deps.return_value = (False, ["databricks-sql-connector"])
 
         runner = CliRunner()
         result = runner.invoke(cli, ["check-deps", "--platform", "databricks"])
@@ -117,7 +107,7 @@ class TestCheckDepsCommand:
 
     @patch("benchbox.utils.dependencies.list_available_dependency_groups")
     def test_check_deps_unknown_platform(self, mock_list_groups):
-        """Test check-deps for unknown platform."""
+
         mock_groups = {
             "databricks": MagicMock(),
             "bigquery": MagicMock(),
@@ -134,7 +124,7 @@ class TestCheckDepsCommand:
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
     @patch("benchbox.utils.dependencies.list_available_dependency_groups")
     def test_check_deps_verbose_specific_platform(self, mock_list_groups, mock_check_deps):
-        """Test check-deps with verbose flag for specific platform."""
+
         mock_groups = {
             "databricks": MagicMock(
                 description="Databricks SQL connector",
@@ -157,7 +147,7 @@ class TestCheckDepsCommand:
     @patch("benchbox.utils.dependencies.list_available_dependency_groups")
     @patch("benchbox.utils.dependencies.get_installation_recommendations")
     def test_check_deps_verbose_overview(self, mock_recommendations, mock_list_groups, mock_check_deps):
-        """Test check-deps with verbose flag in overview mode."""
+
         mock_groups = {
             "databricks": MagicMock(description="Databricks", packages=["databricks-sql-connector"]),
         }
@@ -173,7 +163,7 @@ class TestCheckDepsCommand:
         mock_recommendations.assert_called_once()
 
     def test_check_deps_case_insensitive_platform(self):
-        """Test that platform names are case insensitive."""
+
         with patch("benchbox.utils.dependencies.list_available_dependency_groups") as mock_list_groups:
             with patch("benchbox.utils.dependencies.check_platform_dependencies") as mock_check_deps:
                 mock_groups = {
@@ -193,7 +183,7 @@ class TestCheckDepsCommand:
     @patch("benchbox.utils.dependencies.get_installation_scenarios")
     @patch("benchbox.utils.dependencies.get_installation_matrix_rows")
     def test_check_deps_matrix_flag(self, mock_matrix_rows, mock_scenarios):
-        """Test the matrix flag renders installation guidance."""
+
         mock_matrix_rows.return_value = [
             (
                 "Scenario A",
@@ -217,7 +207,7 @@ class TestCheckDepsCommand:
     @patch("benchbox.utils.dependencies.get_installation_scenarios")
     @patch("benchbox.utils.dependencies.get_installation_matrix_rows")
     def test_check_deps_matrix_flag_with_tip(self, mock_matrix_rows, mock_scenarios):
-        """Test that the tip is included when multi-group scenarios exist."""
+
         mock_matrix_rows.return_value = [
             (
                 "Scenario B",
@@ -238,32 +228,27 @@ class TestCheckDepsCommand:
 
 
 class TestCheckDepsIntegration:
-    """Integration tests for check-deps command."""
-
     def test_check_deps_real_execution(self):
-        """Test check-deps command with real dependency checking."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["check-deps"])
 
-        # Should run without errors
         assert result.exit_code == 0
         assert "BenchBox Dependency Status" in result.output
 
     def test_check_deps_real_platform_check(self):
-        """Test check-deps for a real platform."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["check-deps", "--platform", "databricks"])
 
-        # Should run without errors regardless of whether deps are installed
         assert result.exit_code == 0
-        # Should show either success or failure message
         assert (
             "✅ databricks dependencies are installed" in result.output
             or "❌ databricks missing dependencies" in result.output
         )
 
     def test_check_deps_verbose_real(self):
-        """Test check-deps with verbose flag in real execution."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["check-deps", "--verbose"])
 

@@ -1,17 +1,6 @@
-"""Shared helpers for real PySpark + Delta Lake live integration tests.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-These helpers start a local PySpark session with the Delta Lake extension
-using the repository's own JDK compatibility logic
-(:func:`benchbox.platforms.pyspark.ensure_compatible_java`), so the tests
-work on machines whose default Java is too new for Spark.
-
-The suites using these helpers are marked ``live_integration`` and are
-excluded from the default test selection.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -22,11 +11,6 @@ from typing import Any
 
 @lru_cache(maxsize=1)
 def delta_live_skip_reason() -> str | None:
-    """Return a skip reason when the live Delta runtime is unavailable, else None.
-
-    Cached: the result only depends on the ambient interpreter and JDK, and
-    every live module evaluates it twice at collection (condition + reason).
-    """
     try:
         import delta  # noqa: F401
         import pyspark  # noqa: F401
@@ -43,15 +27,6 @@ def delta_live_skip_reason() -> str | None:
 
 
 def make_delta_spark_session(warehouse_dir: Path | str, app_name: str = "benchbox-delta-live") -> Any:
-    """Create a local PySpark session with Delta Lake support.
-
-    Args:
-        warehouse_dir: Directory used as the Spark SQL warehouse.
-        app_name: Spark application name.
-
-    Returns:
-        A running ``SparkSession`` with the Delta extension configured.
-    """
     from benchbox.platforms.pyspark import ensure_compatible_java
 
     ensure_compatible_java()

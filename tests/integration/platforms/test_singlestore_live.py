@@ -1,18 +1,6 @@
 # Copyright 2026 Joe Harris / BenchBox Project
-#
 # Licensed under the MIT License. See LICENSE file in the project root for details.
 
-"""
-Docker live integration tests for SingleStore.
-
-Setup:
-    make test-docker-up-singlestore
-    # or: docker compose -f docker/singlestore/docker-compose.yml up -d --wait
-
-These tests require a running SingleStore instance accessible at localhost:13306 by default.
-Set SINGLESTORE_HOST_PORT to target a different host port.
-Set SINGLESTORE_PASSWORD to override the default test password.
-"""
 
 import os
 
@@ -35,7 +23,6 @@ _PASSWORD = os.getenv("SINGLESTORE_PASSWORD", "benchbox")
 
 @pytest.fixture(scope="module", autouse=True)
 def ensure_database():
-    """Pre-create the test database so the adapter can connect with skip_database_management."""
     try:
         import singlestoredb as s2
 
@@ -50,7 +37,6 @@ def ensure_database():
 
 @pytest.fixture
 def singlestore_adapter():
-    """Create a SingleStoreAdapter connected to the local Docker instance."""
     skip_unless_docker_service("localhost", _HOST_PORT, platform="SingleStore")
     adapter = SingleStoreAdapter(
         host="localhost",
@@ -64,10 +50,8 @@ def singlestore_adapter():
 
 
 class TestLiveSingleStoreConnection:
-    """Test basic SingleStore connectivity via Docker."""
-
     def test_connection(self, singlestore_adapter):
-        """Verify we can connect to SingleStore and run a trivial query."""
+
         connection = singlestore_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -78,7 +62,7 @@ class TestLiveSingleStoreConnection:
             singlestore_adapter.close_connection(connection)
 
     def test_platform_info(self, singlestore_adapter):
-        """Verify platform info reports SingleStore metadata."""
+
         info = singlestore_adapter.get_platform_info()
         assert info["platform_type"] == "singlestore"
         assert info["platform_name"] == "SingleStore"
@@ -86,7 +70,7 @@ class TestLiveSingleStoreConnection:
         assert info["port"] == _HOST_PORT
 
     def test_version_string(self, singlestore_adapter):
-        """Verify SingleStore returns a version via @@memsql_version."""
+
         connection = singlestore_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -99,21 +83,19 @@ class TestLiveSingleStoreConnection:
             singlestore_adapter.close_connection(connection)
 
     def test_check_server_database_exists(self, singlestore_adapter):
-        """Verify check_server_database_exists returns True for the pre-created database."""
+
         result = singlestore_adapter.check_server_database_exists(database="benchbox_test")
         assert result is True
 
     def test_check_server_database_exists_missing(self, singlestore_adapter):
-        """Verify check_server_database_exists returns False for a nonexistent database."""
+
         result = singlestore_adapter.check_server_database_exists(database="benchbox_does_not_exist_xyz")
         assert result is False
 
 
 class TestLiveSingleStoreQueryExecution:
-    """Test query execution against a live SingleStore instance."""
-
     def test_execute_select(self, singlestore_adapter):
-        """Verify basic SELECT execution via adapter."""
+
         connection = singlestore_adapter.create_connection()
         try:
             result = singlestore_adapter.execute_query(
@@ -127,7 +109,6 @@ class TestLiveSingleStoreQueryExecution:
             singlestore_adapter.close_connection(connection)
 
     def test_aggregation_query(self, singlestore_adapter):
-        """Execute an aggregation to verify analytical capabilities."""
         connection = singlestore_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -139,7 +120,6 @@ class TestLiveSingleStoreQueryExecution:
             singlestore_adapter.close_connection(connection)
 
     def test_mysql_dialect(self, singlestore_adapter):
-        """Verify MySQL-dialect operations work (SHOW DATABASES, SHOW TABLES)."""
         connection = singlestore_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -151,10 +131,8 @@ class TestLiveSingleStoreQueryExecution:
 
 
 class TestLiveSingleStoreDDL:
-    """Test SingleStore-specific DDL (columnstore, shard/sort keys, reference tables)."""
-
     def test_create_table_with_shard_and_sort_key(self, singlestore_adapter):
-        """Verify that transformed DDL with SHARD KEY and SORT KEY executes successfully."""
+
         connection = singlestore_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -178,7 +156,6 @@ class TestLiveSingleStoreDDL:
             singlestore_adapter.close_connection(connection)
 
     def test_create_reference_table(self, singlestore_adapter):
-        """Verify that nation/region become REFERENCE TABLEs in SingleStore DDL."""
         connection = singlestore_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -201,7 +178,6 @@ class TestLiveSingleStoreDDL:
             singlestore_adapter.close_connection(connection)
 
     def test_insert_and_query(self, singlestore_adapter):
-        """Create a table, insert rows, verify count, and clean up."""
         connection = singlestore_adapter.create_connection()
         try:
             cursor = connection.cursor()

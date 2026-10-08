@@ -1,10 +1,3 @@
-"""Tests for benchbox.core.data_fetch.manifest.
-
-Exercises every required-field check, malformed-TOML handling, and the
-TableEntry/provenance round-trip — all against TOML strings written to
-tmp files; no fixture artifacts checked into the repo.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -143,8 +136,6 @@ def test_tables_must_be_array(tmp_path: Path) -> None:
         load_manifest(p)
 
 
-# ---- logical-mode manifests (per-table logical_sha256 pinned) ----
-
 _T1_LOGICAL = "1a" * 32
 _T2_LOGICAL = "2b" * 32
 _LOGICAL_TABLES = [
@@ -218,18 +209,14 @@ def test_legacy_manifest_is_not_logical(tmp_path: Path) -> None:
 
 
 def test_logical_manifest_hash_stable_across_transport_byte_change(tmp_path: Path) -> None:
-    """The whole point of logical mode: changing per-table byte sha256 and the
-    transport archive_sha256 (what a non-deterministic rebuild changes) must NOT
-    invalidate manifest_hash."""
     p = _write_raw(tmp_path, _logical_body(_LOGICAL_TABLES))
     original = load_manifest(p)
     rebuilt = p.read_text()
-    # Anchor on the leading newline so the per-table byte `sha256` line is hit
-    # without also matching `logical_sha256`.
+
     rebuilt = rebuilt.replace(f'\nsha256 = "{_HEX_B}"', f'\nsha256 = "{"e" * 64}"')
     rebuilt = rebuilt.replace(f'archive_sha256 = "{_HEX_D}"', f'archive_sha256 = "{"f" * 64}"')
     p.write_text(rebuilt)
-    reloaded = load_manifest(p)  # must not raise
+    reloaded = load_manifest(p)
     assert reloaded.manifest_hash == original.manifest_hash
     assert reloaded.table("t1").sha256 == "e" * 64
     assert reloaded.table("t1").logical_sha256 == _T1_LOGICAL
@@ -254,10 +241,9 @@ def test_mixed_logical_mode_rejected(tmp_path: Path) -> None:
         _LOGICAL_TABLES[0],
         TableEntry(name="t2", file="t2.parquet", sha256=_HEX_C, row_count=200, schema={"id": "integer"}),
     ]
-    # Build text by hand so t2 simply omits logical_sha256; the identity hash
-    # over the pair is irrelevant because mode-detection fails first.
+
     body = _logical_body(_LOGICAL_TABLES).replace(f'logical_sha256 = "{_T2_LOGICAL}"\n', "")
     p = _write_raw(tmp_path, body)
     with pytest.raises(ManifestValidationError, match="present on some tables but missing"):
         load_manifest(p)
-    assert partial  # documents the intended shape
+    assert partial

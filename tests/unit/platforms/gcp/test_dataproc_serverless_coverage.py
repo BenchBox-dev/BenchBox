@@ -1,5 +1,3 @@
-"""Additional coverage tests for Dataproc Serverless adapter."""
-
 from __future__ import annotations
 
 from types import SimpleNamespace

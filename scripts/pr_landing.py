@@ -1,32 +1,4 @@
 #!/usr/bin/env python3
-"""One cohesive revision/readiness/queue/follow-up helper behind the Make PR targets.
-
-Session history shows the failure modes this closes: queued-branch push
-rejection after readiness was armed, unpublished fixes riding along, wrong-PR
-operations from an inferred branch, and late-fix merges ahead of corrections.
-The contract:
-
-* Every mutation names the exact repository, PR number/node, expected head,
-  branch, and worktree. A PR resolved from a reused branch name alone is
-  refused (wrong-PR protection).
-* Readiness is withdrawn (auto-merge disabled and verified) before the first
-  edit. If the merge wins the race, the helper stops and preserves commits
-  for a correctly identified follow-up instead of modifying a closed PR.
-* Ready requires local/remote head agreement on the exact expected head, no
-  unpublished work, completed review evidence on that head, required checks
-  green at that head, and no durable hold. Enqueue re-checks the remote head
-  immediately before arming; a head change invalidates readiness.
-* Feature-batch readiness additionally binds batch id/version, member set,
-  owner generation, and integration head; late members or content edits
-  invalidate it. Member SHAs must be ancestors of the integration head.
-* Follow-up state (pre-PR assembly through post-merge) persists with an
-  explicit owner and next action; retries are bounded to evidenced transient
-  failures on unchanged heads; terminal state is explicit, never inferred
-  from an empty PR list.
-
-All GitHub access goes through an injectable runner so tests replay races
-with fake hosted events. The live runner shells out to `gh`.
-"""
 
 from __future__ import annotations
 
@@ -48,7 +20,37 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from _project.scripts.soundness_paths import any_soundness_path  # noqa: E402
+from _project.scripts.soundness_paths import any_soundness_path
+
+CLI_DESCRIPTION = (
+    "One cohesive revision/readiness/queue/follow-up helper behind the Make PR targets.\n"
+    "\n"
+    "Session history shows the failure modes this closes: queued-branch push\n"
+    "rejection after readiness was armed, unpublished fixes riding along, wrong-PR\n"
+    "operations from an inferred branch, and late-fix merges ahead of corrections.\n"
+    "The contract:\n"
+    "\n"
+    "* Every mutation names the exact repository, PR number/node, expected head,\n"
+    "  branch, and worktree. A PR resolved from a reused branch name alone is\n"
+    "  refused (wrong-PR protection).\n"
+    "* Readiness is withdrawn (auto-merge disabled and verified) before the first\n"
+    "  edit. If the merge wins the race, the helper stops and preserves commits\n"
+    "  for a correctly identified follow-up instead of modifying a closed PR.\n"
+    "* Ready requires local/remote head agreement on the exact expected head, no\n"
+    "  unpublished work, completed review evidence on that head, required checks\n"
+    "  green at that head, and no durable hold. Enqueue re-checks the remote head\n"
+    "  immediately before arming; a head change invalidates readiness.\n"
+    "* Feature-batch readiness additionally binds batch id/version, member set,\n"
+    "  owner generation, and integration head; late members or content edits\n"
+    "  invalidate it. Member SHAs must be ancestors of the integration head.\n"
+    "* Follow-up state (pre-PR assembly through post-merge) persists with an\n"
+    "  explicit owner and next action; retries are bounded to evidenced transient\n"
+    "  failures on unchanged heads; terminal state is explicit, never inferred\n"
+    "  from an empty PR list.\n"
+    "\n"
+    "All GitHub access goes through an injectable runner so tests replay races\n"
+    "with fake hosted events. The live runner shells out to `gh`.\n"
+)
 
 HOLD_LABEL = "no-auto-merge"
 REQUIRED_CONTEXTS: tuple[str, ...] = (
@@ -84,15 +86,15 @@ MAX_FOLLOWUP_BYTES = 64 * 1024
 
 
 class LandingError(RuntimeError):
-    """A refused or failed landing transition with an actionable message."""
+    pass
 
 
 class WrongPR(LandingError):
-    """The resolved PR does not match the declared branch/head identity."""
+    pass
 
 
 class MergedRace(LandingError):
-    """The PR merged or closed while we were preparing a revision."""
+    pass
 
 
 def state_dir(repo: Path) -> Path:
@@ -104,7 +106,6 @@ def state_dir(repo: Path) -> Path:
 
 
 def start_record_path(repo: Path, branch: str) -> Path:
-    """Return the per-worktree, per-branch start-identity record path."""
     if not branch or len(branch) > 512 or any(ord(char) < 32 for char in branch):
         raise LandingError("branch is invalid for a start-identity record")
     digest = hashlib.sha256(branch.encode("utf-8")).hexdigest()[:32]
@@ -123,7 +124,6 @@ def _write_json_atomic(path: Path, data: dict) -> None:
 
 
 def record_start_identity(repo: Path, branch: str, identity: GitIdentity, pr: dict | None) -> Path:
-    """Persist the exact start identity used by later withdraw/ready steps."""
     path = start_record_path(repo, branch)
     record = {
         "schema": START_RECORD_SCHEMA,
@@ -137,7 +137,6 @@ def record_start_identity(repo: Path, branch: str, identity: GitIdentity, pr: di
 
 
 def load_start_identity(repo: Path, branch: str) -> dict | None:
-    """Load a persisted start identity; malformed state is never trusted."""
     path = start_record_path(repo, branch)
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -155,7 +154,6 @@ def require_start_identity(
     pr_node_id: str | None = None,
     require_unchanged_head: bool = False,
 ) -> dict:
-    """Require and consume the persisted start identity for a transition."""
     record = load_start_identity(repo, branch)
     if record is None or not isinstance(record.get("identity"), dict):
         raise LandingError("start identity is missing; run pr-landing-start before this transition")
@@ -183,7 +181,6 @@ def require_start_identity(
 
 
 def batch_runtime_capability_available(repo: Path) -> bool:
-    """Return whether the checked-in active-runtime proof enables feature mode."""
     evidence_path = repo / "_project" / "analysis" / "batch-rollout-evidence.json"
     try:
         evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
@@ -213,7 +210,6 @@ def batch_runtime_capability_available(repo: Path) -> bool:
 
 
 def batch_mode_failures(evidence: ReadyEvidence, repo: Path) -> list[str]:
-    """Return readiness failures specific to feature delivery mode."""
     if not evidence.require_batch:
         return []
     failures: list[str] = []
@@ -244,7 +240,6 @@ class GitIdentity:
 
 
 def git_identity(repo: Path) -> GitIdentity:
-    """Exact local identity for revision and readiness transitions."""
     branch = _git(repo, "branch", "--show-current")
     if not branch:
         raise LandingError("detached HEAD has no branch identity; refuse to guess the PR")
@@ -282,7 +277,6 @@ def live_run(cmd: list[str]) -> tuple[int, str]:
 
 
 def normalize_github_repository(value: object) -> str:
-    """Normalize a GitHub ``owner/name`` identity, rejecting ambiguous input."""
     if not isinstance(value, str) or not value or any(ord(char) < 32 for char in value):
         raise LandingError("repository must be a GitHub owner/name identity")
     parts = value.split("/")
@@ -292,7 +286,6 @@ def normalize_github_repository(value: object) -> str:
 
 
 def github_repository(origin_url: str) -> str:
-    """Derive the exact GitHub repository identity from an origin URL or SSH form."""
     if not isinstance(origin_url, str) or not origin_url or any(ord(char) < 32 for char in origin_url):
         raise LandingError("origin remote is missing or malformed; refusing repository binding")
     match = re.fullmatch(r"git@github\.com:([^/]+)/([^/]+?)(?:\.git)?", origin_url, re.IGNORECASE)
@@ -307,7 +300,6 @@ def github_repository(origin_url: str) -> str:
 
 
 def _pr_node_id(pr: dict) -> str:
-    """Return the GraphQL node identity used by exact PR bindings."""
     return str(pr.get("node_id") or pr.get("id") or "")
 
 
@@ -319,7 +311,6 @@ def _check_pr_identity(
     node_id: str | None = None,
     head: str | None = None,
 ) -> None:
-    """Reject any PR record that does not match the caller's declared identity."""
     if branch is not None and pr.get("headRefName") != branch:
         raise WrongPR(
             f"resolved PR #{pr.get('number')} points at {pr.get('headRefName')!r}, "
@@ -354,7 +345,6 @@ def check_worktree_binding(
     worktree: str | None = None,
     worktree_id: str | None = None,
 ) -> None:
-    """Check the caller's binding against the current checkout identity."""
     if repository is not None and normalize_github_repository(repository) != identity.repository:
         raise LandingError(f"repository binding {repository!r} does not match {identity.repository!r}")
     if branch is not None and branch != identity.branch:
@@ -374,7 +364,6 @@ def resolve_pr(
     expected_node_id: str | None = None,
     expected_head: str | None = None,
 ) -> dict | None:
-    """Resolve one PR, then verify every declared identity field."""
     repo_full = normalize_github_repository(repo_full)
     if expected_head is not None:
         _require_revision(expected_head, "expected head")
@@ -419,7 +408,6 @@ def resolve_pr(
 
 
 def unpublished_work(repo: Path) -> list[str]:
-    """Local commits or edits not yet on the upstream branch."""
     problems: list[str] = []
     if _git(repo, "status", "--porcelain=v1"):
         problems.append("uncommitted working-tree changes")
@@ -444,7 +432,6 @@ def view_pr(
     expected_node_id: str | None = None,
     expected_head: str | None = None,
 ) -> dict:
-    """Read one PR and verify every identity supplied by the caller."""
     repo_full = normalize_github_repository(repo_full)
     if expected_head is not None:
         _require_revision(expected_head, "expected head")
@@ -471,9 +458,6 @@ def view_pr(
     _check_pr_identity(
         pr,
         branch=expected_branch,
-        # Keep the historical low-level helper permissive for its compact
-        # re-verification fixture; bound/CLI calls always supply a branch or
-        # head and therefore get the full number check as well.
         number=pr_number if expected_branch or expected_node_id or expected_head else None,
         node_id=expected_node_id,
         head=expected_head,
@@ -490,12 +474,6 @@ def withdraw_readiness(
     expected_node_id: str | None = None,
     expected_head: str | None = None,
 ) -> dict:
-    """Disable auto-merge and verify it stays disabled before any revision.
-
-    Never adds or removes hold labels: user/maintainer holds are theirs to
-    manage. If the PR already merged or closed, raises MergedRace so the
-    caller stops modifying and preserves commits for a follow-up.
-    """
     pr = view_pr(
         run,
         repo_full,
@@ -524,9 +502,6 @@ def withdraw_readiness(
                 expected_head=expected_head,
             )
         else:
-            # Preserve the compact historical low-level interface. Bound CLI
-            # calls always provide expected_head and use the strict branch,
-            # node, and head re-read above.
             rc, out = run(["gh", "pr", "view", "--repo", repo_full, str(pr_number), "--json", "autoMergeRequest"])
             if rc != 0:
                 raise LandingError(f"could not re-read PR #{pr_number} after disabling auto-merge")
@@ -544,8 +519,6 @@ def withdraw_readiness(
 
 @dataclass
 class ReadyEvidence:
-    """Evidence the ready transition verifies (never inferred from snapshots)."""
-
     expected_head: str
     review_decision: str
     dispositions_complete: bool
@@ -565,17 +538,10 @@ class ReadyEvidence:
 
 
 def live_check_verdicts(run: Runner, repo_full: str, head: str) -> dict[str, dict]:
-    """Latest live conclusion per check context at *head* (single page, fail closed).
-
-    Refuses when the commit carries more check runs than one page holds:
-    silently verifying a subset would reintroduce the staleness hole.
-    """
     rc, out = run(
         [
             "gh",
             "api",
-            # Query in the path with no -F fields: gh api sends POST when
-            # fields are present, and list endpoints answer GET only.
             f"repos/{repo_full}/commits/{head}/check-runs?per_page=100",
             "--jq",
             "{total: .total_count, runs: [.check_runs[] | {name, conclusion, head_sha, status, started_at}]}",
@@ -593,23 +559,12 @@ def live_check_verdicts(run: Runner, repo_full: str, head: str) -> dict[str, dic
     verdicts: dict[str, dict] = {}
     for check in runs:
         name = str(check.get("name") or "")
-        # Latest by start time wins, mirroring checks_green_at_head: API
-        # order is not a recency contract, and first-wins could accept a
-        # stale success over a newer failure.
         if name not in verdicts or str(check.get("started_at") or "") > str(verdicts[name].get("started_at") or ""):
             verdicts[name] = check
     return verdicts
 
 
 def verify_evidence_live(run: Runner, repo_full: str, pr: dict, evidence: ReadyEvidence) -> None:
-    """Re-verify caller evidence against live API state before arming.
-
-    Caller JSON assembles the claim, but the transaction trusts only what it
-    re-reads: every required context must be live-success at the expected
-    head, the live review decision must equal the claimed one, and the live
-    labels must still carry every claimed label. Anything else is stale or
-    fabricated evidence and refuses.
-    """
     head = evidence.expected_head
     _check_pr_identity(
         pr,
@@ -644,12 +599,6 @@ def verify_evidence_live(run: Runner, repo_full: str, pr: dict, evidence: ReadyE
 
 
 def unresolved_review_threads(run: Runner, repo_full: str, pr_number: int) -> bool:
-    """Return whether the PR has a live unresolved, non-outdated review thread.
-
-    GitHub's aggregate review decision does not cover comment-only review
-    threads, and this repository's ruleset does not require thread resolution.
-    Read every page so a caller-provided disposition claim cannot hide one.
-    """
     try:
         owner, name = repo_full.split("/", 1)
     except ValueError as exc:
@@ -713,7 +662,6 @@ def unresolved_review_threads(run: Runner, repo_full: str, pr_number: int) -> bo
 
 
 def checks_green_at_head(check_runs: list, required: tuple, head: str) -> list[str]:
-    """Required contexts must be latest-success bound to *head*, not just green."""
     failures: list[str] = []
     for name in required:
         matches = [run for run in check_runs if run.get("name") == name]
@@ -761,12 +709,10 @@ def _canonical_files(value: object) -> list[str] | None:
 
 
 def _git_changed_files(repo: Path, base: str, head: str) -> set[str]:
-    """Return the exact changed-file set for two revisions."""
     return set(_git(repo, "diff", "--name-only", "--no-renames", f"{base}..{head}").splitlines())
 
 
 def _git_blob(repo: Path, revision: str, path: str) -> bytes | None:
-    """Return a committed path's bytes, or ``None`` when the path is absent."""
     proc = subprocess.run(
         ["git", "show", f"{revision}:{path}"],
         cwd=repo,
@@ -1158,7 +1104,6 @@ def _check_batch_member_maps(
 
 
 def check_batch_binding(repo: Path, batch: dict, integration_head: str) -> list[str]:
-    """Validate the canonical todo-db batch receipt and final evidence binding."""
     if not isinstance(batch, dict):
         return ["batch binding must be an object"]
     failures: list[str] = []
@@ -1234,7 +1179,6 @@ def ready_failures(
     evidence: ReadyEvidence,
     repo: Path,
 ) -> list[str]:
-    """All reasons the PR must not be enqueued yet. Empty means ready."""
     failures: list[str] = []
     expected_head = evidence.expected_head if isinstance(evidence.expected_head, str) else ""
     head_valid = bool(FULL_REVISION_RE.fullmatch(expected_head))
@@ -1260,8 +1204,6 @@ def ready_failures(
     if remote_head != expected_head:
         failures.append(f"remote head {remote_head[:12]} != expected {expected_head[:12]}")
     failures.extend(f"unpublished work: {problem}" for problem in unpublished_work(repo))
-    # GitHub leaves reviewDecision empty when the branch-wide ruleset needs no formal approval.
-    # Non-soundness PRs still require complete review dispositions; soundness paths require approval.
     soundness_changed = head_valid and soundness_paths_changed(repo, identity.base, expected_head)
     if evidence.review_decision != "APPROVED" and (evidence.review_decision != "" or soundness_changed):
         failures.append(f"review decision is {evidence.review_decision!r}, not APPROVED")
@@ -1288,7 +1230,6 @@ def ready_failures(
 
 
 def soundness_paths_changed(repo: Path, base: str | None, head: str) -> bool:
-    """Derive the auto-merge classification from the canonical path predicate."""
     if not base:
         raise LandingError("origin/develop is unavailable; cannot classify soundness paths")
     if base == head:
@@ -1311,13 +1252,6 @@ def enqueue_pr(
     expected_node_id: str | None = None,
     expected_review_decision: str = "APPROVED",
 ) -> dict:
-    """Arm queue enrollment after a final expected-head check.
-
-    The helper re-reads the remote head immediately before arming and refuses
-    on mismatch, then passes `--match-head-commit` so admission itself is an
-    atomic compare-and-set on the expected head. A push landing between the
-    check and admission is refused server-side rather than armed.
-    """
     repo_full = normalize_github_repository(repo_full)
     _require_revision(expected_head, "expected head")
     if expected_review_decision not in {"", "APPROVED"}:
@@ -1375,16 +1309,11 @@ def enqueue_pr(
     return {"pr": pr_number, "enqueued": True, "note": "API success is not proof of merge"}
 
 
-# ---------------------------------------------------------------------------
-# Resumable follow-up ownership (pr-followup-resumable-ownership)
-# ---------------------------------------------------------------------------
 TERMINAL_OUTCOMES = ("merged", "closed-merged", "abandoned", "superseded")
 
 
 @dataclass
 class FollowupState:
-    """Bounded continuation state. Terminal outcomes are explicit, never inferred."""
-
     owner: str
     session: str
     scope: str
@@ -1419,7 +1348,6 @@ def followup_path(directory: Path, key: str) -> Path:
 
 
 def _legacy_followup_path(directory: Path, key: str) -> Path:
-    """Return the pre-digest path used by older follow-up records."""
     if not isinstance(key, str) or not key or len(key) > MAX_FOLLOWUP_KEY_LEN:
         raise LandingError("followup key must be a bounded non-empty string")
     safe = "".join(c if c.isascii() and (c.isalnum() or c in "-_") else "_" for c in key)
@@ -1427,16 +1355,10 @@ def _legacy_followup_path(directory: Path, key: str) -> Path:
 
 
 def _followup_locked(directory: Path, key: str) -> BinaryIO:
-    """Exclusive safe-key lock so migration and check-then-act do not interleave.
-
-    The lock retains the legacy safe-key name deliberately. That serializes
-    keys which collided under the old naming scheme and coordinates migration
-    with older callers that still lock the legacy path.
-    """
     import fcntl
 
     directory.mkdir(parents=True, exist_ok=True)
-    handle = open(_legacy_followup_path(directory, key).with_suffix(".lock"), "a+b")  # noqa: PTH123
+    handle = open(_legacy_followup_path(directory, key).with_suffix(".lock"), "a+b")
     fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
     return handle
 
@@ -1486,12 +1408,8 @@ def _merge_followup_state(existing: FollowupState, state: FollowupState) -> Foll
     if not head_changed and existing.terminal is not None and merged.terminal is None:
         merged = replace(merged, terminal=existing.terminal)
     if head_changed:
-        # A terminal result and final PR binding certify one exact head. A new
-        # head starts a fresh continuation and must be re-evaluated.
         merged = replace(merged, final_pr=None, terminal=None)
     if head_changed:
-        # Retry budgets are evidence about one exact head. A new head starts
-        # with a fresh budget and cannot inherit consumption from its parent.
         attempts = 0
         reentries = 0
     else:
@@ -1505,12 +1423,6 @@ def _merge_followup_state(existing: FollowupState, state: FollowupState) -> Foll
 
 
 def record_followup(directory: Path, key: str, state: FollowupState) -> Path:
-    """Atomically persist continuation state (crash-safe via rename).
-
-    Refuses to overwrite another owner's record: same-principal sessions may
-    rotate `session`, but a different `owner` must use its own key. Retry
-    counters are monotonic: re-recording state never restores spent budget.
-    """
     directory.mkdir(parents=True, exist_ok=True)
     path = followup_path(directory, key)
     with _followup_locked(directory, key):
@@ -1528,7 +1440,6 @@ def record_followup(directory: Path, key: str, state: FollowupState) -> Path:
 
 
 def _write_followup_atomic(path: Path, state: FollowupState) -> None:
-    """Write one bounded state record through a same-directory rename."""
     encoded = json.dumps(asdict(state), indent=2) + "\n"
     if len(encoded.encode("utf-8")) > MAX_FOLLOWUP_BYTES:
         raise LandingError("followup state exceeds its size bound")
@@ -1666,7 +1577,6 @@ def _validate_followup_batch(state: FollowupState) -> list[str]:
 
 
 def validate_followup(state: FollowupState) -> None:
-    """Validate the local continuation schema before it can be persisted."""
     failures: list[str] = []
     for field in ("owner", "session", "scope"):
         failures.extend(_valid_text(getattr(state, field, None), field, required=True))
@@ -1704,7 +1614,6 @@ def validate_followup(state: FollowupState) -> None:
 
 
 def coerce_followup(data: object) -> FollowupState:
-    """Build state from untrusted input, refusing missing required fields."""
     if not isinstance(data, dict):
         raise LandingError("followup state must be an object")
     aliases = {
@@ -1740,7 +1649,6 @@ def load_followup(directory: Path, key: str) -> FollowupState | None:
 
 
 def _read_followup(path: Path) -> tuple[bool, FollowupState | None]:
-    """Read one candidate, distinguishing absent from malformed state."""
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
@@ -1754,7 +1662,6 @@ def _read_followup(path: Path) -> tuple[bool, FollowupState | None]:
 
 
 def _load_followup_unlocked(directory: Path, key: str) -> FollowupState | None:
-    """Load the canonical record, migrating one valid legacy record in place."""
     path = followup_path(directory, key)
     present, state = _read_followup(path)
     if present:
@@ -1765,10 +1672,6 @@ def _load_followup_unlocked(directory: Path, key: str) -> FollowupState | None:
     if not legacy_present or legacy_state is None:
         return None
 
-    # Move, rather than copy, so a successful migration leaves one record. The
-    # safe-key lock also serializes colliding legacy keys. If a canonical file
-    # appeared while inspecting the candidates, prefer it and never overwrite
-    # that newer record.
     if path.exists():
         return _read_followup(path)[1]
     try:
@@ -1781,7 +1684,6 @@ def _load_followup_unlocked(directory: Path, key: str) -> FollowupState | None:
 
 
 def resume_followup(state: FollowupState) -> dict:
-    """Route to the owned next action. Missing/unknown state is never 'done'."""
     validate_followup(state)
     if state.claim_expires_at:
         expires = dt.datetime.fromisoformat(state.claim_expires_at.replace("Z", "+00:00"))
@@ -1818,7 +1720,6 @@ def resume_followup(state: FollowupState) -> dict:
 
 
 def allow_retry(state: FollowupState, kind: str, head: str) -> dict:
-    """Bound retries to evidenced transient failures on unchanged heads."""
     if state.head != head:
         return {"allowed": False, "reason": "head changed; re-evaluate instead of retrying"}
     if kind == "rerun":
@@ -1833,11 +1734,6 @@ def allow_retry(state: FollowupState, kind: str, head: str) -> dict:
 
 
 def consume_retry(directory: Path, key: str, kind: str, head: str) -> dict:
-    """Decide a retry AND persist the consumed budget atomically.
-
-    A pure decision function would authorize the same retry forever; consuming
-    here makes the second identical call observe the spent budget.
-    """
     with _followup_locked(directory, key):
         state = _load_followup_unlocked(directory, key)
         if state is None:
@@ -1863,12 +1759,6 @@ def bound_withdraw(
     expected_node_id: str | None = None,
     expected_head: str | None = None,
 ) -> dict:
-    """Withdraw readiness only for the PR owned by *branch*.
-
-    A branch that owns no PR yet (pre-PR assembly) may name an explicit PR;
-    a branch that owns one refuses any other number, so a stale or mistaken
-    `--pr` can never disarm another PR.
-    """
     owned = resolve_pr(
         run,
         repo_full,
@@ -1896,7 +1786,6 @@ def arm_current_pr(
     repo: Path,
     requested_pr: int | None = None,
 ) -> dict:
-    """Arm only the open PR bound to this checkout's exact current identity."""
     problems = unpublished_work(repo)
     if problems:
         raise LandingError(f"unpublished work: {'; '.join(problems)}")
@@ -2071,7 +1960,7 @@ def _run_ready(args: argparse.Namespace, identity: GitIdentity, branch: str, rep
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--repo", default=None)
     parser.add_argument("--worktree", type=Path, default=Path.cwd())
     parser.add_argument("--branch", default=None)

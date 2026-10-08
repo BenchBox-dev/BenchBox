@@ -1,9 +1,3 @@
-"""Tests for PrestoDB platform adapter.
-
-Validates PrestoAdapter behavior and ensures the adapter remains distinct
-from the Trino adapter.
-"""
-
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -22,7 +16,7 @@ pytestmark = [
 
 @pytest.fixture()
 def presto_stubs(monkeypatch):
-    """Patch prestodb client objects so tests don't require the real driver."""
+
     mock_dbapi = Mock()
     prestodb_mock = SimpleNamespace(dbapi=mock_dbapi, __version__="0.999.0")
     auth_factory = Mock(return_value="auth-token")
@@ -34,11 +28,9 @@ def presto_stubs(monkeypatch):
 
 
 class TestPrestoAdapter:
-    """Unit tests for Presto adapter wiring and SQL handling."""
-
     def test_initialization_defaults(self, presto_stubs):
-        """Adapter should initialize with Presto defaults when stubs are present."""
-        adapter = PrestoAdapter(catalog="hive")  # catalog is required
+
+        adapter = PrestoAdapter(catalog="hive")
 
         assert adapter.platform_name == "Presto"
         assert adapter.get_target_dialect() == PRESTO_DIALECT
@@ -49,7 +41,7 @@ class TestPrestoAdapter:
         assert adapter.http_scheme == "http"
 
     def test_initialization_without_catalog(self, presto_stubs):
-        """Adapter should initialize without catalog (validation happens on connection)."""
+
         adapter = PrestoAdapter()
 
         assert adapter.catalog is None
@@ -57,7 +49,7 @@ class TestPrestoAdapter:
         assert adapter.port == 8080
 
     def test_get_connection_params_includes_auth_and_timeout(self, presto_stubs):
-        """Connection parameters should carry auth, session properties, and timeouts."""
+
         _, auth_factory = presto_stubs
         adapter = PrestoAdapter(
             host="presto.example.com",
@@ -86,12 +78,11 @@ class TestPrestoAdapter:
         assert params["requests_kwargs"] == {"verify": "/tmp/cert.pem"}
 
     def test_check_server_database_exists_true(self, presto_stubs, monkeypatch):
-        """Schema existence check returns True when catalog/schema pair is found."""
+
         prestodb_mock, _ = presto_stubs
         mock_conn = Mock()
         mock_cursor = Mock()
-        # First call: SHOW CATALOGS (catalog validation)
-        # Second call: schema existence check
+
         mock_cursor.fetchall.return_value = [("hive",), ("system",)]
         mock_cursor.fetchone.return_value = ("default",)
         mock_conn.cursor.return_value = mock_cursor
@@ -103,7 +94,7 @@ class TestPrestoAdapter:
         prestodb_mock.dbapi.connect.assert_called()
 
     def test_check_server_database_exists_false_on_error(self, presto_stubs):
-        """Schema existence check should return False on connection errors."""
+
         prestodb_mock, _ = presto_stubs
         prestodb_mock.dbapi.connect.side_effect = Exception("connection failed")
 
@@ -112,13 +103,13 @@ class TestPrestoAdapter:
         assert adapter.check_server_database_exists(schema="missing", catalog="hive") is False
 
     def test_validate_catalog_raises_on_missing_catalog(self, presto_stubs):
-        """Catalog validation should raise ConfigurationError with helpful message."""
+
         from benchbox.core.exceptions import ConfigurationError
 
         prestodb_mock, _ = presto_stubs
         mock_conn = Mock()
         mock_cursor = Mock()
-        # Return available catalogs that don't include 'memory'
+
         mock_cursor.fetchall.return_value = [("hive",), ("system",), ("iceberg",)]
         mock_conn.cursor.return_value = mock_cursor
         prestodb_mock.dbapi.connect.return_value = mock_conn
@@ -131,11 +122,11 @@ class TestPrestoAdapter:
         error_msg = str(exc_info.value)
         assert "memory" in error_msg
         assert "does not exist" in error_msg
-        assert "hive" in error_msg  # Should list available catalogs
-        assert "--platform-option catalog=" in error_msg  # Should suggest fix
+        assert "hive" in error_msg
+        assert "--platform-option catalog=" in error_msg
 
     def test_get_available_catalogs(self, presto_stubs):
-        """Should return list of available catalogs from server."""
+
         prestodb_mock, _ = presto_stubs
         mock_conn = Mock()
         mock_cursor = Mock()
@@ -150,7 +141,7 @@ class TestPrestoAdapter:
         mock_cursor.execute.assert_called_with("SHOW CATALOGS")
 
     def test_auto_select_catalog_prefers_hive(self, presto_stubs):
-        """Auto-selection should prefer hive over other catalogs."""
+
         prestodb_mock, _ = presto_stubs
         mock_conn = Mock()
         mock_cursor = Mock()
@@ -164,7 +155,7 @@ class TestPrestoAdapter:
         assert selected == "hive"
 
     def test_auto_select_catalog_fallback_to_memory(self, presto_stubs):
-        """Auto-selection should fall back to memory when hive not available."""
+
         prestodb_mock, _ = presto_stubs
         mock_conn = Mock()
         mock_cursor = Mock()
@@ -178,11 +169,11 @@ class TestPrestoAdapter:
         assert selected == "memory"
 
     def test_auto_select_catalog_uses_first_available(self, presto_stubs):
-        """Auto-selection should use first usable catalog when no preferred catalogs."""
+
         prestodb_mock, _ = presto_stubs
         mock_conn = Mock()
         mock_cursor = Mock()
-        # system is filtered out, custom_catalog is used
+
         mock_cursor.fetchall.return_value = [("custom_catalog",), ("system",)]
         mock_conn.cursor.return_value = mock_cursor
         prestodb_mock.dbapi.connect.return_value = mock_conn
@@ -193,11 +184,11 @@ class TestPrestoAdapter:
         assert selected == "custom_catalog"
 
     def test_auto_select_catalog_only_system_catalogs(self, presto_stubs):
-        """Auto-selection should return None when only system catalogs exist."""
+
         prestodb_mock, _ = presto_stubs
         mock_conn = Mock()
         mock_cursor = Mock()
-        # Only jmx and system - both are system-only and unusable
+
         mock_cursor.fetchall.return_value = [("jmx",), ("system",)]
         mock_conn.cursor.return_value = mock_cursor
         prestodb_mock.dbapi.connect.return_value = mock_conn
@@ -208,7 +199,7 @@ class TestPrestoAdapter:
         assert selected is None
 
     def test_auto_select_catalog_server_unreachable(self, presto_stubs):
-        """Auto-selection should return None when server unreachable."""
+
         prestodb_mock, _ = presto_stubs
         prestodb_mock.dbapi.connect.side_effect = Exception("Connection refused")
 
@@ -218,7 +209,7 @@ class TestPrestoAdapter:
         assert selected is None
 
     def test_validation_auto_selects_when_none(self, presto_stubs):
-        """Validation should auto-select catalog when None provided."""
+
         prestodb_mock, _ = presto_stubs
         mock_conn = Mock()
         mock_cursor = Mock()
@@ -233,7 +224,7 @@ class TestPrestoAdapter:
         assert adapter._catalog_was_auto_selected is True
 
     def test_validation_raises_when_server_unreachable(self, presto_stubs):
-        """Validation should raise ConfigurationError when server unreachable and no catalog."""
+
         from benchbox.core.exceptions import ConfigurationError
 
         prestodb_mock, _ = presto_stubs
@@ -247,13 +238,13 @@ class TestPrestoAdapter:
         assert "server is unreachable" in str(exc_info.value)
 
     def test_validation_raises_when_only_system_catalogs(self, presto_stubs):
-        """Validation should raise ConfigurationError when only system catalogs exist."""
+
         from benchbox.core.exceptions import ConfigurationError
 
         prestodb_mock, _ = presto_stubs
         mock_conn = Mock()
         mock_cursor = Mock()
-        # Only jmx and system catalogs exist
+
         mock_cursor.fetchall.return_value = [("jmx",), ("system",)]
         mock_conn.cursor.return_value = mock_cursor
         prestodb_mock.dbapi.connect.return_value = mock_conn
@@ -267,19 +258,16 @@ class TestPrestoAdapter:
         assert "jmx, system" in str(exc_info.value)
 
     def test_drop_database_executes_cascade(self, presto_stubs):
-        """Dropping a schema should drop all tables then drop the schema."""
+
         prestodb_mock, _ = presto_stubs
         mock_conn = Mock()
         mock_cursor = Mock()
-        # Sequence of fetchall/fetchone calls:
-        # 1. check_server_database_exists -> _validate_catalog_exists -> SHOW CATALOGS -> fetchall
-        # 2. check_server_database_exists -> schema check -> fetchone
-        # 3. drop_database -> SHOW TABLES -> fetchall
+
         mock_cursor.fetchall.side_effect = [
-            [("memory",), ("system",)],  # SHOW CATALOGS (catalog validation)
-            [("table1",), ("table2",)],  # SHOW TABLES
+            [("memory",), ("system",)],
+            [("table1",), ("table2",)],
         ]
-        mock_cursor.fetchone.return_value = ("test_schema",)  # Schema existence check
+        mock_cursor.fetchone.return_value = ("test_schema",)
         mock_conn.cursor.return_value = mock_cursor
         prestodb_mock.dbapi.connect.return_value = mock_conn
 
@@ -288,13 +276,13 @@ class TestPrestoAdapter:
         adapter.drop_database(schema="test_schema", catalog="memory")
 
         executed = " ".join(call.args[0] for call in mock_cursor.execute.call_args_list)
-        # Should drop tables first, then the schema (without CASCADE since Presto doesn't support it)
+
         assert "DROP TABLE IF EXISTS memory.test_schema.table1" in executed
         assert "DROP TABLE IF EXISTS memory.test_schema.table2" in executed
         assert "DROP SCHEMA IF EXISTS memory.test_schema" in executed
 
     def test_create_connection_uses_session_properties(self, presto_stubs):
-        """Connections should honor session properties and request timeout settings."""
+
         prestodb_mock, _ = presto_stubs
         mock_conn = Mock()
         mock_cursor = Mock()
@@ -308,7 +296,7 @@ class TestPrestoAdapter:
             session_properties={"join_reordering_strategy": "AUTOMATIC"},
             query_timeout=15,
         )
-        adapter.database_was_reused = True  # Skip schema creation
+        adapter.database_was_reused = True
 
         with patch.object(adapter, "handle_existing_database"):
             connection = adapter.create_connection()
@@ -327,7 +315,7 @@ class TestPrestoAdapter:
         assert connection is mock_conn
 
     def test_get_platform_info_fallback_version(self, presto_stubs):
-        """Platform info should fall back to SELECT version() when runtime tables fail."""
+
         prestodb_mock, _ = presto_stubs
         mock_cursor = Mock()
         mock_connection = Mock()
@@ -356,7 +344,7 @@ class TestPrestoAdapter:
         assert info["configuration"]["client_source"] == "BenchBox"
 
     def test_load_data_qualifies_table_names(self, presto_stubs, tmp_path):
-        """Data loads should use fully qualified catalog.schema.table names."""
+
         prestodb_mock, _ = presto_stubs
         mock_cursor = Mock()
         mock_connection = Mock()
@@ -378,7 +366,7 @@ class TestPrestoAdapter:
         assert "INSERT INTO hive.analytics.orders VALUES" in executed_sql
 
     def test_load_data_skips_invalid_identifier(self, presto_stubs, tmp_path):
-        """Invalid table identifiers should be skipped safely."""
+
         prestodb_mock, _ = presto_stubs
         mock_cursor = Mock()
         mock_connection = Mock()
@@ -399,14 +387,14 @@ class TestPrestoAdapter:
         assert mock_cursor.execute.call_count == 0
 
     def test_external_table_mode_requires_staging_root(self, presto_stubs):
-        """External mode should require staging_root configuration."""
+
         adapter = PrestoAdapter(catalog="hive", schema="analytics")
 
         with pytest.raises(ValueError, match="requires --platform-option staging_root"):
             adapter.validate_external_table_requirements()
 
     def test_create_external_tables_generates_location_sql(self, presto_stubs):
-        """External mode should create tables with external_location and parquet format."""
+
         mock_cursor = Mock()
         mock_cursor.fetchone.return_value = (12,)
         mock_connection = Mock()
@@ -434,7 +422,7 @@ class TestPrestoAdapter:
         assert "format = 'PARQUET'" in executed_sql
 
     def test_load_data_does_not_invoke_external_registration(self, presto_stubs, tmp_path):
-        """Native load_data path should remain independent from external registration."""
+
         mock_cursor = Mock()
         mock_connection = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -456,14 +444,14 @@ class TestPrestoAdapter:
         assert stats["orders"] == 1
 
     def test_dialect_is_presto_not_trino(self, presto_stubs):
-        """Ensure the adapter is locked to the Presto dialect."""
+
         adapter = PrestoAdapter()
 
         assert adapter.get_target_dialect() == PRESTO_DIALECT
         assert adapter.get_target_dialect() != "trino"
 
     def test_from_config_with_schema(self, presto_stubs):
-        """Test from_config with explicit schema."""
+
         config = {
             "schema": "custom_schema",
             "benchmark": "tpch",
@@ -481,7 +469,7 @@ class TestPrestoAdapter:
         assert adapter.catalog == "hive"
 
     def test_from_config_generates_schema_name(self, presto_stubs):
-        """Test from_config generates schema name from benchmark params."""
+
         config = {
             "benchmark": "tpch",
             "scale_factor": 1.0,
@@ -493,7 +481,7 @@ class TestPrestoAdapter:
         assert "tpch" in adapter.schema.lower()
 
     def test_validate_identifier_rejects_invalid(self, presto_stubs):
-        """Test identifier validation rejects SQL injection attempts."""
+
         adapter = PrestoAdapter()
 
         assert adapter._validate_identifier("valid_name") is True
@@ -502,10 +490,10 @@ class TestPrestoAdapter:
         assert adapter._validate_identifier("") is False
         assert adapter._validate_identifier("table; DROP TABLE users") is False
         assert adapter._validate_identifier("123invalid") is False
-        assert adapter._validate_identifier("a" * 200) is False  # Too long
+        assert adapter._validate_identifier("a" * 200) is False
 
     def test_execute_query_success(self, presto_stubs):
-        """Test successful query execution."""
+
         prestodb_mock, _ = presto_stubs
         mock_cursor = Mock()
         mock_cursor.fetchall.return_value = [(1, "test"), (2, "test2")]
@@ -523,7 +511,7 @@ class TestPrestoAdapter:
         mock_cursor.execute.assert_called_once_with("SELECT * FROM test")
 
     def test_execute_query_failure(self, presto_stubs):
-        """Test query execution failure handling."""
+
         prestodb_mock, _ = presto_stubs
         mock_cursor = Mock()
         mock_cursor.execute.side_effect = Exception("Query failed")
@@ -540,7 +528,7 @@ class TestPrestoAdapter:
         assert "Query failed" in result["error"]
 
     def test_get_query_plan(self, presto_stubs):
-        """Test query plan retrieval."""
+
         prestodb_mock, _ = presto_stubs
         mock_cursor = Mock()
         mock_cursor.fetchall.return_value = [("Scan Table",), ("Filter",)]
@@ -556,7 +544,7 @@ class TestPrestoAdapter:
         mock_cursor.execute.assert_called_once()
 
     def test_get_query_plan_error(self, presto_stubs):
-        """Test query plan retrieval on error."""
+
         prestodb_mock, _ = presto_stubs
         mock_cursor = Mock()
         mock_cursor.execute.side_effect = Exception("EXPLAIN failed")
@@ -570,7 +558,7 @@ class TestPrestoAdapter:
         assert plan is None
 
     def test_close_connection(self, presto_stubs):
-        """Test connection closing."""
+
         mock_connection = Mock()
         adapter = PrestoAdapter()
 
@@ -579,14 +567,13 @@ class TestPrestoAdapter:
         mock_connection.close.assert_called_once()
 
     def test_close_connection_handles_none(self, presto_stubs):
-        """Test connection closing handles None gracefully."""
+
         adapter = PrestoAdapter()
 
-        # Should not raise
         adapter.close_connection(None)
 
     def test_test_connection_success(self, presto_stubs):
-        """Test connection test success."""
+
         prestodb_mock, _ = presto_stubs
         mock_cursor = Mock()
         mock_cursor.fetchone.return_value = (1,)
@@ -602,7 +589,7 @@ class TestPrestoAdapter:
         prestodb_mock.dbapi.connect.assert_called()
 
     def test_test_connection_failure(self, presto_stubs):
-        """Test connection test failure."""
+
         prestodb_mock, _ = presto_stubs
         prestodb_mock.dbapi.connect.side_effect = Exception("Connection refused")
 
@@ -613,7 +600,7 @@ class TestPrestoAdapter:
         assert result is False
 
     def test_supports_tuning_type(self, presto_stubs):
-        """Test tuning type support detection."""
+
         adapter = PrestoAdapter()
 
         with patch("benchbox.core.tuning.interface.TuningType") as mock_tuning_type:
@@ -624,7 +611,7 @@ class TestPrestoAdapter:
             assert adapter.supports_tuning_type(mock_tuning_type.SORTING) is False
 
     def test_generate_tuning_clause_empty(self, presto_stubs):
-        """Test tuning clause generation with no tuning."""
+
         adapter = PrestoAdapter()
 
         mock_tuning = Mock()
@@ -634,7 +621,7 @@ class TestPrestoAdapter:
         assert clause == ""
 
     def test_generate_tuning_clause_partitioning(self, presto_stubs):
-        """Test tuning clause generation with partitioning."""
+
         adapter = PrestoAdapter(table_format="hive")
 
         mock_col = Mock()
@@ -653,7 +640,7 @@ class TestPrestoAdapter:
             assert "date_col" in clause
 
     def test_configure_for_benchmark_olap(self, presto_stubs):
-        """Test OLAP benchmark configuration."""
+
         prestodb_mock, _ = presto_stubs
         mock_cursor = Mock()
         mock_connection = Mock()
@@ -663,13 +650,12 @@ class TestPrestoAdapter:
 
         adapter.configure_for_benchmark(mock_connection, "olap")
 
-        # Should set session properties
         executed_sql = [str(call) for call in mock_cursor.execute.call_args_list]
         assert any("optimize_hash_generation" in sql for sql in executed_sql)
         assert any("join_reordering_strategy" in sql for sql in executed_sql)
 
     def test_normalize_table_name_in_sql(self, presto_stubs):
-        """Test table name normalization to lowercase."""
+
         adapter = PrestoAdapter()
 
         sql = 'CREATE TABLE "CUSTOMER" (id INTEGER)'
@@ -679,13 +665,12 @@ class TestPrestoAdapter:
         assert "CUSTOMER" not in normalized
 
     def test_optimize_table_definition_memory(self, presto_stubs):
-        """Test table optimization for memory catalog."""
+
         adapter = PrestoAdapter(table_format="memory")
 
         sql = "CREATE TABLE test (id INTEGER) WITH (format='ORC')"
         optimized = adapter._optimize_table_definition(sql)
 
-        # Should remove WITH clause for memory catalog
         assert "WITH" not in optimized
 
         sql = "CREATE TABLE kind_type (id INTEGER PRIMARY KEY, kind VARCHAR(15) NOT NULL)"
@@ -706,13 +691,12 @@ class TestPrestoAdapter:
         assert all("PRIMARY KEY" not in statement for statement in optimized)
 
     def test_optimize_table_definition_hive(self, presto_stubs):
-        """Test table optimization for hive catalog."""
+
         adapter = PrestoAdapter(table_format="hive")
 
         sql = "CREATE TABLE test (id INTEGER)"
         optimized = adapter._optimize_table_definition(sql)
 
-        # Should add format specification for hive
         assert "WITH" in optimized
         assert "PARQUET" in optimized
 
@@ -724,7 +708,7 @@ class TestPrestoAdapter:
         assert "WITH (format = 'PARQUET')" in optimized
 
     def test_optimize_table_definition_memory_catalog_name(self, presto_stubs):
-        """A catalog literally named memory strips like the memory table format."""
+
         adapter = PrestoAdapter(catalog="memory", table_format="hive")
 
         sql = "CREATE TABLE test (id INTEGER PRIMARY KEY, kind VARCHAR(15) NOT NULL)"
@@ -735,7 +719,7 @@ class TestPrestoAdapter:
         assert "WITH" not in optimized
 
     def test_analyze_table_memory_catalog(self, presto_stubs):
-        """Test ANALYZE is skipped for memory catalog."""
+
         prestodb_mock, _ = presto_stubs
         mock_cursor = Mock()
         mock_connection = Mock()
@@ -745,11 +729,10 @@ class TestPrestoAdapter:
 
         adapter.analyze_table(mock_connection, "test_table")
 
-        # Should not execute ANALYZE for memory catalog
         mock_cursor.execute.assert_not_called()
 
     def test_analyze_table_hive_catalog(self, presto_stubs):
-        """Test ANALYZE is executed for hive catalog."""
+
         prestodb_mock, _ = presto_stubs
         mock_cursor = Mock()
         mock_connection = Mock()
@@ -759,14 +742,13 @@ class TestPrestoAdapter:
 
         adapter.analyze_table(mock_connection, "test_table")
 
-        # Should execute ANALYZE for hive catalog
         mock_cursor.execute.assert_called()
         call_args = str(mock_cursor.execute.call_args)
         assert "ANALYZE" in call_args
         assert "test_table" in call_args
 
     def test_get_existing_tables(self, presto_stubs):
-        """Test getting list of existing tables."""
+
         prestodb_mock, _ = presto_stubs
         mock_cursor = Mock()
         mock_cursor.fetchall.return_value = [("orders",), ("lineitem",)]
@@ -782,7 +764,7 @@ class TestPrestoAdapter:
         mock_cursor.execute.assert_called_with("SHOW TABLES")
 
     def test_apply_table_tunings_logs_partitioning(self, presto_stubs):
-        """Test that apply_table_tunings logs partitioning info."""
+
         adapter = PrestoAdapter()
         mock_connection = Mock()
 
@@ -798,11 +780,10 @@ class TestPrestoAdapter:
             mock_tuning_type.PARTITIONING = "partitioning"
             mock_tuning.get_columns_by_type.return_value = [mock_col]
 
-            # Should not raise
             adapter.apply_table_tunings(mock_tuning, mock_connection)
 
     def test_extract_table_name(self, presto_stubs):
-        """Test extracting table name from CREATE TABLE statement."""
+
         adapter = PrestoAdapter()
 
         assert adapter._extract_table_name("CREATE TABLE orders (id INT)") == "orders"
@@ -810,7 +791,7 @@ class TestPrestoAdapter:
         assert adapter._extract_table_name("INSERT INTO orders VALUES (1)") is None
 
     def test_load_table_data_uses_manifest_dialect_over_suffix(self, presto_stubs, tmp_path):
-        """A manifest-declared comma dialect wins over the .tbl pipe heuristic."""
+
         from benchbox.platforms.base.data_loading import DataSource
 
         adapter = PrestoAdapter(catalog="hive")
@@ -840,7 +821,7 @@ class TestPrestoAdapter:
         assert batches.call_args.kwargs["delimiter"] == ","
 
     def test_load_table_data_without_context_keeps_heuristic(self, presto_stubs, tmp_path):
-        """Callers without DataSource context fall back to the file heuristic."""
+
         adapter = PrestoAdapter(catalog="hive")
         data_file = tmp_path / "orders.tbl"
         data_file.write_text("1|Alice\n")

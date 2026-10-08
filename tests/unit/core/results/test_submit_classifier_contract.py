@@ -1,13 +1,3 @@
-"""Drift guard: the CLI and UAT must agree on submit terminal state.
-
-`benchbox submit` (benchbox/cli/commands/submit.py) and the UAT runner
-(tests/uat/runner.py) both consume
-benchbox.core.results.submit_classification. This contract drives a matrix of
-result fixtures through every surface and asserts the verdicts cannot diverge:
-add a refused compliance class or change the policy in one place and this test
-fails if the other surface does not follow.
-"""
-
 from __future__ import annotations
 
 import importlib
@@ -59,7 +49,6 @@ def _write_result_json(
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
-# Each entry: label -> (file-builder | None for missing, expected terminal state, loadable?)
 def _loadable_cases(tmp_path: Path) -> list[tuple[str, Path, SubmitTerminalState]]:
     clean = tmp_path / "clean.json"
     _write_result_json(clean)
@@ -82,14 +71,9 @@ def _loadable_cases(tmp_path: Path) -> list[tuple[str, Path, SubmitTerminalState
     unvalidated_unknown = tmp_path / "unvalidated-unknown.json"
     _write_result_json(unvalidated_unknown, failed=0, validation="unknown")
 
-    # Translation fallback alone is non-clean but not an unvalidated partition
-    # status → schema_violation terminal (not submittable).
     translation_fallback = tmp_path / "translation-fallback.json"
     _write_result_json(translation_fallback, failed=0, validation="passed", translation_status="fallback")
 
-    # Uncertain + translation fallback: unvalidated takes precedence over the
-    # translation non-clean reason so the refusal wording stays in the
-    # unvalidated family (claim-weakened), not schema_violation.
     uncertain_with_translation_fallback = tmp_path / "uncertain-with-translation-fallback.json"
     _write_result_json(
         uncertain_with_translation_fallback,
@@ -129,19 +113,16 @@ def _loadable_cases(tmp_path: Path) -> list[tuple[str, Path, SubmitTerminalState
 
 
 def test_submit_classifier_contract_loaded_and_path_agree(tmp_path: Path):
-    """Loaded-result policy (CLI side) and path policy (UAT side) agree per state."""
     for label, path, expected in _loadable_cases(tmp_path):
-        # Path-based policy (used by UAT's classify_for_submit).
         assert classify_result_path(path) is expected, label
-        # UAT adapter delegates to the shared path policy.
+
         assert runner.classify_for_submit(path) is runner.SubmitTerminalState.__members__[expected.name], label
-        # Loaded-result policy (used by `benchbox submit`) agrees on the same file.
+
         loaded, _raw = load_result_file(path)
         assert classify_loaded_result(loaded) is expected, label
 
 
 def test_submit_classifier_contract_path_only_states(tmp_path: Path):
-    """Missing and malformed inputs resolve identically via the shared path policy."""
     missing = tmp_path / "does-not-exist.json"
     assert classify_result_path(missing) is SubmitTerminalState.missing_manifest
     assert classify_result_path(None) is SubmitTerminalState.missing_manifest
@@ -149,13 +130,12 @@ def test_submit_classifier_contract_path_only_states(tmp_path: Path):
 
     malformed = tmp_path / "malformed.json"
     malformed.write_text("{not valid json", encoding="utf-8")
-    # Load/parse failures are bundle_load_error, not schema_violation (integrity).
+
     assert classify_result_path(malformed) is SubmitTerminalState.bundle_load_error
     assert runner.classify_for_submit(malformed) is runner.SubmitTerminalState.bundle_load_error
 
 
 def test_submit_classifier_contract_load_error_distinct_from_integrity(tmp_path: Path):
-    """Loaded integrity failures stay schema_violation; unreadable files are load errors."""
     integrity = tmp_path / "integrity.json"
     _write_result_json(integrity, failed=0, validation="failed")
     assert classify_result_path(integrity) is SubmitTerminalState.schema_violation
@@ -166,11 +146,7 @@ def test_submit_classifier_contract_load_error_distinct_from_integrity(tmp_path:
 
 
 def test_submit_classifier_contract_cli_refusal_tracks_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    """The CLI's externally observable refuse/accept verdict equals the shared state."""
-    # This test drives `sub.submit` end-to-end, which is community-facing and
-    # hard-refuses without a deployment salt. That precondition is orthogonal
-    # to the classification-refusal contract under test here, so satisfy it
-    # once up front (mirrors tests/unit/cli/commands/test_submit.py).
+
     monkeypatch.setenv("BENCHBOX_MACHINE_ID_SALT", "unit-test-community-publish-salt")
     out_dir = tmp_path / "out"
     for label, path, expected in _loadable_cases(tmp_path):
@@ -179,9 +155,6 @@ def test_submit_classifier_contract_cli_refusal_tracks_state(tmp_path: Path, mon
         result = CliRunner().invoke(sub.submit, [str(path), "--dry-run", "--output", str(out_dir)])
 
         if expected is SubmitTerminalState.submittable:
-            # The classifier accepts: the CLI must not refuse on classification
-            # grounds. (Downstream bundle/dry-run validation is orthogonal and
-            # may still flag a minimal fixture — that is not this contract.)
             assert "Submission refused" not in result.output, f"{label}: {result.output}"
         else:
             assert result.exit_code == 1, f"{label}: {result.output}"
@@ -189,7 +162,6 @@ def test_submit_classifier_contract_cli_refusal_tracks_state(tmp_path: Path, mon
             if expected is SubmitTerminalState.unofficial:
                 assert "compliance_class" in result.output, label
             elif expected is SubmitTerminalState.unvalidated:
-                # Distinct wording: must name unvalidated, not imply schema violation.
                 assert "unvalidated" in result.output, label
                 assert "validation_status=" in result.output, label
                 assert "schema violation" not in result.output.lower(), label

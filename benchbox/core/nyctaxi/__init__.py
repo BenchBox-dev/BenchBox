@@ -1,11 +1,6 @@
-"""NYC Taxi OLAP benchmark package.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides access to NYC Taxi & Limousine Commission trip data for OLAP benchmarking.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark
 from benchbox.core.nyctaxi.downloader import GreenTaxiDataDownloader, HVFHVDataDownloader, NYCTaxiDataDownloader
@@ -28,7 +23,6 @@ __all__ = [
     "NYCTaxiQueryManager",
     "NYC_TAXI_SCHEMA",
     "get_create_tables_sql",
-    # Spatial extensions
     "TAXI_ZONE_CENTROIDS",
     "get_spatial_queries",
     "get_all_spatial_queries",

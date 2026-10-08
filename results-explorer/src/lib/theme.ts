@@ -49,7 +49,6 @@ export function persistThemeChoice(choice: ThemeChoice) {
       window.localStorage.setItem(THEME_STORAGE_KEY, choice);
     }
   } catch {
-    // Storage can be unavailable in privacy contexts; data attributes still update.
   }
 }
 

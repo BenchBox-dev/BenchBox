@@ -1,5 +1,3 @@
-"""Alternating-worker acceptance for the shared remote MCP deployment model."""
-
 from __future__ import annotations
 
 import json
@@ -27,8 +25,6 @@ pytestmark = [pytest.mark.integration, pytest.mark.fast]
 
 
 class AlternatingASGITransport(httpx2.AsyncBaseTransport):
-    """Send each successive request to a different in-process worker."""
-
     def __init__(self, apps: Sequence[Any]) -> None:
         self._transports = [httpx2.ASGITransport(app=app) for app in apps]
         self._next = 0

@@ -1,5 +1,3 @@
-"""Contract tests for consumer-driven platform capability views."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -47,20 +45,15 @@ def _requires_categorized_query_benchmark(candidate: CategorizedQueryBenchmark) 
 if TYPE_CHECKING:
 
     def _specialized_benchmark_type_island(read_primitives: ReadPrimitivesBenchmark) -> None:
-        """Prove the production categorized direct-run seam statically."""
         _requires_categorized_query_benchmark(read_primitives)
 
 
 class _ThirdPartySQLAdapter:
-    """Structural stand-in for an adapter shipped outside BenchBox."""
-
     def run_benchmark(self, benchmark: Any, **run_config: Any) -> dict[str, Any]:
         return {"benchmark": benchmark, "config": run_config}
 
 
 class _ThirdPartyDataFrameAdapter:
-    """Minimal dataframe extension using the established marker and method surface."""
-
     is_dataframe_adapter = True
     platform_name = "third-party-frame"
 
@@ -130,8 +123,6 @@ class _LoadAndEvidenceAdapter:
 
 
 class _CloudPlanCaptureAdapter:
-    """Cloud-like structural adapter; no PlatformAdapter inheritance is required."""
-
     analyze_plans = True
     capture_plans = False
     normalize_plan_literals = True
@@ -149,8 +140,6 @@ class _CloudPlanCaptureAdapter:
 
 
 class _MinimalSuppliedConnectionCapture:
-    """Legacy-compatible capture surface with no optional metadata or factory."""
-
     analyze_plans = True
     capture_plans = False
 
@@ -181,7 +170,6 @@ def test_structural_sql_and_dataframe_extensions_need_no_protocol_inheritance() 
 
 
 def test_dataframe_execution_mode_selection_stays_a_caller_responsibility() -> None:
-    """Runtime views preserve legacy duck typing; strict checks own signature proof."""
     assert as_dataframe_benchmark_executor(_ThirdPartySQLAdapter()) is not None
 
 

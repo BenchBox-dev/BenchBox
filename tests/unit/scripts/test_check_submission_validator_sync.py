@@ -1,10 +1,3 @@
-"""Unit tests for the submission-validator drift-check comparison logic.
-
-The scheduled workflow feeds this script the two real branch copies; these
-tests pin the normalization contract (the sanctioned uv-invocation difference
-is ignored, everything else is drift) without any network or branch access.
-"""
-
 from __future__ import annotations
 
 import importlib.util
@@ -27,8 +20,6 @@ def _load_module():
 
 mod = _load_module()
 
-# Minimal representative develop / published-results copies that differ ONLY in
-# the sanctioned invocation.
 DEVELOP = """      - name: Validate bundles
         run: |
           xargs -d '\\n' uv run -- python scripts/validate_submission.py $REQUIRE_MANIFEST
@@ -45,8 +36,6 @@ PUBLISHED_IN_SYNC = """      - name: Validate bundles
 
 
 def test_invocation_only_difference_is_in_sync() -> None:
-    # The develop and published-results copies differ only by the slim-branch
-    # invocation; the drift check must treat them as in sync.
     assert mod.diff(DEVELOP, PUBLISHED_IN_SYNC) == []
 
 
@@ -55,7 +44,6 @@ def test_identical_text_is_in_sync() -> None:
 
 
 def test_substantive_drift_is_detected() -> None:
-    # published-results dropped the fork gate / a guard line -> real drift.
     drifted = PUBLISHED_IN_SYNC.replace("$REQUIRE_MANIFEST", "")
     result = mod.diff(DEVELOP, drifted)
     assert result, "substantive divergence must be reported as drift"

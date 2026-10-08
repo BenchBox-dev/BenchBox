@@ -1,13 +1,6 @@
-"""Coverage tests for benchbox/metadata_primitives.py facade.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-The MetadataPrimitives class is a thin delegation facade wrapping
-MetadataPrimitivesBenchmark.  These tests verify every public method
-delegates correctly without touching a real database.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock, patch
 
@@ -21,7 +14,7 @@ _IMPL_PATH = "benchbox.metadata_primitives.MetadataPrimitivesBenchmark"
 
 
 def _make_facade(**kwargs):
-    """Return a MetadataPrimitives instance with a MagicMock inner _impl."""
+
     with patch(_IMPL_PATH) as MockImpl:
         facade = MetadataPrimitives(scale_factor=1.0, **kwargs)
         mock_impl = MockImpl.return_value

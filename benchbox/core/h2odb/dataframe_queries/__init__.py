@@ -1,14 +1,10 @@
-"""H2ODB DataFrame queries for Expression and Pandas families.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
-# Import queries module to trigger registration
-from benchbox.core.h2odb.dataframe_queries import queries as _queries  # noqa: F401
+from benchbox.core.h2odb.dataframe_queries import queries as _queries
 from benchbox.core.h2odb.dataframe_queries.registry import (
     H2ODB_DATAFRAME_QUERIES,
     get_h2odb_query,

@@ -24,33 +24,30 @@ Databend supports two deployment modes: **Databend Cloud** (managed service) and
 
 ## Quick Start
 
+Install the `databend-driver` dependency directly or through the Databend extra, then configure the connection for Databend Cloud and run TPC-H:
+
 ```bash
-# Install databend-driver dependency
 uv add databend-driver
 
-# Or install via the Databend extra
 uv add benchbox --extra databend
 
-# Configure connection (Databend Cloud)
 export DATABEND_HOST=tenant--warehouse.gw.databend.com
 export DATABEND_USER=benchbox
 export DATABEND_PASSWORD=your_password
 
-# Run TPC-H benchmark
 benchbox run --platform databend --benchmark tpch --scale 0.01
 ```
 
 ### Self-Hosted Quick Start
 
+The Docker image needs MinIO or S3-compatible storage. Configure the self-hosted host and port, and disable SSL for local development:
+
 ```bash
-# Start Databend with Docker (requires MinIO or S3-compatible storage)
 docker run -p 8000:8000 datafuselabs/databend:latest
 
-# Configure for self-hosted
 export DATABEND_HOST=localhost
 export DATABEND_PORT=8000
 
-# Disable SSL for local development
 benchbox run --platform databend --benchmark tpch --scale 0.01 \
     --platform-option ssl=false
 ```
@@ -58,7 +55,6 @@ benchbox run --platform databend --benchmark tpch --scale 0.01 \
 ### DSN-Based Connection
 
 ```bash
-# Self-hosted via DSN
 benchbox run --platform databend --benchmark tpch --scale 0.01 \
     --platform-option dsn=databend+http://benchbox:benchbox@localhost:8000/benchbox?sslmode=disable
 ```
@@ -127,13 +123,10 @@ The current adapter uses INSERT batching for broad compatibility across both dep
 ### Basic Benchmarks
 
 ```bash
-# TPC-H at scale factor 1
 benchbox run --platform databend --benchmark tpch --scale 1.0
 
-# TPC-DS at scale factor 10
 benchbox run --platform databend --benchmark tpcds --scale 10.0
 
-# Run specific queries only
 benchbox run --platform databend --benchmark tpch --queries Q1,Q6,Q17
 ```
 
@@ -150,11 +143,12 @@ benchbox run --platform databend --benchmark tpch --scale 10.0
 
 ### Self-Hosted Configuration
 
+Disable SSL for a local Databend:
+
 ```bash
 export DATABEND_HOST=localhost
 export DATABEND_PORT=8000
 
-# Disable SSL for local Databend
 benchbox run --platform databend --benchmark tpch --scale 1.0 \
     --platform-option ssl=false
 ```
@@ -169,7 +163,6 @@ benchbox run --platform databend --benchmark tpch --scale 1.0 \
 ### Dry Run (Preview)
 
 ```bash
-# Preview execution plan without running
 benchbox run --platform databend --benchmark tpch --scale 1.0 --dry-run ./preview
 ```
 
@@ -254,10 +247,9 @@ The adapter automatically applies optimizations when running benchmarks:
 
 ### Clustering Keys
 
-Databend supports `CLUSTER BY` to optimize data layout for frequently queried columns, similar to Snowflake clustering keys:
+Databend supports `CLUSTER BY` to optimize data layout for frequently queried columns, similar to Snowflake clustering keys. BenchBox applies this automatically via the tuning configuration:
 
 ```sql
--- Applied automatically via tuning configuration
 ALTER TABLE lineitem CLUSTER BY (l_shipdate, l_orderkey)
 ```
 

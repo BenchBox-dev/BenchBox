@@ -14,7 +14,6 @@ WAIT_PROGRESS_SECONDS = 5.0
 
 
 def read_holder(lock_path: Path) -> str:
-    """Best-effort holder description for wait/timeout messages."""
     try:
         return lock_path.read_text(encoding="utf-8", errors="replace").strip() or "(empty lock file)"
     except OSError:
@@ -22,12 +21,6 @@ def read_holder(lock_path: Path) -> str:
 
 
 def write_holder(fd: int, lock_path: Path, *, phase: str, gate: str | None = None) -> None:
-    """Publish bounded owner/progress information while holding *fd*.
-
-    The kernel lock, rather than this text, is the liveness authority.  The
-    text is only diagnostic and is deliberately best effort so a read-only or
-    unusual filesystem cannot turn a valid lock into a bypass.
-    """
     started = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     command = " ".join(shlex.quote(part) for part in sys.argv[:8])
     details = f" phase:{phase}"
@@ -62,15 +55,6 @@ def _close_lock(fd: int) -> None:
 
 
 def wait_on_fd(fd: int, lock_path: Path, timeout_seconds: float) -> None:
-    """Acquire an exclusive lock on open *fd*, waiting up to *timeout_seconds*.
-
-    Raises TimeoutError carrying the last observed holder description without
-    closing *fd*. KeyboardInterrupt cancels the wait. A held lock always
-    means a live holder: the kernel releases locks on process death, so this
-    never steals, deletes, or bypasses. Shared with tests/conftest.py.
-    Uses ``fcntl.flock`` on POSIX and ``msvcrt.locking`` on Windows so the
-    canonical preflight remains usable on native Windows.
-    """
     deadline = time.monotonic() + max(0.0, timeout_seconds)
     wait_started = time.monotonic()
     last_report = 0.0
@@ -94,8 +78,6 @@ def wait_on_fd(fd: int, lock_path: Path, timeout_seconds: float) -> None:
                     )
                 return
             except OSError as exc:
-                # The CRT reports a nonblocking locking violation as EACCES.
-                # Other errors (such as EBADF or EINVAL) are not contention.
                 if exc.errno != errno.EACCES:
                     raise
                 holder = read_holder(lock_path)
@@ -135,11 +117,6 @@ def wait_on_fd(fd: int, lock_path: Path, timeout_seconds: float) -> None:
 
 
 def wait_for_lock(lock_path: Path, timeout_seconds: float) -> int:
-    """Open *lock_path* and acquire it via :func:`wait_on_fd`.
-
-    Returns the open fd (caller must close it to release). Closes the fd
-    before raising while waiting for the lock.
-    """
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0), 0o644)
     try:
@@ -155,7 +132,6 @@ def wait_for_lock(lock_path: Path, timeout_seconds: float) -> int:
 
 
 def clear_inactive_lock(lock_path: Path) -> int:
-    """Clear inactive diagnostic text without unlinking the lock pathname."""
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0), 0o644)
     try:

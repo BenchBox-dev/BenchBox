@@ -1,12 +1,3 @@
-/**
- * Tests for the long summary overview section chrome.
- *
- * Covers what the shared chart section commits to: leading with a chart
- * rather than a restatement of the page, consistent column naming, the
- * distribution boundary footnote, drawing each chart once, and the dynamic
- * additional-analyses count.
- */
-
 import { render, screen, fireEvent, within } from "@testing-library/preact";
 import { describe, it, expect } from "vitest";
 import type { BenchmarkSummary, PlatformRow } from "@/types";
@@ -87,11 +78,6 @@ function renderOverview(summary: BenchmarkSummary = makeSummary()) {
 
 describe("SummaryChartOverview section chrome", () => {
   it("labels the expanded Percentiles view with cohort-aware identities, not bare platform names", () => {
-    // Audit finding: the expanded Percentiles view under "More views" used
-    // to pass the raw platform name as displayLabel, so two same-platform
-    // rows collapsed to identical "DuckDB" strings, and preserveUniqueAfterTruncation's
-    // last-resort repair then rendered them as "DuckDB 2", "DuckDB 3" - a
-    // third, inconsistent labelling scheme next to the other expanded charts.
     const summary = makeSummary({
       platforms: [
         makePlatform({
@@ -117,19 +103,11 @@ describe("SummaryChartOverview section chrome", () => {
     const full = screen.getByTestId("summary-chart-full-percentile_ladder");
     expect(full.textContent).toContain("v1.4.3");
     expect(full.textContent).toContain("v1.5.0");
-    // The old bug's bare index-suffixed labels must not appear.
     expect(full.textContent).not.toMatch(/DuckDB\s*2\b/);
   });
 
   it("leads with the first chart rather than a restatement of the page", () => {
     const { container } = renderOverview();
-    // The section used to open with a question heading, a "shared scope"
-    // callout, and a copy-link button, none of which said anything the charts
-    // below do not say for themselves. A later round replaced the callout
-    // with a "Which platforms lead..." heading/description pair that
-    // restated the table's own column headers ("Display geomean", "lower is
-    // better") - that pair is gone too, and the table (with its own
-    // aria-label and caption) leads instead.
     expect(screen.queryByText("What does this cohort show?")).toBeNull();
     expect(screen.queryByText(/Shared scope:/)).toBeNull();
     expect(screen.queryByRole("button", { name: /Copy chart-section link/ })).toBeNull();
@@ -148,7 +126,6 @@ describe("SummaryChartOverview section chrome", () => {
     expect(within(table as HTMLElement).getByText("Platform")).not.toBeNull();
     expect(within(table as HTMLElement).queryByText("Engine")).toBeNull();
     const cell = table.querySelector("td.summary-metric-cell")!;
-    // Value and bar share one flex row; the bar is not stacked under the value.
     expect(cell.querySelector(".summary-metric-track")?.parentElement).toBe(
       cell.querySelector("div"),
     );
@@ -194,14 +171,10 @@ describe("SummaryChartOverview section chrome", () => {
       .getAllByText(/across different queries, not repeated runs/)
       .filter((el) => el.tagName === "P");
     expect(paragraphs).toHaveLength(1);
-    // Clicking the link opens the Query matrix card in place, rather than
-    // navigating to a page-level anchor the matrix no longer owns.
     const matrixLink = screen.getByTestId("see-per-query-matrix-link") as HTMLAnchorElement;
     expect(screen.getByTestId("summary-chart-full-query_heatmap").textContent).toBe("");
     fireEvent.click(matrixLink);
     expect(screen.getByTestId("summary-chart-full-query_heatmap").textContent).not.toBe("");
-    // The old "Inspect exclusions" link pointed at the provenance legend,
-    // which is not where a chart's excluded rows are named.
     expect(screen.queryByText(/Inspect exclusions/)).toBeNull();
   });
 

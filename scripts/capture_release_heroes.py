@@ -1,13 +1,4 @@
 #!/usr/bin/env python3
-"""Render hero PNGs for v0.3.0 release blog posts.
-
-Two render modes:
-  --ansi-file <path>  ANSI text → ansi2html → headless Chrome → PNG
-  --url <url>         headless Chrome → PNG (for the /prompts/ landing page)
-
-Outputs land in ``_blog/building-benchbox/images`` and are synced into
-``docs/blog/images``, matching ``scripts/capture_chart_images.py`` conventions.
-"""
 
 from __future__ import annotations
 
@@ -18,6 +9,17 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+CLI_DESCRIPTION = (
+    "Render hero PNGs for v0.3.0 release blog posts.\n"
+    "\n"
+    "Two render modes:\n"
+    "  --ansi-file <path>  ANSI text → ansi2html → headless Chrome → PNG\n"
+    "  --url <url>         headless Chrome → PNG (for the /prompts/ landing page)\n"
+    "\n"
+    "Outputs land in ``_blog/building-benchbox/images`` and are synced into\n"
+    "``docs/blog/images``, matching ``scripts/capture_chart_images.py`` conventions.\n"
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 PRIMARY_OUT = ROOT / "_blog" / "building-benchbox" / "images"
@@ -67,7 +69,7 @@ HTML_TEMPLATE = """\
 
 
 def ansi_to_html(ansi_text: str) -> str:
-    from ansi2html import Ansi2HTMLConverter  # type: ignore[import]
+    from ansi2html import Ansi2HTMLConverter
 
     converter = Ansi2HTMLConverter(inline=True, scheme="ansi2html", dark_bg=True)
     return converter.convert(ansi_text, full=False)
@@ -116,7 +118,7 @@ def render_url_to_png(url: str, out_path: Path, width: int = 1280, height: int =
 
 
 def crop_to_content(png_path: Path, bg=(26, 30, 36), tolerance: int = 4, pad: int = 32) -> None:
-    from PIL import Image  # type: ignore[import]
+    from PIL import Image
 
     img = Image.open(png_path).convert("RGB")
     pixels = img.load()
@@ -149,7 +151,7 @@ def sync(name: str) -> int:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description=__doc__)
+    p = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     p.add_argument("--name", required=True, help="Output basename (no extension)")
     src = p.add_mutually_exclusive_group(required=True)
     src.add_argument("--ansi-file", help="Path to an ANSI text fixture")

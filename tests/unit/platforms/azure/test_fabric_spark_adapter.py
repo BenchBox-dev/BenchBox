@@ -1,9 +1,6 @@
-"""Tests for Microsoft Fabric Spark platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock, patch
 
@@ -18,10 +15,8 @@ pytestmark = [
 
 
 class TestFabricSparkAdapterInitialization:
-    """Test FabricSparkAdapter initialization."""
-
     def test_missing_workspace_id_raises_error(self):
-        """Test error when workspace_id is not provided."""
+
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -35,7 +30,7 @@ class TestFabricSparkAdapterInitialization:
                 )
 
     def test_missing_lakehouse_id_raises_error(self):
-        """Test error when lakehouse_id is not provided."""
+
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -49,7 +44,7 @@ class TestFabricSparkAdapterInitialization:
                 )
 
     def test_valid_configuration(self):
-        """Test valid configuration with workspace and lakehouse IDs."""
+
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -73,7 +68,7 @@ class TestFabricSparkAdapterInitialization:
             assert adapter.spark_pool_name == "my-pool"
 
     def test_default_values(self):
-        """Test default configuration values."""
+
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -94,7 +89,6 @@ class TestFabricSparkAdapterInitialization:
             assert adapter.spark_pool_name is None
 
     def test_derived_livy_endpoint(self):
-        """Test Livy endpoint is derived from workspace and lakehouse IDs."""
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -115,7 +109,6 @@ class TestFabricSparkAdapterInitialization:
             assert "livyApi" in adapter.livy_endpoint
 
     def test_custom_livy_endpoint(self):
-        """Test custom Livy endpoint overrides derived endpoint."""
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -137,10 +130,8 @@ class TestFabricSparkAdapterInitialization:
 
 
 class TestFabricSparkAdapterPlatformInfo:
-    """Test platform info methods."""
-
     def test_get_platform_info(self):
-        """Test get_platform_info returns correct metadata."""
+
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -171,7 +162,7 @@ class TestFabricSparkAdapterPlatformInfo:
             assert info["storage"] == "OneLake"
 
     def test_get_dialect(self):
-        """Test get_target_dialect returns spark."""
+
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -191,10 +182,8 @@ class TestFabricSparkAdapterPlatformInfo:
 
 
 class TestFabricSparkAdapterConnection:
-    """Test connection and authentication."""
-
     def test_create_connection_success(self):
-        """Test successful workspace connection."""
+
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential") as mock_cred_class,
@@ -204,15 +193,13 @@ class TestFabricSparkAdapterConnection:
         ):
             mock_staging.from_uri.return_value = MagicMock()
 
-            # Setup mock credential
             mock_credential = MagicMock()
             mock_token = MagicMock()
             mock_token.token = "test-token"
-            mock_token.expires_on = 9999999999  # Far future
+            mock_token.expires_on = 9999999999
             mock_credential.get_token.return_value = mock_token
             mock_cred_class.return_value = mock_credential
 
-            # Setup mock response
             mock_response = MagicMock()
             mock_response.status_code = 200
             mock_response.json.return_value = {
@@ -235,7 +222,7 @@ class TestFabricSparkAdapterConnection:
             assert result["lakehouse_id"] == "lakehouse-xyz"
 
     def test_create_connection_auth_failure(self):
-        """Test authentication failure handling."""
+
         import requests as real_requests
 
         with (
@@ -246,7 +233,6 @@ class TestFabricSparkAdapterConnection:
         ):
             mock_staging.from_uri.return_value = MagicMock()
 
-            # Setup mock credential
             mock_credential = MagicMock()
             mock_token = MagicMock()
             mock_token.token = "test-token"
@@ -254,12 +240,9 @@ class TestFabricSparkAdapterConnection:
             mock_credential.get_token.return_value = mock_token
             mock_cred_class.return_value = mock_credential
 
-            # Mock requests.get but keep real exceptions
             with patch("benchbox.platforms.azure.fabric_spark_adapter.requests") as mock_requests:
-                # Keep real exceptions accessible
                 mock_requests.exceptions = real_requests.exceptions
 
-                # Setup mock 401 response
                 mock_response = MagicMock()
                 mock_response.status_code = 401
                 mock_requests.get.return_value = mock_response
@@ -275,7 +258,7 @@ class TestFabricSparkAdapterConnection:
                     adapter.create_connection()
 
     def test_create_connection_workspace_not_found(self):
-        """Test workspace not found handling."""
+
         import requests as real_requests
 
         with (
@@ -286,7 +269,6 @@ class TestFabricSparkAdapterConnection:
         ):
             mock_staging.from_uri.return_value = MagicMock()
 
-            # Setup mock credential
             mock_credential = MagicMock()
             mock_token = MagicMock()
             mock_token.token = "test-token"
@@ -294,12 +276,9 @@ class TestFabricSparkAdapterConnection:
             mock_credential.get_token.return_value = mock_token
             mock_cred_class.return_value = mock_credential
 
-            # Mock requests.get but keep real exceptions
             with patch("benchbox.platforms.azure.fabric_spark_adapter.requests") as mock_requests:
-                # Keep real exceptions accessible
                 mock_requests.exceptions = real_requests.exceptions
 
-                # Setup mock 404 response
                 mock_response = MagicMock()
                 mock_response.status_code = 404
                 mock_requests.get.return_value = mock_response
@@ -316,10 +295,7 @@ class TestFabricSparkAdapterConnection:
 
 
 class TestFabricSparkAdapterDataLoading:
-    """Test data loading functionality."""
-
     def test_load_data_propagates_table_creation_failure(self, tmp_path):
-        """A failed table creation must not produce a successful load result."""
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -340,7 +316,7 @@ class TestFabricSparkAdapterDataLoading:
                 adapter.load_data(benchmark, None, tmp_path)
 
     def test_load_data_skips_when_exists(self):
-        """Test that load_data skips upload when tables already exist."""
+
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -348,19 +324,16 @@ class TestFabricSparkAdapterDataLoading:
             patch("benchbox.platforms.azure.fabric_spark_adapter.requests") as mock_requests,
             patch("benchbox.platforms.azure.fabric_spark_adapter.CloudSparkStaging") as mock_staging,
         ):
-            # Setup mock staging that says tables exist
             mock_staging_instance = MagicMock()
             mock_staging_instance.tables_exist.return_value = True
             mock_staging.from_uri.return_value = mock_staging_instance
 
-            # Mock token and Livy API for execute_statement calls
             mock_cred = MagicMock()
             mock_token = MagicMock()
             mock_token.token = "test-token"
             mock_token.expires_on = 9999999999
             mock_cred.get_token.return_value = mock_token
 
-            # Mock statement execution
             mock_session_response = MagicMock()
             mock_session_response.status_code = 201
             mock_session_response.json.return_value = {"id": 1, "state": "idle"}
@@ -391,11 +364,9 @@ class TestFabricSparkAdapterDataLoading:
                     with patch.object(adapter, "_execute_statement", return_value={}):
                         adapter.load_data(mock_benchmark, None, Path(tmpdir))
 
-                    # Should not call upload_tables since tables exist
                     mock_staging_instance.upload_tables.assert_not_called()
 
     def test_load_data_falls_back_to_table_discovery_for_placeholder_tables(self):
-        """Placeholder benchmark.tables mappings should keep the legacy parquet discovery path."""
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -452,10 +423,8 @@ class TestFabricSparkAdapterDataLoading:
 
 
 class TestFabricSparkAdapterTuning:
-    """Test benchmark tuning configuration."""
-
     def test_configure_for_tpch(self):
-        """Test TPC-H benchmark configuration."""
+
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -465,7 +434,6 @@ class TestFabricSparkAdapterTuning:
         ):
             mock_staging.from_uri.return_value = MagicMock()
 
-            # Mock optimizer (class method pattern)
             mock_config = MagicMock()
             mock_config.to_dict.return_value = {"spark.sql.adaptive.enabled": "true"}
             mock_optimizer.for_tpch.return_value = mock_config
@@ -484,7 +452,7 @@ class TestFabricSparkAdapterTuning:
             mock_optimizer.for_tpch.assert_called_once()
 
     def test_configure_for_tpcds(self):
-        """Test TPC-DS benchmark configuration."""
+
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -494,7 +462,6 @@ class TestFabricSparkAdapterTuning:
         ):
             mock_staging.from_uri.return_value = MagicMock()
 
-            # Mock optimizer (class method pattern)
             mock_config = MagicMock()
             mock_config.to_dict.return_value = {}
             mock_optimizer.for_tpcds.return_value = mock_config
@@ -514,10 +481,8 @@ class TestFabricSparkAdapterTuning:
 
 
 class TestFabricSparkAdapterCLI:
-    """Test CLI argument handling."""
-
     def test_add_cli_arguments(self):
-        """Test CLI arguments are added correctly."""
+
         from argparse import ArgumentParser
 
         with (
@@ -529,7 +494,6 @@ class TestFabricSparkAdapterCLI:
             parser = ArgumentParser()
             FabricSparkAdapter.add_cli_arguments(parser)
 
-            # Parse with test arguments
             args = parser.parse_args(
                 [
                     "--workspace-id",
@@ -552,7 +516,7 @@ class TestFabricSparkAdapterCLI:
             assert args.timeout_minutes == 120
 
     def test_from_config(self):
-        """Test adapter creation from config dictionary."""
+
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -580,7 +544,6 @@ class TestFabricSparkAdapterCLI:
             assert adapter.timeout_minutes == 90
 
     def test_from_config_reads_nested_options_toggle(self):
-        """CLI --platform-option values nest under options without a builder."""
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -609,13 +572,10 @@ class TestFabricSparkAdapterCLI:
 
 
 class TestFabricSparkAdapterRegistry:
-    """Test platform registry integration."""
-
     def test_platform_registered_in_registry(self):
-        """Test that fabric-spark is registered in platform registry."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
-        # Get all platform metadata
         all_metadata = PlatformRegistry.get_all_platform_metadata()
 
         assert "fabric-spark" in all_metadata
@@ -626,7 +586,7 @@ class TestFabricSparkAdapterRegistry:
         assert "azure-identity" in str(metadata.get("libraries", []))
 
     def test_platform_capabilities(self):
-        """Test that fabric-spark capabilities are correctly defined."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         all_metadata = PlatformRegistry.get_all_platform_metadata()
@@ -638,10 +598,8 @@ class TestFabricSparkAdapterRegistry:
 
 
 class TestFabricSparkLivySessionConstants:
-    """Test Livy session state constants."""
-
     def test_livy_session_states(self):
-        """Test LivySessionState constants are defined."""
+
         from benchbox.platforms.azure.fabric_spark_adapter import LivySessionState
 
         assert LivySessionState.NOT_STARTED == "not_started"
@@ -652,7 +610,7 @@ class TestFabricSparkLivySessionConstants:
         assert LivySessionState.DEAD == "dead"
 
     def test_table_format_default_delta(self):
-        """Test table_format defaults to delta on Fabric."""
+
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -667,7 +625,7 @@ class TestFabricSparkLivySessionConstants:
             assert adapter.table_format == "delta"
 
     def test_table_format_iceberg(self):
-        """Test table_format can be set to iceberg."""
+
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -683,7 +641,7 @@ class TestFabricSparkLivySessionConstants:
             assert adapter.table_format == "iceberg"
 
     def test_table_format_from_config(self):
-        """Test table_format is passed through from_config."""
+
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -701,7 +659,7 @@ class TestFabricSparkLivySessionConstants:
             assert adapter.table_format == "parquet"
 
     def test_adaptive_enabled_from_config(self):
-        """Test adaptive_enabled is forwarded through from_config."""
+
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -727,7 +685,7 @@ class TestFabricSparkLivySessionConstants:
             assert defaulted.adaptive_enabled is True
 
     def test_session_config_iceberg_extensions(self):
-        """Test Iceberg extensions are added to session config."""
+
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -755,7 +713,6 @@ class TestFabricSparkLivySessionConstants:
             assert "SparkSessionCatalog" in session_conf["spark.sql.catalog.spark_catalog"]
 
     def test_session_config_delta_no_extensions(self):
-        """Test delta (default on Fabric) does not add extra extensions since Delta is native."""
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -781,7 +738,7 @@ class TestFabricSparkLivySessionConstants:
             assert "spark.sql.extensions" not in session_conf
 
     def test_livy_statement_states(self):
-        """Test LivyStatementState constants are defined."""
+
         from benchbox.platforms.azure.spark_execution_utils import LivyStatementState
 
         assert LivyStatementState.WAITING == "waiting"
@@ -791,11 +748,6 @@ class TestFabricSparkLivySessionConstants:
         assert LivyStatementState.CANCELLED == "cancelled"
 
     def test_user_spark_config_wins_over_benchmark_config(self):
-        """Explicit user spark_config must survive benchmark config merge.
-
-        Benchmark-specific configuration (e.g. the optimizer's AQE enablement)
-        is merged first so an explicit user override is not clobbered.
-        """
         with (
             patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -826,7 +778,6 @@ class TestFabricSparkLivySessionConstants:
 
 
 def _create_fabric_session_conf(**adapter_kwargs):
-    """Build a Fabric adapter with mocked Livy transport and return the session conf."""
     with (
         patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
         patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -854,8 +805,6 @@ def _create_fabric_session_conf(**adapter_kwargs):
 
 
 class TestFabricAdaptiveToggle:
-    """Livy session build renders adaptive_enabled explicitly in both directions."""
-
     AQE_KEYS = (
         "spark.sql.adaptive.enabled",
         "spark.sql.adaptive.coalescePartitions.enabled",

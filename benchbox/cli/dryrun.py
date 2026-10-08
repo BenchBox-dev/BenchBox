@@ -1,9 +1,6 @@
-"""Dry run display functionality for BenchBox CLI.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -15,16 +12,13 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
-# Import DryRunExecutor from core module
 from benchbox.core.dryrun import DryRunExecutor as CoreDryRunExecutor, DryRunQueryExtractionError
 from benchbox.core.schemas import BenchmarkConfig, DatabaseConfig, DryRunResult, SystemProfile
 from benchbox.utils.printing import quiet_console
 
-if TYPE_CHECKING:  # pragma: no cover - typing only
+if TYPE_CHECKING:  # pragma: no cover
     from rich.console import Console
 
-# Module-level console handle used by display helpers.
-# Cast to Console for type checking since QuietConsoleProxy forwards all calls to Console.
 console: Any = quiet_console
 
 
@@ -69,48 +63,6 @@ def generate_cli_command(
     client_cloud: str | None = None,
     no_link_probe: bool = False,
 ) -> str:
-    """Generate equivalent CLI command from interactive wizard configuration.
-
-    Args:
-        platform: Platform name (duckdb, snowflake, etc.)
-        benchmark: Benchmark name (tpch, tpcds, etc.)
-        scale: Scale factor
-        phases: List of phases to run
-        queries: Query subset (e.g., ["Q1", "Q6"])
-        tuning: Tuning mode (tuned, notuning, auto, or YAML path)
-        seed: RNG seed for reproducibility
-        output: Output directory
-        table_mode: Table mode (native, external)
-        table_format: Table format (parquet, vortex, delta, iceberg, or format:compression)
-        compression: Compression config (zstd:9, gzip:6, etc.), None when not explicitly set
-        mode: Execution mode (sql, dataframe)
-        force: Force mode (all, datagen, upload)
-        official: TPC-compliant mode
-        capture_plans: Capture query execution plans
-        strict_translation: Fail when SQL dialect translation falls back
-        normalize_plan_literals: Also record a literal-normalized plan fingerprint
-        stats_reset: Cold-stats vs warm-stats control for the statistics phase
-        stats_per_table_timing: Record a per-table statistics-build timing breakdown
-        validation: Validation mode (exact, loose, range, disabled, full)
-        verbose: Verbosity level (0=off, 1=-v, 2=-vv)
-        platform_options: Platform-specific key=value options
-        plan_config: Plan capture config string
-        presort: Pre-sort mode (parquet-sorted, delta-sorted, iceberg-sorted)
-        sorted_ingestion_mode: Cloud sorted-ingestion strategy (off, auto, force)
-        sorted_ingestion_method: Cloud sorted-ingestion method override
-        global_cache: Use global DataFrame cache
-        publish: Publish the exported result bundle after a successful run
-        publish_target: Destination for --publish (local dir or cloud URI)
-        publish_label: Trust label for --publish
-        funding: Funding-source disclosure recorded in the bundle's provenance block
-        result_source: Advisory producer hint recorded in the bundle's provenance block
-        client_region: Attested client cloud region recorded in environment.client_link
-        client_cloud: Attested client cloud provider recorded in environment.client_link
-        no_link_probe: Disable the post-benchmark statement overhead probe
-
-    Returns:
-        Complete CLI command string
-    """
     parts = ["benchbox run"]
     parts.append(f"--platform {platform}")
     parts.append(f"--benchmark {benchmark}")
@@ -118,7 +70,6 @@ def generate_cli_command(
     if scale != 0.01:
         parts.append(f"--scale {scale}")
 
-    # List-value flags: (value, flag, skip_value) - joined with comma
     _LIST_PARAMS = [
         (phases, "--phases", ["power"]),
         (queries, "--queries", None),
@@ -127,7 +78,6 @@ def generate_cli_command(
         if value and value != skip:
             parts.append(f"{flag} {','.join(value)}")
 
-    # Simple value flags: (value, flag, skip_value)
     _VALUE_PARAMS = [
         (tuning, "--tuning", "notuning"),
         (seed, "--seed", None),
@@ -152,7 +102,6 @@ def generate_cli_command(
         if value is not None and value != skip:
             parts.append(f"{flag} {value}")
 
-    # Repeated key=value flags
     if platform_options:
         for key, val in sorted(platform_options.items()):
             parts.append(f"--platform-option {key}={val}")
@@ -161,7 +110,6 @@ def generate_cli_command(
         for key, val in sorted(benchmark_options.items()):
             parts.append(f"--benchmark-option {key}={val}")
 
-    # Boolean flags: (value, flag)
     _BOOL_PARAMS = [
         (official, "--official"),
         (capture_plans, "--capture-plans"),
@@ -177,24 +125,18 @@ def generate_cli_command(
         if flag_value:
             parts.append(flag)
 
-    # analyze_plans is a tri-state --analyze-plans/--no-analyze-plans flag: only
-    # emit it when explicitly set (None = not passed, adapter default applies).
     if analyze_plans is not None:
         parts.append("--analyze-plans" if analyze_plans else "--no-analyze-plans")
 
-    # stats_reset is a tri-state --stats-reset/--no-stats-reset flag: only emit
-    # it when explicitly set (None = not passed, PR #980 default applies).
     if stats_reset is not None:
         parts.append("--stats-reset" if stats_reset else "--no-stats-reset")
 
-    # Publish target/label only meaningful when --publish is set
     if publish:
         if publish_target and publish_target != "benchmark_runs/published":
             parts.append(f"--publish-target {publish_target}")
         if publish_label and publish_label != "maintainer-run":
             parts.append(f"--publish-label {publish_label}")
 
-    # Verbose flags (-v, -vv)
     if verbose > 0:
         parts.append("-" + "v" * min(verbose, 2))
 
@@ -207,7 +149,6 @@ def _format_compression_str(
     compression_level: int | None,
     default_type: str | None = None,
 ) -> str | None:
-    """Format compression type and level into a display string."""
     if not compress_data:
         return None
     comp_str = compression_type or default_type
@@ -219,7 +160,6 @@ def _format_compression_str(
 
 
 def _resolve_cli_table_format(options: dict[str, Any]) -> str | None:
-    """Resolve table format with optional compression suffix for CLI display."""
     table_format = options.get("table_format")
     if not table_format:
         return None
@@ -255,35 +195,6 @@ def display_interactive_preview(
     global_cache: bool = False,
     benchmark_options: dict[str, str] | None = None,
 ) -> None:
-    """Display a preview summary for interactive wizard users.
-
-    Shows configuration summary, resource estimates, and equivalent CLI command
-    before proceeding with benchmark execution.
-
-    Args:
-        database_config: Database configuration from wizard
-        benchmark_config: Benchmark configuration from wizard
-        phases: Phases to execute
-        output: Output directory (if specified)
-        table_mode: Table mode (native or external)
-        tuning: Tuning mode
-        seed: RNG seed
-        force: Force mode (all, datagen, upload)
-        official: TPC-compliant mode
-        capture_plans: Capture query execution plans
-        strict_translation: Fail when SQL dialect translation falls back
-        stats_reset: Cold-stats vs warm-stats control for the statistics phase
-        stats_per_table_timing: Record a per-table statistics-build timing breakdown
-        validation: Validation mode
-        verbose: Verbosity level (0=off, 1=-v, 2=-vv)
-        console_obj: Rich console for output
-        platform_options: Platform-specific key=value options
-        plan_config: Plan capture config string
-        presort: Pre-sort mode
-        sorted_ingestion_mode: Cloud sorted-ingestion strategy
-        sorted_ingestion_method: Cloud sorted-ingestion method override
-        global_cache: Use global DataFrame cache
-    """
     display_console = console_obj or console
 
     display_console.print()
@@ -294,31 +205,25 @@ def display_interactive_preview(
         )
     )
 
-    # Configuration summary table
     table = Table(show_header=False, box=None, padding=(0, 2))
     table.add_column("Setting", style="cyan", min_width=18)
     table.add_column("Value", style="white")
 
-    # Platform info
     platform_display = database_config.type.upper()
     if hasattr(database_config, "execution_mode") and database_config.execution_mode:
         platform_display += f" ({database_config.execution_mode} mode)"
     table.add_row("Platform:", platform_display)
 
-    # Benchmark info
     table.add_row("Benchmark:", f"{benchmark_config.display_name} at scale {benchmark_config.scale_factor}")
 
-    # Phases
     table.add_row("Phases:", ", ".join(phases))
 
-    # Queries
     if benchmark_config.queries:
         table.add_row("Queries:", f"{len(benchmark_config.queries)} selected")
     else:
         num_queries = getattr(benchmark_config, "options", {}).get("num_queries", "all")
         table.add_row("Queries:", str(num_queries) if num_queries != "all" else "All")
 
-    # Data-driven optional rows to reduce per-field branching
     options = getattr(benchmark_config, "options", {})
     table_fmt = options.get("table_format")
     optional_rows: list[tuple[str, str | None]] = [
@@ -363,7 +268,6 @@ def display_interactive_preview(
 
     display_console.print(table)
 
-    # Generate and show CLI command
     display_console.print()
     display_console.print("[bold]Equivalent CLI command:[/bold]")
 
@@ -410,13 +314,10 @@ def display_interactive_preview(
 
 
 class DryRunDisplay:
-    """Handles display of dry run results."""
-
     def __init__(self, console: Console | None = None):
         self.console = console or quiet_console
 
     def display_dry_run_results(self, result: DryRunResult):
-        """Display dry run results to console."""
         self.console.print(
             Panel.fit(
                 Text("DRY RUN MODE - No queries will be executed", style="bold yellow"),
@@ -428,7 +329,6 @@ class DryRunDisplay:
 
         self._display_query_preview(result.queries, result)
 
-        # Display schema based on execution mode
         if result.execution_mode == "dataframe" and getattr(result, "dataframe_schema", None):
             self._display_schema_preview(result.dataframe_schema, syntax_lang="python", title="DataFrame Schema")
         elif result.schema_sql:
@@ -437,11 +337,9 @@ class DryRunDisplay:
         if result.tuning_config:
             self._display_tuning_config(result.tuning_config)
 
-        # Display DDL preview with tuning clauses
         if result.ddl_preview:
             self._display_ddl_preview(result.ddl_preview)
 
-        # Display post-load statements
         if result.post_load_statements:
             self._display_post_load_statements(result.post_load_statements)
 
@@ -487,7 +385,6 @@ class DryRunDisplay:
         )
         table.add_row("", "Context", execution_context)
 
-        # Data layout: table mode, table format, compression
         options = benchmark_config.get("options", {})
         table_mode = str(options.get("table_mode", "native") or "native").lower()
         table_format = options.get("table_format") or benchmark_config.get("table_format")
@@ -511,7 +408,6 @@ class DryRunDisplay:
                 table.add_row(category, "Compression", comp_display)
                 category = ""
 
-        # Tuning
         tuning_config = result.tuning_config
         if tuning_config:
             tuning_type = tuning_config.get("tuning_type", "tuned")
@@ -547,11 +443,9 @@ class DryRunDisplay:
         if result:
             execution_mode = getattr(result, "execution_mode", "sql")
 
-        # Separate maintenance operations from regular queries
         maintenance_ops = {k: v for k, v in queries.items() if k in ("RF1", "RF2")}
         regular_queries = {k: v for k, v in queries.items() if k not in ("RF1", "RF2") and not k.startswith("_")}
 
-        # Determine syntax highlighting language based on execution mode
         syntax_lang = "python" if execution_mode == "dataframe" else "sql"
 
         preview_title = self._get_preview_title(test_execution_type, len(regular_queries))
@@ -559,7 +453,6 @@ class DryRunDisplay:
             preview_title = "DataFrame Query Preview"
         self.console.print(f"\n[bold]{preview_title}[/bold] ([dim]{execution_context}[/dim])")
 
-        # Filter out error entries for DataFrame mode (use regular_queries now)
         display_queries = list(regular_queries.items())
 
         for _i, (query_id, query_content) in enumerate(display_queries[:3]):
@@ -583,7 +476,6 @@ class DryRunDisplay:
             remaining_type = "operations" if test_execution_type == "maintenance" else "queries"
             self.console.print(f"\n[dim]... and {remaining} more {remaining_type}[/dim]")
 
-        # Display maintenance operations in separate section
         if maintenance_ops:
             self._display_maintenance_operations(maintenance_ops)
 
@@ -622,7 +514,6 @@ class DryRunDisplay:
             self.console.print("[dim]No detailed tuning configuration available[/dim]")
 
     def _display_constraints_table(self, constraints: dict[str, Any]) -> None:
-        """Display constraints configuration table."""
         constraints_table = Table(show_header=True, header_style="bold blue")
         constraints_table.add_column("Constraint Type", style="cyan")
         constraints_table.add_column("Enabled", style="white")
@@ -641,7 +532,6 @@ class DryRunDisplay:
         self.console.print(constraints_table)
 
     def _display_table_tunings(self, table_tunings: dict[str, Any]) -> None:
-        """Display table organization tunings."""
         self.console.print("\n[bold]Table Organization Tunings[/bold]")
 
         tuning_table = Table(show_header=True, header_style="bold blue")
@@ -662,7 +552,6 @@ class DryRunDisplay:
         self.console.print(tuning_table)
 
     def _display_platform_optimizations(self, platform_opts: dict[str, Any]) -> None:
-        """Display platform optimization settings."""
         self.console.print("\n[bold]Platform Optimizations[/bold]")
 
         platform_table = Table(show_header=True, header_style="bold blue")
@@ -677,7 +566,6 @@ class DryRunDisplay:
             self.console.print(platform_table)
 
     def _display_dataframe_tuning(self, df_tuning: dict[str, Any]) -> None:
-        """Display DataFrame tuning configuration."""
         self.console.print("\n[bold]DataFrame Tuning Configuration[/bold]")
 
         df_table = Table(show_header=True, header_style="bold blue")
@@ -701,7 +589,6 @@ class DryRunDisplay:
             self.console.print(df_table)
 
     def _add_df_tuning_section(self, df_table: Table, category_name: str, section: dict[str, Any]) -> None:
-        """Add a runtime tuning section to the DataFrame table."""
         first_row = True
         for key, value in section.items():
             category = category_name if first_row else ""
@@ -709,7 +596,6 @@ class DryRunDisplay:
             first_row = False
 
     def _add_df_write_layout(self, df_table: Table, write: dict[str, Any]) -> None:
-        """Add write layout settings to the DataFrame table."""
         first_row = True
 
         if write.get("sort_by"):
@@ -743,7 +629,6 @@ class DryRunDisplay:
             )
 
     def _display_ddl_preview(self, ddl_preview: dict[str, dict[str, Any]]):
-        """Display DDL preview with tuning clauses per table."""
         if not ddl_preview:
             return
 
@@ -752,7 +637,6 @@ class DryRunDisplay:
         for table_name, table_info in ddl_preview.items():
             self.console.print(f"\n[cyan]Table: {table_name}[/cyan]")
 
-            # Display tuning summary
             tuning_summary = table_info.get("tuning_summary", {})
             if tuning_summary:
                 summary_parts = []
@@ -771,14 +655,12 @@ class DryRunDisplay:
 
                 self.console.print(f"  [dim]Tuning: {' | '.join(summary_parts)}[/dim]")
 
-            # Display DDL clauses with syntax highlighting
             ddl_clauses = table_info.get("ddl_clauses")
             if ddl_clauses:
                 syntax = Syntax(ddl_clauses, "sql", theme="monokai", line_numbers=False)
                 self.console.print(Panel(syntax, border_style="green", padding=(0, 1)))
 
     def _display_post_load_statements(self, post_load_statements: dict[str, list[str]]):
-        """Display post-load statements (VACUUM, ANALYZE, OPTIMIZE, etc.)."""
         if not post_load_statements:
             return
 
@@ -797,7 +679,6 @@ class DryRunDisplay:
             self.console.print(Panel(syntax, title="Post-Load SQL", border_style="yellow"))
 
     def _display_maintenance_operations(self, operations: dict[str, str]):
-        """Display TPC-H maintenance operation SQL."""
         display_ops = {k: v for k, v in operations.items() if not k.startswith("_")}
         if not display_ops:
             return
@@ -806,7 +687,6 @@ class DryRunDisplay:
         self.console.print("[dim]These INSERT/DELETE operations execute during the maintenance phase[/dim]")
 
         for op_id, sql in display_ops.items():
-            # Truncate very long SQL for display (keep full in output files)
             display_sql = sql
             if len(sql) > 2000:
                 display_sql = sql[:2000] + "\n\n-- [truncated for display, see output files for full SQL]"
@@ -927,8 +807,6 @@ class DryRunDisplay:
 
 
 class DryRunExecutor(CoreDryRunExecutor):
-    """Extended DryRunExecutor with CLI-specific display functionality."""
-
     def __init__(self, output_dir=None):
         super().__init__(output_dir)
         self.console = quiet_console
@@ -940,18 +818,15 @@ class DryRunExecutor(CoreDryRunExecutor):
         system_profile: SystemProfile,
         database_config: DatabaseConfig | None,
     ) -> DryRunResult:
-        """Execute a dry run and translate rendering failures into clean CLI errors."""
         try:
             return super().execute_dry_run(benchmark_config, system_profile, database_config)
         except DryRunQueryExtractionError as exc:
             raise click.ClickException(str(exc)) from exc
 
     def display_dry_run_results(self, result: DryRunResult):
-        """Display dry run results using the display component."""
         self.display.display_dry_run_results(result)
 
     def _format_test_execution_type(self, test_execution_type: str) -> str:
-        """Format test execution type for display."""
         type_formats = {
             "standard": "Standard (Sequential)",
             "power": "PowerTest (Stream Permutation)",
@@ -964,7 +839,6 @@ class DryRunExecutor(CoreDryRunExecutor):
         return type_formats.get(test_execution_type, f"{test_execution_type.title()} Test")
 
     def _get_preview_title(self, test_execution_type: str, query_count: int) -> str:
-        """Get the preview title for different test types."""
         if test_execution_type == "power":
             return "PowerTest Stream Execution Preview"
         elif test_execution_type == "throughput":
@@ -975,7 +849,6 @@ class DryRunExecutor(CoreDryRunExecutor):
             return "Query Preview"
 
     def _format_query_display_title(self, query_id: str, test_execution_type: str) -> str:
-        """Format query display title based on test type and query ID."""
         query_id_str = str(query_id)
         if test_execution_type == "maintenance":
             return f"Operation {query_id_str}"
@@ -987,7 +860,6 @@ class DryRunExecutor(CoreDryRunExecutor):
             return f"Query {query_id_str}"
 
     def _format_panel_title(self, query_id: str, test_execution_type: str) -> str:
-        """Format panel title for query display."""
         query_id_str = str(query_id)
         if test_execution_type == "maintenance":
             return f"Maintenance Operation: {query_id_str}"

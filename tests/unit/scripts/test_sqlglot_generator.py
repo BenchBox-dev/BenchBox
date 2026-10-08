@@ -1,5 +1,3 @@
-"""Contract tests for the deterministic SQLGlot generator pilot."""
-
 from __future__ import annotations
 
 import copy

@@ -1,5 +1,3 @@
-"""Q1, Q7, Q8 and Q12 read the values dsqgen draws, and keep SQL's NULL semantics while doing so."""
-
 from __future__ import annotations
 
 import pytest
@@ -49,7 +47,6 @@ def _run(family, number, parameters, tables):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_q1_sums_the_return_column_the_template_drew_and_keeps_a_null_total_out(family):
-    """Store 1 has customers 1 to 3. Customer 3's chosen amounts are all NULL, so its total is NULL."""
     tables = {
         "store_returns": {
             "sr_returned_date_sk": [1, 1, 1, 1],
@@ -65,9 +62,7 @@ def test_q1_sums_the_return_column_the_template_drew_and_keeps_a_null_total_out(
     on_fees = _run(family, 1, {"year": 2000, "state": "TN", "agg_field": "sr_fee"}, tables)
     on_amounts = _run(family, 1, {"year": 2000, "state": "TN", "agg_field": "sr_return_amt"}, tables)
 
-    # Fees are equal (1, 1, 2): only customer 3 is above 1.2 times the average of 4/3.
     assert on_fees == [("C3",)]
-    # Amounts are 100, 10 and NULL: the average ignores the NULL, 100 is above 1.2 x 55, NULL is not above anything.
     assert on_amounts == [("C1",)]
 
 
@@ -101,7 +96,6 @@ def test_q7_reports_an_average_over_only_nulls_as_none(family):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_q8_filters_on_the_zip_codes_it_is_given(family):
-    """Store 'S1' (zip 10xxx) qualifies only through a zip that both is wanted and has more than ten preferred customers."""
     zips = ["10001"] * 11 + ["20002"] * 11
     tables = {
         "store_sales": {"ss_sold_date_sk": [1], "ss_store_sk": [1], "ss_net_profit": [5.0]},
@@ -123,7 +117,6 @@ def test_q8_filters_on_the_zip_codes_it_is_given(family):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_q12_keeps_a_null_class_group_and_sorts_it_last(family):
-    """SQL keeps a NULL grouping key as a group and sorts NULL as the largest value."""
     tables = {
         "web_sales": {
             "ws_item_sk": [1, 2, 3],

@@ -1,11 +1,5 @@
-"""Core benchmark configuration validation — platform, mode, benchmark checks.
-
-Previously in ``benchbox.mcp.tools.benchmark._validate_*`` helpers.
-Moved to core so CLI, MCP, and the run service share one validation path.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -15,7 +9,6 @@ from typing import Any
 def validate_platform_config(
     platform: str, platform_lower: str, base_platform: str, errors: list[str], warnings: list[str]
 ) -> Any:
-    """Validate platform availability and return platform info."""
     from benchbox.core.platform_registry import PlatformRegistry
 
     info = PlatformRegistry.get_platform_info(base_platform)
@@ -34,7 +27,6 @@ def validate_platform_config(
 def validate_mode_config(
     mode: str | None, platform: str, base_platform: str, info: Any, errors: list[str]
 ) -> str | None:
-    """Validate and resolve execution mode."""
     from benchbox.core.platform_registry import PlatformRegistry
 
     if mode is None:
@@ -68,7 +60,6 @@ def validate_benchmark_config(
     errors: list[str],
     warnings: list[str],
 ) -> None:
-    """Validate benchmark name, scale factor, and dataframe compatibility."""
     from benchbox.core.benchmark_registry import get_all_benchmarks
 
     all_benchmarks = get_all_benchmarks()
@@ -95,7 +86,6 @@ def validate_config(
     scale_factor: float,
     mode: str | None,
 ) -> dict[str, Any]:
-    """Validate a benchmark configuration before running (core-owned)."""
     errors: list[str] = []
     warnings: list[str] = []
 

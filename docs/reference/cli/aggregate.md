@@ -42,17 +42,16 @@ The CSV output contains one row per result file with these columns:
 
 ## Usage Examples
 
+The first command aggregates all results in a directory. The second filters by benchmark, and the third filters by platform.
+
 ```bash
-# Aggregate all results in directory
 benchbox aggregate --input-dir benchmark_runs/ --output-file trends.csv
 
-# Filter by benchmark
 benchbox aggregate \
   --input-dir benchmark_runs/ \
   --output-file tpch_trends.csv \
   --benchmark tpch
 
-# Filter by platform
 benchbox aggregate \
   --input-dir benchmark_runs/ \
   --output-file duckdb_trends.csv \

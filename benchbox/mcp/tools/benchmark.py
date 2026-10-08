@@ -1,12 +1,6 @@
-"""Benchmark execution tools for BenchBox MCP server.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides tools for running benchmarks, validating configurations,
-and performing dry runs.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -49,16 +43,14 @@ from benchbox.utils.printing import get_quiet_console, silence_output
 
 logger = logging.getLogger(__name__)
 
-# Tool annotations for benchmark execution tools
 RUN_BENCHMARK_ANNOTATIONS = ToolAnnotations(
     title="Execute benchmark",
-    read_only_hint=False,  # Creates files, runs queries
-    destructive_hint=False,  # Does not delete existing data
-    idempotent_hint=False,  # Each run produces new results
-    open_world_hint=True,  # Interacts with external databases
+    read_only_hint=False,
+    destructive_hint=False,
+    idempotent_hint=False,
+    open_world_hint=True,
 )
 
-# Tool annotations for query details (read-only)
 QUERY_DETAILS_ANNOTATIONS = ToolAnnotations(
     title="Get query details",
     read_only_hint=True,
@@ -69,7 +61,6 @@ QUERY_DETAILS_ANNOTATIONS = ToolAnnotations(
 
 
 def _build_query_details_benchmark_info(benchmark: str, meta: dict[str, Any]) -> dict[str, Any]:
-    """Return benchmark metadata safe for the query-details MCP surface."""
     info = {
         "display_name": meta.get("display_name", benchmark),
         "category": meta.get("category", "unknown"),
@@ -80,7 +71,6 @@ def _build_query_details_benchmark_info(benchmark: str, meta: dict[str, Any]) ->
 
 
 def _get_platform_adapter(platform: str, mode: str | None = None, **config):
-    """Get platform adapter from public API."""
     from benchbox.platforms import get_dataframe_adapter, get_platform_adapter, is_dataframe_platform
 
     platform_lower = platform.lower()
@@ -100,20 +90,11 @@ def register_benchmark_tools(
     allow_synchronous_execution: bool = True,
     anonymize_results: bool = False,
 ) -> None:
-    """Register benchmark execution tools with the MCP server.
 
-    Args:
-        mcp: Server to register on.
-        results_dir: Provider for the server-owned result root.
-        allow_synchronous_execution: False in remote mode, where normal runs
-            must go through ``start_benchmark``.
-        anonymize_results: True when the server runs under a remote security
-            policy. Local stdio serves a same-trust-boundary agent and keeps
-            real paths and hostnames; a remote tenant is a different trust
-            boundary, so exported bundles are anonymized.
-    """
-
-    @mcp.tool(annotations=RUN_BENCHMARK_ANNOTATIONS)
+    @mcp.tool(
+        description="Run a benchmark on a database platform.\n\n        Args:\n            platform: Target platform (duckdb, polars-df, snowflake, etc.)\n            benchmark: Benchmark to run (tpch, tpcds, tpcds_obt, ssb, joinorder, clickbench, nyctaxi, tsbs_devops, h2odb, amplab, coffeeshop, tpch_skew, datavault, tpcdi, write_primitives, read_primitives, and more)\n            scale_factor: Data scale factor (0.01 for testing, 1+ for production; joinorder uses canonical IMDb 2013 data and only accepts 1.0)\n            queries: Comma-separated query IDs to run (e.g., \"1,3,6\")\n            phases: Comma-separated phases (default: \"load,power\")\n            mode: Execution mode: 'sql', 'dataframe', or 'data_only'\n            capture_plans: Capture query execution plans (3-8%% overhead). Supported: DuckDB, PostgreSQL, DataFusion.\n            dry_run: Preview execution plan without running\n            validate_only: Validate configuration without running\n            link_probe: Measure post-benchmark statement overhead (6 metered SELECT 1 statements on billable warehouses). Set false to skip; equivalent to the CLI --no-link-probe flag.\n            platform_options: Bounded, non-secret platform settings approved for the selected platform.\n\n        Returns:\n            Benchmark results, dry-run preview, or validation status.\n\n        Platform options are a deliberately smaller MCP contract than the CLI\n        ``--platform-option`` surface. Only bounded, non-secret execution\n        settings are accepted; credentials, endpoints, paths, and package\n        installation controls must remain server configuration.\n\n        JoinOrder note:\n            The public joinorder benchmark downloads and verifies the canonical IMDb 2013\n            Parquet archive on first use, then reuses BENCHBOX_OUTPUT_DIR/benchmark_runs/datagen/joinorder_sf1/.\n        ",
+        annotations=RUN_BENCHMARK_ANNOTATIONS,
+    )
     def run_benchmark(
         platform: str,
         benchmark: str,
@@ -127,33 +108,6 @@ def register_benchmark_tools(
         link_probe: bool = True,
         platform_options: dict[str, object] | None = None,
     ) -> dict[str, Any]:
-        """Run a benchmark on a database platform.
-
-        Args:
-            platform: Target platform (duckdb, polars-df, snowflake, etc.)
-            benchmark: Benchmark to run (tpch, tpcds, tpcds_obt, ssb, joinorder, clickbench, nyctaxi, tsbs_devops, h2odb, amplab, coffeeshop, tpch_skew, datavault, tpcdi, write_primitives, read_primitives, and more)
-            scale_factor: Data scale factor (0.01 for testing, 1+ for production; joinorder uses canonical IMDb 2013 data and only accepts 1.0)
-            queries: Comma-separated query IDs to run (e.g., "1,3,6")
-            phases: Comma-separated phases (default: "load,power")
-            mode: Execution mode: 'sql', 'dataframe', or 'data_only'
-            capture_plans: Capture query execution plans (3-8%% overhead). Supported: DuckDB, PostgreSQL, DataFusion.
-            dry_run: Preview execution plan without running
-            validate_only: Validate configuration without running
-            link_probe: Measure post-benchmark statement overhead (6 metered SELECT 1 statements on billable warehouses). Set false to skip; equivalent to the CLI --no-link-probe flag.
-            platform_options: Bounded, non-secret platform settings approved for the selected platform.
-
-        Returns:
-            Benchmark results, dry-run preview, or validation status.
-
-        Platform options are a deliberately smaller MCP contract than the CLI
-        ``--platform-option`` surface. Only bounded, non-secret execution
-        settings are accepted; credentials, endpoints, paths, and package
-        installation controls must remain server configuration.
-
-        JoinOrder note:
-            The public joinorder benchmark downloads and verifies the canonical IMDb 2013
-            Parquet archive on first use, then reuses BENCHBOX_OUTPUT_DIR/benchmark_runs/datagen/joinorder_sf1/.
-        """
         try:
             normalized_platform_options = validate_platform_options(platform, platform_options)
         except MCPValidationError as exc:
@@ -170,11 +124,9 @@ def register_benchmark_tools(
             response["status"] = "failed"
             return response
 
-        # Handle validate_only mode
         if validate_only:
             return _validate_config_impl(platform, benchmark, scale_factor, mode)
 
-        # Handle dry_run mode
         if dry_run:
             return _dry_run_impl(platform, benchmark, scale_factor, queries, mode)
 
@@ -187,7 +139,6 @@ def register_benchmark_tools(
             response["status"] = "failed"
             return response
 
-        # Run benchmark
         return _run_benchmark_impl(
             platform,
             benchmark,
@@ -202,24 +153,16 @@ def register_benchmark_tools(
             anonymize=anonymize_results,
         )
 
-    @mcp.tool(annotations=QUERY_DETAILS_ANNOTATIONS)
+    @mcp.tool(
+        description="Get detailed information about a specific query.\n\n        Args:\n            benchmark: Benchmark name (tpch, tpcds, ssb, clickbench, nyctaxi, tsbs_devops, h2odb, amplab, coffeeshop, tpch_skew, datavault, and more)\n            query_id: Query identifier (e.g., '1', 'Q1', '17')\n            platform: Target platform for dialect translation\n            mode: Execution mode: 'sql' or 'dataframe'\n\n        Returns:\n            Query details including SQL text or DataFrame source code.\n        ",
+        annotations=QUERY_DETAILS_ANNOTATIONS,
+    )
     def get_query_details(
         benchmark: str,
         query_id: str,
         platform: str | None = None,
         mode: str | None = None,
     ) -> dict[str, Any]:
-        """Get detailed information about a specific query.
-
-        Args:
-            benchmark: Benchmark name (tpch, tpcds, ssb, clickbench, nyctaxi, tsbs_devops, h2odb, amplab, coffeeshop, tpch_skew, datavault, and more)
-            query_id: Query identifier (e.g., '1', 'Q1', '17')
-            platform: Target platform for dialect translation
-            mode: Execution mode: 'sql' or 'dataframe'
-
-        Returns:
-            Query details including SQL text or DataFrame source code.
-        """
         benchmark_lower = benchmark.lower()
         all_benchmarks = get_all_benchmarks()
 
@@ -265,14 +208,12 @@ def register_benchmark_tools(
 
 
 def _make_failed_response(error_response: dict[str, Any], execution_id: str) -> dict[str, Any]:
-    """Attach execution_id and failed status to an error response."""
     error_response["execution_id"] = execution_id
     error_response["status"] = "failed"
     return error_response
 
 
 def _resolve_mcp_mode_with_registry(platform: str, mode: str | None):
-    """Resolve a mode through core and adapt unsupported-mode errors for MCP."""
     from benchbox.core.run_service import resolve_mode_with_registry
 
     resolved_mode, mode_error = resolve_mode_with_registry(platform, mode)
@@ -288,23 +229,10 @@ def _export_and_build_payload(
     *,
     anonymize: bool,
 ) -> tuple[str | None, dict[str, Any] | None]:
-    """Export benchmark result to JSON and build payload dict.
-
-    Args:
-        anonymize: True under a remote security policy. Local stdio serves a
-            same-trust-boundary agent that needs real paths and hostnames to act
-            on results, so it stays False there; a remote tenant is a different
-            trust boundary and receives an anonymized bundle.
-    """
     result_file_path = None
     result_payload: dict[str, Any] | None = None
     try:
         result.execution_id = execution_id
-        # egress-reviewed: local stdio serves a same-trust-boundary agent that
-        # needs real paths/hostnames to act on results; secrets are already
-        # redacted at capture time by sanitize_platform_options, and exception
-        # text is scrubbed in mcp/errors.py. Remote/tenant mode is a different
-        # trust boundary, so the caller sets anonymize=True there.
         exporter = ResultExporter(
             output_dir=results_dir,
             anonymize=anonymize,
@@ -325,7 +253,6 @@ def _export_and_build_payload(
 
 
 def _attach_summary_charts(response: dict[str, Any], result: Any) -> None:
-    """Attach post-run summary charts to the response if available."""
     if not result or not result.query_results:
         return
     try:
@@ -358,7 +285,6 @@ def _execute_mcp_run_via_core(
     start_time: float,
     anonymize: bool,
 ) -> dict[str, Any]:
-    """Execute a validated MCP run through the shared core run service."""
     from benchbox.core.run_service import (
         SilentVerbosity,
         execute_run,
@@ -579,22 +505,6 @@ def _run_benchmark_impl(
     execution_id: str | None = None,
     anonymize: bool,
 ) -> dict[str, Any]:
-    """Core implementation for running benchmarks.
-
-    Args:
-        platform_options: Re-admitted here even when the caller already ran
-            ``validate_platform_options``. This is the last gate before an
-            adapter is constructed, and some adapters act in ``__init__`` -- the
-            Dask adapter builds its ``LocalCluster`` there -- so a request that
-            reaches this function unadmitted would be executed, not merely
-            accepted. It is also the only gate on the durable-job worker path,
-            where the request mapping is re-read from persistent storage.
-        anonymize: Passed through to the result exporter; see
-            ``_export_and_build_payload``. Required rather than defaulted: it
-            governs a trust boundary, and a default would make "the caller
-            forgot" indistinguishable from "the caller chose local", failing
-            open on exactly the remote path that needs it.
-    """
     execution_id = execution_id or f"mcp_{uuid.uuid4().hex[:8]}"
     start_time = mono_time()
 
@@ -668,7 +578,6 @@ def _build_data_only_response(
     start_time: float,
     data_dir: Path,
 ) -> dict[str, Any]:
-    """Adapt a successful core data-only result to the stable MCP envelope."""
     generated_files = list(data_dir.glob("*.parquet"))
     if not generated_files:
         generated_files = list(data_dir.glob("*.*"))
@@ -704,15 +613,10 @@ def _dry_run_impl(
     queries: str | None,
     mode: str | None,
 ) -> dict[str, Any]:
-    """Preview what a benchmark run would do without executing.
-
-    Delegates to :func:`benchbox.core.dryrun.preview_benchmark_run` (core-owned).
-    """
     from benchbox.core.dryrun import preview_benchmark_run
 
     result = preview_benchmark_run(platform, benchmark, scale_factor, queries, mode)
 
-    # Preserve MCP error shape for benchmark-not-found (uses make_not_found_error).
     if result.get("status") == "error" and "not found" in str(result.get("error", "")).lower():
         benchmark_lower = benchmark.lower()
         all_benchmarks = get_all_benchmarks()
@@ -721,8 +625,6 @@ def _dry_run_impl(
             error_response["status"] = "error"
             return error_response
 
-    # Map VALIDATION_UNSUPPORTED_MODE from core through MCP error envelope so
-    # the error has the canonical suggestion/shape from make_unsupported_mode_error.
     if result.get("error_code") == "VALIDATION_UNSUPPORTED_MODE":
         details = result.get("details", {})
         error_response = make_unsupported_mode_error(
@@ -733,8 +635,6 @@ def _dry_run_impl(
         error_response["status"] = "error"
         return error_response
 
-    # Map core INTERNAL_ERROR to MCP error envelope when the core fell through
-    # to a generic exception (preserves previous behaviour and error codes).
     if result.get("status") == "error" and result.get("error_code") == "INTERNAL_ERROR":
         if "error" in result and "not found" not in str(result["error"]).lower():
             error_response = make_error(
@@ -754,14 +654,12 @@ def _validate_config_impl(
     scale_factor: float,
     mode: str | None,
 ) -> dict[str, Any]:
-    """Validate a benchmark configuration before running (core-owned)."""
     from benchbox.core.validation.config import validate_config as _core_validate
 
     return _core_validate(platform, benchmark, scale_factor, mode)
 
 
 def _resolve_query_details_mode(platform: str | None, mode: str | None) -> str:
-    """Resolve the execution mode for get_query_details."""
     if mode is not None:
         return mode.lower()
 
@@ -775,7 +673,6 @@ def _resolve_query_details_mode(platform: str | None, mode: str | None) -> str:
 
 
 def _get_dataframe_family_for_platform(platform: str | None) -> str | None:
-    """Determine the DataFrame family for a platform."""
     if platform is None:
         return None
 
@@ -789,11 +686,6 @@ def _get_dataframe_family_for_platform(platform: str | None) -> str | None:
 
 
 def _resolve_dataframe_impl(df_query: Any, family: str | None) -> tuple[Any | None, str | None]:
-    """Resolve the best DataFrame implementation for the given family.
-
-    Returns (impl, resolved_family) where resolved_family is set only when
-    family was None and we auto-detected which implementation to use.
-    """
     if family == "expression" and df_query.expression_impl is not None:
         return df_query.expression_impl, None
     if family == "pandas" and df_query.pandas_impl is not None:
@@ -811,7 +703,6 @@ def _populate_dataframe_query_details(
     normalized_id: str,
     platform: str | None,
 ) -> None:
-    """Populate response dict with DataFrame query details."""
     import inspect
 
     from benchbox.core.query_catalog import get_dataframe_query
@@ -854,7 +745,6 @@ def _populate_sql_query_details(
     normalized_id: str,
     platform: str | None,
 ) -> None:
-    """Populate response dict with SQL query details."""
     from benchbox.core.query_catalog import get_sql_render
 
     if get_public_benchmark_class(benchmark) is None:

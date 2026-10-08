@@ -1,14 +1,6 @@
-"""End-to-end wiring for the applied-tuning ledger on the result record.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Traces the two ledger fields (``applied_tuning_ledger`` / ``applied_ledger_hash``)
-through the public result factory onto the built ``BenchmarkResults`` and back
-through the loader's ``.applied.json`` companion reconstruction (TODO
-``tuning-applied-ledger-and-validation-status-20260712`` / tuning-ADR-001).
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -59,7 +51,6 @@ def test_factory_threads_applied_ledger_onto_result() -> None:
     assert result.applied_ledger_hash == applied["applied_ledger_hash"]
     assert result.tuning_validation_status == "applied_unverified"
     assert result.tuning_metadata_saved is True
-    # ADR-1: the requested-config hash stays distinct from the applied hash.
     assert result.tuning_config_hash == "requested-hash"
     assert result.applied_ledger_hash != result.tuning_config_hash
 
@@ -89,7 +80,6 @@ def test_loader_reconstructs_applied_ledger_from_companion() -> None:
     )
     payload = build_result_payload(result)
 
-    # The .applied.json companion is the ledger payload; reconstruct with it.
     reconstructed = reconstruct_benchmark_results(payload, applied_data=applied)
 
     assert reconstructed.applied_tuning_ledger == applied
@@ -108,14 +98,6 @@ def test_loader_without_applied_companion_leaves_fields_none() -> None:
 
 
 def test_anonymized_export_drops_raw_statement_text(tmp_path) -> None:
-    """Anonymized exports must not leak path/host-bearing statement text.
-
-    The ``.applied.json`` companion is written outside ``_apply_anonymization``
-    (like ``.plans.json``); a Spark session config records an absolute
-    warehouse path verbatim. Anonymized exports drop the free-text
-    ``statement``/``error`` fields while keeping the hash, honest status, and
-    structural fields so cross-run comparison still works.
-    """
     from benchbox.core.results.exporter import ResultExporter
 
     exporter = ResultExporter(output_dir=tmp_path, anonymize=True)
@@ -148,15 +130,13 @@ def test_anonymized_export_drops_raw_statement_text(tmp_path) -> None:
     for entry in sanitized["statements"]:
         assert "statement" not in entry
         assert "error" not in entry
-        assert "table" not in entry  # catalog.schema.table can embed a user catalog
+        assert "table" not in entry
         assert entry["statement_redacted"] is True
-    # Structural + identity fields are preserved.
     assert sanitized["applied_ledger_hash"] == "f" * 64
     assert sanitized["status"] == "applied_unverified"
     assert sanitized["statements"][0]["phase"] == "session"
     assert sanitized["statements"][0]["mechanism"] == "spark_session_config"
     assert sanitized["dropped"] == [{"redacted": True}]
-    # The caller's payload is never mutated (deep-copy contract).
     assert payload["statements"][0]["statement"].startswith("SET spark")
 
 

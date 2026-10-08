@@ -1,10 +1,3 @@
-"""TPC-DS query parameters for DataFrame implementations.
-
-Default parameter values are loaded from ``default_parameters.yaml``. They are
-representative values extracted from the TPC-DS specification and dsqgen output
-and are valid for SF >= 1.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -19,13 +12,10 @@ import yaml
 
 @dataclass
 class TPCDSParameters:
-    """Parameters for a specific TPC-DS query."""
-
     query_id: int
     params: dict[str, Any] = field(default_factory=dict)
 
     def get(self, key: str, default: Any = None) -> Any:
-        """Get a parameter value."""
         return self.params.get(key, default)
 
 
@@ -70,7 +60,6 @@ def parameter_overrides(overrides: dict[int, dict[str, Any]]) -> Iterator[None]:
 
 
 def get_parameters(query_id: int) -> TPCDSParameters:
-    """Get parameters for a TPC-DS query."""
     params = dict(TPCDS_DEFAULT_PARAMS.get(query_id, {}))
     overrides = _parameter_overrides.get()
     if overrides is not None and query_id in overrides:
@@ -79,5 +68,4 @@ def get_parameters(query_id: int) -> TPCDSParameters:
 
 
 def get_all_parameters() -> dict[int, TPCDSParameters]:
-    """Get all TPC-DS query parameters."""
     return {qid: get_parameters(qid) for qid in range(1, 100)}

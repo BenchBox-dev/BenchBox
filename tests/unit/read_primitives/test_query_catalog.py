@@ -1,5 +1,3 @@
-"""Tests for the Primitives query catalog infrastructure."""
-
 from __future__ import annotations
 
 import io
@@ -23,7 +21,6 @@ pytestmark = [
 
 
 def test_load_primitives_catalog_success() -> None:
-    """Catalog should load successfully and expose expected structure."""
 
     catalog = load_primitives_catalog()
 
@@ -33,25 +30,23 @@ def test_load_primitives_catalog_success() -> None:
     entry = catalog.queries["aggregation_distinct"]
     assert isinstance(entry, PrimitiveQuery)
     assert entry.category == "aggregation"
-    assert entry.sql.strip().startswith("-- Distinct count")
+    assert entry.sql.strip().startswith("SELECT COUNT(DISTINCT o_custkey)")
 
 
 def test_query_manager_category_index() -> None:
-    """The query manager should expose category filtering backed by the catalog."""
 
     manager = ReadPrimitivesQueryManager()
 
     aggregation = manager.get_queries_by_category("aggregation")
-    window = manager.get_queries_by_category("WINDOW")  # case-insensitive
+    window = manager.get_queries_by_category("WINDOW")
 
     assert "aggregation_distinct" in aggregation
-    assert aggregation["aggregation_distinct"].startswith("\n-- Distinct count")
+    assert aggregation["aggregation_distinct"].startswith("\nSELECT COUNT(DISTINCT o_custkey)")
     assert "window_growing_frame" in window
     assert manager.get_query_categories()[0] == "aggregation"
 
 
 def test_load_primitives_catalog_duplicate_id(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Duplicate IDs in the catalog should raise a descriptive error."""
 
     duplicate_yaml = """
 version: 1

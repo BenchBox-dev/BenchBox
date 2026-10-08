@@ -1,5 +1,3 @@
-"""Canonical ASCII chart type registry for visualization surfaces."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -7,8 +5,6 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class ChartTypeSpec:
-    """Metadata for a supported chart type."""
-
     name: str
     description: str
     requires_two_results: bool = False
@@ -57,5 +53,4 @@ ALL_CHART_TYPES: tuple[str, ...] = tuple(spec.name for spec in _CHART_SPECS)
 
 
 def is_valid_chart_type(chart_type: str) -> bool:
-    """Return whether a chart type is known."""
     return chart_type in CHART_TYPE_SPECS

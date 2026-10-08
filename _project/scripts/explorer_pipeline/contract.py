@@ -1,59 +1,6 @@
-"""Shared contract metadata for explorer-build integrations."""
-
 from __future__ import annotations
 
 EXPLORER_BUILD_CONTRACT_VERSION = "6"
-# v2: added the results.funding column (result provenance funding disclosure).
-# v3: projected funding into platform_index_rows and benchmark_rankings so the
-#     card surfaces can render it. A v2 snapshot has the base column but not the
-#     projections, and passes a version check that only compares base columns -
-#     so the shape of every view the UI reads is what this number tracks, not
-#     just the shape of `results`.
-# v4: added results.physical_rendering_id (ADR-2 secondary facet). A v3
-#     snapshot lacks the column, and duckdbQueries.ts's listResults()/detail
-#     projections now select it unconditionally - a v3 snapshot passing this
-#     check would hit a DuckDB binder error instead of the intended rebuild
-#     message.
-# v5: added results.tuning_validation_status (ADR-1 tuning verified-state,
-#     surfaced in the RunReceipt). A v4 snapshot lacks the column and the detail
-#     projection now selects it unconditionally, so a v4 snapshot would hit a
-#     DuckDB binder error instead of the intended rebuild message.
-# v6: added results.applied_receipt (ADR-1 per-statement introspection receipt,
-#     stored verbatim from the {stem}.applied.json companion and drilled down
-#     under the RunReceipt's tuning verified-state row). A v5 snapshot lacks the
-#     column and the detail projection now selects it unconditionally, so a v5
-#     snapshot would hit a DuckDB binder error instead of the intended rebuild
-#     message.
-# v7: cohort/ranking identity now derives the canonical benchmark alias
-#     (`star_schema` -> `ssb`) and explicit `unknown` phase instead of guessing
-#     missing test_type as `power`. Existing snapshots must be rebuilt so their
-#     ranking and cohort tables cannot be queried under the new semantics.
-# v8: `query_executions` gained run_type/iter/stream and a new
-#     `result_basis_availability` table (#1947), and `result_environment` /
-#     `result_detail_metrics` gained cpu_model/cpu_family (#1948). All of them
-#     are selected unconditionally by the frontend, so a v7 snapshot would hit
-#     a DuckDB binder error -- or, for the new table, a missing-relation error
-#     -- instead of the intended rebuild message. #1947 added its columns
-#     under v7 without bumping; this bump covers both changes, so v8 means "has
-#     pass provenance AND CPU identity".
-# v9: result_environment/result_detail_metrics gained cpu_identity_provenance,
-#     which the detail receipt selects unconditionally.
-# v10: result_environment and result_detail_metrics gained client_region,
-#      client_cloud, statement_overhead_min_ms, statement_overhead_median_ms,
-#      and link_status.
-# v11: results and result_detail_metrics gained override_rules,
-#      override_evidence, override_approver, and override_expires (accepted
-#      plausibility-override badge data, stored verbatim from the
-#      {stem}.override.json companion and selected unconditionally by the
-#      detail projection). A v10 snapshot lacks the columns, so a v10
-#      snapshot would hit a DuckDB binder error instead of the intended
-#      rebuild message.
-# v12: version number advance with no required column change.
-# v13: results gained benchmark_support_status (registry-declared product
-#      support status, stored per row and selected unconditionally by the
-#      listResults() projection that powers the benchmark browser). A v12
-#      snapshot lacks the column, so a v12 snapshot would hit a DuckDB
-#      binder error instead of the intended rebuild message.
 EXPLORER_READ_MODEL_VERSION = 14
 EXPLORER_READ_MODEL_COMPATIBILITY = {
     "minimum_supported": EXPLORER_READ_MODEL_VERSION,

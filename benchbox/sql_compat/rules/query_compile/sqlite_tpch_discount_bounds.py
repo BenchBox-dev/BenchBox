@@ -1,9 +1,3 @@
-"""SQLite TPC-H Q6 exact discount-bound normalization at QUERY_COMPILE.
-
-The existing SQLite translation hook applies this rewrite. SQLite REAL
-arithmetic can move inclusive decimal endpoints inward and silently drop rows.
-"""
-
 from benchbox.sql_compat.actions import CompatAction
 from benchbox.sql_compat.context import Phase
 from benchbox.sql_compat.decision import CompatibilityDecision, FailureMode, RewriteQueryPayload, SupportLevel

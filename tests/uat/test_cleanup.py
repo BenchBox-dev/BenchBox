@@ -1,5 +1,3 @@
-"""Fast-test coverage for tests/uat/cleanup.py."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -72,8 +70,7 @@ def test_can_prune_unknown_source_only_blocks_on_self_consumers():
         pending_cells=pending,
         completed_cells=[],
     )
-    # ssb has no registry data-source consumers; only the same-name
-    # consumer blocks pruning.
+
     assert decision.safe_to_prune is False
 
 

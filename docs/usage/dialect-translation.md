@@ -33,14 +33,12 @@ from benchbox import TPCH
 
 tpch = TPCH(scale_factor=0.01)
 
-# Translate to PostgreSQL dialect
 postgres_query = tpch.translate_query(1, "postgres")
 
-# Translate to MySQL dialect
 mysql_query = tpch.translate_query(1, "mysql")
-
-# Both work even though PostgreSQL/MySQL adapters don't exist yet!
 ```
+
+Both translations work even though PostgreSQL and MySQL adapters do not exist yet.
 
 ### Platform Adapters (Database Connectivity)
 
@@ -113,22 +111,19 @@ mysql_query = tpch.translate_query(1, "mysql")
 
 > "BenchBox can translate queries to MySQL dialect. I can use these translated queries with my own MySQL connection, but BenchBox doesn't have a built-in MySQL adapter yet."
 
-**How to use dialect translation for unsupported platforms**:
-
+**How to use dialect translation for unsupported platforms**: you provide the connection (here `mysql.connector`) and handle execution yourself.
 ```python
 from benchbox import TPCH
-import mysql.connector  # You provide the connection
+import mysql.connector
 
 tpch = TPCH(scale_factor=0.01)
 tpch.generate_data()
 
-# Get MySQL-dialect query
 query = tpch.translate_query(1, "mysql")
 
-# Use your own connection
 conn = mysql.connector.connect(host="localhost", user="root", database="benchmark")
 cursor = conn.cursor()
-cursor.execute(query)  # You handle execution
+cursor.execute(query)
 results = cursor.fetchall()
 ```
 
@@ -147,18 +142,15 @@ import mysql.connector
 benchmark = TPCH(scale_factor=0.01)
 benchmark.generate_data()
 
-# Your MySQL connection
 mysql_conn = mysql.connector.connect(
     host="localhost",
     user="root",
     database="benchbox"
 )
 
-# Get MySQL-translated queries
 for query_id in range(1, 23):
     query = benchmark.translate_query(query_id, "mysql")
 
-    # Execute with your connection
     cursor = mysql_conn.cursor()
     cursor.execute(query)
     results = cursor.fetchall()
@@ -174,7 +166,6 @@ from benchbox import TPCH
 
 benchmark = TPCH(scale_factor=0.01)
 
-# Compare translations
 dialects = ["postgres", "mysql", "oracle", "mssql"]
 
 for dialect in dialects:
@@ -192,7 +183,6 @@ from benchbox import TPCH
 
 benchmark = TPCH(scale_factor=0.01)
 
-# Analyze compatibility between source and target
 source_dialect = "postgres"
 target_dialect = "mysql"
 
@@ -221,7 +211,6 @@ from benchbox.platforms import DuckDBAdapter
 
 benchmark = TPCH(scale_factor=0.01)
 
-# Platform adapter handles everything
 adapter = DuckDBAdapter()
 results = benchmark.run_with_platform(adapter)
 
@@ -250,7 +239,7 @@ print(f"Completed {results.successful_queries}/{results.total_queries} queries")
 
 ### Translation Quality
 
-Not all SQL features translate perfectly:
+Not all SQL features translate perfectly. Most queries translate successfully, but some complex queries may fail. In that case, fall back to a more compatible dialect:
 
 ```python
 from benchbox import TPCH
@@ -258,13 +247,10 @@ from benchbox import TPCH
 benchmark = TPCH(scale_factor=0.01)
 
 try:
-    # Most queries translate successfully
     query = benchmark.translate_query(1, "mysql")
     print("✅ Translation succeeded")
 except Exception as e:
-    # Some complex queries may fail
     print(f"❌ Translation failed: {e}")
-    # Fallback to a more compatible dialect
     query = benchmark.translate_query(1, "postgres")
 ```
 
@@ -297,7 +283,7 @@ except Exception as e:
 
 ### Translation Methods
 
-All benchmark classes inherit from `BaseBenchmark` and provide:
+All benchmark classes inherit from `BaseBenchmark` and provide `translate_query()`. It takes a query identifier and a target SQL dialect (`postgres`, `mysql`, and so on), and returns the translated SQL query string. It raises `ValueError` if the query ID or dialect is invalid, and `ImportError` if sqlglot is not installed.
 
 ```python
 def translate_query(
@@ -305,25 +291,14 @@ def translate_query(
     query_id: Union[int, str],
     dialect: str
 ) -> str:
-    """Translate query to target SQL dialect.
-
-    Args:
-        query_id: Query identifier
-        dialect: Target SQL dialect (postgres, mysql, etc.)
-
-    Returns:
-        Translated SQL query string
-
-    Raises:
-        ValueError: If query_id or dialect is invalid
-        ImportError: If sqlglot is not installed
-    """
+    pass
 ```
 
 ### Alternative: get_query with dialect
 
+Both methods are equivalent:
+
 ```python
-# Both methods are equivalent
 query1 = benchmark.translate_query(1, "mysql")
 query2 = benchmark.get_query(1, dialect="mysql")
 

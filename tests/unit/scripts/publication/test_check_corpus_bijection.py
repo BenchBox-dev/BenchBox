@@ -1,5 +1,3 @@
-"""Tests for the zero-skip corpus path-to-result-id bijection check."""
-
 from __future__ import annotations
 
 import importlib.util

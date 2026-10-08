@@ -1,16 +1,6 @@
-"""Regression tests for UnifiedListExpr native projection and expression indices.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Covers the F-01/F-03 follow-up of full-string-to-array list-expression support:
-
-* UnifiedListExpr exposes .native, so unaliased list expressions flow through
-  UnifiedLazyFrame.with_columns/select unwrapping on every backend.
-* UnifiedListExpr.get accepts per-row expression indices (UnifiedExpr or
-  backend-native), applying the 0-to-1 offset on DataFusion.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -83,7 +73,7 @@ def test_get_accepts_expression_index_datafusion_with_offset():
         .collect()
         .to_pydict()
     )
-    # 0-based idx 1 -> second element; the 0-to-1 offset must apply to expressions too.
+
     assert out["picked"] == [20, 40]
 
 

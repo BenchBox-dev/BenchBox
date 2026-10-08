@@ -1,18 +1,9 @@
-"""Tests for the official dsqgen -STREAMS batch generation path.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Pins the per-stream query ORDERING and per-stream substitution PARAMETERS
-produced by the bundled dsqgen binary's ``-STREAMS N`` mode for a fixed
-(num_streams, seed) pair -- this is the ground truth the TPC-DS throughput
-test now uses instead of a home-grown Python permutation (see
-_project/DONE/main/planning/tpcds-throughput-permutation-compliance.yaml).
+# TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-DS specification.
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DS specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import sys
 from pathlib import Path
@@ -37,18 +28,6 @@ pytestmark = [
 
 
 def _get_dsqgen_path() -> Path | None:
-    """Resolve the bundled dsqgen binary path, returning None instead of
-    raising when it (or its templates) are unavailable.
-
-    ``_resolve_dsqgen_binary_and_templates()`` itself never raises (it just
-    resolves paths, which may not exist) but ``generate_dsqgen_streams()``
-    raises ``DSQGenStreamsError`` once it notices the binary/templates are
-    missing. This is a non-raising probe kept local to this TEST file --
-    mirrors ``get_dsdgen_path()`` in
-    ``tests/unit/core/tpcds/test_tpcds_stdout_datagen.py`` for the dsqgen
-    -STREAMS path so the real-binary test class here can skip cleanly on
-    unsupported arches / partial checkouts instead of hard-failing.
-    """
     try:
         tools_dir, templates_dir = _resolve_dsqgen_binary_and_templates()
     except Exception:
@@ -60,10 +39,6 @@ def _get_dsqgen_path() -> Path | None:
     return dsqgen_path
 
 
-# Pinned against the bundled darwin-arm64 dsqgen (qgen2 Version 4.0.0) via
-# `dsqgen -STREAMS 2 -INPUT q/templates.lst -DIRECTORY q -SCALE 1
-#  -DIALECT netezza -LOG stream_params.log -RNGSEED 19620718`.
-# Evidence captured 2026-07-09; see commit message for the full w0 diff.
 PINNED_SEED = 19620718
 PINNED_NUM_STREAMS = 2
 PINNED_STREAM0_ORDER_HEAD = [
@@ -83,25 +58,10 @@ PINNED_STREAM1_ORDER_HEAD = [
     (84, None),
 ]
 
-# Query IDs whose dsqgen substitution parameters are NOT reproducible even for a
-# fixed -RNGSEED, and are therefore excluded from byte-identity determinism
-# checks. Currently only query46, whose 5-city IN-list comes from a
-# `ulist(random(1, rowcount("active_cities", "store"), uniform), 5)` substitution
-# with a dsqgen-internal non-seeded draw (a property of the bundled reference
-# binary, not of BenchBox). Ordering is unaffected -- query46 keeps a stable slot.
 DSQGEN_NONREPRODUCIBLE_QUERY_IDS = {46}
 
 
 class TestGenerateDsqgenStreamsRealBinary:
-    """Exercises the bundled dsqgen binary end-to-end (fast: ~60ms for N=2).
-
-    Skips (rather than hard-failing) when the bundled dsqgen binary or its
-    query templates aren't available for this platform -- e.g. an
-    unsupported arch or a partial checkout -- mirroring the
-    ``pytest.mark.skipif(get_dsdgen_path() is None, ...)`` convention in
-    ``tests/unit/core/tpcds/test_tpcds_stdout_datagen.py``.
-    """
-
     pytestmark = pytest.mark.skipif(
         _get_dsqgen_path() is None,
         reason="dsqgen binary (or its query templates) not available for this platform",
@@ -109,10 +69,6 @@ class TestGenerateDsqgenStreamsRealBinary:
 
     @pytest.fixture(autouse=True)
     def _require_dsqgen_binary(self) -> None:
-        """Belt-and-suspenders skip guard (redundant with the class-level
-        skipif above): if collection-time resolution somehow disagreed with
-        the runtime environment, skip cleanly here instead of letting
-        ``generate_dsqgen_streams`` raise ``DSQGenStreamsError``."""
         if _get_dsqgen_path() is None:
             pytest.skip("dsqgen binary (or its query templates) not available for this platform")
 
@@ -127,15 +83,11 @@ class TestGenerateDsqgenStreamsRealBinary:
         assert stream0_order[:6] == PINNED_STREAM0_ORDER_HEAD
         assert stream1_order[:6] == PINNED_STREAM1_ORDER_HEAD
 
-        # Streams 0 and 1 must NOT share the same ordering (each stream gets
-        # its own official permutation from dsqgen's sequential RNG state).
         assert stream0_order[:6] != stream1_order[:6]
 
     def test_official_ordering_includes_multi_part_expansion(self):
         streams = generate_dsqgen_streams(num_streams=PINNED_NUM_STREAMS, scale_factor=1.0, seed=PINNED_SEED)
 
-        # 99 templates, 4 of which (14/23/24/39) expand to 2 SQL statements
-        # each -> 103 StreamQuery entries per stream.
         assert len(streams[0]) == 103
         assert len(streams[1]) == 103
 
@@ -146,8 +98,6 @@ class TestGenerateDsqgenStreamsRealBinary:
         assert variants_for_39 == ["a", "b"]
 
     def test_official_substitution_parameters_baked_into_sql(self):
-        """The first query of stream 0 (query96) must carry dsqgen's own
-        substitution parameters, not the home-grown Python RNG jitter."""
         streams = generate_dsqgen_streams(num_streams=PINNED_NUM_STREAMS, scale_factor=1.0, seed=PINNED_SEED)
         first_sql = streams[0][0].sql
 
@@ -160,21 +110,10 @@ class TestGenerateDsqgenStreamsRealBinary:
         first = generate_dsqgen_streams(num_streams=2, scale_factor=1.0, seed=PINNED_SEED)
         second = generate_dsqgen_streams(num_streams=2, scale_factor=1.0, seed=PINNED_SEED)
 
-        # ORDERING is fully deterministic for a fixed (num_streams, seed) -- this
-        # is the soundness-critical property (per-stream query sequencing feeds
-        # QphDS compliance).
         first_order = [(q.query_id, q.variant) for q in first[0]]
         second_order = [(q.query_id, q.variant) for q in second[0]]
         assert first_order == second_order
 
-        # Per-query substitution PARAMETERS are deterministic for 98/99 queries.
-        # The sole exception is query46, whose IN-list of 5 cities is built by a
-        # dsqgen-internal `ulist(random(1, rowcount("active_cities", "store"),
-        # uniform), 5)` substitution that is NOT reproducible even with a fixed
-        # -RNGSEED (verified against the bundled dsqgen binary directly, both
-        # serially and concurrently -- it is a property of the reference binary,
-        # not of BenchBox's integration). We therefore pin every query EXCEPT
-        # query46 to byte-identity, while its ordering slot stays stable (above).
         for pos, (q1, q2) in enumerate(zip(first[0], second[0])):
             if q1.query_id in DSQGEN_NONREPRODUCIBLE_QUERY_IDS:
                 continue
@@ -186,8 +125,6 @@ class TestGenerateDsqgenStreamsRealBinary:
 
 
 class TestParseDsqgenStreamLog:
-    """White-box tests for the -LOG parser, no subprocess required."""
-
     def test_parses_begin_stream_and_template_markers(self):
         log_text = (
             "BEGIN STREAM 0\n"
@@ -218,8 +155,6 @@ class TestParseDsqgenStreamLog:
 
 
 class TestSplitDsqgenStreamSql:
-    """White-box tests for splitting a per-stream .sql file into statements."""
-
     def test_splits_on_semicolon_newline_boundary(self):
         sql_text = "select 1;\nselect 2;\nselect 3;\n"
         statements = _split_dsqgen_stream_sql(sql_text)

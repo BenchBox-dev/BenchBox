@@ -1,5 +1,3 @@
-"""Clustering helpers for data organization workflows."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -12,7 +10,6 @@ _HILBERT_KEY_COLUMN = "__benchbox_hilbert_key__"
 
 
 def z_order_key(values: list[int], bits: int = 32) -> int:
-    """Interleave bits from multiple integer dimensions into one Z-order key."""
     if bits <= 0:
         raise ValueError(f"bits must be positive, got {bits}")
 
@@ -26,12 +23,9 @@ def z_order_key(values: list[int], bits: int = 32) -> int:
 
 @dataclass
 class ZOrderClusterer:
-    """Cluster Arrow tables by Morton (Z-order) curve."""
-
     bits: int = 32
 
     def cluster_table(self, table: pa.Table, cluster_columns: list[str]) -> pa.Table:
-        """Return table sorted by an interleaved-bit key from cluster columns."""
         if not cluster_columns:
             raise ValueError("cluster_columns cannot be empty")
 
@@ -65,7 +59,6 @@ class ZOrderClusterer:
 
 
 def hilbert_index_2d(x: int, y: int, bits: int = 16) -> int:
-    """Compute 2D Hilbert curve index for coordinates in [0, 2**bits)."""
     if bits <= 0:
         raise ValueError(f"bits must be positive, got {bits}")
     n = 1 << bits
@@ -94,12 +87,9 @@ def hilbert_index_2d(x: int, y: int, bits: int = 16) -> int:
 
 @dataclass
 class HilbertClusterer:
-    """Cluster Arrow tables by a 2D Hilbert curve key."""
-
     bits: int = 16
 
     def cluster_table(self, table: pa.Table, cluster_columns: list[str]) -> pa.Table:
-        """Return table sorted by 2D Hilbert key derived from cluster columns."""
         if len(cluster_columns) != 2:
             raise ValueError("Hilbert clustering currently requires exactly 2 cluster columns")
 

@@ -17,11 +17,10 @@ AWS Glue is a fully managed, serverless ETL service that runs Apache Spark for d
 
 ## Installation
 
-```bash
-# Install with Glue support
-uv add benchbox --extra glue
+This installs Glue support and the `boto3` dependency.
 
-# Dependencies installed: boto3
+```bash
+uv add benchbox --extra glue
 ```
 
 ## Prerequisites
@@ -38,12 +37,13 @@ uv add benchbox --extra glue
 
 ### Environment Variables
 
+`GLUE_S3_STAGING_DIR` and `GLUE_JOB_ROLE` are required. `AWS_REGION`, `AWS_PROFILE`, `GLUE_DATABASE` and
+`GLUE_VERSION` are optional.
+
 ```bash
-# Required
 export GLUE_S3_STAGING_DIR=s3://your-bucket/benchbox/
 export GLUE_JOB_ROLE=arn:aws:iam::123456789012:role/GlueBenchmarkRole
 
-# Optional
 export AWS_REGION=us-east-1
 export AWS_PROFILE=default
 export GLUE_DATABASE=benchbox
@@ -54,20 +54,19 @@ export GLUE_VERSION=4.0
 
 ### CLI Usage
 
+The first command is basic usage. The second uses custom workers. The third is a dry run that previews queries.
+
 ```bash
-# Basic usage
 benchbox run --platform glue --benchmark tpch --scale 1.0 \
   --platform-option s3_staging_dir=s3://bucket/benchbox/ \
   --platform-option job_role=arn:aws:iam::123456789012:role/GlueRole
 
-# With custom workers
 benchbox run --platform glue --benchmark tpch --scale 10.0 \
   --platform-option s3_staging_dir=s3://bucket/benchbox/ \
   --platform-option job_role=arn:aws:iam::123456789012:role/GlueRole \
   --platform-option worker_type=G.2X \
   --platform-option number_of_workers=10
 
-# Dry-run to preview queries
 benchbox run --platform glue --benchmark tpch --dry-run ./preview \
   --platform-option s3_staging_dir=s3://bucket/benchbox/ \
   --platform-option job_role=arn:aws:iam::123456789012:role/GlueRole
@@ -100,7 +99,6 @@ benchbox run --platform glue --benchmark tpch --dry-run ./preview \
 ```python
 from benchbox.platforms.aws import AWSGlueAdapter
 
-# Initialize adapter
 adapter = AWSGlueAdapter(
     s3_staging_dir="s3://my-bucket/benchbox/",
     job_role="arn:aws:iam::123456789012:role/GlueRole",
@@ -110,19 +108,15 @@ adapter = AWSGlueAdapter(
     number_of_workers=4,
 )
 
-# Create database in Glue Data Catalog
 adapter.create_schema("tpch_sf1")
 
-# Load data to S3 and create Glue tables
 adapter.load_data(
     tables=["lineitem", "orders", "customer"],
     source_dir="/path/to/tpch/data",
 )
 
-# Execute query (submitted as Glue job)
 result = adapter.execute_query("SELECT COUNT(*) FROM lineitem")
 
-# Clean up
 adapter.close()
 ```
 
@@ -144,20 +138,10 @@ This batch model means:
 
 ## Spark Configuration
 
-BenchBox automatically optimizes Spark configuration based on benchmark type and scale factor:
-
-```python
-# Automatic configuration includes:
-# - Adaptive Query Execution (AQE) settings
-# - Shuffle partition tuning
-# - Memory allocation
-# - Join optimization
-
-# For TPC-H at SF=10 with 4 G.1X workers:
-# spark.sql.shuffle.partitions = 200
-# spark.sql.adaptive.enabled = true
-# spark.sql.adaptive.skewJoin.enabled = true
-```
+BenchBox automatically optimizes Spark configuration based on benchmark type and scale factor. The automatic
+configuration includes Adaptive Query Execution (AQE) settings, shuffle partition tuning, memory allocation and join
+optimization. For TPC-H at SF=10 with 4 G.1X workers, it sets `spark.sql.shuffle.partitions = 200`,
+`spark.sql.adaptive.enabled = true` and `spark.sql.adaptive.skewJoin.enabled = true`.
 
 ## Cost Estimation
 

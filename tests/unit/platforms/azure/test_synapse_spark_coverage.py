@@ -1,5 +1,3 @@
-"""Additional coverage tests for Synapse Spark adapter."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -43,8 +41,6 @@ def test_get_access_token_refreshes_and_reuses_cached_token() -> None:
     cred = MagicMock()
     cred.get_token.return_value = token
 
-    # Replace the token provider's credential with our mock; the adapter's
-    # _get_access_token delegates through the provider now.
     adapter._token_provider._credential = cred
 
     assert adapter._get_access_token() == "abc"

@@ -1,5 +1,3 @@
-"""Tests for scripts/ci_units.py and the .github/ci-units.yml ownership map."""
-
 from __future__ import annotations
 
 import json
@@ -23,7 +21,7 @@ def rules() -> dict[str, list[str]]:
 
 def needed(paths: list[str], rules: dict[str, list[str]]) -> set[str]:
     decision = classify_units(paths, rules)
-    return {unit for unit, on in decision["units"].items() if on}  # type: ignore[union-attr]
+    return {unit for unit, on in decision["units"].items() if on}
 
 
 @pytest.mark.parametrize(
@@ -54,7 +52,6 @@ def test_single_unit_ownership(paths: list[str], expected: set[str], rules: dict
 @pytest.mark.parametrize(
     ("paths", "extra"),
     [
-        # Producer-owned contracts widen the consumer units.
         (["benchbox/core/results/schema.py"], {"explorer", "results-data"}),
         (["benchbox/cli/main.py"], {"docs"}),
         (["benchbox/core/platform_registry.py"], {"docs", "landing"}),
@@ -68,28 +65,27 @@ def test_widened_triggers(paths: list[str], extra: set[str], rules: dict[str, li
 
 
 def test_independent_units_do_not_pull_core(rules: dict[str, list[str]]) -> None:
-    """Docs, landing, explorer, and results-data changes must not require core."""
     for path in ("docs/index.rst", "landing/script.js", "results-explorer/src/db.ts", "results-data/README.md"):
         assert "core" not in needed([path], rules), path
 
 
 def test_unowned_path_fails_closed_to_core(rules: dict[str, list[str]]) -> None:
     decision = classify_units(["brand-new-top-level/thing.bin"], rules)
-    assert decision["units"]["core"] is True  # type: ignore[index]
+    assert decision["units"]["core"] is True
     assert decision["unowned_paths"] == ["brand-new-top-level/thing.bin"]
 
 
 def test_empty_change_set_runs_every_unit(rules: dict[str, list[str]]) -> None:
     decision = classify_units([], rules)
     assert decision["run_all"] is True
-    assert all(decision["units"][unit] for unit in UNITS)  # type: ignore[index]
+    assert all(decision["units"][unit] for unit in UNITS)
 
 
 @pytest.mark.parametrize("path", [".github/workflows/ci.yml", ".github/ci-units.yml", "scripts/ci_units.py"])
 def test_self_protection_runs_every_unit(path: str, rules: dict[str, list[str]]) -> None:
     decision = classify_units([path], rules)
     assert decision["run_all"] is True
-    assert all(decision["units"][unit] for unit in UNITS)  # type: ignore[index]
+    assert all(decision["units"][unit] for unit in UNITS)
 
 
 def test_code_tests_needed_covers_core_and_tooling(rules: dict[str, list[str]]) -> None:
@@ -145,7 +141,6 @@ def test_cli_reads_changed_file_and_writes_json(tmp_path: Path) -> None:
 
 
 def test_cli_diff_failure_runs_every_unit(tmp_path: Path) -> None:
-    """A base ref that cannot be diffed must fail closed, not run nothing."""
     out = tmp_path / "out"
     subprocess.run(
         [

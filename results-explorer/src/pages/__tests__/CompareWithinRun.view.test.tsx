@@ -91,7 +91,6 @@ describe("CompareWithinRun page component", () => {
       expect(screen.getByText("Compare measurements from one DuckDB run")).toBeTruthy();
     });
 
-    // Check table headers and cells
     expect(screen.getByText("Q1")).toBeTruthy();
     expect(screen.getByText("Q2")).toBeTruthy();
     expect(screen.getAllByText(/Geomean query time/i).length).toBeGreaterThan(0);
@@ -246,7 +245,6 @@ describe("CompareWithinRun page component", () => {
     fireEvent.click(addButton);
 
     await waitFor(() => {
-      // Third column added
       expect(screen.getAllByRole("radio").length).toBe(3);
     });
   });

@@ -1,33 +1,6 @@
-"""AWS Glue managed Spark platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-AWS Glue is a fully managed ETL (extract, transform, and load) service
-that makes it easy to prepare and load data for analytics. Under the
-hood, Glue uses Apache Spark for distributed data processing.
-
-Key Features:
-- Serverless: No infrastructure to manage, scales automatically
-- Pay-per-use: Charged per DPU-hour (~$0.44/DPU-hour)
-- Integrated: Native AWS Glue Data Catalog for metadata management
-- Flexible: Supports Python shell, Spark, and Ray job types
-
-Usage:
-    from benchbox.platforms.aws import AWSGlueAdapter
-
-    adapter = AWSGlueAdapter(
-        region="us-east-1",
-        s3_staging_dir="s3://my-bucket/benchbox-data",
-        job_role="arn:aws:iam::123456789:role/GlueBenchmarkRole",
-    )
-
-    # Run TPC-H benchmark
-    adapter.create_schema("tpch_sf1")
-    adapter.load_data(["lineitem", "orders", ...], source_dir)
-    result = adapter.execute_query("SELECT * FROM lineitem LIMIT 10")
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -74,8 +47,6 @@ logger = logging.getLogger(__name__)
 
 
 class GlueJobStatus:
-    """AWS Glue job run status constants."""
-
     STARTING = "STARTING"
     RUNNING = "RUNNING"
     STOPPING = "STOPPING"
@@ -88,63 +59,26 @@ class GlueJobStatus:
 
 
 class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter):
-    """AWS Glue managed Spark platform adapter.
-
-    Glue is AWS's serverless ETL service that runs Apache Spark jobs.
-    It integrates with the Glue Data Catalog for metadata management
-    and S3 for data storage.
-
-    Execution Model:
-    - Unlike interactive query services, Glue executes jobs as batch processes
-    - Each benchmark query is submitted as a Glue job run
-    - Results are written to S3 and retrieved after job completion
-
-    Key Features:
-    - Serverless: Scales automatically based on workload
-    - Pay-per-use: ~$0.44 per DPU-hour
-    - Native AWS integration (S3, Data Catalog, CloudWatch)
-    - Supports both SQL and DataFrame execution modes
-    """
-
     plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 
     def __init__(self, **config: Any) -> None:
-        """Initialize AWS Glue adapter.
-
-        Args:
-            **config: Configuration options:
-                - region: AWS region (default: us-east-1)
-                - s3_staging_dir: S3 path for data staging (required)
-                - job_role: IAM role ARN for Glue jobs (required)
-                - database: Glue Data Catalog database (default: benchbox)
-                - worker_type: Glue worker type (default: G.1X)
-                - number_of_workers: Number of Glue workers (default: 2)
-                - glue_version: Glue version (default: 4.0)
-                - job_timeout: Job timeout in minutes (default: 60)
-                - extra_py_files: Additional Python files for jobs
-                - extra_jars: Additional JAR files for jobs
-                - spark_conf: Additional Spark configuration
-        """
         super().__init__(**config)
 
-        # Check dependencies
         if not BOTO3_AVAILABLE:
             available, missing = check_platform_dependencies("glue")
             if not available:
                 error_msg = get_dependency_error_message("glue", missing)
                 raise ImportError(error_msg)
 
-        self._dialect = "spark"  # Glue uses Spark SQL
+        self._dialect = "spark"
 
-        # AWS configuration
         self.region = config.get("region") or config.get("aws_region") or "us-east-1"
         self.aws_access_key_id = config.get("aws_access_key_id")
         self.aws_secret_access_key = config.get("aws_secret_access_key")
         self.aws_profile = config.get("aws_profile")
 
-        # S3 staging configuration (required)
         self.s3_staging_dir = config.get("s3_staging_dir") or config.get("staging_root")
         if not self.s3_staging_dir:
             raise ConfigurationError(
@@ -155,7 +89,6 @@ class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter)
                 "  or: BENCHBOX_S3_STAGING_DIR environment variable"
             )
 
-        # Parse S3 staging path
         if self.s3_staging_dir.startswith("s3://"):
             parts = self.s3_staging_dir[5:].split("/", 1)
             self.s3_bucket = parts[0]
@@ -165,7 +98,6 @@ class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter)
                 f"Invalid S3 staging path: {self.s3_staging_dir}\nMust start with s3:// (e.g., s3://my-bucket/path)"
             )
 
-        # IAM role for Glue jobs (required)
         self.job_role = config.get("job_role") or config.get("iam_role")
         if not self.job_role:
             raise ConfigurationError(
@@ -177,63 +109,50 @@ class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter)
                 "  - Glue Data Catalog access"
             )
 
-        # Glue Data Catalog configuration
         self.database = config.get("database") or "benchbox"
-        self.catalog_id = config.get("catalog_id")  # AWS account ID, defaults to caller
+        self.catalog_id = config.get("catalog_id")
 
-        # Glue job configuration
         self.worker_type = config.get("worker_type") or "G.1X"
         self.number_of_workers = config.get("number_of_workers") or 2
         self.glue_version = config.get("glue_version") or "4.0"
-        self.job_timeout = config.get("job_timeout") or 60  # minutes
+        self.job_timeout = config.get("job_timeout") or 60
         self.max_concurrent_runs = config.get("max_concurrent_runs") or 1
 
-        # Additional job resources
         self.extra_py_files = config.get("extra_py_files") or []
         self.extra_jars = config.get("extra_jars") or []
 
-        # Spark configuration (merged with optimizer recommendations)
         self.spark_conf = config.get("spark_conf") or {}
 
-        # Execution mode
         self.execution_mode = config.get("execution_mode") or "sql"
 
-        # Job tracking
         self._job_name: str | None = None
         self._job_runs: list[str] = []
 
-        # Cost tracking
         self._total_dpu_hours = 0.0
         self._query_count = 0
 
-        # AWS clients (lazy initialization)
         self._glue_client = None
         self._s3_client = None
         self._staging: CloudSparkStaging | None = None
 
-        # Initialize staging using shared infrastructure
         self._init_staging()
 
     def _init_staging(self) -> None:
-        """Initialize cloud staging using shared infrastructure."""
         self._staging = CloudSparkStaging.from_uri(self.s3_staging_dir)
 
     def _get_glue_client(self) -> Any:
-        """Get or create Glue client."""
         if self._glue_client is None:
             session = self._get_boto_session()
             self._glue_client = session.client("glue")
         return self._glue_client
 
     def _get_s3_client(self) -> Any:
-        """Get or create S3 client."""
         if self._s3_client is None:
             session = self._get_boto_session()
             self._s3_client = session.client("s3")
         return self._s3_client
 
     def _get_boto_session(self) -> Any:
-        """Create boto3 session with configured credentials."""
         if self.aws_profile:
             return boto3.Session(profile_name=self.aws_profile, region_name=self.region)
         elif self.aws_access_key_id and self.aws_secret_access_key:
@@ -243,25 +162,11 @@ class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter)
                 region_name=self.region,
             )
         else:
-            # Use default credential chain (env vars, instance profile, etc.)
             return boto3.Session(region_name=self.region)
 
-    # -------------------------------------------------------------------------
-    # PlatformAdapter Interface
-    # -------------------------------------------------------------------------
-
     def create_connection(self) -> Any:
-        """Verify AWS credentials and Glue access.
-
-        Returns:
-            Glue client for subsequent operations.
-
-        Raises:
-            ConfigurationError: If AWS credentials are invalid or Glue access denied.
-        """
         try:
             client = self._get_glue_client()
-            # Verify access by listing databases
             client.get_databases(MaxResults=1)
             logger.info(f"Connected to AWS Glue in {self.region}")
             return client
@@ -274,12 +179,6 @@ class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter)
             raise ConfigurationError(f"Failed to connect to AWS Glue: {e}") from e
 
     def create_schema(self, benchmark, connection: Any) -> float:
-        """Create Glue Data Catalog database if it doesn't exist.
-
-        Args:
-            benchmark: Benchmark instance.
-            connection: Active connection metadata; not used by Glue.
-        """
         start_time = mono_time()
         database = self.database
         client = self._get_glue_client()
@@ -306,16 +205,6 @@ class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter)
         connection: Any,
         data_dir: Path,
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Upload benchmark data to S3 and create Glue tables.
-
-        Args:
-            benchmark: Benchmark instance.
-            connection: Active connection metadata; not used by Glue.
-            data_dir: Local directory containing table data files.
-
-        Returns:
-            Tuple of table row-count placeholders, elapsed seconds, and table URI metadata.
-        """
         start_time = mono_time()
         source_path = Path(data_dir)
         tables = _resolve_benchmark_table_names(benchmark)
@@ -323,13 +212,11 @@ class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter)
         if not source_path.exists():
             raise ConfigurationError(f"Source directory not found: {data_dir}")
 
-        # Check if tables already exist in S3
         if self._staging and self._staging.tables_exist(tables):
             logger.info("Tables already exist in S3 staging, skipping upload")
             table_uris = {table: self._staging.get_table_uri(table) for table in tables}
             return dict.fromkeys(tables, 0), elapsed_seconds(start_time), {"table_uris": table_uris}
 
-        # Upload tables using shared staging infrastructure
         logger.info(f"Uploading {len(tables)} tables to S3")
         if self._staging:
             uploaded = self._staging.upload_tables(
@@ -340,7 +227,6 @@ class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter)
         else:
             uploaded = {}
 
-        # Create Glue Data Catalog tables
         for table in tables:
             self._create_catalog_table(table, file_format, uploaded.get(table, ""))
 
@@ -353,19 +239,8 @@ class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter)
         s3_location: str,
         replace: bool = False,
     ) -> None:
-        """Create a table in Glue Data Catalog.
-
-        Args:
-            table_name: Name of the table.
-            file_format: Data format (parquet, csv, etc.).
-            s3_location: S3 path to table data.
-            replace: When True, delete any existing registration first so a
-                stale pointer (different location or format from an earlier
-                run) can never survive.
-        """
         client = self._get_glue_client()
 
-        # Determine SerDe and input format based on file format
         if file_format.lower() == "parquet":
             input_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
             output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
@@ -375,7 +250,6 @@ class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter)
             output_format = "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat"
             serde = "org.apache.hadoop.hive.serde2.OpenCSVSerde"
         else:
-            # Default to Parquet
             input_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
             output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
             serde = "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
@@ -385,7 +259,7 @@ class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter)
             "Description": f"BenchBox {table_name} table",
             "TableType": "EXTERNAL_TABLE",
             "StorageDescriptor": {
-                "Columns": [],  # Schema inference from data
+                "Columns": [],
                 "Location": s3_location,
                 "InputFormat": input_format,
                 "OutputFormat": output_format,
@@ -415,7 +289,6 @@ class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter)
                 raise
 
     def _register_external_table(self, table_name: str, location: str, file_format: str) -> None:
-        """Register one external table in the Glue Data Catalog."""
         self._validate_external_identifier(table_name, "table name")
         self._validate_external_identifier(self.database, "database name")
         self._create_catalog_table(table_name, file_format, location, replace=True)
@@ -431,16 +304,6 @@ class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter)
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute SQL query via Glue job.
-
-        Args:
-            connection: Active connection metadata; not used by Glue.
-            query: SQL query to execute.
-            query_id: Query identifier.
-
-        Returns:
-            Standard query result dictionary.
-        """
         start_time = mono_time()
         try:
             self._ensure_job_exists()
@@ -472,27 +335,19 @@ class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter)
             }
 
     def _ensure_job_exists(self) -> str:
-        """Ensure Glue job exists for benchmark execution.
-
-        Returns:
-            Job name.
-        """
         if self._job_name:
             return self._job_name
 
         job_name = f"benchbox-{self.database}-{uuid.uuid4().hex[:8]}"
         client = self._get_glue_client()
 
-        # Get optimized Spark config
         spark_config = SparkConfigOptimizer.for_tpch(
             scale_factor=1.0,
             platform=CloudPlatform.GLUE,
         )
 
-        # Merge with user-provided config
         merged_config = {**spark_config.to_dict(), **self.spark_conf}
 
-        # Build job script
         script_location = self._upload_job_script()
 
         default_arguments = {
@@ -506,7 +361,6 @@ class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter)
             "--output_path": f"s3://{self.s3_bucket}/{self.s3_prefix}/results/",
         }
 
-        # Add Spark configuration
         for key, value in merged_config.items():
             default_arguments["--conf"] = f"{key}={value}"
 
@@ -538,11 +392,6 @@ class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter)
         return job_name
 
     def _upload_job_script(self) -> str:
-        """Upload Glue job script to S3.
-
-        Returns:
-            S3 path to script.
-        """
         script_content = """
 import sys
 from awsglue.transforms import *
@@ -594,14 +443,6 @@ job.commit()
         return f"s3://{self.s3_bucket}/{script_key}"
 
     def _submit_job_run(self, query: str) -> str:
-        """Submit a Glue job run.
-
-        Args:
-            query: SQL query to execute.
-
-        Returns:
-            Job run ID.
-        """
         client = self._get_glue_client()
 
         response = client.start_job_run(
@@ -618,15 +459,6 @@ job.commit()
         return run_id
 
     def _wait_for_job(self, run_id: str, poll_interval: int = 10) -> str:
-        """Wait for Glue job to complete.
-
-        Args:
-            run_id: Job run ID.
-            poll_interval: Seconds between status checks.
-
-        Returns:
-            Final job status.
-        """
         client = self._get_glue_client()
         terminal_states = {
             GlueJobStatus.SUCCEEDED,
@@ -641,7 +473,6 @@ job.commit()
             status = response["JobRun"]["JobRunState"]
 
             if status in terminal_states:
-                # Track DPU usage
                 execution_time = response["JobRun"].get("ExecutionTime", 0)
                 dpu_hours = (execution_time / 3600) * self.number_of_workers
                 self._total_dpu_hours += dpu_hours
@@ -652,18 +483,9 @@ job.commit()
             time.sleep(poll_interval)
 
     def _retrieve_results(self, run_id: str) -> list[dict[str, Any]]:
-        """Retrieve query results from S3.
-
-        Args:
-            run_id: Job run ID.
-
-        Returns:
-            Query results as list of dicts.
-        """
         s3_client = self._get_s3_client()
         result_prefix = f"{self.s3_prefix}/results/{run_id}/"
 
-        # List result files
         response = s3_client.list_objects_v2(
             Bucket=self.s3_bucket,
             Prefix=result_prefix,
@@ -674,11 +496,9 @@ job.commit()
         for obj in response.get("Contents", []):
             key = obj["Key"]
             if key.endswith(".json") and not key.endswith("_SUCCESS"):
-                # Read JSON result file
                 data = s3_client.get_object(Bucket=self.s3_bucket, Key=key)
                 content = data["Body"].read().decode("utf-8")
 
-                # Parse JSON lines format
                 for line in content.strip().split("\n"):
                     if line:
                         results.append(json.loads(line))
@@ -686,17 +506,10 @@ job.commit()
         return results
 
     def close(self) -> None:
-        """Clean up Glue resources."""
-        # Note: We don't delete the job by default to allow result inspection
         logger.info(f"AWS Glue adapter closed. Total DPU-hours: {self._total_dpu_hours:.2f}")
-
-    # -------------------------------------------------------------------------
-    # CLI and Configuration Interface
-    # -------------------------------------------------------------------------
 
     @staticmethod
     def add_cli_arguments(parser) -> None:
-        """Add AWS Glue-specific CLI arguments."""
         glue_group = parser.add_argument_group("AWS Glue Arguments")
         glue_group.add_argument("--region", type=str, default="us-east-1", help="AWS region for Glue")
         glue_group.add_argument(
@@ -734,14 +547,6 @@ job.commit()
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> AWSGlueAdapter:
-        """Create AWS Glue adapter from unified configuration.
-
-        Args:
-            config: Unified configuration dictionary.
-
-        Returns:
-            Configured AWSGlueAdapter instance.
-        """
         from benchbox.platforms.base.config_utils import build_adapter_config
 
         return cls(
@@ -769,25 +574,9 @@ job.commit()
         )
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
-        """Configure Glue for benchmark execution.
-
-        Args:
-            connection: Not used (Glue is job-based, not session-based).
-            benchmark_type: Type of benchmark being executed.
-        """
-        # Glue configuration is applied at job creation time via Spark config
         logger.debug(f"Configuring Glue for {benchmark_type} benchmark")
 
-    # -------------------------------------------------------------------------
-    # Platform Information
-    # -------------------------------------------------------------------------
-
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get AWS Glue platform information.
-
-        Args:
-            connection: Not used (Glue manages sessions internally).
-        """
         return {
             "platform": "aws_glue",
             "display_name": "AWS Glue",
@@ -804,18 +593,9 @@ job.commit()
         }
 
     def get_dialect(self) -> str:
-        """Get SQL dialect."""
         return self._dialect
 
-    # -------------------------------------------------------------------------
-    # Tuning Interface (Minimal Implementation)
-    # -------------------------------------------------------------------------
-
-    # apply_primary_keys, apply_foreign_keys, apply_platform_optimizations,
-    # and apply_constraint_configuration are inherited from SparkTuningMixin
-
     def apply_tuning(self, config: UnifiedTuningConfiguration) -> dict[str, Any]:
-        """Apply unified tuning configuration."""
         results: dict[str, Any] = {
             "platform_optimizations": [],
             "primary_keys": [],
@@ -828,11 +608,4 @@ job.commit()
         return results
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for AWS Glue.
-
-        Glue uses Spark SQL for query execution, so we use the Spark dialect.
-
-        Returns:
-            The dialect string "spark".
-        """
         return "spark"

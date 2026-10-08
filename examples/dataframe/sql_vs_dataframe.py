@@ -1,19 +1,6 @@
 #!/usr/bin/env python3
-"""
-SQL vs DataFrame Comparison Example
-
-Demonstrates comparing the same TPC-H queries executed via:
-1. SQL mode (DuckDB SQL interface)
-2. DataFrame mode (Polars expression API)
-
-This highlights how BenchBox enables fair comparison between query paradigms.
-
-Copyright 2026 Joe Harris / BenchBox Project.
-Licensed under the MIT License.
-
-Usage:
-    python examples/dataframe/sql_vs_dataframe.py
-"""
+# Copyright 2026 Joe Harris / BenchBox Project.
+# Licensed under the MIT License.
 
 from __future__ import annotations
 
@@ -21,7 +8,6 @@ import sys
 import time
 from pathlib import Path
 
-# Check availability
 has_duckdb = False
 has_polars = False
 
@@ -43,7 +29,6 @@ except ImportError:
 
 
 def run_sql_query(conn, sql: str) -> tuple[float, int]:
-    """Execute SQL query and return time and row count."""
     start = time.perf_counter()
     result = conn.execute(sql).fetchdf()
     elapsed = time.perf_counter() - start
@@ -51,7 +36,6 @@ def run_sql_query(conn, sql: str) -> tuple[float, int]:
 
 
 def run_dataframe_query(query, ctx) -> tuple[float, int]:
-    """Execute DataFrame query and return time and row count."""
     start = time.perf_counter()
     result = query.execute(ctx, "expression")
     if hasattr(result, "collect"):
@@ -176,7 +160,6 @@ def _print_results_summary(results: dict) -> None:
 
 
 def main() -> int:
-    """Run SQL vs DataFrame comparison."""
     print("=" * 70)
     print("SQL vs DataFrame Comparison")
     print("=" * 70)

@@ -1,5 +1,3 @@
-"""Governance for SQLite's exact TPC-H discount-bound compilation rewrite."""
-
 import importlib
 
 import pytest

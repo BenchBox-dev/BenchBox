@@ -1,17 +1,5 @@
-# Transaction Primitives Operations Catalog
-#
-# This file defines all transaction operation tests for the Transaction Primitives benchmark.
-#
-# Categories:
-# - overhead: Transaction commit/rollback overhead testing
-# - isolation: Isolation level testing (READ COMMITTED, REPEATABLE READ, SERIALIZABLE)
-# - savepoint: Savepoint and nested transaction testing
-# - multi_statement: Multi-statement transactions with mixed DML
-# - advanced: Advanced transaction features (deferred constraints, DDL in transactions, etc.)
-#
 # Copyright 2026 Joe Harris / BenchBox Project
 # Licensed under the MIT License. See LICENSE file in the project root for details.
-# NOTE: Catalog body is compact YAML; parsed data must remain identical.
 
 operations:
 - id: transaction_commit_small

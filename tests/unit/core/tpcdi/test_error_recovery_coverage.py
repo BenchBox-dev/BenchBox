@@ -1,9 +1,3 @@
-"""Coverage tests for benchbox.core.tpcdi.etl.error_recovery.
-
-Tests span all enums, dataclasses, ErrorClassifier, RetryManager,
-and ErrorRecoveryManager to reach ≥80% line coverage.
-"""
-
 from __future__ import annotations
 
 import json
@@ -25,11 +19,6 @@ from benchbox.core.tpcdi.etl.error_recovery import (
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
-
-
-# ---------------------------------------------------------------------------
-# Enum coverage
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -72,11 +61,6 @@ def test_error_category_values(member, value):
 )
 def test_retry_strategy_values(member, value):
     assert member.value == value
-
-
-# ---------------------------------------------------------------------------
-# ErrorRecord dataclass
-# ---------------------------------------------------------------------------
 
 
 def test_error_record_defaults():
@@ -128,11 +112,6 @@ def test_error_record_with_all_fields():
     assert rec.error_code == "ENOSPC"
 
 
-# ---------------------------------------------------------------------------
-# RecoveryCheckpoint dataclass
-# ---------------------------------------------------------------------------
-
-
 def test_recovery_checkpoint_defaults():
     cp = RecoveryCheckpoint(
         checkpoint_id="CP_1",
@@ -147,11 +126,6 @@ def test_recovery_checkpoint_defaults():
     assert cp.dependencies == []
 
 
-# ---------------------------------------------------------------------------
-# RetryPolicy dataclass
-# ---------------------------------------------------------------------------
-
-
 def test_retry_policy_defaults():
     policy = RetryPolicy()
     assert policy.max_attempts == 3
@@ -159,11 +133,6 @@ def test_retry_policy_defaults():
     assert policy.base_delay_seconds == 1.0
     assert policy.max_delay_seconds == 300.0
     assert policy.jitter is True
-
-
-# ---------------------------------------------------------------------------
-# ErrorClassifier
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -198,14 +167,9 @@ def test_error_classifier_message_patterns(msg, expected_category, expected_seve
 )
 def test_error_classifier_exception_type_fallback(exception_type, expected_category):
     classifier = ErrorClassifier()
-    # Use a message that won't match any patterns so exception type drives classification
+
     category, _ = classifier.classify_error("generic failure", exception_type)
     assert category == expected_category
-
-
-# ---------------------------------------------------------------------------
-# RetryManager - should_retry
-# ---------------------------------------------------------------------------
 
 
 def _make_error_record(**kwargs) -> ErrorRecord:
@@ -279,11 +243,6 @@ def test_retry_manager_system_category_retried_by_default():
     assert mgr.should_retry(rec) is True
 
 
-# ---------------------------------------------------------------------------
-# RetryManager - calculate_delay
-# ---------------------------------------------------------------------------
-
-
 def test_calculate_delay_immediate():
     policy = RetryPolicy(strategy=RetryStrategy.IMMEDIATE, jitter=False)
     mgr = RetryManager(policy)
@@ -300,7 +259,7 @@ def test_calculate_delay_fixed():
 def test_calculate_delay_linear_backoff():
     policy = RetryPolicy(strategy=RetryStrategy.LINEAR_BACKOFF, base_delay_seconds=2.0, jitter=False)
     mgr = RetryManager(policy)
-    # Linear: base * (count + 1)
+
     assert mgr.calculate_delay(0) == pytest.approx(2.0)
     assert mgr.calculate_delay(1) == pytest.approx(4.0)
     assert mgr.calculate_delay(2) == pytest.approx(6.0)
@@ -314,7 +273,7 @@ def test_calculate_delay_exponential_backoff():
         jitter=False,
     )
     mgr = RetryManager(policy)
-    # 1 * 2^0 = 1, 1 * 2^1 = 2, 1 * 2^2 = 4
+
     assert mgr.calculate_delay(0) == pytest.approx(1.0)
     assert mgr.calculate_delay(1) == pytest.approx(2.0)
     assert mgr.calculate_delay(2) == pytest.approx(4.0)
@@ -329,7 +288,7 @@ def test_calculate_delay_respects_max_delay():
         jitter=False,
     )
     mgr = RetryManager(policy)
-    # 2^10 = 1024, capped at 10
+
     assert mgr.calculate_delay(10) == pytest.approx(10.0)
 
 
@@ -341,15 +300,9 @@ def test_calculate_delay_with_jitter_is_nonnegative():
 
 
 def test_calculate_delay_no_retry_falls_back_to_base():
-    """NO_RETRY strategy falls through to the else branch (base_delay_seconds)."""
     policy = RetryPolicy(strategy=RetryStrategy.NO_RETRY, base_delay_seconds=3.0, jitter=False)
     mgr = RetryManager(policy)
     assert mgr.calculate_delay(0) == pytest.approx(3.0)
-
-
-# ---------------------------------------------------------------------------
-# ErrorRecoveryManager
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture()
@@ -389,7 +342,7 @@ def test_manager_handle_error_permanent_goes_to_dead_letter(manager):
 
 
 def test_manager_handle_error_with_custom_policy(manager):
-    policy = RetryPolicy(max_attempts=0)  # no retries
+    policy = RetryPolicy(max_attempts=0)
     err = TimeoutError("timeout")
     ctx = {"operation_name": "op", "batch_id": 2}
     should_retry, _ = manager.handle_error(err, ctx, retry_policy=policy)
@@ -454,9 +407,7 @@ def test_manager_get_error_statistics_with_errors(manager):
 
 
 def test_manager_get_recovery_statistics(manager):
-    # Use a fresh manager to avoid prior checkpoint state from other tests.
-    # Checkpoint IDs are time-based (second resolution) so same batch+op within
-    # the same second will collide and overwrite - use distinct batch IDs/ops.
+
     conn = MagicMock()
     mgr = ErrorRecoveryManager(conn)
     mgr.create_checkpoint("op1", 1, "SAVEPOINT")
@@ -480,7 +431,7 @@ def test_manager_cleanup_old_errors_removes_nothing_recent(manager):
 def test_manager_cleanup_old_errors_removes_old_records(manager):
     err = TimeoutError("old error")
     manager.handle_error(err, {"operation_name": "op", "batch_id": 1})
-    # Backdate the error record
+
     manager.error_log[0].timestamp = datetime.now() - timedelta(hours=48)
     removed = manager.cleanup_old_errors(retention_hours=24)
     assert removed == 1
@@ -524,7 +475,7 @@ def test_manager_execute_with_recovery_raises_after_all_attempts(manager):
 
 
 def test_manager_export_error_report(manager, tmp_path):
-    # Inject an error record directly to avoid lock contention from handle_error
+
     rec = ErrorRecord(
         error_id="E_export",
         timestamp=datetime.now(),
@@ -536,8 +487,7 @@ def test_manager_export_error_report(manager, tmp_path):
     manager.error_log.append(rec)
 
     out = tmp_path / "report.json"
-    # export_error_report acquires error_lock then calls get_error_statistics which
-    # also acquires it - patch get_error_statistics to avoid the deadlock
+
     with patch.object(manager, "get_error_statistics", return_value={"total_errors": 1}):
         success = manager.export_error_report(str(out))
     assert success is True
@@ -573,7 +523,6 @@ def test_manager_export_error_report_failure(manager):
 
 
 def test_manager_error_trend_with_enough_errors(manager):
-    """Push 20 errors so the trend logic branch is exercised."""
     for i in range(20):
         rec = ErrorRecord(
             error_id=f"E{i}",
@@ -589,7 +538,6 @@ def test_manager_error_trend_with_enough_errors(manager):
 
 
 def test_manager_log_error_severity_routing(manager):
-    """Exercise all severity branches in _log_error."""
     for severity in (ErrorSeverity.LOW, ErrorSeverity.MEDIUM, ErrorSeverity.HIGH, ErrorSeverity.CRITICAL):
         rec = ErrorRecord(
             error_id=f"E_{severity.value}",

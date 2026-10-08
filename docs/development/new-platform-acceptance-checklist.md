@@ -51,15 +51,9 @@ Use this checklist before opening a platform-support PR. It is deliberately conc
 - New docs should link to setup, credentials, deployment modes, and benchmark limitations.
 - If a platform is experimental or deprecated, the docs must say so on the first screen.
 
-## Measured Extension Cost
+## Expected Extension Cost
 
-Recent platform additions show the minimum durable file count is not one adapter file:
-
-| Example | Evidence | Durable files touched |
-| --- | --- | ---: |
-| LakeSail release follow-up | `b2559016b` touched registry, adapter, platform docs, and unit tests. | 4 |
-| Onehouse Quanton initial support | `e0438e993` touched registry, adapter package, client, and docs. | 4 |
-| Databend/Doris/LakeSail/Quanton migration | `e980da3ae` touched registry, adapters, docs, and tests across multiple platforms. | 10+ per platform family cluster |
+The minimum durable file count for a new platform is more than one adapter file.
 
 Target for a straightforward SQL platform is **7-10 files**:
 
@@ -75,11 +69,5 @@ Target for a straightforward DataFrame platform is **8-12 files** because native
 
 ## Scaffold Helper
 
-Run the scaffold helper to print the expected file plan before starting:
-
-```bash
-uv run -- python _project/scripts/platform_scaffold.py --name newdatabase --kind sql
-uv run -- python _project/scripts/platform_scaffold.py --name newframe --kind dataframe
-```
-
-The helper emits a checklist and file plan only. It is an architecture health aid, not a framework that owns platform implementation.
+A maintainer scaffold script prints the expected file plan for a new SQL or
+DataFrame platform. The helper emits a checklist and file plan only. It is an architecture health aid, not a framework that owns platform implementation.

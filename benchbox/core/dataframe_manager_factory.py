@@ -1,5 +1,3 @@
-"""Shared factory helpers for DataFrame benchmark manager dispatch."""
-
 from __future__ import annotations
 
 from logging import Logger
@@ -17,7 +15,6 @@ def get_dataframe_manager(
     manager_label: str,
     spark_session: Any = None,
 ) -> ManagerT | None:
-    """Create a DataFrame manager when the platform matches a supported family."""
     platform_lower = platform_name.lower()
     if not any(platform in platform_lower for platform in supported_platforms):
         logger.debug(f"Platform {platform_name} is not a DataFrame platform")

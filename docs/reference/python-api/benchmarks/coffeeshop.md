@@ -5,7 +5,7 @@
 
 Python API reference for the CoffeeShop benchmark.
 
-CoffeeShop is a three-table star schema of a coffee-shop chain (`dim_locations`, `dim_products` and the `order_lines` fact table) with 11 analytical queries. Every statement on this page was checked against the released 0.4.1 wheel.
+CoffeeShop is a three-table star schema of a coffee-shop chain (`dim_locations`, `dim_products` and the `order_lines` fact table) with 11 analytical queries.
 
 ## `benchbox.CoffeeShop`
 

@@ -1,9 +1,6 @@
-"""Tests for ClickHouse local mode functionality.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import sys
 import tempfile
@@ -19,24 +16,18 @@ pytestmark = [
 ]
 
 
-# Include the project root to the Python path
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from tests.utilities.optional_engines import require_chdb  # noqa: E402
+from tests.utilities.optional_engines import require_chdb
 
-# Local mode needs a chDB whose native library loads, not just an installed package.
 require_chdb()
 
-from benchbox.platforms.clickhouse import ClickHouseAdapter, ClickHouseLocalClient  # noqa: E402
+from benchbox.platforms.clickhouse import ClickHouseAdapter, ClickHouseLocalClient
 
 
 class TestClickHouseEmbeddedMode:
-    """Test ClickHouse local mode initialization and configuration."""
-
     def test_local_mode_initialization(self):
-        """Test local mode initializes correctly with chDB available."""
-        # Test with actual chDB since we have it installed
         adapter = ClickHouseAdapter(deployment_mode="local")
         assert adapter.deployment_mode == "local"
         assert adapter.platform_name == "ClickHouse (Local)"
@@ -45,30 +36,25 @@ class TestClickHouseEmbeddedMode:
         assert adapter.database is None
 
     def test_server_mode_initialization(self):
-        """Test server mode initializes correctly."""
         try:
             adapter = ClickHouseAdapter(deployment_mode="server", host="test.com", port=9999)
             assert adapter.deployment_mode == "server"
-            assert adapter.deployment_mode == "server"  # Backward compat
+            assert adapter.deployment_mode == "server"
             assert adapter.platform_name == "ClickHouse (Server)"
             assert adapter.host == "test.com"
             assert adapter.port == 9999
         except ImportError:
-            # Expected if ClickHouse driver is not installed
             pytest.skip("ClickHouse driver not installed - skipping server mode test")
 
     def test_invalid_mode_error(self):
-        """Test invalid deployment mode raises appropriate error."""
         with pytest.raises(ValueError) as exc_info:
             ClickHouseAdapter(deployment_mode="invalid")
 
         assert "Invalid ClickHouse deployment mode 'invalid'" in str(exc_info.value)
-        # Cloud is now a separate first-class platform (clickhouse-cloud)
         assert "local" in str(exc_info.value)
         assert "server" in str(exc_info.value)
 
     def test_local_mode_configuration(self):
-        """Test local mode configuration parameters."""
         adapter = ClickHouseAdapter(
             deployment_mode="local",
             data_path="/tmp/test",
@@ -80,42 +66,34 @@ class TestClickHouseEmbeddedMode:
         assert adapter.data_path == "/tmp/test"
         assert adapter.max_memory_usage == "2GB"
         assert adapter.max_threads == 2
-        # Embedded mode doesn't have server connection parameters
         assert adapter.username is None
         assert adapter.password is None
         assert adapter.secure is None
 
 
 class TestClickHouseLocalClient:
-    """Test ClickHouseLocalClient functionality."""
-
     def test_client_initialization(self):
-        """Test local client initializes correctly."""
         client = ClickHouseLocalClient()
         assert client._initialized is True
 
     def test_simple_query_execution(self):
-        """Test simple query execution with real chDB."""
         client = ClickHouseLocalClient()
         result = client.execute("SELECT 1")
         assert len(result) == 1
         assert result[0] == (1,)
 
     def test_empty_query_result(self):
-        """Test handling of queries that return no results."""
         client = ClickHouseLocalClient()
         result = client.execute("SELECT * FROM (SELECT 1 WHERE 0)")
         assert result == []
 
     def test_query_result_is_a_materialized_sequence(self):
-        """Result validation must not mistake a ClickHouse result for a row factory."""
         result = ClickHouseLocalClient().execute("SELECT 1")
 
         assert isinstance(result, Sequence)
         assert result[0] == (1,)
 
     def test_multi_column_query_result(self):
-        """Test handling of multi-column query results."""
         client = ClickHouseLocalClient()
         result = client.execute("SELECT 1, 'hello', 3.14")
 
@@ -125,59 +103,46 @@ class TestClickHouseLocalClient:
         assert abs(result[0][2] - 3.14) < 0.01
 
     def test_csv_parsing_with_quotes(self):
-        """Test CSV parsing with quoted values."""
         client = ClickHouseLocalClient()
 
-        # Test parsing a line with quoted values
         line = '"John Doe",30,"Software Engineer"'
         result = client._parse_csv_line(line)
 
         assert result == ("John Doe", 30, "Software Engineer")
 
     def test_csv_parsing_with_nulls(self):
-        """Test CSV parsing with null/empty values."""
         client = ClickHouseLocalClient()
 
-        # Test parsing a line with empty values
         line = "John,,Engineer"
         result = client._parse_csv_line(line)
 
         assert result == ("John", None, "Engineer")
 
     def test_type_conversion(self):
-        """Test proper type conversion for different data types."""
         client = ClickHouseLocalClient()
 
-        # Test integer
         assert client._is_float("123") is True
         assert client._is_float("123.45") is True
         assert client._is_float("abc") is False
 
-        # Test parsing with different types
         line = "123,123.45,true,hello"
         result = client._parse_csv_line(line)
 
-        assert result[0] == 123  # integer
-        assert result[1] == 123.45  # float
-        assert result[2] == "true"  # string (boolean as string)
-        assert result[3] == "hello"  # string
+        assert result[0] == 123
+        assert result[1] == 123.45
+        assert result[2] == "true"
+        assert result[3] == "hello"
 
     def test_disconnect(self):
-        """Test disconnect method."""
         client = ClickHouseLocalClient()
-        # Should not raise any exception
         client.disconnect()
 
 
 class TestClickHouseEmbeddedConnection:
-    """Test ClickHouse local mode connection functionality."""
-
     def test_create_local_connection(self):
-        """Test creating local mode connection."""
         adapter = ClickHouseAdapter(deployment_mode="local")
-        # Avoid persistent session to prevent filesystem locking
         with patch.object(ClickHouseAdapter, "get_database_path", return_value=None):
-            # Patch local client to a simple fake to avoid real chDB usage
+
             class _FakeClient:
                 def __init__(self, db_path=None):
                     pass
@@ -191,28 +156,22 @@ class TestClickHouseEmbeddedConnection:
             with patch("benchbox.platforms.clickhouse.setup.ClickHouseLocalClient", _FakeClient):
                 connection = adapter.create_connection()
 
-        # Should look like an local client (duck-typed): has execute()
         assert hasattr(connection, "execute")
 
     def test_database_operations_local_mode(self):
-        """Test database operations don't fail in local mode."""
         adapter = ClickHouseAdapter(deployment_mode="local")
 
         tmpdir = tempfile.mkdtemp()
         db_path = str(Path(tmpdir) / "clickhouse_local.chdb")
         with patch.object(ClickHouseAdapter, "get_database_path", return_value=db_path):
-            # Initially no persistent database file exists
             assert adapter.check_server_database_exists() is False
-            # the persistent file and verify existence
             Path(db_path).parent.mkdir(parents=True, exist_ok=True)
             Path(db_path).touch()
             assert adapter.check_server_database_exists() is True
-            adapter.drop_database()  # No-op in local mode; should not raise
+            adapter.drop_database()
 
     def test_local_metadata_collection(self):
-        """Test metadata collection in local mode."""
         adapter = ClickHouseAdapter(deployment_mode="local", data_path="/tmp/test")
-        # Use in-memory connection with fake client
         with patch.object(ClickHouseAdapter, "get_database_path", return_value=None):
 
             class _FakeClient:
@@ -233,16 +192,13 @@ class TestClickHouseEmbeddedConnection:
         assert metadata["platform"] == "ClickHouse (Local)"
         assert metadata["mode"] == "local"
         assert metadata["data_path"] == "/tmp/test"
-        assert "host" not in metadata  # Server-specific fields should not be present
+        assert "host" not in metadata
         assert "port" not in metadata
         assert "database" not in metadata
 
 
 class TestClickHouseEmbeddedIntegration:
-    """Integration tests for ClickHouse local mode."""
-
     def test_query_execution_integration(self):
-        """Test query execution integration."""
         adapter = ClickHouseAdapter(deployment_mode="local")
         with patch.object(ClickHouseAdapter, "get_database_path", return_value=None):
 
@@ -269,7 +225,6 @@ class TestClickHouseEmbeddedIntegration:
         assert result["execution_time_seconds"] > 0
 
     def test_query_execution_error_handling(self):
-        """Test query execution error handling."""
         adapter = ClickHouseAdapter(deployment_mode="local")
         with patch.object(ClickHouseAdapter, "get_database_path", return_value=None):
 
@@ -288,7 +243,6 @@ class TestClickHouseEmbeddedIntegration:
             with patch("benchbox.platforms.clickhouse.setup.ClickHouseLocalClient", _FakeClient):
                 connection = adapter.create_connection()
 
-        # Use a clearly invalid SQL query
         result = adapter.execute_query(connection, "INVALID SQL QUERY HERE", "test_query")
 
         assert result["status"] == "FAILED"
@@ -298,7 +252,6 @@ class TestClickHouseEmbeddedIntegration:
         assert result["error_type"] == "RuntimeError"
 
     def test_basic_table_operations(self):
-        """Test basic table creation and query operations."""
         adapter = ClickHouseAdapter(deployment_mode="local")
         with patch.object(ClickHouseAdapter, "get_database_path", return_value=None):
 
@@ -326,7 +279,6 @@ class TestClickHouseEmbeddedIntegration:
             with patch("benchbox.platforms.clickhouse.setup.ClickHouseLocalClient", _FakeClient):
                 connection = adapter.create_connection()
 
-        # a simple table
         create_result = adapter.execute_query(
             connection,
             "CREATE TABLE IF NOT EXISTS test_table (id Int32, name String) ENGINE = Memory",
@@ -334,7 +286,6 @@ class TestClickHouseEmbeddedIntegration:
         )
         assert create_result["status"] == "SUCCESS"
 
-        # Insert some data
         insert_result = adapter.execute_query(
             connection,
             "INSERT INTO test_table VALUES (1, 'Alice'), (2, 'Bob')",
@@ -342,11 +293,9 @@ class TestClickHouseEmbeddedIntegration:
         )
         assert insert_result["status"] == "SUCCESS"
 
-        # Query the data
         select_result = adapter.execute_query(connection, "SELECT * FROM test_table ORDER BY id", "select_test")
         assert select_result["status"] == "SUCCESS"
         assert select_result["rows_returned"] == 2
 
-        # Drop the table
         drop_result = adapter.execute_query(connection, "DROP TABLE IF EXISTS test_table", "drop_test")
         assert drop_result["status"] == "SUCCESS"

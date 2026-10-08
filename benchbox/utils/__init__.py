@@ -1,9 +1,6 @@
-"""Utility functions for BenchBox.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from .config_helpers import (
     ConcurrentQueriesSettings,
@@ -44,22 +41,18 @@ from .timeout_manager import (
 )
 
 __all__ = [
-    # Scale factor utilities
     "format_scale_factor",
     "format_benchmark_name",
     "format_data_directory",
     "format_schema_name",
-    # Execution management
     "PowerRunSettings",
     "ConcurrentQueriesSettings",
     "ExecutionConfigHelper",
     "create_sample_execution_config",
-    # Formatting
     "format_duration",
     "format_bytes",
     "format_memory_usage",
     "format_number",
-    # Resource limits
     "ResourceLimitsConfig",
     "ResourceLimitMonitor",
     "ResourceUsageSummary",
@@ -69,7 +62,6 @@ __all__ = [
     "get_system_memory_mb",
     "get_available_memory_mb",
     "calculate_safe_memory_limit",
-    # Timeout management
     "TimeoutManager",
     "TimeoutConfig",
     "TimeoutError",

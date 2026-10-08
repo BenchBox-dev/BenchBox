@@ -1,24 +1,3 @@
-"""Dictionary-recovery privacy gate for the curated results corpus.
-
-``find_public_path_leaks`` only sees *plaintext* absolute paths. Pseudonyms
-minted with the empty default salt are a confirmation oracle: a short
-dictionary of low-entropy public candidates recovers them with certainty.
-This gate closes that hole for the unread-identifier drop (ADR
-``adr-published-identifier-field-set``):
-
-1. Drop-field keys must be absent from every corpus JSON file after re-derive.
-2. Measured recoverable tokens that lived under dropped fields must be gone.
-3. A fixed safe dictionary of low-entropy *public* candidates must not recover
-   a path/machine/host pseudonym still present in the corpus (prefixes that
-   only the dropped fields used to mint at those keys).
-
-Retained fields (``endpoint``, ``database_name``, ``submission_path``) still
-publish pseudonyms under the empty OSS default salt. The residual confirmation
-oracle on those fields is an accepted, documented policy (ADR salt decision
-2026-08-05), not a green-gate failure. Do not record or print recovered
-plaintext values in comments, commits, or PR bodies — tokens only.
-"""
-
 from __future__ import annotations
 
 import json
@@ -36,7 +15,6 @@ pytestmark = [
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RESULTS_DATA = REPO_ROOT / "results-data"
 
-# Exact JSON keys dropped at the public anonymization boundary.
 DROP_FIELD_KEYS = frozenset(
     {
         "machine_id",
@@ -48,14 +26,8 @@ DROP_FIELD_KEYS = frozenset(
     }
 )
 
-# Measured recoverable tokens from the pre-drop corpus audit. The path token
-# lived under working_dir (dropped). Absence is the re-derive acceptance bar
-# for the unread-field work. Tokens only — never embed recovered plaintext.
 FORBIDDEN_RECOVERABLE_TOKENS = ("path_1c98692f827e",)
 
-# Low-entropy *public* candidates only (generic product / local defaults). No
-# personal names, home directories, or hostnames. Used to attempt recovery
-# against prefixes the dropped fields used to emit.
 _SAFE_PUBLIC_DICTIONARY = (
     "benchbox",
     "BenchBox",
@@ -87,7 +59,6 @@ def _walk_keys(value: object, *, found: set[str]) -> None:
 
 
 def _corpus_blob() -> str:
-    """Concatenate corpus file bytes for token scans without echoing contents."""
     parts: list[str] = []
     for path in _corpus_json_files():
         parts.append(path.read_text(encoding="utf-8"))
@@ -100,7 +71,6 @@ def test_corpus_directory_is_present() -> None:
 
 
 def test_drop_field_keys_are_absent_from_corpus() -> None:
-    """Unread identifier keys must not reappear after re-derive."""
     offenders: list[str] = []
     unreadable: list[str] = []
 
@@ -124,20 +94,12 @@ def test_drop_field_keys_are_absent_from_corpus() -> None:
 
 
 def test_measured_recoverable_tokens_from_dropped_fields_are_absent() -> None:
-    """Tokens recovered under dropped fields must not remain in the corpus."""
     blob = _corpus_blob()
     remaining = [token for token in FORBIDDEN_RECOVERABLE_TOKENS if token in blob]
     assert not remaining, f"recoverable tokens still present after re-derive: {remaining}"
 
 
 def test_safe_dictionary_does_not_recover_dropped_field_pseudonyms() -> None:
-    """A fixed public dictionary must not confirm path/machine/host tokens.
-
-    Only prefixes that dropped fields used to mint at those keys are checked.
-    Retained-field prefixes (database, endpoint, path-under-submission_path)
-    are out of this fail-closed sweep: residual empty-salt recovery there is
-    the accepted OSS default policy, not a re-derive regression.
-    """
     manager = AnonymizationManager()
     blob = _corpus_blob()
     hits: list[str] = []
@@ -148,31 +110,20 @@ def test_safe_dictionary_does_not_recover_dropped_field_pseudonyms() -> None:
             if token in blob:
                 hits.append(token)
 
-    # Deduplicate while preserving order for a stable failure message.
     unique_hits = list(dict.fromkeys(hits))
     assert not unique_hits, f"dictionary-recoverable dropped-field tokens remain: {unique_hits}"
 
 
 def test_retained_field_residual_oracle_is_documented_policy_not_a_gate_failure() -> None:
-    """Empty-salt retained prefixes remain dictionary-confirmable by design.
-
-    Pins the 2026-08-05 ADR decision: residual oracle on retained fields is
-    accepted for the OSS default. This test proves the algorithm property
-    (empty salt + known candidate → stable token) without scanning the corpus
-    for residual hits and without embedding recovered plaintext.
-    """
     empty = AnonymizationManager()
-    # Public product token only — not a personal or path secret.
     candidate = "benchbox"
     token = empty._hash_public_identifier(candidate, "database")
     assert token.startswith("database_")
     assert len(token) == len("database_") + 12
-    # Same empty-salt manager always confirms the same candidate.
     assert empty._hash_public_identifier(candidate, "database") == token
 
 
 def test_operator_salt_defeats_safe_dictionary_for_new_raw_values() -> None:
-    """A deployment-private salt closes the oracle for newly hashed raw values."""
     salted = AnonymizationManager(AnonymizationConfig(machine_id_salt="deployment-private-test-salt"))
     empty = AnonymizationManager()
     for candidate in _SAFE_PUBLIC_DICTIONARY:
@@ -181,7 +132,6 @@ def test_operator_salt_defeats_safe_dictionary_for_new_raw_values() -> None:
 
 
 def test_publication_fixed_point_ignores_operator_salt() -> None:
-    """Already-public-shaped tokens pass through even when a salt is configured."""
     token = AnonymizationManager()._hash_public_identifier("benchbox", "database")
     salted = AnonymizationManager(AnonymizationConfig(machine_id_salt="deployment-private-test-salt"))
     assert salted._hash_public_identifier(token, "database") == token

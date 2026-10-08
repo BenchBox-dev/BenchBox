@@ -1,5 +1,3 @@
-"""Shared tuning utilities for SQL platform adapters."""
-
 from __future__ import annotations
 
 from logging import Logger
@@ -11,17 +9,6 @@ def log_partition_tunings(
     logger: Logger,
     platform_name: str,
 ) -> None:
-    """Log partition tuning configuration for a table.
-
-    Shared implementation for platforms where tuning is primarily handled at
-    table creation time and post-creation optimization is limited (Firebolt,
-    LakeSail, Presto).
-
-    Args:
-        table_tuning: Table tuning configuration object.
-        logger: Logger instance from the platform adapter.
-        platform_name: Display name for log messages (e.g. "Firebolt").
-    """
     if not table_tuning or not table_tuning.has_any_tuning():
         return
 

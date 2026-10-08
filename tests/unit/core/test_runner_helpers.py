@@ -1,5 +1,3 @@
-"""Targeted unit tests for core runner helper functions."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -74,8 +72,6 @@ class TestResolveManifestAllowedNames:
 
 
 class _OutputDirTrackingBenchmark:
-    """Stub recording how many times output_dir is assigned post-construction."""
-
     def __init__(self, value):
         self._output_dir = value
         self.set_count = 0
@@ -118,21 +114,12 @@ class TestOutputDirResolution:
         assert benchmark.set_count == 1
 
     def test_resolve_output_dir_handler_assigns_databricks_handler_with_matching_local_cache(self):
-        """A DatabricksPath handler must be assigned even when its local cache
-        path equals the benchmark's existing local default.
-
-        ``create_path_handler`` preserves a DatabricksPath by identity, and its
-        ``__eq__`` compares only the local path (ignoring ``dbfs_target``). An
-        equality-only skip would therefore drop the dbfs target, leaving the
-        benchmark on a plain local path and never uploading to dbfs. The handler
-        must always reach the benchmark.
-        """
         from benchbox.utils.cloud_storage import DatabricksPath
 
         local_cache = Path("/tmp/datagen/tpch_sf1")
         benchmark = _OutputDirTrackingBenchmark(local_cache)
         handler = DatabricksPath(str(local_cache), "dbfs:/Volumes/cat/schema/vol")
-        assert handler == local_cache  # equal by local path alone
+        assert handler == local_cache
 
         result = _resolve_output_dir_handler(benchmark, handler)
 

@@ -1,10 +1,3 @@
-"""Tests for the stale _project/ reference lint.
-
-The lint blocks NEW stale references (tracked files outside _project/
-mentioning a _project/ path that does not exist) while grandfathering
-pre-existing violations in a baseline that cannot rot.
-"""
-
 from __future__ import annotations
 
 import importlib.util

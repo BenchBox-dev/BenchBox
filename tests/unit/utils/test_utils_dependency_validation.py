@@ -1,5 +1,3 @@
-"""Tests for dependency validation utilities."""
-
 import sys
 import textwrap
 from pathlib import Path
@@ -31,8 +29,6 @@ from benchbox.utils.dependency_validation import (
 
 @pytest.mark.unit
 class TestDependencyValidation:
-    """Ensure dependency validation remains aligned with the lock file."""
-
     pyproject_path = Path("pyproject.toml")
     lock_path = Path("uv.lock")
 
@@ -47,8 +43,6 @@ class TestDependencyValidation:
     def test_cli_matrix_output(self, capsys, monkeypatch):
         import benchbox.utils.printing as printing
 
-        # Reset both globals: _QUIET may be leaked as True by CLI tests that call
-        # set_quiet(True) via the --quiet flag but never restore it afterwards.
         monkeypatch.setattr(printing, "_QUIET", False)
         monkeypatch.setattr(printing, "_STD_CONSOLE", None)
         exit_code = dependency_validation.main(

@@ -114,16 +114,10 @@ describe("facet URL contract", () => {
     expect(readFacetParam(params, "benchmark")).toEqual(["tpch", "ssb"]);
     expect(readFacetParam(params, "date_window")).toBe("30d");
     expect(readFacetParam(params, "deployment_class")).toEqual(["cloud"]);
-    // w16: when both ?instance_type= and ?warehouse_size= are present, the
-    // shared `instance_or_warehouse` facet must merge them rather than
-    // dropping one. Pre-w16 this returned only ["m6i.large"], silently
-    // discarding the warehouse_size value on the next mount.
     expect(readFacetParam(params, "instance_or_warehouse")).toEqual(["m6i.large", "MEDIUM"]);
   });
 
   it("merges multiple legacy aliases for instance_or_warehouse (w16)", () => {
-    // Multi-value aliases on each side: both halves of the union should
-    // survive after dedupe.
     const params = new URLSearchParams("instance_type=m6i.large,c5.xlarge&warehouse_size=MEDIUM,LARGE");
     expect(readFacetParam(params, "instance_or_warehouse")).toEqual([
       "m6i.large",
@@ -139,8 +133,6 @@ describe("facet URL contract", () => {
   });
 
   it("canonical key takes precedence over aliases when both are present (w16)", () => {
-    // The canonical URL key for instance_or_warehouse is `shape` (see
-    // FACET_URL_KEYS); aliases include `instance_type` and `warehouse_size`.
     const params = new URLSearchParams(
       "shape=canonical&instance_type=foo&warehouse_size=bar",
     );
@@ -226,10 +218,6 @@ describe("facetsToWhereClause", () => {
     expect(params).toEqual(["auto"]);
   });
 
-  // The `unknown` phase cohort is user-selectable, and `matchesFacetRow` folds a
-  // null/blank `test_type` into it. A raw `test_type IN ('unknown')` predicate
-  // matched no null-phase row, so the cohort that produced the facet returned an
-  // empty leaderboard.
   it("folds null and blank test_type into the unknown phase cohort", () => {
     const { sql, params } = facetsToWhereClause({ phase: ["unknown"] });
 
@@ -246,8 +234,6 @@ describe("facetsToWhereClause", () => {
   it("canonicalizes phase casing on both the SQL and in-memory sides", () => {
     const { params } = facetsToWhereClause({ phase: ["POWER", "power", " Power "] });
 
-    // canonicalPhase() trims and lowercases, so the three spellings collapse to
-    // one bound parameter rather than three literals that miss stored casing.
     expect(params).toEqual(["power"]);
 
     const rowMatches = matchesFacetRow({ test_type: "POWER" }, normalizeFacetState({ phase: ["power"] }), {
@@ -339,7 +325,6 @@ describe("facetsToWhereClause", () => {
         }),
       ).toBe(true);
 
-      // Missing candidate in row does not match non-empty filter
       const emptyRow = {
         platform_version: null,
         arch: null,
@@ -351,7 +336,6 @@ describe("facetsToWhereClause", () => {
         }),
       ).toBe(false);
 
-      // Empty filter matches any row (all-inclusive)
       expect(
         matchesFacetRow(emptyRow, normalizeFacetState({}), {
           keys: ["platform_version", "arch", "cpu_family"],

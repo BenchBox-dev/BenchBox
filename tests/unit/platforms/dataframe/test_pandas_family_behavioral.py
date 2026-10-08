@@ -1,15 +1,4 @@
-"""Behavioral tests for PandasFamilyAdapter using the real Pandas backend.
-
-Tests cover:
-- DataFrame creation from dicts
-- Type mapping between pandas dtypes and benchbox types
-- Pandas-specific operations: merge, groupby, apply
-- String-based column access API patterns
-- Scalar extraction and scalar_to_df round-trip
-- Context helpers: concat, groupby_size, groupby_agg, filter_gt, to_set
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -26,26 +15,16 @@ pytestmark = [
 
 @pytest.fixture
 def adapter() -> PandasDataFrameAdapter:
-    """Create a real Pandas adapter."""
     return PandasDataFrameAdapter()
 
 
 @pytest.fixture
 def ctx(adapter):
-    """Create a fresh execution context."""
     return adapter.create_context()
 
 
-# =========================================================================
-# DataFrame creation from dicts
-# =========================================================================
-
-
 class TestDataFrameCreation:
-    """Verify DataFrame creation through the adapter."""
-
     def test_scalar_to_df_single_column(self, adapter):
-        """scalar_to_df creates a one-row DataFrame from a single column dict."""
         result = adapter.scalar_to_df({"total": 42})
 
         assert len(result) == 1
@@ -53,7 +32,6 @@ class TestDataFrameCreation:
         assert result["total"].iloc[0] == 42
 
     def test_scalar_to_df_multiple_columns(self, adapter):
-        """scalar_to_df creates a one-row DataFrame with multiple columns."""
         result = adapter.scalar_to_df({"count": 10, "avg": 3.5, "label": "test"})
 
         assert len(result) == 1
@@ -63,7 +41,6 @@ class TestDataFrameCreation:
         assert result["label"].iloc[0] == "test"
 
     def test_scalar_to_df_via_context(self, ctx):
-        """Context's scalar_to_df returns a UnifiedPandasFrame."""
         from benchbox.platforms.dataframe.unified_pandas_frame import UnifiedPandasFrame
 
         result = ctx.scalar_to_df({"answer": 42})
@@ -73,16 +50,8 @@ class TestDataFrameCreation:
         assert result.native["answer"].iloc[0] == 42
 
 
-# =========================================================================
-# Type mapping and dtype handling
-# =========================================================================
-
-
 class TestTypeMappingAndDtypes:
-    """Verify Pandas dtype behaviors through the adapter."""
-
     def test_integer_column_dtype(self, adapter, ctx):
-        """Registered integer columns retain integer dtype."""
         df = pd.DataFrame({"val": [1, 2, 3]})
         ctx.register_table("nums", df)
 
@@ -90,7 +59,6 @@ class TestTypeMappingAndDtypes:
         assert pd.api.types.is_integer_dtype(retrieved["val"])
 
     def test_float_column_dtype(self, adapter, ctx):
-        """Registered float columns retain float dtype."""
         df = pd.DataFrame({"val": [1.5, 2.5, 3.5]})
         ctx.register_table("floats", df)
 
@@ -98,16 +66,13 @@ class TestTypeMappingAndDtypes:
         assert pd.api.types.is_float_dtype(retrieved["val"])
 
     def test_string_column_dtype(self, adapter, ctx):
-        """Registered string columns retain object/string dtype."""
         df = pd.DataFrame({"name": ["alice", "bob"]})
         ctx.register_table("names", df)
 
         retrieved = ctx.get_table("names").native
-        # Pandas can store strings as object or StringDtype
         assert pd.api.types.is_string_dtype(retrieved["name"].dtype)
 
     def test_datetime_column_dtype(self, adapter, ctx):
-        """Registered datetime columns retain datetime64 dtype."""
         df = pd.DataFrame({"ts": pd.to_datetime(["2024-01-01", "2024-06-15"])})
         ctx.register_table("dates", df)
 
@@ -115,16 +80,8 @@ class TestTypeMappingAndDtypes:
         assert pd.api.types.is_datetime64_any_dtype(retrieved["ts"])
 
 
-# =========================================================================
-# Pandas-specific operations: merge
-# =========================================================================
-
-
 class TestMergeOperations:
-    """Verify merge/join behavior on the real Pandas adapter."""
-
     def test_inner_merge_on_key(self, adapter):
-        """Inner merge keeps only matching rows."""
         left = pd.DataFrame({"key": [1, 2, 3], "val_l": ["a", "b", "c"]})
         right = pd.DataFrame({"key": [2, 3, 4], "val_r": ["x", "y", "z"]})
 
@@ -135,7 +92,6 @@ class TestMergeOperations:
         assert list(result.columns) == ["key", "val_l", "val_r"]
 
     def test_left_merge_preserves_left_rows(self, adapter):
-        """Left merge keeps all left rows, filling missing right with NaN."""
         left = pd.DataFrame({"key": [1, 2, 3], "val_l": ["a", "b", "c"]})
         right = pd.DataFrame({"key": [2, 3], "val_r": ["x", "y"]})
 
@@ -143,12 +99,10 @@ class TestMergeOperations:
 
         assert len(result) == 3
         assert set(result["key"]) == {1, 2, 3}
-        # Row with key=1 should have NaN in val_r
         row_1 = result[result["key"] == 1]
         assert pd.isna(row_1["val_r"].iloc[0])
 
     def test_merge_with_left_on_right_on(self, adapter):
-        """Merge with different column names using left_on/right_on."""
         left = pd.DataFrame({"order_id": [10, 20], "amount": [100, 200]})
         right = pd.DataFrame({"oid": [10, 20], "status": ["shipped", "pending"]})
 
@@ -159,21 +113,12 @@ class TestMergeOperations:
         assert "status" in result.columns
 
     def test_merge_invalid_input_raises(self, adapter):
-        """Merge with non-DataFrame inputs raises TypeError."""
         with pytest.raises(TypeError, match="merge requires DataFrame-like"):
             adapter.merge("not_a_df", "also_not_a_df", on="key")
 
 
-# =========================================================================
-# Pandas-specific operations: groupby
-# =========================================================================
-
-
 class TestGroupByOperations:
-    """Verify groupby behavior on the real Pandas adapter."""
-
     def test_groupby_agg_named_style(self, adapter):
-        """Named aggregation produces correctly named result columns."""
         df = pd.DataFrame({"category": ["A", "A", "B", "B"], "value": [10, 20, 30, 40]})
 
         result = adapter.groupby_agg(
@@ -191,7 +136,6 @@ class TestGroupByOperations:
         assert row_a["average"].iloc[0] == pytest.approx(15.0)
 
     def test_groupby_agg_direct_style(self, adapter):
-        """Direct dict-style aggregation produces correct results."""
         df = pd.DataFrame({"category": ["X", "X", "Y"], "value": [5, 15, 100]})
 
         result = adapter.groupby_agg(df, "category", {"value": "sum"}, as_index=False)
@@ -201,7 +145,6 @@ class TestGroupByOperations:
         assert row_x["value"].iloc[0] == 20
 
     def test_groupby_size_single_column(self, adapter):
-        """groupby_size counts rows per group correctly."""
         df = pd.DataFrame({"grp": ["A", "B", "A", "B", "A"]})
 
         result = adapter.groupby_size(df, "grp", name="cnt")
@@ -213,7 +156,6 @@ class TestGroupByOperations:
         assert row_b["cnt"].iloc[0] == 2
 
     def test_groupby_size_multiple_columns(self, adapter):
-        """groupby_size with multiple columns produces correct groups."""
         df = pd.DataFrame(
             {
                 "region": ["East", "East", "West", "West"],
@@ -226,20 +168,11 @@ class TestGroupByOperations:
         assert "region" in result.columns
         assert "product" in result.columns
         assert "count" in result.columns
-        # (East,A)=2, (West,A)=1, (West,B)=1
         assert len(result) == 3
 
 
-# =========================================================================
-# Scalar extraction
-# =========================================================================
-
-
 class TestScalarExtraction:
-    """Verify scalar extraction from DataFrames."""
-
     def test_scalar_from_single_value_df(self, adapter):
-        """scalar() extracts the single value from a 1x1 DataFrame."""
         df = pd.DataFrame({"result": [42]})
 
         value = adapter.scalar(df)
@@ -247,7 +180,6 @@ class TestScalarExtraction:
         assert value == 42
 
     def test_scalar_from_named_column(self, adapter):
-        """scalar(column='name') extracts from the named column."""
         df = pd.DataFrame({"name": ["alice"], "age": [30]})
 
         value = adapter.scalar(df, column="name")
@@ -255,21 +187,18 @@ class TestScalarExtraction:
         assert value == "alice"
 
     def test_scalar_empty_df_raises(self, adapter):
-        """scalar() on empty DataFrame raises ValueError."""
         df = pd.DataFrame({"val": []})
 
         with pytest.raises(ValueError, match="empty DataFrame"):
             adapter.scalar(df)
 
     def test_scalar_multi_row_raises(self, adapter):
-        """scalar() on multi-row DataFrame raises ValueError."""
         df = pd.DataFrame({"val": [1, 2]})
 
         with pytest.raises(ValueError, match="Expected exactly one row"):
             adapter.scalar(df)
 
     def test_scalar_via_context(self, ctx, adapter):
-        """Context scalar() delegates to adapter correctly."""
         df = pd.DataFrame({"total": [99]})
         ctx.register_table("results", df)
 
@@ -279,50 +208,31 @@ class TestScalarExtraction:
         assert value == 99
 
 
-# =========================================================================
-# String-based column access patterns
-# =========================================================================
-
-
 class TestStringColumnAccess:
-    """Verify that PandasFamilyContext uses string-based column references."""
-
     def test_col_returns_string(self, ctx):
-        """ctx.col('name') returns the literal string 'name'."""
         result = ctx.col("order_total")
 
         assert result == "order_total"
         assert isinstance(result, str)
 
     def test_lit_returns_value_unchanged(self, ctx):
-        """ctx.lit(42) returns 42 unchanged."""
         assert ctx.lit(42) == 42
         assert ctx.lit("hello") == "hello"
         assert ctx.lit(3.14) == pytest.approx(3.14)
 
     def test_column_access_pattern_with_df(self, ctx, adapter):
-        """String column names work with DataFrame bracket access."""
         df = pd.DataFrame({"price": [10, 20, 30]})
         ctx.register_table("items", df)
 
         table = ctx.get_table("items")
         col_name = ctx.col("price")
-        # In pandas family, col returns a string, so df[col] works
         values = table.native[col_name]
 
         assert list(values) == [10, 20, 30]
 
 
-# =========================================================================
-# Context-level helpers
-# =========================================================================
-
-
 class TestContextHelpers:
-    """Verify context helper methods with real Pandas backend."""
-
     def test_rename_columns(self, adapter):
-        """rename_columns correctly renames columns."""
         df = pd.DataFrame({"old_a": [1], "old_b": [2]})
 
         result = adapter.rename_columns(df, {"old_a": "new_a", "old_b": "new_b"})
@@ -331,7 +241,6 @@ class TestContextHelpers:
         assert result["new_a"].iloc[0] == 1
 
     def test_union_all_single(self, adapter):
-        """union_all with a single DataFrame returns it unchanged."""
         df = pd.DataFrame({"val": [1, 2]})
 
         result = adapter.union_all(df)
@@ -340,7 +249,6 @@ class TestContextHelpers:
         assert list(result["val"]) == [1, 2]
 
     def test_union_all_multiple(self, adapter):
-        """union_all with multiple DataFrames concatenates them."""
         df1 = pd.DataFrame({"val": [1, 2]})
         df2 = pd.DataFrame({"val": [3, 4]})
 
@@ -350,12 +258,10 @@ class TestContextHelpers:
         assert list(result["val"]) == [1, 2, 3, 4]
 
     def test_union_all_empty_raises(self, adapter):
-        """union_all with no arguments raises ValueError."""
         with pytest.raises(ValueError, match="At least one DataFrame"):
             adapter.union_all()
 
     def test_context_filter_gt(self, ctx, adapter):
-        """Context filter_gt filters rows where column exceeds threshold."""
         df = pd.DataFrame({"price": [5, 10, 15, 20]})
         ctx.register_table("products", df)
 
@@ -365,7 +271,6 @@ class TestContextHelpers:
         assert list(result.native["price"]) == [15, 20]
 
     def test_context_to_set_from_series(self, ctx):
-        """Context to_set extracts unique values from a Series."""
         series = pd.Series([1, 2, 2, 3, 3, 3])
 
         result = ctx.to_set(series)
@@ -374,7 +279,6 @@ class TestContextHelpers:
         assert result == {1, 2, 3}
 
     def test_context_to_set_from_dataframe(self, ctx):
-        """Context to_set extracts unique values from first column of DataFrame."""
         df = pd.DataFrame({"ids": [10, 20, 10, 30]})
 
         result = ctx.to_set(df)
@@ -382,49 +286,30 @@ class TestContextHelpers:
         assert result == {10, 20, 30}
 
 
-# =========================================================================
-# Date operations (descriptors)
-# =========================================================================
-
-
 class TestDateOperationDescriptors:
-    """Verify date operation descriptors from the adapter."""
-
     def test_date_sub_descriptor(self, adapter):
-        """date_sub returns a correct operation descriptor."""
         result = adapter.date_sub("ship_date", 30)
 
         assert result == {"op": "date_sub", "column": "ship_date", "days": 30}
 
     def test_date_add_descriptor(self, adapter):
-        """date_add returns a correct operation descriptor."""
         result = adapter.date_add("order_date", 7)
 
         assert result == {"op": "date_add", "column": "order_date", "days": 7}
 
     def test_cast_date_descriptor(self, adapter):
-        """cast_date returns a correct operation descriptor."""
         result = adapter.cast_date("date_string")
 
         assert result == {"op": "cast_date", "column": "date_string"}
 
     def test_cast_string_descriptor(self, adapter):
-        """cast_string returns a correct operation descriptor."""
         result = adapter.cast_string("numeric_col")
 
         assert result == {"op": "cast_string", "column": "numeric_col"}
 
 
-# =========================================================================
-# Window function descriptors
-# =========================================================================
-
-
 class TestWindowFunctionDescriptors:
-    """Verify window function descriptors from the adapter."""
-
     def test_window_rank_descriptor(self, adapter):
-        """window_rank returns correct descriptor with order_by and partition_by."""
         result = adapter.window_rank(order_by=[("price", False)], partition_by=["category"])
 
         assert result["op"] == "window_rank"
@@ -432,7 +317,6 @@ class TestWindowFunctionDescriptors:
         assert result["partition_by"] == ["category"]
 
     def test_window_row_number_descriptor(self, adapter):
-        """window_row_number returns correct descriptor."""
         result = adapter.window_row_number(order_by=[("date", True)])
 
         assert result["op"] == "window_row_number"
@@ -440,7 +324,6 @@ class TestWindowFunctionDescriptors:
         assert result["partition_by"] == []
 
     def test_window_sum_descriptor(self, adapter):
-        """window_sum returns correct descriptor with column and partitioning."""
         result = adapter.window_sum("amount", partition_by=["region"], order_by=[("date", True)])
 
         assert result["op"] == "window_sum"

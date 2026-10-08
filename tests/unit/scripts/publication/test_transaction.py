@@ -1,5 +1,3 @@
-"""Unit tests for canonical publication transaction module (scripts/publication/transaction.py)."""
-
 from __future__ import annotations
 
 import dataclasses
@@ -107,14 +105,12 @@ def test_promotion_lifecycle_happy_path(base_context: dict[str, dict[str, str]])
         artifact=base_context["artifact"],
     )
 
-    # 1. Start write
     intent_oid = "1" * 40
     tx, effect = tx_mod.transition(tx, tx_mod.EVENT_START_WRITE, {"intent_commit_oid": intent_oid})
     assert tx.state == tx_mod.STATE_WRITE_STARTED
     assert effect.action == "create_deployment"
     assert effect.data["pages_build_version"] == intent_oid
 
-    # 2. Acknowledge write
     tx, effect = tx_mod.transition(
         tx,
         tx_mod.EVENT_ACKNOWLEDGE_WRITE,
@@ -124,7 +120,6 @@ def test_promotion_lifecycle_happy_path(base_context: dict[str, dict[str, str]])
     assert effect.action == "probe_endpoints"
     assert tx.write["id"] == "dep-456"
 
-    # 3. Verify success
     obs_digest = "obs" * 20
     tx, effect = tx_mod.transition(
         tx,
@@ -136,7 +131,6 @@ def test_promotion_lifecycle_happy_path(base_context: dict[str, dict[str, str]])
     assert tx.verification["observation_digest"] == obs_digest
     assert tx.attestation["signature"] == "test-signature"
 
-    # 4. Commit durable
     tx, effect = tx_mod.transition(tx, tx_mod.EVENT_COMMIT_DURABLE)
     assert tx.state == tx_mod.STATE_DURABLE
     assert effect.action == "advance_durable_head"
@@ -190,7 +184,6 @@ def test_prepare_rollback_requires_activation_barrier(base_context: dict[str, di
     failed_tx, _ = tx_mod.transition(failed_tx, tx_mod.EVENT_START_WRITE, {"intent_commit_oid": "2" * 40})
     failed_tx, _ = tx_mod.transition(failed_tx, tx_mod.EVENT_FAIL_WRITE, {"reason": "timeout"})
 
-    # Rollback without barrier evidence must fail
     with pytest.raises(tx_mod.TransactionError, match="activation barrier evidence is required"):
         tx_mod.prepare_rollback(
             failed_transaction=failed_tx,
@@ -335,7 +328,6 @@ def test_rollback_lifecycle_happy_path(base_context: dict[str, dict[str, str]]) 
     failed_tx, _ = tx_mod.transition(failed_tx, tx_mod.EVENT_START_WRITE, {"intent_commit_oid": "3" * 40})
     failed_tx, _ = tx_mod.transition(failed_tx, tx_mod.EVENT_FAIL_WRITE, {"reason": "timeout"})
 
-    # Prepare rollback
     rb_tx, effect = tx_mod.prepare_rollback(
         failed_transaction=failed_tx,
         parent_durable_transaction=parent_tx,
@@ -361,12 +353,10 @@ def test_rollback_lifecycle_happy_path(base_context: dict[str, dict[str, str]]) 
     assert effect.action == "create_deployment"
     assert effect.data["artifact_id"] == 888
 
-    # Acknowledge rollback write
     rb_tx, effect = tx_mod.transition(rb_tx, tx_mod.EVENT_ACKNOWLEDGE_WRITE, {"id": "rb-dep-1", "status": "SUCCESS"})
     assert rb_tx.state == tx_mod.STATE_WRITE_ACKNOWLEDGED
     assert effect.action == "probe_endpoints"
 
-    # Verify rollback probes
     rb_tx, effect = tx_mod.transition(
         rb_tx,
         tx_mod.EVENT_VERIFY_ROLLBACK,
@@ -375,7 +365,6 @@ def test_rollback_lifecycle_happy_path(base_context: dict[str, dict[str, str]]) 
     assert rb_tx.state == tx_mod.STATE_ROLLBACK_VERIFIED
     assert effect.action == "commit_rollback"
 
-    # Commit rollback durable
     rb_tx, effect = tx_mod.transition(rb_tx, tx_mod.EVENT_COMMIT_ROLLBACK)
     assert rb_tx.state == tx_mod.STATE_ROLLBACK_DURABLE
     assert effect.action == "advance_durable_head"
@@ -534,8 +523,6 @@ def test_recovery_required_still_allows_mark_terminal(base_context: dict[str, di
 def test_recovery_reconciliation_is_restricted_to_promotions(
     base_context: dict[str, dict[str, str]], kind: str
 ) -> None:
-    """A non-promotion in recovery-required must not be reconciled forward: neither
-    kind admits externally-verified, so the journal would reject the written state."""
     tx = dataclasses.replace(_recovery_required_promotion(base_context), kind=kind)
     obs_digest = "obs" * 20
 

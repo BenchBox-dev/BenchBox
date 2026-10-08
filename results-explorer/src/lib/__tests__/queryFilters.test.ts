@@ -136,8 +136,6 @@ describe("buildWhereClause - tuning_mode not-recorded/untuned sentinels", () => 
 
 describe("buildWhereClause - physical_rendering_id unknown sentinel", () => {
   it("matches literal and NULL physical_rendering_id rows for the unknown bucket", () => {
-    // The `unknown` option is produced for NULL rows, but a real bundle may
-    // also record the literal string. Keep both rows selectable.
     const filters: QueryFilterState = { ...EMPTY_FILTERS, physicalRenderingIds: ["unknown"] };
 
     const { sql, params } = buildSelectQuery(filters, ["result_id"], DEFAULT_SORT, 10);
@@ -267,12 +265,9 @@ describe("buildFacetCountQuery - date_window derived", () => {
       exclude: "dateWindow",
       derived: "date_window",
     });
-    // Must not contain bare `AND` without a preceding WHERE
     expect(sql).not.toMatch(/FROM bench\.results\s+AND/);
-    // Must contain WHERE for each UNION branch
     const whereCount = (sql.match(/WHERE run_date >= \?/g) ?? []).length;
     expect(whereCount).toBe(3);
-    // params: 3 cutoff values (no base params when no filters active)
     expect(params).toHaveLength(3);
   });
 
@@ -282,11 +277,9 @@ describe("buildFacetCountQuery - date_window derived", () => {
       exclude: "dateWindow",
       derived: "date_window",
     });
-    // Each UNION branch should have WHERE benchmark IN (?) AND run_date >= ?
     expect(sql).not.toMatch(/FROM bench\.results\s+AND/);
     const whereCount = (sql.match(/WHERE benchmark IN/g) ?? []).length;
     expect(whereCount).toBe(3);
-    // 3 × (1 benchmark param + 1 cutoff param)
     expect(params).toHaveLength(6);
   });
 });

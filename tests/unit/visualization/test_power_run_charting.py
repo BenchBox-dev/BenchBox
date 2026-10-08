@@ -1,5 +1,3 @@
-"""Power-run charting regression tests."""
-
 from __future__ import annotations
 
 import importlib
@@ -24,14 +22,12 @@ visualize_module = importlib.import_module("benchbox.cli.commands.visualize")
 
 @pytest.fixture(autouse=True)
 def _ensure_quiet_off():
-    """Ensure quiet mode is off so console.print() output reaches CliRunner."""
     set_quiet(False)
     yield
     set_quiet(False)
 
 
 def test_power_bar_falls_back_to_query_latency_bars_without_power_metric():
-    """power_bar renders power-run query latency bars when no Power@Size metric exists."""
     results = [
         make_normalized_result(
             platform="DuckDB",
@@ -55,7 +51,6 @@ def test_power_bar_falls_back_to_query_latency_bars_without_power_metric():
 
 
 def test_power_bar_ignores_non_power_runs_without_power_metric():
-    """power_bar remains inapplicable for ordinary query runs without Power@Size."""
     results = [
         make_normalized_result(
             platform="DuckDB",
@@ -70,7 +65,6 @@ def test_power_bar_ignores_non_power_runs_without_power_metric():
 
 
 def test_power_bar_latency_fallback_filters_mixed_non_power_runs():
-    """power_bar fallback labels only power-run query timings in mixed invocations."""
     results = [
         make_normalized_result(
             platform="PowerDB",
@@ -96,7 +90,6 @@ def test_power_bar_latency_fallback_filters_mixed_non_power_runs():
 
 
 def test_query_histogram_uses_horizontal_bars_for_long_query_names():
-    """Primitives-style long query names stay readable in query_histogram."""
     results = [
         make_normalized_result(
             platform="DuckDB",
@@ -119,7 +112,6 @@ def test_query_histogram_uses_horizontal_bars_for_long_query_names():
 
 
 def test_power_bar_suggested_for_power_run_without_power_metric():
-    """Power-run context is enough to suggest the query-latency fallback."""
     result = NormalizedResult(
         benchmark="joinorder",
         platform="duckdb",
@@ -139,7 +131,6 @@ def test_power_bar_suggested_for_power_run_without_power_metric():
 
 
 def test_visualize_cli_power_bar_renders_query_latency_without_tpc_metric(tmp_path):
-    """Non-TPC power runs should still render a useful power_bar chart."""
     result_file = tmp_path / "joinorder_result.json"
     result_file.write_text(
         """{

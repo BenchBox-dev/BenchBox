@@ -1,5 +1,3 @@
-"""Side-effect-free platform readiness diagnostics for the CLI."""
-
 from __future__ import annotations
 
 import socket
@@ -11,8 +9,6 @@ DEFAULT_LAKESAIL_ENDPOINT = "sc://localhost:50051"
 
 @dataclass(frozen=True)
 class LocalTcpEndpoint:
-    """Local service endpoint that must already be provisioned."""
-
     platform: str
     display_name: str
     host: str
@@ -21,18 +17,11 @@ class LocalTcpEndpoint:
 
     @property
     def address(self) -> str:
-        """Return host:port for display."""
         return f"{self.host}:{self.port}"
 
 
 @dataclass(frozen=True)
 class PlatformReadinessResult:
-    """A single platform readiness check result.
-
-    Status is intentionally string-valued so CLI and tests can assert the public
-    contract without importing an enum.
-    """
-
     platform: str
     check: str
     status: str
@@ -43,7 +32,6 @@ class PlatformReadinessResult:
 
     @property
     def ready(self) -> bool:
-        """Whether this readiness check passed."""
         return self.status == "ready"
 
 
@@ -167,7 +155,6 @@ _LOCAL_TCP_ENDPOINTS: dict[str, LocalTcpEndpoint] = {
 
 
 def normalize_readiness_platform(platform: str) -> str:
-    """Normalize CLI platform aliases used only by readiness checks."""
     normalized = platform.lower()
     return _DATAFRAME_ALIASES.get(normalized, normalized)
 
@@ -177,12 +164,6 @@ def check_platform_readiness(
     *,
     timeout_seconds: float = 1.0,
 ) -> tuple[PlatformReadinessResult, ...]:
-    """Return side-effect-free readiness checks for a platform.
-
-    These diagnostics intentionally avoid adapter construction. They may inspect
-    import specs, environment variables, saved endpoint config, and local TCP
-    reachability only.
-    """
     canonical_platform = normalize_readiness_platform(platform)
 
     if canonical_platform in _LOCAL_TCP_ENDPOINTS:
@@ -193,7 +174,6 @@ def check_platform_readiness(
 
 
 def has_readiness_failures(results: tuple[PlatformReadinessResult, ...]) -> bool:
-    """Return True when any readiness result reports an environment gap."""
     return any(not result.ready for result in results)
 
 
@@ -257,10 +237,6 @@ def _check_lakesail(platform: str, timeout_seconds: float) -> tuple[PlatformRead
         return tuple(results)
 
     pysail_available = _module_available("pysail")
-    # The SQL adapter (`lakesail`) can auto-start a local pysail server at run
-    # time via LakeSailAdapter._ensure_server_ready, so an unreachable local
-    # endpoint is not a real readiness failure when pysail is importable. Remote
-    # or distributed endpoints still need an already-running server.
     is_sql_adapter = platform == "lakesail"
     if pysail_available and is_sql_adapter and config.sail_mode == "local":
         results.append(

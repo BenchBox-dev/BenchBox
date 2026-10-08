@@ -1,5 +1,3 @@
-"""Regression tests for benchmark-specific DataFrame registry wrapper helpers."""
-
 from __future__ import annotations
 
 import importlib
@@ -50,7 +48,7 @@ def test_registry_wrapper_helpers_follow_rebound_singleton(
     get_name: str,
     list_name: str,
 ) -> None:
-    """Wrapper helpers should always read the current module registry singleton."""
+
     module = importlib.import_module(module_path)
     replacement = QueryRegistry("replacement")
     query = DataFrameQuery(

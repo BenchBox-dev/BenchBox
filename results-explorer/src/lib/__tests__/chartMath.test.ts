@@ -1,11 +1,3 @@
-/**
- * Log latency axis ticks.
- *
- * The axis has to carry enough labels to be read. Whole decades are the
- * coarsest set that usually does; a range that sits inside one decade needs
- * finer rungs, and a very narrow range needs its own endpoints.
- */
-
 import { describe, it, expect } from "vitest";
 import { buildLogLatencyScale, logLatencyTicks, logLatencyFraction } from "@/lib/chartMath";
 import { formatLatencyAxisLabels } from "@/lib/metricFormatters";
@@ -17,12 +9,9 @@ describe("logLatencyTicks", () => {
   });
 
   it("subdivides a range that falls inside one decade rather than labelling it once", () => {
-    // The motivating case: a run whose queries all land between 22 ms and
-    // 55 ms used to render an axis carrying the single label "10 ms".
     const scale = buildLogLatencyScale([22, 55], { lowerPad: 0.2, upperPad: 0.2 })!;
     const ticks = logLatencyTicks(scale);
     expect(ticks.length).toBeGreaterThanOrEqual(3);
-    // Every tick sits inside the plotted domain, and they bracket the data.
     expect(Math.min(...ticks)).toBeLessThanOrEqual(22);
     expect(Math.max(...ticks)).toBeGreaterThanOrEqual(40);
     expect(Math.max(...ticks)).toBeLessThanOrEqual(2 ** scale.logMax);
@@ -42,11 +31,6 @@ describe("logLatencyTicks", () => {
   });
 
   it("densifies a narrow padded range instead of stopping short of the axis end", () => {
-    // Audit finding: queries spanning 10-15 ms, padded to an ~8-18 ms domain,
-    // used to label only "10 ms" and "15 ms" - the fixed mantissa grid
-    // (1, 1.5, 2, 3, 5, 7 x each decade) happens to land on those two values
-    // and nothing closer to the 18 ms axis end, leaving the top third of the
-    // axis unlabeled even though the plotted line extends well past 15 ms.
     const scale = buildLogLatencyScale([10, 15], { lowerPad: 0.3, upperPad: 0.3 })!;
     const ticks = logLatencyTicks(scale);
     expect(ticks.length).toBeGreaterThanOrEqual(4);

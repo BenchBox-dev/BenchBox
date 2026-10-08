@@ -1,5 +1,3 @@
-"""The shared Snowflake CLI stub is owned and restores the exact descriptor."""
-
 from __future__ import annotations
 
 import argparse
@@ -18,10 +16,10 @@ def test_fixture_restores_real_snowflake_cli_options_on_teardown() -> None:
     body = mock_platform_dependency_checks.__wrapped__
     outer = SnowflakeAdapter.__dict__["add_cli_arguments"]
     real = outer.__func__.real
-    # Start with the real descriptor, rather than proving only stub-to-stub restoration.
+
     with patch.object(SnowflakeAdapter, "add_cli_arguments", staticmethod(real)):
         original = SnowflakeAdapter.__dict__["add_cli_arguments"]
-        # The fixture only orders itself after the state baseline; it does not read it.
+
         generator = body(None)
         next(generator)
         try:

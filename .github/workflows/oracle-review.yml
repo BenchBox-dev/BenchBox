@@ -28,8 +28,6 @@ concurrency:
 jobs:
   oracle-review:
     name: oracle-review
-    # Release PRs are gated by validate-base and release-required-result; a
-    # review on one must not start this check.
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.base.ref != 'release'
     runs-on: ubuntu-latest
     timeout-minutes: 5

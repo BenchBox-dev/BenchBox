@@ -1,15 +1,6 @@
-"""Data Vault DataFrame query implementations.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-22 TPC-H queries adapted for the Data Vault 2.0 schema (Hub-Link-Satellite).
-Each query navigates Hub/Link/Satellite join chains with current-record
-filtering (load_end_dts IS NULL) on satellite tables.
-
-Tables: 7 Hubs, 6 Links, 8 Satellites (21 total)
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -22,41 +13,21 @@ from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from benchbox.core.datavault.dataframe_queries.parameters import get_parameters
 from benchbox.core.datavault.dataframe_queries.registry import register_query
 
-# Housekeeping columns present on Hub/Link/Satellite tables but projected by no
-# query: load_dts/record_source on every table, load_end_dts and hashdiff on
-# satellites. Chained joins keep each side's copy (Polars: DuplicateError once a
-# suffixed copy collides; Pandas: MergeError on re-suffixed columns), so every
-# table is stripped right after load / the current-record filter, before any
-# join. See _strip_audit_columns.
 _AUDIT_COLUMNS = ("load_dts", "record_source", "load_end_dts", "hashdiff")
 
 
 def _strip_audit_columns(frame: Any) -> Any:
-    """Drop Data Vault housekeeping columns from an expression-family frame.
-
-    Missing columns are tolerated (hubs/links carry no load_end_dts/hashdiff).
-    """
     drop = [c for c in _AUDIT_COLUMNS if c in frame.columns]
     return frame.drop(*drop) if drop else frame
 
 
 def _strip_audit_columns_pandas(frame: Any) -> Any:
-    """Drop Data Vault housekeeping columns from a pandas frame.
-
-    Missing columns are tolerated (hubs/links carry no load_end_dts/hashdiff).
-    """
     drop = [c for c in _AUDIT_COLUMNS if c in frame.columns]
     return frame.drop(columns=drop) if drop else frame
 
 
-# =============================================================================
-# Q1: Pricing Summary Report
-# Tables: link_lineitem, sat_lineitem
-# =============================================================================
-
-
 def q1_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q1: Pricing Summary Report (Expression)."""
+
     params = get_parameters("Q1")
     col, lit = ctx.col, ctx.lit
     cutoff = date(1998, 12, 1) - timedelta(days=params.get("delta", 90))
@@ -67,9 +38,6 @@ def q1_expression_impl(ctx: DataFrameContext) -> Any:
     df = ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link")
     df = df.filter(col("l_shipdate") <= lit(cutoff))
 
-    # Row-level values are precomputed so the grouped aggregates stay plain
-    # column sums on every backend (arithmetic inside an aggregate is not
-    # portable).
     df = df.with_columns(
         (col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("disc_price"),
         (col("l_extendedprice") * (lit(1) - col("l_discount")) * (lit(1) + col("l_tax"))).alias("charge"),
@@ -88,7 +56,7 @@ def q1_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q1_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q1: Pricing Summary Report (Pandas)."""
+
     params = get_parameters("Q1")
     cutoff = date(1998, 12, 1) - timedelta(days=params.get("delta", 90))
 
@@ -114,16 +82,8 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.reset_index().sort_values(["l_returnflag", "l_linestatus"])
 
 
-# =============================================================================
-# Q2: Minimum Cost Supplier
-# Tables: hub_part, sat_part, link_part_supplier, hub_supplier, sat_supplier,
-#         sat_partsupp, link_supplier_nation, hub_nation, sat_nation,
-#         link_nation_region, hub_region, sat_region
-# =============================================================================
-
-
 def q2_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q2: Minimum Cost Supplier (Expression)."""
+
     params = get_parameters("Q2")
     col, lit = ctx.col, ctx.lit
     size = params.get("size", 15)
@@ -142,7 +102,6 @@ def q2_expression_impl(ctx: DataFrameContext) -> Any:
     lnr = _strip_audit_columns(ctx.get_table("link_nation_region"))
     sr = _strip_audit_columns(ctx.get_table("sat_region").filter(col("load_end_dts").is_null()))
 
-    # Build supplier-in-region chain: supplier → nation → region
     supplier_region = (
         hs.join(ss, left_on="hk_supplier", right_on="hk_supplier")
         .join(lsn, left_on="hk_supplier", right_on="hk_supplier")
@@ -153,7 +112,6 @@ def q2_expression_impl(ctx: DataFrameContext) -> Any:
         .filter(col("r_name") == lit(region))
     )
 
-    # Build part-supplier with costs
     part_supplier = (
         hp.join(sp, left_on="hk_part", right_on="hk_part")
         .filter((col("p_size") == lit(size)) & col("p_type").str.ends_with(type_suffix))
@@ -162,12 +120,10 @@ def q2_expression_impl(ctx: DataFrameContext) -> Any:
         .join(supplier_region, left_on="hk_supplier", right_on="hk_supplier")
     )
 
-    # Find min cost per part
     min_cost = part_supplier.group_by("p_partkey").agg(
         col("ps_supplycost").min().alias("min_cost"),
     )
 
-    # Filter to only minimum-cost suppliers
     return (
         part_supplier.join(min_cost, left_on="p_partkey", right_on="p_partkey")
         .filter(col("ps_supplycost") == col("min_cost"))
@@ -178,7 +134,7 @@ def q2_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q2_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q2: Minimum Cost Supplier (Pandas)."""
+
     params = get_parameters("Q2")
     size = params.get("size", 15)
     type_suffix = params.get("type_suffix", "BRASS")
@@ -201,21 +157,17 @@ def q2_pandas_impl(ctx: DataFrameContext) -> Any:
     sr = ctx.get_table("sat_region")
     sr = _strip_audit_columns_pandas(sr[sr["load_end_dts"].isna()])
 
-    # Supplier in region
     supplier_region = hs.merge(ss, on="hk_supplier").merge(lsn, on="hk_supplier")
     supplier_region = supplier_region.merge(hn, on="hk_nation").merge(sn, on="hk_nation")
     supplier_region = supplier_region.merge(lnr, on="hk_nation").merge(sr, on="hk_region")
     supplier_region = supplier_region[supplier_region["r_name"] == region]
 
-    # Part filtered
     parts = hp.merge(sp, on="hk_part")
     parts = parts[(parts["p_size"] == size) & parts["p_type"].str.endswith(type_suffix)]
 
-    # Part-supplier with costs
     ps = parts.merge(lps, on="hk_part").merge(sps, on="hk_part_supplier")
     ps = ps.merge(supplier_region, on="hk_supplier")
 
-    # Min cost per part
     min_cost = ps.groupby("p_partkey")["ps_supplycost"].min().reset_index()
     min_cost.columns = ["p_partkey", "min_cost"]
     result = ps.merge(min_cost, on="p_partkey")
@@ -229,15 +181,8 @@ def q2_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
-# Q3: Shipping Priority
-# Tables: hub_customer, sat_customer, link_order_customer, hub_order,
-#         sat_order, link_lineitem, sat_lineitem
-# =============================================================================
-
-
 def q3_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q3: Shipping Priority (Expression)."""
+
     params = get_parameters("Q3")
     col, lit = ctx.col, ctx.lit
     segment = params.get("segment", "BUILDING")
@@ -263,19 +208,16 @@ def q3_expression_impl(ctx: DataFrameContext) -> Any:
         .filter(col("l_shipdate") > lit(order_date))
     )
 
-    # Precomputed so the grouped aggregate stays a plain column sum on every
-    # backend (arithmetic inside an aggregate is not portable).
     df = df.with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
     result = df.group_by("o_orderkey", "o_orderdate", "o_shippriority").agg(
         col("revenue").sum().alias("revenue"),
     )
-    # Column order matches the SQL surface (key, revenue, date, priority).
     result = result.select("o_orderkey", "revenue", "o_orderdate", "o_shippriority")
     return result.sort([("revenue", "desc"), ("o_orderdate", "asc")]).limit(10)
 
 
 def q3_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q3: Shipping Priority (Pandas)."""
+
     params = get_parameters("Q3")
     segment = params.get("segment", "BUILDING")
     order_date = params.get("order_date", date(1995, 3, 15))
@@ -300,19 +242,12 @@ def q3_pandas_impl(ctx: DataFrameContext) -> Any:
 
     df["revenue"] = df["l_extendedprice"] * (1 - df["l_discount"])
     result = df.groupby(["o_orderkey", "o_orderdate", "o_shippriority"]).agg(revenue=("revenue", "sum")).reset_index()
-    # Column order matches the SQL surface (key, revenue, date, priority).
     result = result[["o_orderkey", "revenue", "o_orderdate", "o_shippriority"]]
     return result.sort_values(["revenue", "o_orderdate"], ascending=[False, True]).head(10)
 
 
-# =============================================================================
-# Q4: Order Priority Checking
-# Tables: hub_order, sat_order, link_lineitem, sat_lineitem
-# =============================================================================
-
-
 def q4_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q4: Order Priority Checking (Expression)."""
+
     params = get_parameters("Q4")
     col, lit = ctx.col, ctx.lit
     start_date = params.get("start_date", date(1993, 7, 1))
@@ -323,7 +258,6 @@ def q4_expression_impl(ctx: DataFrameContext) -> Any:
     ll = _strip_audit_columns(ctx.get_table("link_lineitem"))
     sl = _strip_audit_columns(ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()))
 
-    # Find orders with late lineitems (EXISTS equivalent)
     late_orders = (
         ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link")
         .filter(col("l_commitdate") < col("l_receiptdate"))
@@ -344,7 +278,7 @@ def q4_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q4_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q4: Order Priority Checking (Pandas)."""
+
     params = get_parameters("Q4")
     start_date = params.get("start_date", date(1993, 7, 1))
     end_date = params.get("end_date", date(1993, 10, 1))
@@ -368,16 +302,8 @@ def q4_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values("o_orderpriority")
 
 
-# =============================================================================
-# Q5: Local Supplier Volume
-# Tables: hub_region, sat_region, link_nation_region, hub_nation, sat_nation,
-#         link_customer_nation, hub_customer, link_order_customer, hub_order,
-#         sat_order, link_lineitem, sat_lineitem, link_supplier_nation, hub_supplier
-# =============================================================================
-
-
 def q5_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q5: Local Supplier Volume (Expression)."""
+
     params = get_parameters("Q5")
     col, lit = ctx.col, ctx.lit
     region = params.get("region", "ASIA")
@@ -394,14 +320,12 @@ def q5_expression_impl(ctx: DataFrameContext) -> Any:
     sl = _strip_audit_columns(ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()))
     lsn = _strip_audit_columns(ctx.get_table("link_supplier_nation"))
 
-    # Nations in region
     nations = (
         sr.filter(col("r_name") == lit(region))
         .join(lnr, left_on="hk_region", right_on="hk_region")
         .join(sn, left_on="hk_nation", right_on="hk_nation")
     )
 
-    # Customers in those nations
     cust_orders = (
         nations.join(lcn, left_on="hk_nation", right_on="hk_nation")
         .join(loc, left_on="hk_customer", right_on="hk_customer")
@@ -411,14 +335,10 @@ def q5_expression_impl(ctx: DataFrameContext) -> Any:
         .join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link")
     )
 
-    # Supplier must be in same nation (join supplier_nation on same hk_nation).
-    # Use explicit suffix to avoid platform-dependent auto-naming of duplicate columns.
     df = cust_orders.join(lsn, left_on="hk_nation", right_on="hk_nation", suffix="_lsn").filter(
         col("hk_supplier") == col("hk_supplier_lsn")
     )
 
-    # Precomputed so the grouped aggregate stays a plain column sum on every
-    # backend (arithmetic inside an aggregate is not portable).
     df = df.with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
     result = df.group_by("n_name").agg(
         col("revenue").sum().alias("revenue"),
@@ -427,7 +347,7 @@ def q5_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q5_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q5: Local Supplier Volume (Pandas)."""
+
     params = get_parameters("Q5")
     region = params.get("region", "ASIA")
     start_date = params.get("start_date", date(1994, 1, 1))
@@ -453,7 +373,6 @@ def q5_pandas_impl(ctx: DataFrameContext) -> Any:
     df = df[(df["o_orderdate"] >= start_date) & (df["o_orderdate"] < end_date)]
     df = df.merge(ll, on="hk_order").merge(sl, on="hk_lineitem_link")
 
-    # Supplier must be in same nation
     df = df.merge(lsn, on="hk_nation", suffixes=("", "_supp"))
     df = df[df["hk_supplier"] == df["hk_supplier_supp"]]
 
@@ -462,14 +381,8 @@ def q5_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values("revenue", ascending=False)
 
 
-# =============================================================================
-# Q6: Forecasting Revenue Change
-# Tables: link_lineitem, sat_lineitem
-# =============================================================================
-
-
 def q6_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q6: Forecasting Revenue Change (Expression)."""
+
     params = get_parameters("Q6")
     col, lit = ctx.col, ctx.lit
     start_date = params.get("start_date", date(1994, 1, 1))
@@ -488,11 +401,6 @@ def q6_expression_impl(ctx: DataFrameContext) -> Any:
         & (col("l_discount") <= lit(discount_high))
         & (col("l_quantity") < lit(quantity))
     )
-    # Precompute row-level values so the global aggregate stays a plain column
-    # sum on every backend (arithmetic inside an aggregate is not portable).
-    # SQL SUM() over an empty set is NULL (not 0.0): stay lazy and single-pass,
-    # selecting NULL when the row count is zero so every backend yields one
-    # NULL row like the reference query.
     return (
         df.with_columns((col("l_extendedprice") * col("l_discount")).alias("charge"))
         .agg(
@@ -504,7 +412,7 @@ def q6_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q6_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q6: Forecasting Revenue Change (Pandas)."""
+
     params = get_parameters("Q6")
     start_date = params.get("start_date", date(1994, 1, 1))
     end_date = params.get("end_date", date(1995, 1, 1))
@@ -526,24 +434,13 @@ def q6_pandas_impl(ctx: DataFrameContext) -> Any:
     ]
     import pandas as pd
 
-    # SQL SUM() over an empty set is NULL (not 0.0): preserve the NULL row.
-    # len() works on every pandas-family frame (plain pandas, Dask, Modin);
-    # .empty is not implemented by Dask.
     if len(df) == 0:
         return pd.DataFrame({"revenue": [None]})
     return pd.DataFrame({"revenue": [(df["l_extendedprice"] * df["l_discount"]).sum()]})
 
 
-# =============================================================================
-# Q7: Volume Shipping
-# Tables: link_lineitem, sat_lineitem, hub_supplier, link_supplier_nation,
-#         hub_nation(x2), sat_nation(x2), hub_order, link_order_customer,
-#         hub_customer, link_customer_nation
-# =============================================================================
-
-
 def q7_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q7: Volume Shipping (Expression)."""
+
     params = get_parameters("Q7")
     col, lit = ctx.col, ctx.lit
     nation1 = params.get("nation1", "FRANCE")
@@ -556,17 +453,14 @@ def q7_expression_impl(ctx: DataFrameContext) -> Any:
     loc = _strip_audit_columns(ctx.get_table("link_order_customer"))
     lcn = _strip_audit_columns(ctx.get_table("link_customer_nation"))
 
-    # Lineitem base
     lineitem = ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link").filter(
         (col("l_shipdate") >= lit(date(1995, 1, 1))) & (col("l_shipdate") <= lit(date(1996, 12, 31)))
     )
 
-    # Supplier nation via link_supplier_nation
     supp_nation = lsn.join(sn, left_on="hk_nation", right_on="hk_nation").rename(
         {"n_name": "supp_nation", "hk_nation": "hk_supp_nation"}
     )
 
-    # Customer nation via order → customer → customer_nation
     cust_nation_base = loc.join(lcn, left_on="hk_customer", right_on="hk_customer")
     cust_nation = cust_nation_base.join(sn, left_on="hk_nation", right_on="hk_nation").rename(
         {"n_name": "cust_nation", "hk_nation": "hk_cust_nation"}
@@ -581,8 +475,6 @@ def q7_expression_impl(ctx: DataFrameContext) -> Any:
         )
     )
 
-    # The revenue is precomputed so the grouped aggregate stays a plain column
-    # sum on every backend (arithmetic inside an aggregate is not portable).
     result = (
         df.with_columns(col("l_shipdate").dt.year().alias("l_year"))
         .with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
@@ -595,7 +487,7 @@ def q7_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q7_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q7: Volume Shipping (Pandas)."""
+
     params = get_parameters("Q7")
     nation1 = params.get("nation1", "FRANCE")
     nation2 = params.get("nation2", "GERMANY")
@@ -612,9 +504,7 @@ def q7_pandas_impl(ctx: DataFrameContext) -> Any:
     lineitem = ll.merge(sl, on="hk_lineitem_link")
     lineitem = lineitem[(lineitem["l_shipdate"] >= date(1995, 1, 1)) & (lineitem["l_shipdate"] <= date(1996, 12, 31))]
 
-    # Supplier nation
     supp_n = lsn.merge(sn, on="hk_nation").rename(columns={"n_name": "supp_nation"})
-    # Customer nation
     cust_n = loc.merge(lcn, on="hk_customer").merge(sn, on="hk_nation").rename(columns={"n_name": "cust_nation"})
 
     df = lineitem.merge(supp_n[["hk_supplier", "supp_nation"]], on="hk_supplier")
@@ -631,13 +521,8 @@ def q7_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values(["supp_nation", "cust_nation", "l_year"])
 
 
-# =============================================================================
-# Q8: National Market Share
-# =============================================================================
-
-
 def q8_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q8: National Market Share (Expression)."""
+
     params = get_parameters("Q8")
     col, lit = ctx.col, ctx.lit
     target_nation = params.get("nation", "BRAZIL")
@@ -655,17 +540,14 @@ def q8_expression_impl(ctx: DataFrameContext) -> Any:
     lnr = _strip_audit_columns(ctx.get_table("link_nation_region"))
     sr = _strip_audit_columns(ctx.get_table("sat_region").filter(col("load_end_dts").is_null()))
 
-    # Lineitem with part filter
     lineitem = (
         ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link")
         .join(sp, left_on="hk_part", right_on="hk_part")
         .filter(col("p_type") == lit(part_type))
     )
 
-    # Supplier nation
     supp_nation = lsn.join(sn, left_on="hk_nation", right_on="hk_nation").rename({"n_name": "supp_nation"})
 
-    # Customer in region filter via order → customer → nation → region
     cust_region = (
         loc.join(lcn, left_on="hk_customer", right_on="hk_customer")
         .join(lnr, left_on="hk_nation", right_on="hk_nation")
@@ -680,9 +562,6 @@ def q8_expression_impl(ctx: DataFrameContext) -> Any:
         .join(supp_nation, left_on="hk_supplier", right_on="hk_supplier")
     )
 
-    # Both row-level values are precomputed so the grouped aggregates stay
-    # plain column sums on every backend (a CASE expression inside an
-    # aggregate is not portable either).
     df = df.with_columns(col("o_orderdate").dt.year().alias("o_year")).with_columns(
         (col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("volume")
     )
@@ -699,7 +578,7 @@ def q8_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q8_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q8: National Market Share (Pandas)."""
+
     params = get_parameters("Q8")
     target_nation = params.get("nation", "BRAZIL")
     target_region = params.get("region", "AMERICA")
@@ -744,13 +623,8 @@ def q8_pandas_impl(ctx: DataFrameContext) -> Any:
     return result[["o_year", "mkt_share"]].sort_values("o_year")
 
 
-# =============================================================================
-# Q9: Product Type Profit Measure
-# =============================================================================
-
-
 def q9_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q9: Product Type Profit Measure (Expression)."""
+
     params = get_parameters("Q9")
     col, lit = ctx.col, ctx.lit
     color = params.get("color", "green")
@@ -786,7 +660,7 @@ def q9_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q9_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q9: Product Type Profit Measure (Pandas)."""
+
     params = get_parameters("Q9")
     color = params.get("color", "green")
 
@@ -816,13 +690,8 @@ def q9_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values(["n_name", "o_year"], ascending=[True, False])
 
 
-# =============================================================================
-# Q10: Returned Item Reporting
-# =============================================================================
-
-
 def q10_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q10: Returned Item Reporting (Expression)."""
+
     params = get_parameters("Q10")
     col, lit = ctx.col, ctx.lit
     start_date = params.get("start_date", date(1993, 10, 1))
@@ -849,19 +718,16 @@ def q10_expression_impl(ctx: DataFrameContext) -> Any:
         .join(sn, left_on="hk_nation", right_on="hk_nation")
     )
 
-    # Precomputed so the grouped aggregate stays a plain column sum on every
-    # backend (arithmetic inside an aggregate is not portable).
     df = df.with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
     result = df.group_by("c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment").agg(
         col("revenue").sum().alias("revenue"),
     )
-    # Column order matches the SQL surface (revenue third).
     result = result.select("c_custkey", "c_name", "revenue", "c_acctbal", "n_name", "c_address", "c_phone", "c_comment")
     return result.sort([("revenue", "desc")]).limit(20)
 
 
 def q10_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q10: Returned Item Reporting (Pandas)."""
+
     params = get_parameters("Q10")
     start_date = params.get("start_date", date(1993, 10, 1))
     end_date = params.get("end_date", date(1994, 1, 1))
@@ -889,18 +755,12 @@ def q10_pandas_impl(ctx: DataFrameContext) -> Any:
     df["revenue"] = df["l_extendedprice"] * (1 - df["l_discount"])
     grp = ["c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment"]
     result = df.groupby(grp).agg(revenue=("revenue", "sum")).reset_index()
-    # Column order matches the SQL surface (revenue third).
     result = result[["c_custkey", "c_name", "revenue", "c_acctbal", "n_name", "c_address", "c_phone", "c_comment"]]
     return result.sort_values("revenue", ascending=False).head(20)
 
 
-# =============================================================================
-# Q11: Important Stock Identification
-# =============================================================================
-
-
 def q11_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q11: Important Stock Identification (Expression)."""
+
     params = get_parameters("Q11")
     col, lit = ctx.col, ctx.lit
     nation = params.get("nation", "GERMANY")
@@ -912,7 +772,6 @@ def q11_expression_impl(ctx: DataFrameContext) -> Any:
     sn = _strip_audit_columns(ctx.get_table("sat_nation").filter(col("load_end_dts").is_null()))
     hp = _strip_audit_columns(ctx.get_table("hub_part"))
 
-    # Partsupp for suppliers in nation
     df = (
         lps.join(sps, left_on="hk_part_supplier", right_on="hk_part_supplier")
         .join(lsn, left_on="hk_supplier", right_on="hk_supplier")
@@ -921,15 +780,11 @@ def q11_expression_impl(ctx: DataFrameContext) -> Any:
         .join(hp, left_on="hk_part", right_on="hk_part")
     )
 
-    # Precompute the row-level value so both aggregates stay plain column sums
-    # on every backend (arithmetic inside an aggregate is not portable).
     df = df.with_columns((col("ps_supplycost") * col("ps_availqty")).alias("stock_value"))
 
-    # Threshold: total value * fraction
     total = df.agg(col("stock_value").sum().alias("total_value"))
     threshold = ctx.scalar(total, "total_value") * fraction
 
-    # Group by part and filter (SQL projects the p_partkey business key, not hk_part)
     by_part = df.group_by("p_partkey").agg(
         col("stock_value").sum().alias("value"),
     )
@@ -938,7 +793,7 @@ def q11_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q11_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q11: Important Stock Identification (Pandas)."""
+
     params = get_parameters("Q11")
     nation = params.get("nation", "GERMANY")
     fraction = params.get("fraction", 0.0001)
@@ -958,19 +813,13 @@ def q11_pandas_impl(ctx: DataFrameContext) -> Any:
     df["value"] = df["ps_supplycost"] * df["ps_availqty"]
     threshold = df["value"].sum() * fraction
 
-    # SQL projects the p_partkey business key, not hk_part
     by_part = df.groupby("p_partkey").agg(value=("value", "sum")).reset_index()
     result = by_part[by_part["value"] > threshold]
     return result.sort_values("value", ascending=False)
 
 
-# =============================================================================
-# Q12: Shipping Modes and Order Priority
-# =============================================================================
-
-
 def q12_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q12: Shipping Modes and Order Priority (Expression)."""
+
     params = get_parameters("Q12")
     col, lit = ctx.col, ctx.lit
     shipmode1 = params.get("shipmode1", "MAIL")
@@ -1010,7 +859,7 @@ def q12_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q12_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q12: Shipping Modes and Order Priority (Pandas)."""
+
     params = get_parameters("Q12")
     shipmode1 = params.get("shipmode1", "MAIL")
     shipmode2 = params.get("shipmode2", "SHIP")
@@ -1040,13 +889,8 @@ def q12_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values("l_shipmode")
 
 
-# =============================================================================
-# Q13: Customer Distribution
-# =============================================================================
-
-
 def q13_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q13: Customer Distribution (Expression)."""
+
     params = get_parameters("Q13")
     col = ctx.col
     word1 = params.get("word1", "special")
@@ -1057,11 +901,9 @@ def q13_expression_impl(ctx: DataFrameContext) -> Any:
     loc = _strip_audit_columns(ctx.get_table("link_order_customer"))
     so = _strip_audit_columns(ctx.get_table("sat_order").filter(col("load_end_dts").is_null()))
 
-    # Orders excluding the comment pattern
     valid_orders = so.filter(~col("o_comment").str.contains(pattern))
     order_customer = loc.join(valid_orders, left_on="hk_order", right_on="hk_order")
 
-    # Left join customer with orders, count per customer
     cust_orders = hc.join(order_customer, left_on="hk_customer", right_on="hk_customer", how="left")
     c_counts = cust_orders.group_by("c_custkey").agg(col("hk_order").count().alias("c_count"))
 
@@ -1070,7 +912,7 @@ def q13_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q13_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q13: Customer Distribution (Pandas)."""
+
     params = get_parameters("Q13")
     word1 = params.get("word1", "special")
     word2 = params.get("word2", "requests")
@@ -1091,13 +933,8 @@ def q13_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values(["custdist", "c_count"], ascending=[False, False])
 
 
-# =============================================================================
-# Q14: Promotion Effect
-# =============================================================================
-
-
 def q14_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q14: Promotion Effect (Expression)."""
+
     params = get_parameters("Q14")
     col, lit = ctx.col, ctx.lit
     start_date = params.get("start_date", date(1995, 9, 1))
@@ -1113,16 +950,10 @@ def q14_expression_impl(ctx: DataFrameContext) -> Any:
         .filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") < lit(end_date)))
     )
 
-    # Precompute row-level values so the global aggregate holds plain column
-    # sums and the ratio is ordinary column arithmetic in the select: aggregate
-    # expressions combined with arithmetic are not portable across backends.
     df = df.with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
     df = df.with_columns(
         ctx.when(col("p_type").str.starts_with("PROMO")).then(col("revenue")).otherwise(lit(0)).alias("promo_revenue")
     )
-    # SQL SUM() over an empty set is NULL (not 0.0, not NaN): stay lazy and
-    # single-pass, selecting NULL when the row count is zero so every backend
-    # yields one NULL row like the reference query.
     return df.agg(
         col("promo_revenue").sum().alias("promo_sum"),
         col("revenue").sum().alias("revenue_sum"),
@@ -1136,7 +967,7 @@ def q14_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q14_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q14: Promotion Effect (Pandas)."""
+
     params = get_parameters("Q14")
     start_date = params.get("start_date", date(1995, 9, 1))
     end_date = params.get("end_date", date(1995, 10, 1))
@@ -1155,29 +986,17 @@ def q14_pandas_impl(ctx: DataFrameContext) -> Any:
 
     df["revenue"] = df["l_extendedprice"] * (1 - df["l_discount"])
     df["promo_revenue"] = np.where(df["p_type"].str.startswith("PROMO"), df["revenue"], 0)
-    # SQL SUM() over an empty set is NULL (not 0.0, not NaN): preserve the NULL
-    # row. len() works on every pandas-family frame; .empty is not in Dask.
     if len(df) == 0:
         return pd.DataFrame({"promo_revenue": [None]})
-    # float() first: DECIMAL columns arrive as Decimal objects, and float *
-    # Decimal raises TypeError.
     revenue_sum = float(df["revenue"].sum())
     if revenue_sum == 0:
-        # Rows exist but carry no revenue: the SQL reference and the
-        # expression surface yield NaN for the 0/0 ratio, so do the same
-        # instead of raising ZeroDivisionError.
         return pd.DataFrame({"promo_revenue": [float("nan")]})
     promo_pct = 100.0 * float(df["promo_revenue"].sum()) / revenue_sum
     return pd.DataFrame({"promo_revenue": [promo_pct]})
 
 
-# =============================================================================
-# Q15: Top Supplier
-# =============================================================================
-
-
 def q15_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q15: Top Supplier (Expression)."""
+
     params = get_parameters("Q15")
     col, lit = ctx.col, ctx.lit
     start_date = params.get("start_date", date(1996, 1, 1))
@@ -1188,9 +1007,6 @@ def q15_expression_impl(ctx: DataFrameContext) -> Any:
     hs = _strip_audit_columns(ctx.get_table("hub_supplier"))
     ss = _strip_audit_columns(ctx.get_table("sat_supplier").filter(col("load_end_dts").is_null()))
 
-    # CTE: revenue per supplier. The row-level revenue is precomputed so the
-    # grouped aggregate stays a plain column sum on every backend (arithmetic
-    # inside an aggregate is not portable).
     revenue = (
         ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link")
         .filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") < lit(end_date)))
@@ -1205,25 +1021,20 @@ def q15_expression_impl(ctx: DataFrameContext) -> Any:
         revenue, left_on="hk_supplier", right_on="hk_supplier"
     )
     if max_rev is None:
-        # No revenue rows: SQL's `= (SELECT MAX ...)` matches nothing.
         return (
             suppliers.filter(lit(False))
             .select("s_suppkey", "s_name", "s_address", "s_phone", "total_revenue")
             .sort("s_suppkey")
         )
     return (
-        suppliers
-        # Engine float sums can wobble a last bit across collects, so compare
-        # below the data's granularity (revenues carry 4 decimal places): this
-        # keeps SQL's exact-max semantics without engine rounding rules.
-        .filter((col("total_revenue") - lit(max_rev)).abs() < lit(5e-5))
+        suppliers.filter((col("total_revenue") - lit(max_rev)).abs() < lit(5e-5))
         .select("s_suppkey", "s_name", "s_address", "s_phone", "total_revenue")
         .sort("s_suppkey")
     )
 
 
 def q15_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q15: Top Supplier (Pandas)."""
+
     params = get_parameters("Q15")
     start_date = params.get("start_date", date(1996, 1, 1))
     end_date = params.get("end_date", date(1996, 4, 1))
@@ -1248,13 +1059,8 @@ def q15_pandas_impl(ctx: DataFrameContext) -> Any:
     return result[["s_suppkey", "s_name", "s_address", "s_phone", "total_revenue"]].sort_values("s_suppkey")
 
 
-# =============================================================================
-# Q16: Parts/Supplier Relationship
-# =============================================================================
-
-
 def q16_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q16: Parts/Supplier Relationship (Expression)."""
+
     params = get_parameters("Q16")
     col, lit = ctx.col, ctx.lit
     brand = params.get("brand", "Brand#45")
@@ -1265,7 +1071,6 @@ def q16_expression_impl(ctx: DataFrameContext) -> Any:
     lps = _strip_audit_columns(ctx.get_table("link_part_supplier"))
     ss = _strip_audit_columns(ctx.get_table("sat_supplier").filter(col("load_end_dts").is_null()))
 
-    # Exclude suppliers with complaints
     bad_suppliers = ss.filter(col("s_comment").str.contains("Customer.*Complaints"))
 
     parts = sp.filter(
@@ -1274,7 +1079,6 @@ def q16_expression_impl(ctx: DataFrameContext) -> Any:
 
     df = parts.join(lps, left_on="hk_part", right_on="hk_part")
 
-    # Anti-join: exclude bad suppliers
     df = df.join(bad_suppliers.select("hk_supplier"), left_on="hk_supplier", right_on="hk_supplier", how="anti")
 
     result = df.group_by("p_brand", "p_type", "p_size").agg(
@@ -1284,7 +1088,7 @@ def q16_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q16_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q16: Parts/Supplier Relationship (Pandas)."""
+
     params = get_parameters("Q16")
     brand = params.get("brand", "Brand#45")
     type_prefix = params.get("type_prefix", "MEDIUM POLISHED")
@@ -1306,13 +1110,8 @@ def q16_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values(["supplier_cnt", "p_brand", "p_type", "p_size"], ascending=[False, True, True, True])
 
 
-# =============================================================================
-# Q17: Small-Quantity-Order Revenue
-# =============================================================================
-
-
 def q17_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q17: Small-Quantity-Order Revenue (Expression)."""
+
     params = get_parameters("Q17")
     col, lit = ctx.col, ctx.lit
     brand = params.get("brand", "Brand#23")
@@ -1328,9 +1127,6 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
         .filter((col("p_brand") == lit(brand)) & (col("p_container") == lit(container)))
     )
 
-    # Average quantity per part. The mean stays a plain grouped aggregate and the
-    # scaling is ordinary column arithmetic afterwards: arithmetic inside an
-    # aggregate is not portable across backends.
     avg_qty = (
         df.group_by("hk_part")
         .agg(col("l_quantity").mean().alias("mean_qty"))
@@ -1338,9 +1134,6 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
         .drop("mean_qty")
     )
 
-    # SQL SUM() over an empty set is NULL (not 0.0): stay lazy and single-pass,
-    # selecting NULL when the row count is zero so every backend yields one
-    # NULL row like the reference query.
     filtered = df.join(avg_qty, left_on="hk_part", right_on="hk_part").filter(col("l_quantity") < col("avg_qty"))
     return filtered.agg(
         col("l_extendedprice").sum().alias("total"),
@@ -1349,7 +1142,7 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q17_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q17: Small-Quantity-Order Revenue (Pandas)."""
+
     params = get_parameters("Q17")
     brand = params.get("brand", "Brand#23")
     container = params.get("container", "MED BOX")
@@ -1372,21 +1165,13 @@ def q17_pandas_impl(ctx: DataFrameContext) -> Any:
 
     import pandas as pd
 
-    # SQL SUM() over an empty set is NULL (not 0.0): preserve the NULL row.
-    # len() works on every pandas-family frame (plain pandas, Dask, Modin);
-    # .empty is not implemented by Dask.
     if len(df) == 0:
         return pd.DataFrame({"avg_yearly": [None]})
     return pd.DataFrame({"avg_yearly": [df["l_extendedprice"].sum() / 7.0]})
 
 
-# =============================================================================
-# Q18: Large Volume Customer
-# =============================================================================
-
-
 def q18_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q18: Large Volume Customer (Expression)."""
+
     params = get_parameters("Q18")
     col, lit = ctx.col, ctx.lit
     quantity = params.get("quantity", 300)
@@ -1399,7 +1184,6 @@ def q18_expression_impl(ctx: DataFrameContext) -> Any:
     ll = _strip_audit_columns(ctx.get_table("link_lineitem"))
     sl = _strip_audit_columns(ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()))
 
-    # Orders with total quantity > threshold
     order_qty = (
         ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link")
         .group_by("hk_order")
@@ -1420,7 +1204,7 @@ def q18_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q18_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q18: Large Volume Customer (Pandas)."""
+
     params = get_parameters("Q18")
     quantity = params.get("quantity", 300)
 
@@ -1447,13 +1231,8 @@ def q18_pandas_impl(ctx: DataFrameContext) -> Any:
     return df[cols].sort_values(["o_totalprice", "o_orderdate"], ascending=[False, True]).head(100)
 
 
-# =============================================================================
-# Q19: Discounted Revenue
-# =============================================================================
-
-
 def q19_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q19: Discounted Revenue (Expression)."""
+
     params = get_parameters("Q19")
     col, lit = ctx.col, ctx.lit
 
@@ -1499,11 +1278,6 @@ def q19_expression_impl(ctx: DataFrameContext) -> Any:
         & deliver
     )
 
-    # Precompute the row-level revenue so the global aggregate stays a plain
-    # column sum on every backend (arithmetic inside an aggregate is not
-    # portable). SQL SUM() over an empty set is NULL (not 0.0): stay lazy and
-    # single-pass, selecting NULL when the row count is zero so every backend
-    # yields one NULL row like the reference query.
     return (
         df.filter(cond1 | cond2 | cond3)
         .with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
@@ -1516,7 +1290,7 @@ def q19_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q19_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q19: Discounted Revenue (Pandas)."""
+
     params = get_parameters("Q19")
 
     ll = _strip_audit_columns_pandas(ctx.get_table("link_lineitem"))
@@ -1564,20 +1338,13 @@ def q19_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered = df[c1 | c2 | c3]
     import pandas as pd
 
-    # SQL SUM() over an empty set is NULL (not 0.0): preserve the NULL row.
-    # len() works on every pandas-family frame; .empty is not in Dask.
     if len(filtered) == 0:
         return pd.DataFrame({"revenue": [None]})
     return pd.DataFrame({"revenue": [(filtered["l_extendedprice"] * (1 - filtered["l_discount"])).sum()]})
 
 
-# =============================================================================
-# Q20: Potential Part Promotion
-# =============================================================================
-
-
 def q20_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q20: Potential Part Promotion (Expression)."""
+
     params = get_parameters("Q20")
     col, lit = ctx.col, ctx.lit
     color = params.get("color", "forest")
@@ -1594,13 +1361,8 @@ def q20_expression_impl(ctx: DataFrameContext) -> Any:
     ll = _strip_audit_columns(ctx.get_table("link_lineitem"))
     sl = _strip_audit_columns(ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()))
 
-    # Parts matching color
     color_parts = sp.filter(col("p_name").str.starts_with(color))
 
-    # Lineitem quantity by part+supplier in date range. The aggregate stays a
-    # plain column sum and the halving folds into the downstream comparison
-    # (avail > half ⟺ avail * 2 > total): arithmetic inside an aggregate is not
-    # portable across backends.
     li_qty = (
         ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link")
         .filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") < lit(end_date)))
@@ -1608,7 +1370,6 @@ def q20_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("l_quantity").sum().alias("total_qty"))
     )
 
-    # Partsupp with excess stock
     excess = (
         lps.join(sps, left_on="hk_part_supplier", right_on="hk_part_supplier")
         .join(color_parts, left_on="hk_part", right_on="hk_part")
@@ -1618,7 +1379,6 @@ def q20_expression_impl(ctx: DataFrameContext) -> Any:
         .unique()
     )
 
-    # Suppliers in nation with excess
     suppliers_in_nation = (
         ss.join(lsn, left_on="hk_supplier", right_on="hk_supplier")
         .join(sn, left_on="hk_nation", right_on="hk_nation")
@@ -1630,7 +1390,7 @@ def q20_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q20_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q20: Potential Part Promotion (Pandas)."""
+
     params = get_parameters("Q20")
     color = params.get("color", "forest")
     start_date = params.get("start_date", date(1994, 1, 1))
@@ -1668,13 +1428,8 @@ def q20_pandas_impl(ctx: DataFrameContext) -> Any:
     return result[["s_name", "s_address"]].sort_values("s_name")
 
 
-# =============================================================================
-# Q21: Suppliers Who Kept Orders Waiting
-# =============================================================================
-
-
 def q21_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q21: Suppliers Who Kept Orders Waiting (Expression)."""
+
     params = get_parameters("Q21")
     col, lit = ctx.col, ctx.lit
     nation = params.get("nation", "SAUDI ARABIA")
@@ -1686,34 +1441,28 @@ def q21_expression_impl(ctx: DataFrameContext) -> Any:
     lsn = _strip_audit_columns(ctx.get_table("link_supplier_nation"))
     sn = _strip_audit_columns(ctx.get_table("sat_nation").filter(col("load_end_dts").is_null()))
 
-    # Supplier's late lineitems on failed orders
     li = ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link")
     late_li = li.filter(col("l_receiptdate") > col("l_commitdate"))
 
-    # Failed orders
     failed_orders = so.filter(col("o_orderstatus") == lit("F")).select("hk_order")
 
-    # Suppliers in nation
     supp_nation = (
         ss.join(lsn, left_on="hk_supplier", right_on="hk_supplier")
         .join(sn, left_on="hk_nation", right_on="hk_nation")
         .filter(col("n_name") == lit(nation))
     )
 
-    # L1: supplier's late items on failed orders
     l1 = late_li.join(failed_orders, left_on="hk_order", right_on="hk_order")
 
-    # For each (order, supplier) in l1, check EXISTS other supplier, NOT EXISTS other late supplier
-    # Simplify: count distinct suppliers per order, and count distinct late suppliers per order
     order_suppliers = li.group_by("hk_order").agg(col("hk_supplier").n_unique().alias("n_suppliers"))
     order_late_suppliers = late_li.group_by("hk_order").agg(col("hk_supplier").n_unique().alias("n_late"))
 
     df = (
         l1.join(supp_nation, left_on="hk_supplier", right_on="hk_supplier")
         .join(order_suppliers, left_on="hk_order", right_on="hk_order")
-        .filter(col("n_suppliers") > lit(1))  # EXISTS: other supplier
+        .filter(col("n_suppliers") > lit(1))
         .join(order_late_suppliers, left_on="hk_order", right_on="hk_order")
-        .filter(col("n_late") == lit(1))  # NOT EXISTS: only this supplier was late
+        .filter(col("n_late") == lit(1))
     )
 
     result = df.group_by("s_name").agg(col("hk_order").count().alias("numwait"))
@@ -1721,7 +1470,7 @@ def q21_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q21_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q21: Suppliers Who Kept Orders Waiting (Pandas)."""
+
     params = get_parameters("Q21")
     nation = params.get("nation", "SAUDI ARABIA")
 
@@ -1758,13 +1507,8 @@ def q21_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values(["numwait", "s_name"], ascending=[False, True]).head(100)
 
 
-# =============================================================================
-# Q22: Global Sales Opportunity
-# =============================================================================
-
-
 def q22_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q22: Global Sales Opportunity (Expression)."""
+
     params = get_parameters("Q22")
     col, lit = ctx.col, ctx.lit
     codes = params.get("country_codes", ["13", "31", "23", "29", "30", "18", "17"])
@@ -1777,13 +1521,11 @@ def q22_expression_impl(ctx: DataFrameContext) -> Any:
     customers = customers.with_columns(col("c_phone").str.slice(0, 2).alias("cntrycode"))
     customers = customers.filter(col("cntrycode").is_in(codes))
 
-    # Average balance for positive-balance customers in these codes
     avg_bal = ctx.scalar(
         customers.filter(col("c_acctbal") > lit(0)).agg(col("c_acctbal").mean().alias("avg_bal")),
         "avg_bal",
     )
 
-    # NOT EXISTS: no orders
     has_orders = loc.select("hk_customer").unique()
     no_orders = customers.join(has_orders, left_on="hk_customer", right_on="hk_customer", how="anti")
 
@@ -1799,7 +1541,7 @@ def q22_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q22_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q22: Global Sales Opportunity (Pandas)."""
+
     params = get_parameters("Q22")
     codes = params.get("country_codes", ["13", "31", "23", "29", "30", "18", "17"])
 
@@ -1825,10 +1567,6 @@ def q22_pandas_impl(ctx: DataFrameContext) -> Any:
     )
     return result.sort_values("cntrycode")
 
-
-# =============================================================================
-# Registration
-# =============================================================================
 
 _CATEGORY_CODES = {
     "AG": QueryCategory.AGGREGATE,

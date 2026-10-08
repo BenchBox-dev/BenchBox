@@ -1,5 +1,3 @@
-"""Tests for scripts/tpcds_platform_identity.py."""
-
 from __future__ import annotations
 
 import copy
@@ -132,7 +130,7 @@ def test_compare_command_exit_code_and_report(tmp_path: Path, capsys):
 
 
 def test_manifest_is_deterministic_on_one_platform_and_covers_the_pinned_seed():
-    """Two builds with the same seed must compare equal, or a cross-platform difference would be noise."""
+
     from benchbox.core.tpcds.c_tools import DSQGenBinary, TPCDSError
 
     try:
@@ -149,7 +147,6 @@ def test_manifest_is_deterministic_on_one_platform_and_covers_the_pinned_seed():
     assert first["tables"]["store_sales"]["rows"] > 0
     assert first["queries"]["39"]["values"]["YEAR.01"]
     assert len(first["queries"]["39"]["sql_sha256"]) == 64
-    # SF 0.01 draws one city for every Q46 slot; the SF 100 parameter pass draws distinct cities.
     small = first["queries"]["46"]["values"]
     large = first["parameter_scales"]["100.0"]["46"]["values"]
     assert len({value for key, value in small.items() if key.startswith("CITY_")}) == 1

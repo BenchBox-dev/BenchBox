@@ -1,9 +1,6 @@
-"""System profiling functionality.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import os
 import platform
@@ -21,29 +18,18 @@ from benchbox.utils.environment import detect_cpu_info, is_cpu_architecture_toke
 
 
 class SystemProfiler:
-    """System profiling utilities."""
-
     def get_system_profile(self) -> SystemProfile:
-        """Get system profile."""
-        # Basic system info
         os_name = platform.system()
         os_version = platform.release()
         architecture = platform.machine()
         python_version = platform.python_version()
 
-        # CPU info
         cpu_cores_logical = os.cpu_count() or 1
         if HAS_PSUTIL:
             cpu_cores_physical = psutil.cpu_count(logical=False) or cpu_cores_logical
         else:
             cpu_cores_physical = cpu_cores_logical
 
-        # Two-stage provenance mirroring benchbox/utils/system_info.get_system_info:
-        # detect_cpu_info() is "measured" (real brand string via sysctl, /proc,
-        # or Windows CIM hardware inventory);
-        # the platform.processor() fallback is "inferred" (often the architecture
-        # or a less reliable brand string). Absence stays None so downstream
-        # surfaces never mistake an architecture token for identity.
         cpu_model = self._get_cpu_model()
         if cpu_model:
             cpu_identity_provenance: str | None = "measured"
@@ -58,7 +44,6 @@ class SystemProfiler:
             except Exception:
                 pass
 
-        # Memory info
         if HAS_PSUTIL:
             memory = psutil.virtual_memory()
             memory_total_gb = memory.total / (1024**3)
@@ -67,7 +52,6 @@ class SystemProfiler:
             memory_total_gb = 0.0
             memory_available_gb = 0.0
 
-        # Disk space
         if HAS_PSUTIL:
             disk = psutil.disk_usage("/")
             disk_space_gb = disk.free / (1024**3)
@@ -91,7 +75,6 @@ class SystemProfiler:
         )
 
     def _get_cpu_model(self) -> str | None:
-        """Get a measured CPU model name, or ``None`` when detection fails."""
         try:
             model, _vendor = detect_cpu_info()
         except Exception:
@@ -103,12 +86,6 @@ class SystemProfiler:
 
 
 def recommend_max_scale_factor(available_bytes: int) -> float:
-    """Recommend maximum scale factor based on available memory.
-
-    Heuristic used by the system profiler and the MCP discovery surface.
-    Thresholds are intentionally coarse -- they gate user-facing
-    recommendations, not correctness.
-    """
     available_gb = available_bytes / (1024**3)
 
     if available_gb >= 64:
@@ -124,13 +101,6 @@ def recommend_max_scale_factor(available_bytes: int) -> float:
 
 
 def collect_system_profile_with_recommendations() -> dict[str, object]:
-    """Collect a JSON-serialisable system profile with recommendations.
-
-    Thin assembly over :class:`SystemProfiler` that the MCP discovery tool
-    and other surfaces can share. ``available_bytes`` is sourced from the
-    same ``psutil`` snapshot that populates the memory section, so the
-    recommendation is consistent with the reported ``available_gb``.
-    """
     import platform as _platform
     from importlib.metadata import PackageNotFoundError, version
 
@@ -139,12 +109,11 @@ def collect_system_profile_with_recommendations() -> dict[str, object]:
 
         _has_psutil = True
     except ImportError:
-        _has_psutil = False  # type: ignore[assignment]
+        _has_psutil = False
 
     profiler = SystemProfiler()
     profile = profiler.get_system_profile()
 
-    # Re-derive available_bytes for the recommendation consistently.
     if _has_psutil:
         try:
             _mem = _psutil.virtual_memory()
@@ -154,7 +123,6 @@ def collect_system_profile_with_recommendations() -> dict[str, object]:
     else:
         _available_bytes = int(profile.memory_available_gb * (1024**3))
 
-    # Disk usage (best-effort, mirrors the MCP helper).
     disk_usage: dict[str, object] = {}
     if _has_psutil:
         for _path, _name in [("/", "root"), ("/tmp", "temp")]:
@@ -169,7 +137,6 @@ def collect_system_profile_with_recommendations() -> dict[str, object]:
             except Exception:
                 pass
 
-    # Package versions (best-effort).
     packages: dict[str, str] = {}
     for _pkg in ["polars", "pandas", "duckdb", "pyarrow"]:
         try:

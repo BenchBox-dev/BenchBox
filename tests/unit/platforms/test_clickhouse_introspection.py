@@ -1,14 +1,6 @@
-"""Tests for the ClickHouse post-load introspector.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Uses a fake connection returning ``system.tables`` rows (no live ClickHouse):
-the introspector reports ``sorting_key`` / ``partition_key`` as structured
-facts, bounded to the ledger's tables and non-fatal on failure. TODO
-``tuning-introspection-receipts-20260716``.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -31,14 +23,11 @@ from benchbox.platforms.clickhouse.introspection import ClickHouseTuningIntrospe
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
-    # Constructs local-mode adapters; chDB has no Windows wheels. See the fixture.
     pytest.mark.usefixtures("chdb_probe_satisfied"),
 ]
 
 
 class _FakeCHConnection:
-    """Returns canned ``system.tables`` rows; records the query it received."""
-
     def __init__(self, rows, fail: bool = False):
         self._rows = rows
         self._fail = fail
@@ -52,7 +41,7 @@ class _FakeCHConnection:
 
 
 def _optimize_ledger() -> AppliedTuningLedger:
-    # A realistic ClickHouse tuning ledger: OPTIMIZE (maintenance) + session SETs.
+
     ledger = AppliedTuningLedger()
     ledger.record("OPTIMIZE TABLE lineitem", PHASE_DDL)
     ledger.record("SET max_threads = 4", PHASE_SESSION)
@@ -84,7 +73,7 @@ class TestClickHouseIntrospector:
     def test_bounded_to_ledger_tables(self):
         rows = [
             ("lineitem", "l_orderkey", ""),
-            ("nation", "n_nationkey", ""),  # not in ledger
+            ("nation", "n_nationkey", ""),
         ]
         state = ClickHouseTuningIntrospector().introspect(_FakeCHConnection(rows), _optimize_ledger())
         tables = {obj.table for obj in state.objects}
@@ -105,11 +94,7 @@ class TestClickHouseIntrospector:
         assert state.objects == []
 
     def test_optimize_ledger_reports_keys_but_stays_unverified(self):
-        # A ClickHouse ledger carrying only OPTIMIZE (maintenance) + SET
-        # (transient) statements is non-blocking and has nothing catalog-backed
-        # to earn verification. The observed keys still surface as evidence.
-        # (The tuned CREATE TABLE IS recorded into the ledger separately -- see
-        # TestTunedSortKeyFold below.)
+
         rows = [("lineitem", "l_orderkey, l_linenumber", "")]
         ledger = _optimize_ledger()
         receipt = corroborate(ledger, ClickHouseTuningIntrospector().introspect(_FakeCHConnection(rows), ledger))
@@ -132,7 +117,7 @@ def _sorted_tuning_config(*, partition_on: str | None = None) -> UnifiedTuningCo
 
 
 def _partitioned_only_tuning_config() -> UnifiedTuningConfiguration:
-    """A table tuned with a partition key and no sort/clustering columns."""
+
     config = UnifiedTuningConfiguration()
     config.table_tunings["ORDERS"] = TableTuning(
         table_name="ORDERS",
@@ -146,10 +131,6 @@ def _sort_key_statements(ledger: AppliedTuningLedger) -> list:
 
 
 class TestTunedSortKeyFold:
-    """The tuned MergeTree CREATE TABLE is recorded into the applied ledger so
-    it can corroborate against ``system.tables`` keys and earn verification.
-    """
-
     def _tuned_adapter(self) -> ClickHouseAdapter:
         adapter = ClickHouseAdapter()
         adapter.tuning_enabled = True
@@ -170,17 +151,14 @@ class TestTunedSortKeyFold:
         assert recorded[0].phase == PHASE_DDL and recorded[0].table == "lineitem"
 
     def test_create_table_recorded_before_optimize(self):
-        # Finding B (#1275 review): the tuned CREATE TABLE must enter the ledger
-        # at execute time. Queuing it on _applied_layout_operations deferred it
-        # past data validation, so the order-sensitive applied_ledger_hash
-        # attested OPTIMIZE TABLE *before* the CREATE TABLE that it optimizes.
+
         adapter = self._tuned_adapter()
         tunings = _sorted_tuning_config().table_tunings
         original = "CREATE TABLE lineitem (l_orderkey INTEGER, l_linenumber INTEGER, l_comment VARCHAR)"
         optimized = adapter._optimize_table_definition(original, tunings, nullable_columns=set())
 
         adapter._record_tuned_sort_key_op(original, optimized, "lineitem", tunings)
-        # Post-load maintenance executes later, through the recording connection.
+
         adapter._applied_tuning_ledger.record("OPTIMIZE TABLE lineitem FINAL", PHASE_DDL)
         adapter._fold_layout_operations_into_ledger()
 
@@ -200,8 +178,7 @@ class TestTunedSortKeyFold:
         assert receipt["corroborated"] is True
 
     def test_baseline_order_by_not_recorded(self):
-        # An untuned table (not in the tuning config) gets only the
-        # engine-mandatory baseline ORDER BY, which is NOT tuning -> not recorded.
+
         adapter = self._tuned_adapter()
         tunings = _sorted_tuning_config().table_tunings
         original = "CREATE TABLE nation (n_nationkey INTEGER PRIMARY KEY, n_name VARCHAR)"
@@ -250,12 +227,6 @@ class TestTunedSortKeyFold:
 
 
 class TestCombinedPartitionAndSortKey:
-    """Finding A (#1275 review): a CREATE TABLE that renders BOTH a tuned
-    PARTITION BY and a tuned ORDER BY must have both keys corroborated against
-    the catalog. Corroborating the sort key alone let a run reach
-    ``applied_verified`` while the configured partition key never applied.
-    """
-
     def _tuned_adapter(self) -> ClickHouseAdapter:
         adapter = ClickHouseAdapter()
         adapter.tuning_enabled = True
@@ -281,7 +252,7 @@ class TestCombinedPartitionAndSortKey:
     def test_uncorroborated_partition_key_blocks_verification(self):
         adapter = self._tuned_adapter()
         self._record_combined(adapter)
-        # Catalog carries the tuned sort key but NOT the configured partition.
+
         conn = _FakeCHConnection([("lineitem", "l_orderkey, l_linenumber", "tuple()")])
         status, receipt = adapter._corroborate_applied_ledger(conn, APPLIED_UNVERIFIED)
         assert status == APPLIED_UNVERIFIED
@@ -293,7 +264,7 @@ class TestCombinedPartitionAndSortKey:
     def test_absent_partition_key_blocks_verification(self):
         adapter = self._tuned_adapter()
         self._record_combined(adapter)
-        # Catalog reports no partition key at all for the table.
+
         conn = _FakeCHConnection([("lineitem", "l_orderkey, l_linenumber", "")])
         status, receipt = adapter._corroborate_applied_ledger(conn, APPLIED_UNVERIFIED)
         assert status == APPLIED_UNVERIFIED
@@ -302,17 +273,14 @@ class TestCombinedPartitionAndSortKey:
     def test_both_keys_corroborated_earns_verification(self):
         adapter = self._tuned_adapter()
         self._record_combined(adapter)
-        # system.tables.partition_key reports the whole expression, parens and
-        # all -- exactly what the generator rendered for a DATE column.
+
         conn = _FakeCHConnection([("lineitem", "l_orderkey, l_linenumber", "toYYYYMM(l_shipdate)")])
         status, receipt = adapter._corroborate_applied_ledger(conn, APPLIED_UNVERIFIED)
         assert status == APPLIED_VERIFIED
         assert receipt["corroborated"] is True
 
     def test_partition_only_table_is_recorded(self):
-        # A table tuned with ONLY a partition key must still enter the ledger.
-        # Left out, its unapplied partition is never corroborated and a sibling
-        # table's sort key carries the whole run to applied_verified.
+
         adapter = self._tuned_adapter()
         tunings = _partitioned_only_tuning_config().table_tunings
         original = "CREATE TABLE orders (o_orderkey INTEGER PRIMARY KEY, o_orderdate DATE)"
@@ -339,7 +307,7 @@ class TestCombinedPartitionAndSortKey:
 
     def test_partition_only_table_with_unapplied_partition_blocks_run(self):
         adapter = self._tuned_adapter()
-        # One sort-tuned table whose key DID apply...
+
         sort_tunings = _sorted_tuning_config().table_tunings
         lineitem = "CREATE TABLE lineitem (l_orderkey INTEGER, l_linenumber INTEGER)"
         adapter._record_tuned_sort_key_op(
@@ -348,7 +316,7 @@ class TestCombinedPartitionAndSortKey:
             "lineitem",
             sort_tunings,
         )
-        # ...and one partition-tuned table whose partition did NOT apply.
+
         part_tunings = _partitioned_only_tuning_config().table_tunings
         orders = "CREATE TABLE orders (o_orderkey INTEGER PRIMARY KEY, o_orderdate DATE)"
         adapter._record_tuned_sort_key_op(
@@ -361,7 +329,7 @@ class TestCombinedPartitionAndSortKey:
         conn = _FakeCHConnection(
             [
                 ("lineitem", "l_orderkey, l_linenumber", ""),
-                ("orders", "o_orderkey", ""),  # no partition key in the catalog
+                ("orders", "o_orderkey", ""),
             ]
         )
         status, receipt = adapter._corroborate_applied_ledger(conn, APPLIED_UNVERIFIED)
@@ -369,10 +337,7 @@ class TestCombinedPartitionAndSortKey:
         assert receipt["corroborated"] is False
 
     def test_expression_partition_key_is_not_truncated(self):
-        # The clause regex must capture the full function expression. Truncating
-        # at the inner ")" made the expected columns ("toyyyymm(l_shipdate") a
-        # permanent mismatch against the catalog's "toYYYYMM(l_shipdate)", so no
-        # date-partitioned ClickHouse table could ever corroborate.
+
         adapter = self._tuned_adapter()
         optimized = self._record_combined(adapter)
         assert "PARTITION BY (toYYYYMM(l_shipdate))" in optimized

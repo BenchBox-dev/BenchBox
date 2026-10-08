@@ -1,5 +1,3 @@
-"""ClickHouse integration smoke tests with stubbed clickhouse-driver."""
-
 import sys
 
 import pytest
@@ -16,7 +14,7 @@ pytestmark = [
 @pytest.mark.platform_smoke
 @pytest.mark.skipif(sys.platform == "win32", reason="ClickHouse local mode (chDB) is not available on Windows")
 def test_clickhouse_smoke_server_mode(monkeypatch, tmp_path):
-    """Test basic ClickHouse adapter workflow in server mode."""
+
     state: ClickHouseStubState = install_clickhouse_stub(monkeypatch)
 
     from benchbox.platforms.clickhouse import ClickHouseAdapter
@@ -40,7 +38,7 @@ def test_clickhouse_smoke_server_mode(monkeypatch, tmp_path):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_clickhouse_requires_valid_mode(monkeypatch):
-    """Test that ClickHouse adapter validates mode parameter."""
+
     install_clickhouse_stub(monkeypatch)
 
     from benchbox.platforms.clickhouse import ClickHouseAdapter

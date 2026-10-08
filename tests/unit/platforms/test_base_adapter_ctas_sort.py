@@ -1,11 +1,3 @@
-"""Tests for PlatformAdapter CTAS sort base behavior.
-
-Covers:
-- PlatformAdapter.apply_ctas_sort() shared logic
-- DataLoader integration of tuning_config + apply_ctas_sort hook
-- MotherDuck/DuckDB CTAS SQL hook behavior
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -24,8 +16,6 @@ pytestmark = [
 
 
 class _BaseCtasTestAdapter(PlatformAdapter):
-    """Minimal concrete adapter used to test base CTAS-sort behavior."""
-
     def __init__(self, ctas_sql: str | list[str] | None = "SELECT 1", **config: Any):
         super().__init__(**config)
         self._ctas_sql = ctas_sql
@@ -34,33 +24,33 @@ class _BaseCtasTestAdapter(PlatformAdapter):
         return "duckdb"
 
     @staticmethod
-    def add_cli_arguments(parser) -> None:  # pragma: no cover - test shim
+    def add_cli_arguments(parser) -> None:  # pragma: no cover
         return None
 
     @classmethod
-    def from_config(cls, config: dict[str, Any]):  # pragma: no cover - test shim
+    def from_config(cls, config: dict[str, Any]):  # pragma: no cover
         return cls(**config)
 
-    def create_connection(self, **connection_config) -> Any:  # pragma: no cover - test shim
+    def create_connection(self, **connection_config) -> Any:  # pragma: no cover
         return Mock()
 
-    def create_schema(self, benchmark, connection: Any) -> float:  # pragma: no cover - test shim
+    def create_schema(self, benchmark, connection: Any) -> float:  # pragma: no cover
         return 0.0
 
-    def apply_platform_optimizations(self, platform_config, connection: Any) -> None:  # pragma: no cover - test shim
+    def apply_platform_optimizations(self, platform_config, connection: Any) -> None:  # pragma: no cover
         return None
 
     def apply_constraint_configuration(
         self, primary_key_config, foreign_key_config, connection: Any
-    ) -> None:  # pragma: no cover - test shim
+    ) -> None:  # pragma: no cover
         return None
 
     def load_data(
         self, benchmark, connection: Any, data_dir: Path
-    ) -> tuple[dict[str, int], float, dict[str, Any] | None]:  # pragma: no cover - test shim
+    ) -> tuple[dict[str, int], float, dict[str, Any] | None]:  # pragma: no cover
         return {}, 0.0, None
 
-    def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:  # pragma: no cover - test shim
+    def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:  # pragma: no cover
         return None
 
     def execute_query(
@@ -72,7 +62,7 @@ class _BaseCtasTestAdapter(PlatformAdapter):
         scale_factor: float | None = None,
         validate_row_count: bool = True,
         stream_id: int | None = None,
-    ) -> dict[str, Any]:  # pragma: no cover - test shim
+    ) -> dict[str, Any]:  # pragma: no cover
         return {"query_id": query_id, "status": "SUCCESS", "execution_time_seconds": 0.0, "rows_returned": 0}
 
     def _build_ctas_sort_sql(self, table_name: str, sort_columns: list[Any]) -> str | list[str] | None:
@@ -227,7 +217,6 @@ class TestDataLoaderTuningConfig:
         )
         loader._load_single_file = Mock(return_value=5)
 
-        # Create shard files so they pass the file-existence check
         (tmp_path / "lineitem.csv").write_text("1|data\n")
         (tmp_path / "orders.csv").write_text("1|data\n")
         files = {
@@ -246,11 +235,6 @@ class TestMotherDuckSqlHook:
 
         adapter = MotherDuckAdapter.__new__(MotherDuckAdapter)
 
-        # Real TuningColumn instances (not Mocks): the shared
-        # _build_duckdb_ctas_sort_sql helper delegates to
-        # DuckDBDDLGenerator via a TableTuning, which validates that sorting
-        # columns are genuine TuningColumn instances -- see the
-        # renderer-consolidation TODO's w2 duckdb migration.
         col1 = TuningColumn(name="l_shipdate", type="DATE", order=1)
         col2 = TuningColumn(name="l_orderkey", type="INTEGER", order=2)
 
@@ -334,8 +318,6 @@ class TestSortedIngestionCapabilityAndGuardrails:
 
 
 class TestConstraintPreservingCtasSort:
-    """Regression coverage for DuckDB's constraint-preserving CTAS-sort path."""
-
     def _make_adapter_and_config(self):
         adapter = _SortedIngestionStrategyAdapter(
             "duckdb", ctas_sql="CREATE OR REPLACE TABLE lineitem AS SELECT * FROM lineitem"

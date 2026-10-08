@@ -1,5 +1,3 @@
-"""Exercise both soundness policies without sharing imports or manifest state."""
-
 from __future__ import annotations
 
 import json

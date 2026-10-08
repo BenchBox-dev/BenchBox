@@ -34,29 +34,28 @@ tests/e2e/
 ### Run All E2E Tests
 
 ```bash
-# All E2E tests
 uv run -- python -m pytest tests/e2e/ -v
 
-# With parallel execution
 uv run -- python -m pytest tests/e2e/ -n auto
 ```
+
+The first command runs all E2E tests. The second runs them in parallel.
 
 ### Run Quick E2E Tests (Dry-Run Mode)
 
 ```bash
-# Quick tests using dry-run mode (no actual benchmark execution)
 uv run -- python -m pytest -m e2e_quick
 ```
 
 ### Run Local Platform Tests
 
 ```bash
-# Full execution against local databases
 uv run -- python -m pytest -m e2e_local
 
-# Specific platform
 uv run -- python -m pytest tests/e2e/test_local_platforms.py -v
 ```
+
+The first command runs full execution against local databases. The second runs one test file for a specific platform group.
 
 ## Test Categories
 
@@ -77,12 +76,12 @@ Validates all CLI options work correctly:
 | `--force` | Force modes (datagen, all) |
 
 ```bash
-# Run CLI option tests
 uv run -- python -m pytest tests/e2e/test_cli_options.py -v
 
-# Test specific option
 uv run -- python -m pytest tests/e2e/test_cli_options.py -k "scale" -v
 ```
+
+The second command tests a specific option, here `scale`.
 
 ### Error Handling Tests (`test_error_handling.py`)
 
@@ -98,7 +97,6 @@ Validates proper error messages and exit codes:
 - Help and version commands (`--help`, `--help all`, `--help examples`, `--version`)
 
 ```bash
-# Run error handling tests
 uv run -- python -m pytest tests/e2e/test_error_handling.py -v
 ```
 
@@ -114,7 +112,6 @@ Validates benchmark result file structure and content:
 - **File loading**: Valid JSON, nonexistent files, malformed JSON, end-to-end load-and-validate
 
 ```bash
-# Run result validation tests
 uv run -- python -m pytest tests/e2e/test_result_validation.py -v
 ```
 
@@ -133,10 +130,8 @@ Full benchmark execution against local databases:
 All platforms also include dry-run artifact validation tests, plus parametrized tests for help commands and dry-run across platform/benchmark combinations.
 
 ```bash
-# Run local platform tests
 uv run -- python -m pytest tests/e2e/test_local_platforms.py -v
 
-# Run DuckDB tests only
 uv run -- python -m pytest tests/e2e/test_local_platforms.py -k duckdb -v
 ```
 
@@ -161,12 +156,12 @@ Dry-run tests for cloud platforms (no credentials required):
 Each platform class also has a `test_full_execution_with_credentials()` test gated behind the `live_integration` marker. Parametrized tests cover all platforms across multiple benchmark types (including TPC-DS with SF=1 constraint).
 
 ```bash
-# Run cloud platform dry-run tests
 uv run -- python -m pytest tests/e2e/test_cloud_platforms.py -v
 
-# Run live integration tests (requires credentials)
 uv run -- python -m pytest -m live_integration -v
 ```
+
+The first command runs the cloud platform dry-run tests. The second runs live integration tests and requires credentials.
 
 ### DataFrame Platform Tests (`test_dataframe_platforms.py`)
 
@@ -183,12 +178,12 @@ Tests for DataFrame-based platforms:
 | Cross-platform | Pandas vs Polars result comparison (Q1) |
 
 ```bash
-# Run DataFrame platform tests
 uv run -- python -m pytest tests/e2e/test_dataframe_platforms.py -v
 
-# Skip slow tests (PySpark)
 uv run -- python -m pytest tests/e2e/test_dataframe_platforms.py -m "not slow" -v
 ```
+
+The `not slow` filter skips the slow PySpark tests.
 
 ## Test Markers
 
@@ -207,13 +202,14 @@ E2E tests use several pytest markers for selective execution:
 | `duckdb` / `sqlite` | Platform-specific tests |
 
 ```bash
-# Examples
-uv run -- python -m pytest -m e2e_quick          # Quick tests only
-uv run -- python -m pytest -m e2e_local          # Local platforms
-uv run -- python -m pytest -m "e2e and not slow" # Fast E2E tests
-uv run -- python -m pytest -m "e2e and tpch"     # TPC-H tests only
-uv run -- python -m pytest -m live_integration   # Live cloud tests
+uv run -- python -m pytest -m e2e_quick
+uv run -- python -m pytest -m e2e_local
+uv run -- python -m pytest -m "e2e and not slow"
+uv run -- python -m pytest -m "e2e and tpch"
+uv run -- python -m pytest -m live_integration
 ```
+
+These commands run, in order: quick tests only, local platforms, fast E2E tests, TPC-H tests only, and live cloud tests.
 
 ## Fixtures
 
@@ -224,17 +220,18 @@ The E2E test suite provides fixtures in `conftest.py`:
 ```python
 @pytest.fixture
 def results_dir(tmp_path):
-    """Temporary directory for benchmark results."""
+    pass
 
 @pytest.fixture
 def dry_run_dir(tmp_path):
-    """Temporary directory for dry-run output."""
+    pass
 ```
+
+`results_dir` is a temporary directory for benchmark results. `dry_run_dir` is a temporary directory for dry-run output. The bodies are omitted here.
 
 ### Platform Configuration Fixtures
 
 ```python
-# Local platforms
 @pytest.fixture
 def duckdb_config():
     return {"platform": "duckdb", "benchmark": "tpch", "scale": "0.01"}
@@ -247,7 +244,6 @@ def sqlite_config():
 def datafusion_config():
     return {"platform": "datafusion", "benchmark": "tpch", "scale": "0.01"}
 
-# DataFrame platforms
 @pytest.fixture
 def pandas_df_config():
     return {"platform": "pandas-df", "benchmark": "tpch", "scale": "0.01"}
@@ -256,27 +252,30 @@ def pandas_df_config():
 def polars_df_config():
     return {"platform": "polars-df", "benchmark": "tpch", "scale": "0.01"}
 
-# Cloud platforms (dry-run)
 @pytest.fixture
 def snowflake_dry_run_config(dry_run_dir):
     return {"platform": "snowflake", "benchmark": "tpch", "dry_run": str(dry_run_dir)}
 ```
 
+The fixtures cover three groups: local platforms (DuckDB, SQLite, DataFusion), DataFrame platforms (Pandas, Polars), and cloud platforms in dry-run mode (Snowflake).
+
 ### Helper Functions
 
 ```python
 def build_cli_args(config, extra_args=None):
-    """Build CLI arguments from config dictionary."""
+    pass
 
 def run_benchmark(config, extra_args=None, env=None, timeout=600):
-    """Run a benchmark with configuration."""
+    pass
 
 def find_result_files(directory, pattern="*.json"):
-    """Find result files in directory."""
+    pass
 
 def find_latest_result(directory, pattern="*.json"):
-    """Find the most recent result file."""
+    pass
 ```
+
+`build_cli_args` builds CLI arguments from a config dictionary. `run_benchmark` runs a benchmark with a configuration. `find_result_files` finds result files in a directory, and `find_latest_result` finds the most recent one. The bodies are omitted here.
 
 ## Writing E2E Tests
 
@@ -287,7 +286,6 @@ import pytest
 from tests.e2e.conftest import build_cli_args, run_benchmark
 
 def test_basic_benchmark(duckdb_config, results_dir):
-    """Test basic benchmark execution."""
     config = {**duckdb_config, "output": str(results_dir)}
 
     result = run_benchmark(config)
@@ -300,7 +298,6 @@ def test_basic_benchmark(duckdb_config, results_dir):
 
 ```python
 def test_invalid_scale_factor():
-    """Test that invalid scale factors produce clear errors."""
     config = {"platform": "duckdb", "benchmark": "tpcds", "scale": "0.1"}
 
     result = run_benchmark(config)
@@ -316,7 +313,6 @@ import json
 from tests.e2e.conftest import find_result_files
 
 def test_result_file_schema(duckdb_config, results_dir):
-    """Test that result files match expected schema."""
     config = {**duckdb_config, "output": str(results_dir)}
     run_benchmark(config)
 
@@ -379,12 +375,14 @@ from tests.e2e.utils.platform_detection import requires_platform, requires_gpu
 
 @requires_platform("datafusion")
 def test_datafusion_execution():
-    """Skipped if datafusion not importable."""
+    pass
 
 @requires_gpu()
 def test_cudf_execution():
-    """Skipped if no NVIDIA GPU/CUDA available."""
+    pass
 ```
+
+The first test is skipped if DataFusion is not importable. The second is skipped if no NVIDIA GPU or CUDA is available.
 
 Available decorators:
 
@@ -402,7 +400,6 @@ Available decorators:
 E2E tests have a 10-minute timeout by default. For slower systems:
 
 ```bash
-# Increase timeout
 uv run -- python -m pytest tests/e2e/ --timeout=900
 ```
 
@@ -413,29 +410,30 @@ The test suite includes automatic stub generation for ClickHouse dependencies:
 ```python
 @pytest.fixture
 def clickhouse_stub_dir(tmp_path):
-    """Create minimal chDB and clickhouse_driver stubs."""
-    # Stubs are created automatically for dry-run tests
+    pass
 ```
+
+The fixture creates minimal chDB and `clickhouse_driver` stubs. Stubs are created automatically for dry-run tests.
 
 ### Debugging Test Failures
 
 ```bash
-# Run with verbose output
 uv run -- python -m pytest tests/e2e/test_cli_options.py -v -s
 
-# Run single test with debugging
 uv run -- python -m pytest tests/e2e/test_cli_options.py::test_benchmark_selection -v -s --tb=long
 ```
+
+The first command runs with verbose output. The second runs a single test with debugging.
 
 ### Result File Inspection
 
 ```bash
-# Find generated result files
 find /tmp -name "*.json" -path "*/benchmark_results/*" 2>/dev/null
 
-# Validate JSON schema
 python -c "import json; json.load(open('result.json'))"
 ```
+
+The `find` command locates generated result files, and the `python` command validates that a result file is well-formed JSON.
 
 ## Related Documentation
 

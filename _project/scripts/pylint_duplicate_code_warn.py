@@ -1,22 +1,9 @@
-"""Warn-only pylint duplicate-code (R0801) gate for pre-commit.
-
-Runs `pylint --disable=all --enable=duplicate-code` against `benchbox/` at
-the 15-line similarity threshold, reports new clusters above a baseline
-count, and ALWAYS exits 0 (warn-only). The baseline is intentionally loose
-- this hook exists to surface drift, not to block commits. Promote to
-hard-fail in a follow-up TODO once the deferred refactors documented in
-docs/development/duplication-residuals.md (R-06, R-07, R-08, R-09) land
-and the cluster count drops materially below current.
-"""
-
 from __future__ import annotations
 
 import re
 import subprocess
 import sys
 
-# Keep this in sync with docs/development/duplication-residuals.md.
-# Bump only when refactors land and the new floor sticks for >=1 week.
 BASELINE_CLUSTER_PAIRS = 102
 
 

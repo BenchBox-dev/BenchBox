@@ -1,9 +1,6 @@
-"""Metadata helpers for the InfluxDB adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -11,17 +8,13 @@ from typing import Any
 
 
 class InfluxDBMetadataMixin:
-    """Provide metadata and configuration helpers for InfluxDB."""
-
     @property
     def platform_name(self) -> str:
-        """Return human-readable platform name."""
         mode = getattr(self, "mode", "cloud")
         return f"InfluxDB ({mode.title()})"
 
     @staticmethod
     def add_cli_arguments(parser) -> None:
-        """Add InfluxDB-specific CLI arguments."""
         influx_group = parser.add_argument_group("InfluxDB Arguments")
         influx_group.add_argument(
             "--host",
@@ -73,7 +66,6 @@ class InfluxDBMetadataMixin:
 
     @classmethod
     def from_config(cls, config: dict[str, Any]):
-        """Create InfluxDB adapter from unified configuration."""
         adapter_config = {
             "host": config.get("host", "localhost"),
             "port": config.get("port", 8086),
@@ -86,7 +78,6 @@ class InfluxDBMetadataMixin:
             "mode": config.get("mode", "cloud"),
         }
 
-        # Pass through other relevant config
         for key in [
             "tuning_config",
             "tuning_enabled",
@@ -102,27 +93,9 @@ class InfluxDBMetadataMixin:
         return cls(**adapter_config)
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for InfluxDB.
-
-        InfluxDB 3.x uses standard SQL via FlightSQL, with some extensions
-        for time-series operations.
-        """
         return "influxdb"
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get InfluxDB platform information.
-
-        Captures InfluxDB configuration including:
-        - Connection mode (core/cloud)
-        - Database (bucket) name
-        - Server version (if available)
-
-        Args:
-            connection: Optional InfluxDB connection for querying version
-
-        Returns:
-            Platform information dictionary
-        """
         mode = getattr(self, "mode", "cloud")
 
         platform_info = {
@@ -139,7 +112,6 @@ class InfluxDBMetadataMixin:
             },
         }
 
-        # Get client library version
         try:
             from ._dependencies import FLIGHTSQL_AVAILABLE, INFLUXDB3_AVAILABLE
 
@@ -153,16 +125,12 @@ class InfluxDBMetadataMixin:
                     pass
             elif FLIGHTSQL_AVAILABLE:
                 platform_info["client_library"] = "flightsql-dbapi"
-                # flightsql-dbapi doesn't expose version easily
                 platform_info["client_library_version"] = None
         except ImportError:
             platform_info["client_library_version"] = None
 
-        # Try to get InfluxDB version
         if connection is not None:
             try:
-                # InfluxDB 3.x doesn't have a simple version() function
-                # Version info is typically in HTTP headers or metadata
                 platform_info["platform_version"] = None
             except Exception:
                 platform_info["platform_version"] = None

@@ -1,9 +1,6 @@
-"""Integration tests for Write Primitives benchmark execution.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -19,52 +16,43 @@ pytestmark = [
 @pytest.mark.integration
 @pytest.mark.write_primitives
 class TestWritePrimitivesBasic:
-    """Basic integration tests for Write Primitives benchmark."""
-
     def test_benchmark_initialization(self):
-        """Test benchmark can be instantiated."""
+
         bench = WritePrimitives(scale_factor=0.01, quiet=True)
         assert isinstance(bench, WritePrimitives)
         assert bench.scale_factor == 0.01
 
     def test_get_benchmark_info(self):
-        """Test getting benchmark information."""
+
         bench = WritePrimitives(scale_factor=0.01, quiet=True)
         info = bench.get_benchmark_info()
 
         assert info["name"] == "Write Primitives Benchmark"
         assert info["version"] == "2.0"
-        assert (
-            info["total_operations"] == 112
-        )  # Total operations: INSERT (12), UPDATE (15), DELETE (14), BULK_LOAD (36), MERGE (23), DDL (12)
+        assert info["total_operations"] == 112
         assert "insert" in info["categories"]
         assert "update" in info["categories"]
         assert "delete" in info["categories"]
         assert "ddl" in info["categories"]
-        # Transaction operations moved to Transaction Primitives benchmark
+
         assert "transaction" not in info["categories"]
 
     def test_get_operations(self):
-        """Test retrieving operations."""
+
         bench = WritePrimitives(scale_factor=0.01, quiet=True)
 
-        # Get all operations
         all_ops = bench.get_all_operations()
-        assert (
-            len(all_ops) == 112
-        )  # Total operations: INSERT (12), UPDATE (15), DELETE (14), BULK_LOAD (36), MERGE (23), DDL (12)
+        assert len(all_ops) == 112
 
-        # Get by category
         insert_ops = bench.get_operations_by_category("insert")
-        assert len(insert_ops) == 12  # INSERT category has 12 operations
+        assert len(insert_ops) == 12
 
-        # Get specific operation
         op = bench.get_operation("insert_single_row")
         assert op.id == "insert_single_row"
         assert op.category == "insert"
 
     def test_get_schema(self):
-        """Test getting schema."""
+
         bench = WritePrimitives(scale_factor=0.01, quiet=True)
         schema = bench.get_schema()
 
@@ -73,7 +61,7 @@ class TestWritePrimitivesBasic:
         assert "write_ops_log" in schema
 
     def test_get_create_tables_sql(self):
-        """Test SQL generation."""
+
         bench = WritePrimitives(scale_factor=0.01, quiet=True)
         sql = bench.get_create_tables_sql()
 
@@ -82,7 +70,7 @@ class TestWritePrimitivesBasic:
         assert "CREATE TABLE write_ops_log" in sql
 
     def test_operation_result_structure(self):
-        """Test OperationResult dataclass."""
+
         result = OperationResult(
             operation_id="test_op",
             success=True,
@@ -101,7 +89,7 @@ class TestWritePrimitivesBasic:
         assert result.error is None
 
     def test_data_source_sharing(self):
-        """Test that benchmark declares TPC-H data sharing."""
+
         bench = WritePrimitives(scale_factor=0.01, quiet=True)
         assert bench._impl.get_data_source_benchmark() == "tpch"
 

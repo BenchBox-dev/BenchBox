@@ -1,16 +1,6 @@
 # Copyright 2026 Joe Harris / BenchBox Project
-#
 # Licensed under the MIT License. See LICENSE file in the project root for details.
 
-"""
-Docker live integration tests for Trino.
-
-Setup:
-    make test-docker-up-trino
-
-These tests require a running Trino instance accessible at localhost:18080 by default.
-Set TRINO_HOST_PORT to target a different host port.
-"""
 
 import os
 
@@ -30,7 +20,6 @@ pytestmark = [
 
 @pytest.fixture
 def trino_adapter():
-    """Create a Trino adapter connected to a local Docker instance."""
     port = int(os.getenv("TRINO_HOST_PORT", "18080"))
     skip_unless_docker_service("localhost", port, platform="Trino")
     adapter = TrinoAdapter(
@@ -45,10 +34,8 @@ def trino_adapter():
 
 
 class TestLiveTrinoConnection:
-    """Test basic Trino connectivity via Docker."""
-
     def test_connection(self, trino_adapter):
-        """Verify we can connect to Trino and run a trivial query."""
+
         connection = trino_adapter.create_connection()
         try:
             assert hasattr(connection, "cursor")
@@ -56,17 +43,15 @@ class TestLiveTrinoConnection:
             trino_adapter.close_connection(connection)
 
     def test_platform_info(self, trino_adapter):
-        """Verify platform info reports correct metadata."""
+
         info = trino_adapter.get_platform_info()
         assert info is not None
         assert info["platform_type"] == "trino"
 
 
 class TestLiveTrinoQueryExecution:
-    """Test query execution against a live Trino instance."""
-
     def test_create_schema(self, trino_adapter):
-        """Verify we can create a schema in the memory catalog."""
+
         connection = trino_adapter.create_connection()
         try:
             trino_adapter.execute_query(
@@ -86,7 +71,6 @@ class TestLiveTrinoQueryExecution:
             trino_adapter.close_connection(connection)
 
     def test_execute_query(self, trino_adapter):
-        """Verify basic query execution with SELECT 1."""
         connection = trino_adapter.create_connection()
         try:
             result = trino_adapter.execute_query(

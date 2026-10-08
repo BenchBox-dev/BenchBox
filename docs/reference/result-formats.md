@@ -12,36 +12,34 @@ BenchBox exports benchmark results in multiple formats for analysis, visualizati
 ### Basic Export
 
 ```bash
-# Run benchmark and export results
 benchbox run --platform duckdb --benchmark tpch --scale 0.1
 
-# Results are automatically saved to benchmark_runs/results/
 ls benchmark_runs/results/
-# tpch_duckdb_sf0.01_20251212_143021.json
 ```
+
+Results are saved automatically to `benchmark_runs/results/`, with file names such as `tpch_duckdb_sf0.01_20251212_143021.json`.
 
 ### Export to Other Formats
 
 ```bash
-# Export most recent result to CSV
 benchbox export --last --format csv
 
-# Export to multiple formats
 benchbox export --last --format csv --format html
 
-# Export a specific result file
 benchbox export benchmark_runs/results/tpch_duckdb_sf0.01_20251212_143021.json --format csv --format html
 ```
+
+The first command exports the most recent result to CSV, the second exports to several formats, and the third exports a specific result file.
 
 ### Custom Output Directory
 
 ```bash
-# Local directory
 benchbox run --platform duckdb --benchmark tpch --output ./my_results/
 
-# Cloud storage
 benchbox run --platform snowflake --benchmark tpch --output s3://bucket/results/
 ```
+
+The first command writes to a local directory and the second writes to cloud storage.
 
 ## JSON Format (Schema v2.2)
 
@@ -191,8 +189,8 @@ independently verified record of what physically applied (see
 | ------- | ------ | ------------- |
 | `tuning_source` | string | Raw `TuningSource` enum value: `explicit_file`, `auto_discovered`, `smart_defaults`, `baseline`, `wizard`, or `fallback`. |
 | `requested_config_hash` | string | Full 64-hex-char SHA-256 over the requested `UnifiedTuningConfiguration.to_dict()` (canonical JSON, sorted keys). Identifies the requested template regardless of platform or dict ordering. |
-| `validation_status` | string | ADR-1 honest execution-derived tuning verified-state: `not_applicable`, `noop`, `applied_unverified`, `applied_verified`, or `failed`. Unlike the requested-config fields (which describe intent), this reflects what the execution path *actually did*: `applied_unverified` means at least one tuning statement executed (self-attested), and `applied_verified` means it was additionally **corroborated by a post-load introspection receipt** against the live catalog (the per-statement receipt itself is recorded in `platform.tuning.applied.receipt`). When `platform.tuning.applied` is present, its `status` equals this field. Emitted for runs executed by this version: an untuned run reports `not_applicable`, as does a DataFrame run whose configuration is empty or all defaults; a run that requested tuning and applied nothing reports `noop`; a tuned run reports the status its execution path derived, or the applied ledger's status when none was, and omits the field when it has neither. Absent from bundles whose run never recorded it, and a re-export of such a bundle keeps it absent (apart from the `.applied.json` case described above). |
-| `tuning_policy_generation` | string | Explicit tuning-policy generation marker (ADR-3 seam), currently `"adr-003"`. Identifies which generation of the tuning policy this run was produced under, so tuned results from different generations can be flagged as not directly comparable. Sourced from the `TUNING_POLICY_GENERATION` constant (`benchbox/core/tuning/policy_generation.py`), **never** derived from `benchbox_version`. Bundles predating this field omit it; consumers treat that absence as the "pre-seam" generation. See `docs/development/tuning-adr-003-baseline-and-single-renderer.md`. |
+| `validation_status` | string | Execution-derived tuning verification state: `not_applicable`, `noop`, `applied_unverified`, `applied_verified`, or `failed`. Unlike the requested-config fields (which describe intent), this reflects what the execution path *actually did*: `applied_unverified` means at least one tuning statement executed (self-attested), and `applied_verified` means it was additionally **corroborated by a post-load introspection receipt** against the live catalog (the per-statement receipt itself is recorded in `platform.tuning.applied.receipt`). When `platform.tuning.applied` is present, its `status` equals this field. Emitted for runs executed by this version: an untuned run reports `not_applicable`, as does a DataFrame run whose configuration is empty or all defaults; a run that requested tuning and applied nothing reports `noop`; a tuned run reports the status its execution path derived, or the applied ledger's status when none was, and omits the field when it has neither. Absent from bundles whose run never recorded it, and a re-export of such a bundle keeps it absent (apart from the `.applied.json` case described above). |
+| `tuning_policy_generation` | string | Explicit tuning-policy generation marker, currently `"adr-003"`. Identifies which generation of the tuning policy this run was produced under, so tuned results from different generations can be flagged as not directly comparable. Sourced from the `TUNING_POLICY_GENERATION` constant (`benchbox/core/tuning/policy_generation.py`), **never** derived from `benchbox_version`. Bundles predating this field omit it; consumers treat that absence as the generation before the marker existed. See `docs/development/tuning-adr-003-baseline-and-single-renderer.md`. |
 | `counts.tables_tuned` | number | Number of tables with at least one table-level tuning (partitioning/clustering/distribution/sorting). |
 | `counts.tuning_types` | array | Sorted list of tuning categories actually active (constraint names, platform optimization flags, table-tuning clause types). |
 | `logical_profile` | object | Optional workload-profile coverage metadata (unrelated to the requested-config hash). |
@@ -334,7 +332,7 @@ Discloses the client execution location and connectivity characteristics relativ
 | `collection_error_class` | string \| null | Optional exception or error class name if locality discovery or overhead probing failed. |
 | `collection_error_message` | string \| null | Fixed-template diagnostic (`"<ErrorClass>: statement overhead probe failed"`). Raw error text is never published, so hostnames, IPs, and credentials cannot leak through this field. |
 
-The probe issues 1 warmup plus 5 `SELECT 1` statements on the live connection after the workload succeeds, bounded by a 5-second deadline. On billable warehouses (Snowflake, Athena, Redshift) these are metered statements; pass `--no-link-probe` to skip them. Probe wall time is excluded from the published run `total_duration`. The Explorer read model (v10) projects `min`/`median` only; `samples` stays bundle-level by design. A published Explorer snapshot must be rebuilt after the v10 upgrade to surface the new `client_*` columns; older snapshots show NULLs for them without failing.
+The probe issues 1 warmup plus 5 `SELECT 1` statements on the live connection after the workload succeeds, bounded by a 5-second deadline. On billable warehouses (Snowflake, Athena, Redshift) these are metered statements; pass `--no-link-probe` to skip them. Probe wall time is excluded from the published run `total_duration`. The Results Explorer shows `min`/`median` only; `samples` stays in the bundle.
 
 ###### Example: Observed Cloud VM Run
 
@@ -388,10 +386,8 @@ by table name.
 
 Absence of `load_ms` means "not measured" and is always accepted; an
 explicit `load_ms: 0` is a measured zero and stays distinguishable from a
-missing key. Seed-corpus coverage is partial (forward-only rollout), which is
-expected for an additive field. The Explorer read model does not project this
-block yet; it is bundle-level diagnostic data until a read-model decision
-lands.
+missing key. Older bundles may omit the block. The Results Explorer does not
+read it; it is bundle-level diagnostic data.
 
 #### Export Block
 
@@ -454,10 +450,8 @@ Q3,1230,10,SUCCESS,,1,0
 HTML export generates a standalone report with formatted tables.
 
 ```bash
-# Generate HTML report from most recent result
 benchbox export --last --format html
 
-# Export a specific result file to HTML
 benchbox export benchmark_runs/results/tpch_duckdb_sf0.01_20251212_143021.json --format html
 ```
 
@@ -474,18 +468,16 @@ The HTML report includes:
 Use `benchbox visualize` to generate ASCII charts from any result file:
 
 ```bash
-# Auto-detect latest result and render all applicable charts
 benchbox visualize
 
-# Visualize a specific result file
 benchbox visualize benchmark_runs/results/tpch_duckdb_sf0.01_20251212_143021.json
 
-# Specific chart type
 benchbox visualize benchmark_runs/results/*.json --chart-type performance_bar
 
-# Save plain-text output to file
 benchbox visualize benchmark_runs/results/*.json --no-color > charts.txt
 ```
+
+The first command auto-detects the latest result and renders all applicable charts. The second visualizes a specific result file, the third renders one chart type, and the last saves plain-text output to a file.
 
 See the [Visualization Guide](../visualization/overview.md) for chart types, templates, and customization options.
 
@@ -497,16 +489,13 @@ See the [Visualization Guide](../visualization/overview.md) for chart types, tem
 import json
 from pathlib import Path
 
-# Load result file
 result_file = Path("benchmark_runs/results/tpch_duckdb_sf0.01_20251212_143021.json")
 with result_file.open() as f:
     results = json.load(f)
 
-# Access metrics
 print(f"Power at Size: {results['summary']['tpc_metrics']['power_at_size']}")
 print(f"Total time: {results['summary']['timing']['total_ms']}ms")
 
-# Access query details
 for query in results['queries']:
     print(f"{query['id']}: {query['ms']}ms")
 ```
@@ -517,15 +506,12 @@ for query in results['queries']:
 import pandas as pd
 import json
 
-# Load JSON
 with open("benchmark_runs/results/tpch_duckdb_sf0.01_*.json") as f:
     results = json.load(f)
 
-# Convert queries to DataFrame
 queries = results['queries']
 df = pd.DataFrame(queries)
 
-# Analyze
 print(df.describe())
 print(df.groupby('id')['ms'].mean())
 ```
@@ -535,10 +521,8 @@ print(df.groupby('id')['ms'].mean())
 ```python
 import pandas as pd
 
-# Load query results
 df = pd.read_csv("benchmark_runs/results/tpch_duckdb_sf0.01_queries.csv")
 
-# Quick analysis
 print(f"Total queries: {len(df)}")
 print(f"Mean execution time: {df['ms'].mean():.2f}ms")
 print(f"Slowest query: {df.loc[df['ms'].idxmax(), 'id']}")
@@ -549,15 +533,14 @@ print(f"Slowest query: {df.loc[df['ms'].idxmax(), 'id']}")
 ### CLI Visualization
 
 ```bash
-# Render all applicable charts for a result file
 benchbox visualize benchmark_runs/results/tpch_duckdb_sf0.01_*.json
 
-# Compare multiple platforms
 benchbox visualize duckdb_result.json sqlite_result.json --template head_to_head
 
-# Per-query histogram (auto-splits for large benchmarks)
 benchbox visualize tpcds_result.json --chart-type query_histogram
 ```
+
+The first command renders all applicable charts for a result file. The second compares multiple platforms, and the third draws a per-query histogram (split automatically for large benchmarks).
 
 ### Python API Visualization
 
@@ -566,15 +549,12 @@ from benchbox.core.visualization import ResultPlotter
 from benchbox.core.visualization.ascii import BarChart
 from benchbox.core.visualization.ascii.bar_chart import BarData
 
-# Load results from JSON files
 plotter = ResultPlotter.from_sources(["results/duckdb.json", "results/sqlite.json"])
 
-# Render a bar chart
 bar_data = [BarData(label=r.platform, value=r.total_time_ms or 0) for r in plotter.results]
 chart = BarChart(data=bar_data, title="Platform Comparison")
 print(chart.render())
 
-# Export to plain-text file
 from benchbox.core.visualization.exporters import export_ascii
 
 export_ascii(
@@ -648,17 +628,14 @@ from benchbox.core.results.exporter import ResultExporter
 from benchbox.core.results.anonymization import AnonymizationConfig
 
 config = AnonymizationConfig(
-    # Scopes pseudonyms derived from raw values to your organization, so the
-    # same machine publishes different pseudonyms under different salts.
-    # See the salt-rotation note below for what this does *not* cover.
     machine_id_salt="your-org-salt",
-    # Extra regexes stripped from free-text fields, on top of the built-in
-    # IP / email / SSN patterns.
     custom_sanitizers={r"\bacct-\d+\b": "[REDACTED]"},
 )
 
 exporter = ResultExporter(anonymize=True, anonymization_config=config)
 ```
+
+`machine_id_salt` scopes pseudonyms derived from raw values to your organization, so the same machine publishes different pseudonyms under different salts. See the salt-rotation note below for what this does not cover. `custom_sanitizers` lists extra regexes stripped from free-text fields, on top of the built-in IP, email and SSN patterns.
 
 #### Default salt and residual confirmation oracle
 
@@ -667,8 +644,7 @@ the documented algorithm can confirm candidate values against published
 `<kind>_<12 hex>` tokens. Unread identifier fields are omitted entirely (see
 `docs/development/adr/adr-published-identifier-field-set.md`). Retained fields
 (`endpoint`, `database_name`, `submission_path`) still publish pseudonyms, so
-the **residual oracle on those fields is accepted for the OSS default** and
-documented rather than denied.
+under the empty default those fields remain confirmable this way.
 
 A non-empty salt closes the oracle only if it is **not** shipped in the public
 tree. Operators who will publish community submissions must set
@@ -678,13 +654,11 @@ tokens are salted when they are minted. `ResultExporter(anonymize=True)`
 soft-reads `BENCHBOX_MACHINE_ID_SALT` when present; without it, public-shaped
 export still succeeds with the empty default (local/private use).
 
-`benchbox submit` hard-refuses when that salt env is unset/empty — a
-community-path gate so operators cannot forget to configure salt on the
-submission machine. That gate does **not** re-hash already-exported files:
-already-public-shaped tokens pass through under the publication fixed point,
-so setting salt only at submit time does not close the empty-salt oracle for
-bundles that were minted earlier without salt. A repository-baked "default
-salt" would still be public and is rejected.
+`benchbox submit` refuses to run when that salt env is unset or empty. It
+does **not** re-hash already-exported files: tokens that are already
+pseudonyms pass through unchanged, so setting salt only at submit time does
+not protect bundles that were exported earlier without salt. Do not use a salt
+committed to a public repository; it is not private.
 
 #### Salt rotation
 
@@ -696,13 +670,13 @@ idempotent — and the pass-through happens *before* the salt is consulted:
 a = AnonymizationManager(AnonymizationConfig(machine_id_salt="org-A"))
 b = AnonymizationManager(AnonymizationConfig(machine_id_salt="org-B"))
 
-a.anonymize_result_payload({"machine_id": raw})   # machine_9ba319f754a5
-b.anonymize_result_payload({"machine_id": raw})   # machine_ac228f1f75af  (differs)
+a.anonymize_result_payload({"machine_id": raw})
+b.anonymize_result_payload({"machine_id": raw})
 
-# But B re-anonymizing A's already-published bundle:
 b.anonymize_result_payload({"machine_id": "machine_9ba319f754a5"})
-# -> machine_9ba319f754a5   (unchanged; B's salt is never applied)
 ```
+
+The first call returns `machine_9ba319f754a5` and the second returns `machine_ac228f1f75af`, so different salts give different pseudonyms for the same raw value. In the third call, B re-anonymizes A's already-published bundle and the result is unchanged (`machine_9ba319f754a5`), because B's salt is never applied.
 
 So changing the salt does **not** re-pseudonymize an already-anonymized corpus.
 New captures adopt the new salt while stored bundles keep the old pseudonyms,
@@ -723,11 +697,9 @@ paths and host details, so treat them as private and do not submit them.
 import json
 import pandas as pd
 
-# Load results
 with open("results.json") as f:
     results = json.load(f)
 
-# Flatten to table
 queries = []
 for q in results['queries']:
     queries.append({
@@ -739,19 +711,16 @@ for q in results['queries']:
     })
 
 df = pd.DataFrame(queries)
-
-# Upload to warehouse
-# df.to_sql('benchmark_queries', engine, if_exists='append')
 ```
+
+From here you can upload the DataFrame to a warehouse, for example with `df.to_sql('benchmark_queries', engine, if_exists='append')`.
 
 ### CI/CD Integration
 
 ```bash
-# Run benchmark and check threshold
 benchbox run --platform duckdb --benchmark tpch --scale 0.01 \
   --output ./results/
 
-# Parse results in CI script
 uv run -- python -c "
 import json
 import sys
@@ -760,7 +729,7 @@ with open('results/tpch_duckdb_sf0.01_*.json') as f:
     results = json.load(f)
 
 power = results['summary']['tpc_metrics']['power_at_size']
-if power < 50:  # Performance threshold
+if power < 50:
     print(f'FAIL: Power@Size {power} below threshold 50')
     sys.exit(1)
 print(f'PASS: Power@Size {power}')

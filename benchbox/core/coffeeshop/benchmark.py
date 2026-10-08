@@ -1,5 +1,3 @@
-"""CoffeeShop benchmark implementation aligned with the reference generator."""
-
 from __future__ import annotations
 
 import csv
@@ -55,8 +53,6 @@ ORDER BY revenue DESC;"""
 
 
 class CoffeeShopBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseBenchmark):
-    """Expose data generation and query execution for the CoffeeShop benchmark."""
-
     def __init__(
         self,
         scale_factor: float = 1.0,
@@ -81,9 +77,6 @@ class CoffeeShopBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseB
 
         self.tables: dict[str, str] = {}
 
-    # ------------------------------------------------------------------
-    # Data generation
-    # ------------------------------------------------------------------
     def generate_data(
         self,
         tables: list[str] | None = None,
@@ -103,14 +96,10 @@ class CoffeeShopBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseB
         self.tables = generated
         return generated
 
-    # ------------------------------------------------------------------
-    # Queries
-    # ------------------------------------------------------------------
     def get_query(self, query_id: int | str, *, params: dict[str, Any] | None = None) -> str:
         return self.query_manager.get_query(str(query_id), params)
 
     def get_queries(self, dialect: str | None = None) -> dict[str, str]:
-        import benchbox.sql_compat.rules.query_source.coffeeshop_variants  # noqa: F401
         from benchbox.sql_compat.actions import CompatAction
         from benchbox.sql_compat.context import CompatibilityContext, Phase
         from benchbox.sql_compat.registry import REGISTRY
@@ -157,18 +146,16 @@ class CoffeeShopBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseB
             registry_decision = REGISTRY.resolve(ctx)
             if registry_decision is not None:
                 if registry_decision.action is CompatAction.SELECT_VARIANT:
-                    variant_sql = registry_decision.payload.variant_sql  # type: ignore[union-attr]
+                    variant_sql = registry_decision.payload.variant_sql
                 else:
-                    continue  # registry says NATIVE - keep translated SQL
+                    continue
             else:
-                variant_sql = legacy_sql  # no rule: use legacy SQL
+                variant_sql = legacy_sql
             entry = qm._queries[query_id]
             params = dict(entry.get("defaults", {}))
             translated[query_id] = variant_sql.format(**params)
 
         return translated
-
-    # translate_query_text() is inherited from TranslatableQueryMixin
 
     def get_all_queries(self) -> dict[str, str]:
         return self.query_manager.get_all_queries()
@@ -189,28 +176,11 @@ class CoffeeShopBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseB
             return cursor.fetchall()
         raise ValueError("Unsupported connection type")
 
-    # ------------------------------------------------------------------
-    # Schema helpers
-    # ------------------------------------------------------------------
     def get_schema(self, dialect: str = "standard") -> dict[str, dict]:
         return TABLES
 
     def get_table_loading_order(self, available_tables: list[str]) -> list[str]:
-        """Get the correct order for loading CoffeeShop tables to respect foreign key dependencies.
 
-        Derived from schema FK metadata (see
-        ``benchbox.core.coffeeshop.schema.get_table_loading_order``), not a
-        hand-maintained constant. Without this, callers fall back to
-        alphabetical table order; ``order_lines`` (the fact table)
-        references both dimension tables, so it must load last once
-        constraints are enforced.
-
-        Args:
-            available_tables: List of table names that are actually available
-
-        Returns:
-            List of table names in the correct loading order
-        """
         from benchbox.core.coffeeshop.schema import get_table_loading_order as _schema_table_loading_order
 
         full_order = _schema_table_loading_order()
@@ -235,11 +205,8 @@ class CoffeeShopBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseB
             enable_foreign_keys=enable_foreign_keys,
         )
 
-    # ------------------------------------------------------------------
-    # Data loading
-    # ------------------------------------------------------------------
     def get_csv_loading_config(self, table_name: str) -> list[str]:
-        """Get CSV loading configuration for CoffeeShop tables."""
+
         return ["header=false", "auto_detect=true", "ignore_errors=true"]
 
     def load_data_to_database(self, connection: Any, tables: list[str] | None = None) -> None:
@@ -286,9 +253,6 @@ class CoffeeShopBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseB
     def _normalize_row(self, row: list[str]) -> list[Any]:
         return [value if value != "" else None for value in row]
 
-    # ------------------------------------------------------------------
-    # Benchmark execution
-    # ------------------------------------------------------------------
     def run_benchmark(
         self,
         connection: Any,
@@ -333,7 +297,7 @@ class CoffeeShopBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseB
                     total_successful += duration
                     success_count += 1
                     total_rows += row_count
-                except Exception as exc:  # pragma: no cover - defensive
+                except Exception as exc:
                     iteration_results.append(
                         {
                             "iteration": iteration + 1,

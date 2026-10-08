@@ -1,13 +1,3 @@
-"""G2 preview deploy + soak contract pins.
-
-publication-preview-deploy.yml may write production Pages (same-site preview
-path), so its trigger discipline and permission scoping are load-bearing:
-workflow_dispatch only, pages:write confined to the deploy job, and a
-root-neutrality gate before any Pages write. The soak workflow must never
-write Pages and must fail safe (INCONCLUSIVE on root movement, FAIL on
-preview mismatch, receipt only after the 12h window).
-"""
-
 from __future__ import annotations
 
 import importlib.util
@@ -38,7 +28,6 @@ def _load(path: Path) -> dict:
 
 
 def _triggers(data: dict) -> dict:
-    # Quoted "on" stays a string key; unquoted `on:` parses as boolean True.
     if True in data:
         return data[True]
     return data["on"]
@@ -72,13 +61,9 @@ def test_deploy_has_root_neutrality_gate_before_pages_write() -> None:
     text = DEPLOY_PATH.read_text(encoding="utf-8")
     assert "root neutrality" in text.lower() or "root-neutrality" in text.lower()
     assert "live_database" in text
-    # Gate compares rebuilt root DB against the live baseline digest.
     assert "refusing deploy" in text or "refuses" in text or "refusing" in text
-    # Exact bytes can never match (wall-clock generated_at, 1-ULP float drift),
-    # so the gate must compare canonical digests, never raw sha256 equality.
     assert "compare_db_digest" in text
     assert '"$ROOT_DB_SHA" != "$LIVE_DB_SHA"' not in text
-    # Live must be fetched fail-closed and proven unmoved before comparison.
     assert "could not download" in text
     assert "moved under us" in text
 
@@ -104,15 +89,9 @@ def test_deploy_writes_receipts_with_both_shas() -> None:
 
 
 def test_deploy_builds_docs_before_assembly() -> None:
-    """Root rebuild mirrors docs.yml: Sphinx HTML must exist before assemble.
-
-    Missing docs/_build/html fails assembly with FileNotFoundError (first
-    gen1 deploy red). The sphinx-build step must precede assemble_public_site.
-    """
     text = DEPLOY_PATH.read_text(encoding="utf-8")
     assert "sphinx-build -b html" in text
     assert text.index("sphinx-build -b html") < text.index("assemble_public_site.py")
-    # Explorer app + data must be built before assembly (missing dist red).
     assert "npm ci" in text
     assert "explorer_publish.py build" in text
     assert "results_explorer_snapshot_invariants.py" in text
@@ -171,13 +150,6 @@ def test_soak_verdict_discipline() -> None:
 
 
 def test_soak_conclude_reuses_probe_run_id() -> None:
-    """The receipt job must not search runs by dispatch title.
-
-    Dispatch titles are the workflow name, never the generation, so a
-    title search yields null and the artifact fetch 404s (observed on the
-    first gen1 conclude dispatch). The probe resolves the deploy run once;
-    conclude consumes its run_id fail-closed.
-    """
     text = SOAK_PATH.read_text(encoding="utf-8")
     assert "displayTitle" not in text, "no run may be resolved by dispatch title"
     assert "needs.probe.outputs.run_id" in text

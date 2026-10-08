@@ -1,12 +1,6 @@
-"""Tests for Databend platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the DatabendAdapter for cloud-native OLAP workloads using
-Snowflake-compatible SQL via sqlglot translation.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import tempfile
 from pathlib import Path
@@ -24,16 +18,12 @@ pytestmark = [
 
 @pytest.fixture(autouse=True)
 def mock_databend_available():
-    """Mock DATABEND_AVAILABLE so tests run without the databend-driver installed."""
     with patch("benchbox.platforms.databend.adapter.DATABEND_AVAILABLE", True):
         yield
 
 
 class TestDatabendAdapterInitialization:
-    """Test Databend adapter initialization and configuration."""
-
     def test_initialization_with_host(self):
-        """Test initialization with explicit host."""
         try:
             adapter = DatabendAdapter(
                 host="localhost",
@@ -54,7 +44,6 @@ class TestDatabendAdapterInitialization:
         assert adapter.get_target_dialect() == "snowflake"
 
     def test_initialization_with_dsn(self):
-        """Test initialization with DSN string."""
         try:
             adapter = DatabendAdapter(
                 dsn="databend+http://root:@localhost:8000/test_db",
@@ -63,10 +52,9 @@ class TestDatabendAdapterInitialization:
             pytest.skip("databend-driver not installed")
 
         assert adapter.dsn == "databend+http://root:@localhost:8000/test_db"
-        assert adapter.database == "benchbox"  # default when not set separately
+        assert adapter.database == "benchbox"
 
     def test_initialization_with_cloud_config(self):
-        """Test initialization with Databend Cloud configuration."""
         try:
             adapter = DatabendAdapter(
                 host="tenant--warehouse.gw.databend.com",
@@ -83,7 +71,6 @@ class TestDatabendAdapterInitialization:
         assert adapter.database == "analytics"
 
     def test_initialization_missing_config(self):
-        """Test initialization raises error without host or DSN."""
         from benchbox.core.exceptions import ConfigurationError
 
         try:
@@ -93,7 +80,6 @@ class TestDatabendAdapterInitialization:
             pytest.skip("databend-driver not installed")
 
     def test_initialization_env_vars(self):
-        """Test initialization from environment variables."""
         env_vars = {
             "DATABEND_HOST": "env-host.example.com",
             "DATABEND_USER": "env_user",
@@ -113,7 +99,6 @@ class TestDatabendAdapterInitialization:
         assert adapter.database == "env_db"
 
     def test_default_ssl_enabled(self):
-        """Test SSL is enabled by default."""
         try:
             adapter = DatabendAdapter(host="example.com", password="pass")
         except ImportError:
@@ -122,7 +107,6 @@ class TestDatabendAdapterInitialization:
         assert adapter.ssl is True
 
     def test_disable_result_cache_default(self):
-        """Test result cache is disabled by default for benchmarking."""
         try:
             adapter = DatabendAdapter(host="example.com", password="pass")
         except ImportError:
@@ -132,10 +116,7 @@ class TestDatabendAdapterInitialization:
 
 
 class TestDatabendDSNBuilding:
-    """Test DSN construction from individual parameters."""
-
     def test_build_dsn_ssl(self):
-        """Test DSN building with SSL enabled."""
         try:
             adapter = DatabendAdapter(
                 host="example.com",
@@ -154,7 +135,6 @@ class TestDatabendDSNBuilding:
         assert ":443/" in dsn
 
     def test_build_dsn_no_ssl(self):
-        """Test DSN building without SSL."""
         try:
             adapter = DatabendAdapter(
                 host="localhost",
@@ -172,7 +152,6 @@ class TestDatabendDSNBuilding:
         assert "sslmode=disable" in dsn
 
     def test_build_dsn_with_warehouse(self):
-        """Test DSN building with warehouse parameter."""
         try:
             adapter = DatabendAdapter(
                 host="cloud.example.com",
@@ -187,7 +166,6 @@ class TestDatabendDSNBuilding:
         assert "warehouse=my_wh" in dsn
 
     def test_build_dsn_explicit_port(self):
-        """Test DSN building with explicit port."""
         try:
             adapter = DatabendAdapter(
                 host="example.com",
@@ -202,7 +180,6 @@ class TestDatabendDSNBuilding:
         assert ":9000/" in dsn
 
     def test_build_dsn_returns_explicit_dsn(self):
-        """Test that explicit DSN is returned as-is."""
         try:
             adapter = DatabendAdapter(
                 dsn="databend+http://custom:dsn@host/db",
@@ -213,7 +190,6 @@ class TestDatabendDSNBuilding:
         assert adapter._build_dsn() == "databend+http://custom:dsn@host/db?sslmode=disable"
 
     def test_build_dsn_normalizes_legacy_explicit_dsn(self):
-        """Test that legacy BenchBox DSN schemes are normalized for the driver."""
         try:
             adapter = DatabendAdapter(
                 dsn="databend://custom:dsn@host/db",
@@ -225,10 +201,7 @@ class TestDatabendDSNBuilding:
 
 
 class TestDatabendConnection:
-    """Test connection creation and management."""
-
     def test_create_connection(self):
-        """Test connection creation."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -243,7 +216,6 @@ class TestDatabendConnection:
         ):
             mock_dd.BlockingDatabendClient.return_value = mock_client
 
-            # Need to make databend_driver importable in the from_config context
             with patch.dict("sys.modules", {"databend_driver": mock_dd}):
                 connection = adapter.create_connection()
 
@@ -251,7 +223,6 @@ class TestDatabendConnection:
         mock_client.query_row.assert_called_with("SELECT 1")
 
     def test_create_connection_with_get_conn(self):
-        """Test connection creation with the current databend-driver API."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -275,7 +246,6 @@ class TestDatabendConnection:
         mock_connection.query_row.assert_called_with("SELECT 1")
 
     def test_close_connection(self):
-        """Test connection closing."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -286,17 +256,14 @@ class TestDatabendConnection:
         mock_connection.close.assert_called_once()
 
     def test_close_connection_none(self):
-        """Test closing None connection doesn't raise."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
             pytest.skip("databend-driver not installed")
 
-        # Should not raise
         adapter.close_connection(None)
 
     def test_test_connection_success(self):
-        """Test successful connection test."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -313,7 +280,6 @@ class TestDatabendConnection:
         assert result is True
 
     def test_test_connection_failure(self):
-        """Test failed connection test."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -328,10 +294,7 @@ class TestDatabendConnection:
 
 
 class TestDatabendSchemaOperations:
-    """Test schema creation and management."""
-
     def test_create_schema(self):
-        """Test schema creation with Databend table definitions."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -355,11 +318,9 @@ class TestDatabendSchemaOperations:
 
         assert isinstance(schema_time, float)
         assert schema_time >= 0
-        # Should execute CREATE DATABASE, USE, and at least 2 CREATE TABLE statements
         assert mock_connection.exec.call_count >= 4
 
     def test_optimize_table_definition_char_to_varchar(self):
-        """Test CHAR(n) to VARCHAR(n) conversion for Databend."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -368,8 +329,6 @@ class TestDatabendSchemaOperations:
         sql = "CREATE TABLE test (id INTEGER, code CHAR(10), name VARCHAR(100))"
         optimized = adapter._optimize_table_definition(sql)
 
-        # CHAR(10) should be converted to VARCHAR(10); check no standalone CHAR remains
-        # (note: "CHAR(10)" is a substring of "VARCHAR(10)", so use word boundary check)
         import re
 
         assert not re.search(r"\bCHAR\s*\(", optimized, re.IGNORECASE), f"Standalone CHAR( found in: {optimized}"
@@ -377,7 +336,6 @@ class TestDatabendSchemaOperations:
         assert "VARCHAR(100)" in optimized
 
     def test_optimize_table_definition_removes_primary_key(self):
-        """Test PRIMARY KEY constraint removal."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -389,7 +347,6 @@ class TestDatabendSchemaOperations:
         assert "PRIMARY KEY" not in optimized
 
     def test_optimize_table_definition_removes_foreign_key(self):
-        """Test FOREIGN KEY constraint removal."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -402,7 +359,6 @@ class TestDatabendSchemaOperations:
         assert "REFERENCES" not in optimized
 
     def test_extract_table_name(self):
-        """Test table name extraction from CREATE statement."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -413,7 +369,6 @@ class TestDatabendSchemaOperations:
         assert table_name == "customer"
 
     def test_extract_table_name_if_not_exists(self):
-        """Test table name extraction with IF NOT EXISTS."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -425,10 +380,7 @@ class TestDatabendSchemaOperations:
 
 
 class TestDatabendDataLoading:
-    """Test data loading functionality."""
-
     def test_load_data_csv(self):
-        """Test loading CSV data."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -437,7 +389,6 @@ class TestDatabendDataLoading:
         mock_connection = Mock()
         mock_benchmark = Mock()
 
-        # Create temporary test file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
             f.write("1,test1\n2,test2\n")
             temp_path = Path(f.name)
@@ -453,7 +404,6 @@ class TestDatabendDataLoading:
             assert "test_table" in table_stats
             assert table_stats["test_table"] == 2
 
-            # Should execute USE and INSERT commands
             exec_calls = mock_connection.exec.call_args_list
             assert any("USE" in str(call) for call in exec_calls)
             assert any("INSERT INTO" in str(call) for call in exec_calls)
@@ -462,7 +412,6 @@ class TestDatabendDataLoading:
             temp_path.unlink()
 
     def test_load_data_tbl_files(self):
-        """Test loading pipe-delimited .tbl files (TPC format)."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -471,7 +420,6 @@ class TestDatabendDataLoading:
         mock_connection = Mock()
         mock_benchmark = Mock()
 
-        # Create temporary test file with pipe delimiter
         with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False, encoding="utf-8") as f:
             f.write("1|test1|\n2|test2|\n")
             temp_path = Path(f.name)
@@ -488,7 +436,6 @@ class TestDatabendDataLoading:
             temp_path.unlink()
 
     def test_load_data_escapes_quotes(self):
-        """Test proper escaping of single quotes in data."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -497,7 +444,6 @@ class TestDatabendDataLoading:
         mock_connection = Mock()
         mock_benchmark = Mock()
 
-        # Create file with single quotes in data
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
             f.write("1,test's data\n")
             temp_path = Path(f.name)
@@ -507,11 +453,9 @@ class TestDatabendDataLoading:
 
             adapter.load_data(mock_benchmark, mock_connection, Path("/tmp"))
 
-            # Verify the INSERT call contains properly escaped quotes
             exec_calls = [str(call) for call in mock_connection.exec.call_args_list]
             insert_calls = [c for c in exec_calls if "INSERT INTO" in c]
             assert len(insert_calls) > 0
-            # The escaped value should use '' for single quotes
             assert "test''s data" in insert_calls[0]
 
         finally:
@@ -519,10 +463,7 @@ class TestDatabendDataLoading:
 
 
 class TestDatabendQueryExecution:
-    """Test query execution functionality."""
-
     def test_execute_query_success(self):
-        """Test successful query execution."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -539,7 +480,6 @@ class TestDatabendQueryExecution:
         assert isinstance(result["execution_time_seconds"], float)
 
     def test_execute_query_use_database_before_timing(self):
-        """Test that USE database is called before query timing starts."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -550,16 +490,13 @@ class TestDatabendQueryExecution:
 
         result = adapter.execute_query(mock_connection, "SELECT 1", "q1")
 
-        # USE database should be called via exec before query_iter
         exec_calls = [str(c) for c in mock_connection.exec.call_args_list]
         assert any("USE" in c for c in exec_calls), "USE database should be called"
 
-        # Verify call order: exec (USE) happens before query_iter
         assert mock_connection.exec.call_count >= 1
         assert result["status"] == "SUCCESS"
 
     def test_execute_query_failure(self):
-        """Test query execution failure."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -578,7 +515,6 @@ class TestDatabendQueryExecution:
         assert result["error_type"] == "Exception"
 
     def test_execute_query_empty_result(self):
-        """Test query execution with empty result."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -594,7 +530,6 @@ class TestDatabendQueryExecution:
         assert result["rows_returned"] == 0
 
     def test_get_query_plan(self):
-        """Test query plan retrieval."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -613,10 +548,7 @@ class TestDatabendQueryExecution:
 
 
 class TestDatabendPlatformInfo:
-    """Test platform information retrieval."""
-
     def test_get_platform_info(self):
-        """Test platform info retrieval."""
         try:
             adapter = DatabendAdapter(
                 host="example.com",
@@ -640,7 +572,6 @@ class TestDatabendPlatformInfo:
         assert platform_info["platform_version"] == "v1.2.3"
 
     def test_get_platform_info_with_warehouse(self):
-        """Test platform info includes warehouse when set."""
         try:
             adapter = DatabendAdapter(
                 host="example.com",
@@ -656,7 +587,6 @@ class TestDatabendPlatformInfo:
         assert platform_info["platform_version"] is None
 
     def test_get_platform_info_no_connection(self):
-        """Test platform info without connection."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -669,10 +599,7 @@ class TestDatabendPlatformInfo:
 
 
 class TestDatabendDialect:
-    """Test SQL dialect handling."""
-
     def test_target_dialect_is_snowflake(self):
-        """Test that Databend uses Snowflake-compatible dialect."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -683,10 +610,7 @@ class TestDatabendDialect:
 
 
 class TestDatabendTuning:
-    """Test tuning and optimization functionality."""
-
     def test_configure_for_benchmark_olap(self):
-        """Test OLAP benchmark configuration."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -694,11 +618,9 @@ class TestDatabendTuning:
 
         mock_connection = Mock()
 
-        # Should not raise
         adapter.configure_for_benchmark(mock_connection, "olap")
 
     def test_configure_for_benchmark_disables_result_cache(self):
-        """Test that configure_for_benchmark disables query result cache."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -712,7 +634,6 @@ class TestDatabendTuning:
         mock_connection.exec.assert_called_once_with("SET enable_query_result_cache = 0")
 
     def test_configure_for_benchmark_cache_disable_respects_flag(self):
-        """Test that cache disable is skipped when flag is False."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="", disable_result_cache=False)
         except ImportError:
@@ -724,7 +645,6 @@ class TestDatabendTuning:
         mock_connection.exec.assert_not_called()
 
     def test_generate_tuning_clause_none(self):
-        """Test tuning clause generation with None input."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -734,7 +654,6 @@ class TestDatabendTuning:
         assert clause == ""
 
     def test_apply_constraint_configuration(self):
-        """Test constraint configuration (informational only in Databend)."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -746,11 +665,9 @@ class TestDatabendTuning:
         mock_foreign_key_config = Mock()
         mock_foreign_key_config.enabled = True
 
-        # Should not raise - constraints are informational only
         adapter.apply_constraint_configuration(mock_primary_key_config, mock_foreign_key_config, mock_connection)
 
     def test_analyze_table_skipped(self):
-        """Test that ANALYZE is skipped (Databend collects stats automatically)."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -758,18 +675,13 @@ class TestDatabendTuning:
 
         mock_connection = Mock()
 
-        # ANALYZE should not be called - Databend collects stats automatically
         adapter.analyze_table(mock_connection, "test_table")
 
-        # No exec call should be made
         mock_connection.exec.assert_not_called()
 
 
 class TestDatabendFromConfig:
-    """Test from_config() factory method."""
-
     def test_from_config_with_host(self):
-        """Test from_config() with host parameters."""
         config = {
             "host": "localhost",
             "port": 8000,
@@ -791,7 +703,6 @@ class TestDatabendFromConfig:
         assert adapter.database == "test_db"
 
     def test_from_config_with_dsn(self):
-        """Test from_config() with DSN."""
         config = {
             "dsn": "databend+http://root:@localhost:8000/mydb",
             "benchmark": "tpch",
@@ -806,7 +717,6 @@ class TestDatabendFromConfig:
         assert adapter.dsn == "databend+http://root:@localhost:8000/mydb"
 
     def test_from_config_generates_database_name(self):
-        """Test from_config() generates database name from benchmark config."""
         config = {
             "host": "localhost",
             "ssl": False,
@@ -820,16 +730,12 @@ class TestDatabendFromConfig:
         except ImportError:
             pytest.skip("databend-driver not installed")
 
-        # Database name should be generated from benchmark config
         assert adapter.database is not None
         assert "tpch" in adapter.database.lower() or "sf10" in adapter.database.lower()
 
 
 class TestDatabendQuoteIdentifier:
-    """Test identifier quoting."""
-
     def test_quote_identifier_simple(self):
-        """Test simple identifier quoting with backticks."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -838,7 +744,6 @@ class TestDatabendQuoteIdentifier:
         assert adapter._quote_identifier("table_name") == "`table_name`"
 
     def test_quote_identifier_with_backtick(self):
-        """Test quoting identifier containing backtick."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -847,7 +752,6 @@ class TestDatabendQuoteIdentifier:
         assert adapter._quote_identifier("my`table") == "`my``table`"
 
     def test_quote_identifier_empty_raises(self):
-        """Test that empty identifier raises ValueError."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -858,10 +762,7 @@ class TestDatabendQuoteIdentifier:
 
 
 class TestDatabendCoerceBool:
-    """Test boolean coercion utility."""
-
     def test_coerce_bool_none_returns_default(self):
-        """Test None returns default value."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -871,7 +772,6 @@ class TestDatabendCoerceBool:
         assert adapter._coerce_bool(None, False) is False
 
     def test_coerce_bool_string_values(self):
-        """Test string to bool coercion."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -884,7 +784,6 @@ class TestDatabendCoerceBool:
         assert adapter._coerce_bool("no", True) is False
 
     def test_coerce_bool_native_bool(self):
-        """Test native bool passthrough."""
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
         except ImportError:
@@ -895,10 +794,7 @@ class TestDatabendCoerceBool:
 
 
 class TestDatabendResourceCleanup:
-    """Test that BlockingDatabendClient instances are closed after use."""
-
     def test_test_connection_closes_client(self):
-        """test_connection should close the BlockingDatabendClient."""
         mock_client = Mock()
         mock_client.query_row.return_value = (1,)
 
@@ -917,8 +813,6 @@ class TestDatabendResourceCleanup:
 
 
 class TestDatabendDataResolution:
-    """Tests for shared DataSourceResolver delegation."""
-
     def test_resolve_data_files_delegates_to_resolver(self, tmp_path):
         try:
             adapter = DatabendAdapter(host="localhost", ssl=False, password="")
@@ -952,7 +846,6 @@ class TestDatabendDataResolution:
                 adapter._resolve_data_files(Mock(), tmp_path)
 
     def test_test_connection_closes_client_on_failure(self):
-        """test_connection should close the client even on failure."""
         mock_client = Mock()
         mock_client.query_row.side_effect = Exception("Connection refused")
 
@@ -970,7 +863,6 @@ class TestDatabendDataResolution:
         mock_client.close.assert_called_once()
 
     def test_test_connection_closes_connection_from_get_conn(self):
-        """test_connection should close the connection returned by get_conn."""
         mock_connection = Mock(spec=["query_row", "close"])
         mock_connection.query_row.return_value = (1,)
         mock_client = Mock(spec=["get_conn"])
@@ -991,7 +883,6 @@ class TestDatabendDataResolution:
         mock_connection.close.assert_called_once()
 
     def test_check_server_database_exists_closes_client(self):
-        """check_server_database_exists should close the BlockingDatabendClient."""
         mock_row = Mock()
         mock_row.values.return_value = ["default"]
         mock_client = Mock()
@@ -1012,34 +903,25 @@ class TestDatabendDataResolution:
 
 
 class TestDatabendDelimiterValidation:
-    """Test delimiter validation in data loading path."""
-
     def test_safe_delimiters_accepted(self):
-        """Pipe, comma, and tab delimiters should be accepted."""
         safe_delimiters = [",", "|", "\t"]
         for d in safe_delimiters:
             if d not in (",", "|", "\t"):
                 raise AssertionError(f"Unexpectedly rejected: {d!r}")
 
     def test_unsafe_delimiter_rejected(self):
-        """Unsafe delimiter characters should be rejected by the validation logic."""
-        # The validation checks delimiter not in (",", "|", "\t")
         unsafe_chars = [";", "'", '"', " ", "\n"]
         for char in unsafe_chars:
             assert char not in (",", "|", "\t"), f"Expected {char!r} to be unsafe"
 
 
 class TestDatabendConfigBuilder:
-    """Test config builder resolution from package __init__."""
-
     def test_config_builder_importable_from_package(self):
-        """Test that _build_databend_config is importable from databend package."""
         from benchbox.platforms.databend import _build_databend_config
 
         assert callable(_build_databend_config)
 
     def test_config_builder_getattr_resolution(self):
-        """Test that getattr on package module resolves _build_databend_config."""
         import benchbox.platforms.databend as databend_module
 
         builder = getattr(databend_module, "_build_databend_config", None)
@@ -1048,10 +930,7 @@ class TestDatabendConfigBuilder:
 
 
 class TestDatabendDsnConstruction:
-    """Tests for DSN construction including URL-encoding and SSL scheme."""
-
     def test_dsn_defaults_to_ssl(self):
-        """DSN uses databend+https scheme by default."""
         try:
             adapter = DatabendAdapter(host="myhost", username="user", password="pass", database="db")
         except ImportError:
@@ -1061,7 +940,6 @@ class TestDatabendDsnConstruction:
         assert ":443/" in dsn
 
     def test_dsn_uses_plain_scheme_when_ssl_disabled(self):
-        """DSN uses databend+http scheme when ssl=False."""
         try:
             adapter = DatabendAdapter(host="myhost", username="user", password="pass", database="db", ssl=False)
         except ImportError:
@@ -1072,19 +950,15 @@ class TestDatabendDsnConstruction:
         assert "sslmode=disable" in dsn
 
     def test_dsn_url_encodes_password_with_special_chars(self):
-        """Password with special characters is URL-encoded in DSN."""
         try:
             adapter = DatabendAdapter(host="myhost", username="user", password="p@ss:w/rd#", database="db")
         except ImportError:
             pytest.skip("databend-driver not installed")
         dsn = adapter._build_dsn()
-        # @ should be encoded as %40, : as %3A, / as %2F, # as %23
         assert "p%40ss%3Aw%2Frd%23" in dsn
-        # Raw special chars should not appear in the password section
         assert "p@ss:" not in dsn
 
     def test_dsn_url_encodes_username_with_special_chars(self):
-        """Username with special characters is URL-encoded in DSN."""
         try:
             adapter = DatabendAdapter(host="myhost", username="user@domain", password="pass", database="db")
         except ImportError:
@@ -1093,7 +967,6 @@ class TestDatabendDsnConstruction:
         assert "user%40domain:" in dsn
 
     def test_dsn_plain_credentials_unchanged(self):
-        """Simple alphanumeric credentials pass through without encoding."""
         try:
             adapter = DatabendAdapter(host="myhost", username="admin", password="secret123", database="db")
         except ImportError:

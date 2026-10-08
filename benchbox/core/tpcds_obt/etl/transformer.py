@@ -1,5 +1,3 @@
-"""DuckDB-based transformer for the TPC-DS One Big Table benchmark."""
-
 from __future__ import annotations
 
 import json
@@ -39,14 +37,7 @@ SUPPORTED_CHANNELS = ("store", "web", "catalog")
 
 
 class TPCDSOBTTransformer:
-    """Transforms TPC-DS star schema data into a single OBT table using DuckDB."""
-
     def __init__(self, duckdb_module: Any | None = None) -> None:
-        """Initialize the transformer.
-
-        Args:
-            duckdb_module: Optional injected DuckDB module (for testing).
-        """
         self._duckdb = duckdb_module
 
     def transform(
@@ -59,19 +50,6 @@ class TPCDSOBTTransformer:
         output_format: str = "parquet",
         scale_factor: float | None = None,
     ) -> dict[str, Path]:
-        """Transform TPC-DS data into the unified OBT table.
-
-        Args:
-            tpcds_dir: Directory containing generated TPC-DS data files.
-            output_dir: Directory where the OBT output should be written.
-            mode: Column group to emit ('full' or 'minimal').
-            channels: Optional subset of channels to include.
-            output_format: 'parquet' (default) or 'dat' (pipe-delimited).
-            scale_factor: Optional scale factor for manifest metadata.
-
-        Returns:
-            Mapping containing the output table path and manifest path.
-        """
         channel_list = [c.lower() for c in (channels or SUPPORTED_CHANNELS)]
         self._validate_channels(channel_list)
 
@@ -81,8 +59,6 @@ class TPCDSOBTTransformer:
         output_path = output_dir / f"{OBT_TABLE_NAME}.{output_format}"
         manifest_path = output_dir / f"{OBT_TABLE_NAME}_manifest.json"
 
-        # Use a file-backed temp database so DuckDB can spill to disk effectively
-        # during the large multi-channel UNION+JOIN transformation.
         tmp_dir = tempfile.mkdtemp(prefix="benchbox_obt_")
         tmp_db_path = Path(tmp_dir) / "obt.duckdb"
 
@@ -117,11 +93,6 @@ class TPCDSOBTTransformer:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
     def _connect(self, db_path: Path | None = None) -> Any:
-        """Create a DuckDB connection configured for large ETL workloads.
-
-        Args:
-            db_path: Path to a file-backed database. If None, uses in-memory.
-        """
         target = str(db_path) if db_path else ":memory:"
         if self._duckdb is None:
             import duckdb
@@ -130,19 +101,15 @@ class TPCDSOBTTransformer:
         else:
             conn = self._duckdb.connect(target)
 
-        # Configure for large-scale ETL: disable insertion-order preservation
-        # to reduce memory pressure during multi-way joins.
         conn.execute("SET preserve_insertion_order = false")
         return conn
 
     def _validate_channels(self, channels: Sequence[str]) -> None:
-        """Validate requested channels."""
         invalid = [c for c in channels if c not in SUPPORTED_CHANNELS]
         if invalid:
             raise ValueError(f"Unsupported channels: {invalid}. Supported: {SUPPORTED_CHANNELS}")
 
     def _load_source_tables(self, conn: Any, tpcds_dir: Path, channels: Sequence[str]) -> None:
-        """Load TPC-DS source tables into DuckDB."""
         base_tables = {
             DATE_DIM.name,
             TIME_DIM.name,
@@ -171,19 +138,6 @@ class TPCDSOBTTransformer:
             conn.execute(self._read_csv_sql(path, table_name, columns))
 
     def _resolve_source_path(self, base_dir: Path, table_name: str) -> Path | list[str]:
-        """Resolve the path to TPC-DS source file(s).
-
-        Supports:
-            - Single uncompressed files: table.dat, table.tbl
-            - Single compressed files: table.dat.zst, table.dat.gz
-            - Parallel uncompressed files: table_1_10.dat, table_2_10.dat
-            - Parallel compressed files: table_1_10.dat.zst, table_1_10.dat.gz
-
-        Returns either a single Path for a single file, or a list of file path strings
-        for parallel-generated files.
-        """
-        # Check for single-file candidates first (ordered by preference)
-        # zstd is preferred as it's the default compression type
         candidates = [
             base_dir / f"{table_name}.dat",
             base_dir / f"{table_name}.dat.zst",
@@ -197,9 +151,6 @@ class TPCDSOBTTransformer:
             if candidate.exists():
                 return candidate
 
-        # Check for parallel-generated files (e.g., table_1_10.dat, table_2_10.dat)
-        # Pattern: {table_name}_{chunk_id}_{total_chunks}{extension}
-        # Check each extension type in order of preference
         for extension in [".dat", ".dat.zst", ".dat.gz"]:
             parallel_files = self._find_parallel_files(base_dir, table_name, extension)
             if parallel_files:
@@ -209,23 +160,6 @@ class TPCDSOBTTransformer:
         raise FileNotFoundError(f"Source file for {table_name} not found in {base_dir}")
 
     def _find_parallel_files(self, base_dir: Path, table_name: str, extension: str) -> list[Path]:
-        """Find parallel-generated files for a specific table.
-
-        Parallel files follow the pattern: {table_name}_{chunk_id}_{total_chunks}{extension}
-        For example: customer_1_10.dat, customer_2_10.dat, ..., customer_10_10.dat
-
-        This method validates that files match the exact pattern to avoid false matches
-        like 'customer_demographics_1_10.dat' when looking for 'customer' files.
-
-        Args:
-            base_dir: Directory containing the data files.
-            table_name: Exact table name to find files for.
-            extension: File extension including the dot (e.g., '.dat' or '.dat.gz').
-
-        Returns:
-            List of Path objects for matching parallel files, empty if none found.
-        """
-        # Pattern: table_name_N_M.ext where N and M are integers
         pattern = re.compile(rf"^{re.escape(table_name)}_(\d+)_(\d+){re.escape(extension)}$")
 
         matching_files: list[Path] = []
@@ -236,25 +170,12 @@ class TPCDSOBTTransformer:
         return matching_files
 
     def _read_csv_sql(self, path: Path | str | list[str], table_name: str, columns: list[str]) -> str:
-        """Build DuckDB SQL to load pipe-delimited file(s).
-
-        Uses strict parsing (ignore_errors=false) to ensure data quality.
-        Benchmarking requires consistent data; silent row drops could invalidate results.
-
-        Args:
-            path: Either a Path to a single file, a glob pattern string, or a list of file paths.
-            table_name: Name of the table to create.
-            columns: List of column names.
-        """
         col_list = ", ".join(f"'{c}'" for c in columns)
 
-        # Format the path argument for DuckDB's read_csv
         if isinstance(path, list):
-            # List of files - format as DuckDB list literal
             file_list_str = ", ".join(f"'{f}'" for f in path)
             path_arg = f"[{file_list_str}]"
         else:
-            # Single file or glob pattern
             path_arg = f"'{path}'"
 
         return f"""
@@ -269,13 +190,11 @@ class TPCDSOBTTransformer:
         """
 
     def _build_union_query(self, columns: Sequence[Any], channels: Sequence[str]) -> str:
-        """Build the union-all SQL that populates the OBT table."""
         select_statements = [self._channel_select(channel, columns) for channel in channels]
         union_body = "\nUNION ALL\n".join(select_statements)
         return f"CREATE OR REPLACE TABLE {OBT_TABLE_NAME} AS\n{union_body}"
 
     def _channel_select(self, channel: str, columns: Sequence[Any]) -> str:
-        """Build a channel-specific SELECT aligned with the canonical column order."""
         fact_map = self._fact_map(channel)
         role_aliases = self._role_aliases(channel)
         income_band_aliases = self._income_band_aliases(channel)
@@ -290,7 +209,6 @@ class TPCDSOBTTransformer:
                 else:
                     select_parts.append(f"{self._cast_expr(expr, col)} AS {col.name}")
             elif col.source_table == "income_band":
-                # Income band columns are accessed via household_demographics FK
                 ib_alias = income_band_aliases.get(col.role or "")
                 if ib_alias is None:
                     select_parts.append(f"{self._null_expr(col)} AS {col.name}")
@@ -316,7 +234,6 @@ class TPCDSOBTTransformer:
         return f"SELECT\n    {select_sql}\n{from_clause}\n    " + "\n    ".join(joins)
 
     def _fact_map(self, channel: str) -> dict[str, str | None]:
-        """Return channel-specific mapping for fact columns."""
         if channel == "store":
             return {
                 "channel": "'store'",
@@ -431,7 +348,6 @@ class TPCDSOBTTransformer:
                 "has_return": "CASE WHEN wr.wr_order_number IS NULL THEN 'N' ELSE 'Y' END",
             }
 
-        # catalog
         return {
             "channel": "'catalog'",
             "sale_id": "cs.cs_order_number",
@@ -489,7 +405,6 @@ class TPCDSOBTTransformer:
         }
 
     def _role_aliases(self, channel: str) -> dict[str, str | None]:
-        """Return dimension role aliases for the channel."""
         if channel == "store":
             return {
                 "sold_date": "ssd",
@@ -595,13 +510,12 @@ class TPCDSOBTTransformer:
         }
 
     def _income_band_aliases(self, channel: str) -> dict[str, str | None]:
-        """Return income_band table aliases for each household_demographics role."""
         if channel == "store":
             return {
                 "bill_hdemo": "ib_bill",
-                "ship_hdemo": "ib_bill",  # Store sales: bill = ship
+                "ship_hdemo": "ib_bill",
                 "returning_hdemo": "ib_ret",
-                "refunded_hdemo": "ib_ret",  # Store returns: ret = refunded
+                "refunded_hdemo": "ib_ret",
             }
         if channel == "web":
             return {
@@ -610,7 +524,6 @@ class TPCDSOBTTransformer:
                 "returning_hdemo": "ib_ret",
                 "refunded_hdemo": "ib_ref",
             }
-        # catalog
         return {
             "bill_hdemo": "ib_bill",
             "ship_hdemo": "ib_ship",
@@ -619,7 +532,6 @@ class TPCDSOBTTransformer:
         }
 
     def _joins(self, channel: str) -> list[str]:
-        """Return LEFT JOIN clauses for the channel."""
         if channel == "store":
             return [
                 "LEFT JOIN store_returns sr ON ss.ss_ticket_number = sr.sr_ticket_number "
@@ -718,15 +630,12 @@ class TPCDSOBTTransformer:
         ]
 
     def _cast_expr(self, expr: str, column: Any) -> str:
-        """Cast an expression to the OBT column type."""
         return f"CAST({expr} AS {column.sql_type()})"
 
     def _null_expr(self, column: Any) -> str:
-        """Render a typed NULL expression."""
         return f"CAST(NULL AS {column.sql_type()})"
 
     def _export_table(self, conn: Any, output_path: Path, output_format: str) -> None:
-        """Export the OBT table to disk."""
         if output_format == "parquet":
             conn.execute(f"COPY {OBT_TABLE_NAME} TO '{output_path}' (FORMAT PARQUET)")
         elif output_format == "dat":
@@ -745,7 +654,6 @@ class TPCDSOBTTransformer:
         column_count: int,
         output_format: str,
     ) -> dict[str, Any]:
-        """Build manifest metadata for the generated table."""
         rows_total = int(conn.execute(f"SELECT COUNT(*) FROM {OBT_TABLE_NAME}").fetchone()[0])
         rows_by_channel = dict(
             conn.execute(f"SELECT channel, COUNT(*) FROM {OBT_TABLE_NAME} GROUP BY channel").fetchall()

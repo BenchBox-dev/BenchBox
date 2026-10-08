@@ -1,10 +1,3 @@
-"""Tests for TPCHDataGenerator.
-
-Verifies initialization, parameter validation, row count calculations,
-path resolution, file collection, and manifest writing. Tests that
-require the dbgen binary are skipped when unavailable.
-"""
-
 from __future__ import annotations
 
 import os
@@ -27,9 +20,6 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Initialization
-# ---------------------------------------------------------------------------
 class TestTPCHGeneratorInit:
     def test_default_params(self, tmp_path: Path):
         gen = TPCHDataGenerator(scale_factor=1.0, output_dir=tmp_path, quiet=True)
@@ -56,12 +46,9 @@ class TestTPCHGeneratorInit:
 
     def test_dbgen_exe_deferred(self, tmp_path: Path):
         gen = TPCHDataGenerator(scale_factor=0.01, output_dir=tmp_path, quiet=True)
-        assert gen._dbgen_exe is None  # lazy
+        assert gen._dbgen_exe is None
 
 
-# ---------------------------------------------------------------------------
-# Parameter validation
-# ---------------------------------------------------------------------------
 class TestParameterValidation:
     def test_zero_scale_factor_raises(self, tmp_path: Path):
         with pytest.raises(ValueError, match="positive"):
@@ -93,9 +80,6 @@ class TestParameterValidation:
         assert gen.parallel == 64
 
 
-# ---------------------------------------------------------------------------
-# Row count calculation
-# ---------------------------------------------------------------------------
 class TestExpectedRowCount:
     def test_region_is_constant(self, tmp_path: Path):
         gen = TPCHDataGenerator(scale_factor=10.0, output_dir=tmp_path, quiet=True)
@@ -116,9 +100,6 @@ class TestExpectedRowCount:
         assert gen._expected_row_count("nonexistent") == 0
 
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
 class TestConstants:
     def test_table_codes_has_eight_tables(self):
         assert len(_TPCH_TABLE_CODES) == 8
@@ -130,9 +111,6 @@ class TestConstants:
         assert set(_TPCH_TABLE_CODES.keys()) == set(_TPCH_BASE_ROW_COUNTS.keys())
 
 
-# ---------------------------------------------------------------------------
-# Path resolution
-# ---------------------------------------------------------------------------
 class TestPathResolution:
     def test_package_root_dir_is_parent(self):
         root = TPCHDataGenerator._package_root_dir()
@@ -151,9 +129,6 @@ class TestPathResolution:
         assert isinstance(gen.has_dbgen_sources(), bool)
 
 
-# ---------------------------------------------------------------------------
-# File collection
-# ---------------------------------------------------------------------------
 class TestCollectExistingTableFiles:
     def test_finds_uncompressed_tbl(self, tmp_path: Path):
         gen = TPCHDataGenerator(scale_factor=0.01, output_dir=tmp_path, quiet=True)
@@ -188,9 +163,6 @@ class TestCollectExistingTableFiles:
         assert result == {}
 
 
-# ---------------------------------------------------------------------------
-# Stdout support check
-# ---------------------------------------------------------------------------
 class TestStdoutSupport:
     def test_caches_result(self, tmp_path: Path):
         gen = TPCHDataGenerator(scale_factor=0.01, output_dir=tmp_path, quiet=True)
@@ -200,14 +172,11 @@ class TestStdoutSupport:
     def test_returns_false_when_binary_unavailable(self, tmp_path: Path):
         gen = TPCHDataGenerator(scale_factor=0.01, output_dir=tmp_path, quiet=True)
         gen._dbgen_exe = tmp_path / "nonexistent"
-        # Should not crash, just return False
+
         result = gen._check_stdout_support()
         assert result is False
 
 
-# ---------------------------------------------------------------------------
-# Data organization config
-# ---------------------------------------------------------------------------
 class TestDataOrganizationConfig:
     def test_default_none(self, tmp_path: Path):
         gen = TPCHDataGenerator(scale_factor=0.01, output_dir=tmp_path, quiet=True)
@@ -221,17 +190,14 @@ class TestDataOrganizationConfig:
     def test_from_env_var_invalid_json(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("BENCHBOX_DATA_ORGANIZATION_CONFIG_JSON", "not-json")
         gen = TPCHDataGenerator(scale_factor=0.01, output_dir=tmp_path, quiet=True)
-        assert gen._data_organization_config is None  # graceful fallback
+        assert gen._data_organization_config is None
 
 
-# ---------------------------------------------------------------------------
-# Dbgen exe property
-# ---------------------------------------------------------------------------
 class TestDbgenExeProperty:
     def test_raises_when_binary_unavailable(self, tmp_path: Path):
         gen = TPCHDataGenerator(scale_factor=0.01, output_dir=tmp_path, quiet=True)
         gen.dbgen_available = False
-        # Force _find_or_build_dbgen to fail
+
         with patch.object(gen, "_find_or_build_dbgen", side_effect=FileNotFoundError("no binary")):
             with pytest.raises(RuntimeError):
                 _ = gen.dbgen_exe

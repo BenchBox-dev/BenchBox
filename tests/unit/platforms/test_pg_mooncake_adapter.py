@@ -1,11 +1,6 @@
-"""Tests for pg_mooncake platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the PgMooncakeAdapter for columnstore PostgreSQL support.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import inspect
 from unittest.mock import Mock, patch
@@ -25,15 +20,9 @@ pytestmark = [
 
 @pytest.fixture()
 def pg_mooncake_stubs(monkeypatch):
-    """Patch psycopg objects so tests don't require the real driver.
-
-    Must patch both pg_mooncake and postgresql modules since PgMooncakeAdapter
-    inherits from PostgreSQLAdapter which checks for psycopg in its __init__.
-    """
     mock_psycopg = Mock()
     mock_psycopg.__version__ = "3.1.0"
 
-    # Patch both modules - parent checks in postgresql module
     monkeypatch.setattr(pg_mooncake_module, "psycopg", mock_psycopg)
     monkeypatch.setattr(postgresql_module, "psycopg", mock_psycopg)
 
@@ -41,10 +30,7 @@ def pg_mooncake_stubs(monkeypatch):
 
 
 class TestPgMooncakeAdapter:
-    """Unit tests for pg_mooncake adapter wiring and SQL handling."""
-
     def test_initialization_defaults(self, pg_mooncake_stubs):
-        """Adapter should initialize with pg_mooncake defaults when stubs are present."""
         adapter = PgMooncakeAdapter()
 
         assert adapter.platform_name == "pg_mooncake"
@@ -54,12 +40,10 @@ class TestPgMooncakeAdapter:
         assert adapter.database == "benchbox"
         assert adapter.username == "postgres"
         assert adapter.schema == "public"
-        # pg_mooncake-specific defaults
         assert adapter.storage_mode == "local"
         assert adapter.mooncake_bucket is None
 
     def test_initialization_with_config(self, pg_mooncake_stubs):
-        """Adapter should accept custom pg_mooncake configuration."""
         adapter = PgMooncakeAdapter(
             host="mooncake.example.com",
             port=5433,
@@ -79,14 +63,12 @@ class TestPgMooncakeAdapter:
         assert adapter.storage_mode == "local"
 
     def test_dialect_is_postgres(self, pg_mooncake_stubs):
-        """pg_mooncake should use PostgreSQL dialect (compatible)."""
         adapter = PgMooncakeAdapter()
 
         assert adapter.get_target_dialect() == POSTGRES_DIALECT
         assert adapter.get_target_dialect() == "postgres"
 
     def test_from_config_basic(self, pg_mooncake_stubs):
-        """from_config should create adapter with correct settings."""
         config = {
             "host": "mooncake.local",
             "port": 5433,
@@ -102,7 +84,6 @@ class TestPgMooncakeAdapter:
         assert adapter.storage_mode == "local"
 
     def test_from_config_generates_database_name(self, pg_mooncake_stubs):
-        """from_config should generate database name from benchmark config."""
         config = {
             "benchmark": "tpch",
             "scale_factor": 1.0,
@@ -113,7 +94,6 @@ class TestPgMooncakeAdapter:
         assert "benchbox" in adapter.database
 
     def test_from_config_uses_provided_database(self, pg_mooncake_stubs):
-        """from_config should prefer explicit database name over generated one."""
         config = {
             "database": "explicit_db",
             "benchmark": "tpch",
@@ -125,7 +105,6 @@ class TestPgMooncakeAdapter:
         assert adapter.database == "explicit_db"
 
     def test_inherits_postgresql_connection_params(self, pg_mooncake_stubs):
-        """pg_mooncake adapter should inherit PostgreSQL connection parameter handling."""
         adapter = PgMooncakeAdapter(
             host="mooncake.example.com",
             port=5433,
@@ -147,12 +126,10 @@ class TestPgMooncakeAdapter:
         assert params["connect_timeout"] == 15
 
     def test_supports_tuning_type(self, pg_mooncake_stubs):
-        """pg_mooncake columnstore tables should not support most PostgreSQL tuning."""
         adapter = PgMooncakeAdapter()
 
         from benchbox.core.tuning.interface import TuningType
 
-        # Columnstore tables don't support PostgreSQL tuning
         assert adapter.supports_tuning_type(TuningType.PARTITIONING) is False
         assert adapter.supports_tuning_type(TuningType.SORTING) is False
         assert adapter.supports_tuning_type(TuningType.DISTRIBUTION) is False
@@ -161,7 +138,6 @@ class TestPgMooncakeAdapter:
         assert adapter.supports_tuning_type(TuningType.FOREIGN_KEYS) is False
 
     def test_get_platform_info_basic(self, pg_mooncake_stubs):
-        """Platform info should show pg_mooncake details."""
         adapter = PgMooncakeAdapter(storage_mode="local")
 
         info = adapter.get_platform_info(connection=None)
@@ -172,10 +148,7 @@ class TestPgMooncakeAdapter:
 
 
 class TestPgMooncakeColumnstoreDDL:
-    """Tests for columnstore DDL generation."""
-
     def test_add_columnstore_basic(self, pg_mooncake_stubs):
-        """_add_columnstore_access_method should add USING mooncake."""
         adapter = PgMooncakeAdapter()
 
         result = adapter._add_columnstore_access_method("CREATE TABLE foo (id INT, name TEXT);")
@@ -184,7 +157,6 @@ class TestPgMooncakeColumnstoreDDL:
         assert result.endswith(";")
 
     def test_add_columnstore_no_semicolon(self, pg_mooncake_stubs):
-        """Should handle DDL without trailing semicolon."""
         adapter = PgMooncakeAdapter()
 
         result = adapter._add_columnstore_access_method("CREATE TABLE foo (id INT)")
@@ -192,7 +164,6 @@ class TestPgMooncakeColumnstoreDDL:
         assert "USING mooncake" in result
 
     def test_add_columnstore_already_present(self, pg_mooncake_stubs):
-        """Should not double-add USING mooncake."""
         adapter = PgMooncakeAdapter()
 
         ddl = "CREATE TABLE foo (id INT) USING mooncake;"
@@ -201,19 +172,15 @@ class TestPgMooncakeColumnstoreDDL:
         assert result.count("USING mooncake") == 1
 
     def test_add_columnstore_skips_non_create_table(self, pg_mooncake_stubs):
-        """Should not modify non-CREATE TABLE statements."""
         adapter = PgMooncakeAdapter()
 
-        # ALTER TABLE should be unchanged
         alter = "ALTER TABLE foo ADD COLUMN bar TEXT;"
         assert adapter._add_columnstore_access_method(alter) == alter
 
-        # CREATE INDEX should be unchanged
         index = "CREATE INDEX idx ON foo (id);"
         assert adapter._add_columnstore_access_method(index) == index
 
     def test_create_schema_adds_columnstore(self, pg_mooncake_stubs):
-        """create_schema should keep heap tables for the COPY load phase."""
         adapter = PgMooncakeAdapter()
         conn = Mock()
         cursor = Mock()
@@ -235,15 +202,11 @@ class TestPgMooncakeColumnstoreDDL:
         cursor.close.assert_called_once()
 
     def test_create_schema_signature_matches_postgresql_parent(self, pg_mooncake_stubs):
-        """create_schema must keep the PostgreSQLAdapter public contract."""
         assert inspect.signature(PgMooncakeAdapter.create_schema) == inspect.signature(
             postgresql_module.PostgreSQLAdapter.create_schema
         )
 
     def test_create_schema_fk_strip_retry_preserves_heap_table(self, pg_mooncake_stubs):
-        """When the initial CREATE TABLE fails and FK-strip retry runs, the retry
-        statement should remain loadable by PostgreSQL COPY before mirror promotion.
-        """
         adapter = PgMooncakeAdapter()
         conn = Mock()
         cursor = Mock()
@@ -267,10 +230,7 @@ class TestPgMooncakeColumnstoreDDL:
 
 
 class TestPgMooncakeExtensionVerification:
-    """Tests for pg_mooncake extension verification in create_connection."""
-
     def test_create_connection_verifies_extension(self, pg_mooncake_stubs):
-        """create_connection should verify pg_mooncake extension is available."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -278,7 +238,7 @@ class TestPgMooncakeExtensionVerification:
         mock_cursor.fetchone.side_effect = [
             None,
             None,
-            ("0.5.0",),  # extension exists
+            ("0.5.0",),
             (1,),
         ]
 
@@ -297,7 +257,6 @@ class TestPgMooncakeExtensionVerification:
         assert extension_check
 
     def test_create_connection_raises_when_extension_missing(self, pg_mooncake_stubs):
-        """create_connection should raise when pg_mooncake is not available."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -305,8 +264,8 @@ class TestPgMooncakeExtensionVerification:
         mock_cursor.fetchone.side_effect = [
             None,
             None,
-            None,  # extension not found
-            None,  # still not found after CREATE
+            None,
+            None,
             (1,),
         ]
 
@@ -322,15 +281,14 @@ class TestPgMooncakeExtensionVerification:
             adapter.create_connection()
 
     def test_create_connection_uses_cascade_when_creating_extension(self, pg_mooncake_stubs):
-        """pg_mooncake requires dependent extensions to be created as needed."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
 
         mock_cursor.fetchone.side_effect = [
-            (1,),  # parent PostgreSQL connection verification
-            None,  # extension not found
-            ("0.5.0",),  # extension exists after CREATE EXTENSION CASCADE
+            (1,),
+            None,
+            ("0.5.0",),
         ]
 
         pg_mooncake_stubs.connect.return_value = mock_conn
@@ -348,8 +306,6 @@ class TestPgMooncakeExtensionVerification:
 
 
 class TestPgMooncakeLoadPromotion:
-    """Tests for heap-load to mooncake-mirror promotion."""
-
     def test_load_data_promotes_loaded_tables_to_mooncake_mirrors(self, pg_mooncake_stubs, tmp_path):
         adapter = PgMooncakeAdapter()
         conn = Mock()
@@ -447,8 +403,6 @@ class TestPgMooncakeLoadPromotion:
 
 
 class TestPgMooncakeValidationCatalog:
-    """Tests for pg_mooncake catalog reads used by validation."""
-
     def test_execute_query_commits_around_mooncake_scan(self, pg_mooncake_stubs):
         adapter = PgMooncakeAdapter()
         conn = Mock()
@@ -523,17 +477,13 @@ class TestPgMooncakeValidationCatalog:
 
 
 class TestPgMooncakeStorageConfig:
-    """Tests for storage mode configuration."""
-
     def test_s3_mode_requires_bucket(self, pg_mooncake_stubs, monkeypatch):
-        """S3 mode should require bucket configuration."""
         monkeypatch.delenv("MOONCAKE_S3_BUCKET", raising=False)
 
         with pytest.raises(ValueError, match="S3 storage mode requires bucket configuration"):
             PgMooncakeAdapter(storage_mode="s3")
 
     def test_s3_mode_accepts_config_bucket(self, pg_mooncake_stubs, monkeypatch):
-        """S3 mode should accept bucket from config."""
         monkeypatch.delenv("MOONCAKE_S3_BUCKET", raising=False)
 
         adapter = PgMooncakeAdapter(
@@ -545,7 +495,6 @@ class TestPgMooncakeStorageConfig:
         assert adapter.mooncake_bucket == "s3://my-bucket/mooncake-data"
 
     def test_s3_mode_accepts_env_bucket(self, pg_mooncake_stubs, monkeypatch):
-        """S3 mode should accept bucket from environment variable."""
         monkeypatch.setenv("MOONCAKE_S3_BUCKET", "s3://env-bucket/data")
 
         adapter = PgMooncakeAdapter(storage_mode="s3")
@@ -554,44 +503,10 @@ class TestPgMooncakeStorageConfig:
         assert adapter.mooncake_bucket == "s3://env-bucket/data"
 
     def test_invalid_storage_mode_raises(self, pg_mooncake_stubs):
-        """Invalid storage mode should raise ValueError."""
         with pytest.raises(ValueError, match="Invalid pg_mooncake storage mode"):
             PgMooncakeAdapter(storage_mode="gcs")
 
     def test_create_connection_sets_bucket(self, pg_mooncake_stubs, monkeypatch):
-        """create_connection should set mooncake.default_bucket in S3 mode."""
-        monkeypatch.delenv("MOONCAKE_S3_BUCKET", raising=False)
-
-        mock_conn = Mock()
-        mock_cursor = Mock()
-        mock_conn.cursor.return_value = mock_cursor
-
-        mock_cursor.fetchone.side_effect = [
-            None,
-            None,
-            ("0.5.0",),  # extension exists
-            (1,),
-        ]
-
-        pg_mooncake_stubs.connect.return_value = mock_conn
-
-        adapter = PgMooncakeAdapter(
-            storage_mode="s3",
-            mooncake_bucket="s3://test-bucket/data",
-        )
-
-        with (
-            patch.object(adapter, "check_server_database_exists", return_value=True),
-            patch.object(adapter, "handle_existing_database"),
-        ):
-            adapter.create_connection()
-
-        calls = [str(call) for call in mock_cursor.execute.call_args_list]
-        bucket_set = any("default_bucket" in call for call in calls)
-        assert bucket_set
-
-    def test_create_connection_bucket_set_uses_sql_literal(self, pg_mooncake_stubs, monkeypatch):
-        """SET mooncake.default_bucket should use psycopg.sql.Literal, not f-string."""
         monkeypatch.delenv("MOONCAKE_S3_BUCKET", raising=False)
 
         mock_conn = Mock()
@@ -618,7 +533,37 @@ class TestPgMooncakeStorageConfig:
         ):
             adapter.create_connection()
 
-        # Verify execute was called with a psycopg.sql.Composed object (not an f-string)
+        calls = [str(call) for call in mock_cursor.execute.call_args_list]
+        bucket_set = any("default_bucket" in call for call in calls)
+        assert bucket_set
+
+    def test_create_connection_bucket_set_uses_sql_literal(self, pg_mooncake_stubs, monkeypatch):
+        monkeypatch.delenv("MOONCAKE_S3_BUCKET", raising=False)
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        mock_cursor.fetchone.side_effect = [
+            None,
+            None,
+            ("0.5.0",),
+            (1,),
+        ]
+
+        pg_mooncake_stubs.connect.return_value = mock_conn
+
+        adapter = PgMooncakeAdapter(
+            storage_mode="s3",
+            mooncake_bucket="s3://test-bucket/data",
+        )
+
+        with (
+            patch.object(adapter, "check_server_database_exists", return_value=True),
+            patch.object(adapter, "handle_existing_database"),
+        ):
+            adapter.create_connection()
+
         from psycopg import sql as psycopg_sql
 
         set_calls = [
@@ -630,10 +575,7 @@ class TestPgMooncakeStorageConfig:
 
 
 class TestPgMooncakeRegistration:
-    """Tests for pg_mooncake platform registration."""
-
     def test_pg_mooncake_in_platform_registry(self, pg_mooncake_stubs):
-        """pg_mooncake should be registered in platform registry."""
         from benchbox.core.platform_registry import PlatformRegistry, auto_register_platforms
 
         auto_register_platforms()
@@ -642,7 +584,6 @@ class TestPgMooncakeRegistration:
         assert PlatformRegistry._adapters["pg-mooncake"] == PgMooncakeAdapter
 
     def test_pg_mooncake_metadata(self, pg_mooncake_stubs):
-        """pg_mooncake should have correct metadata in registry."""
         from benchbox.core.platform_registry import PlatformRegistry
 
         metadata = PlatformRegistry._build_platform_metadata()
@@ -654,10 +595,7 @@ class TestPgMooncakeRegistration:
 
 
 class TestPgMooncakeConfigBuilder:
-    """Tests for pg_mooncake configuration builder function."""
-
     def test_config_builder_basic(self, pg_mooncake_stubs):
-        """Config builder should produce correct configuration."""
         from benchbox.platforms.pg_mooncake import _build_pg_mooncake_config
 
         options = {
@@ -675,7 +613,6 @@ class TestPgMooncakeConfigBuilder:
         assert config.scale_factor == 1.0
 
     def test_config_builder_defaults(self, pg_mooncake_stubs):
-        """Config builder should apply defaults for missing options."""
         from benchbox.platforms.pg_mooncake import _build_pg_mooncake_config
 
         config = _build_pg_mooncake_config("pg-mooncake", {}, {}, None)
@@ -695,27 +632,22 @@ class TestPgMooncakeConfigBuilder:
 
 
 class TestPgMooncakeMigrationPhase:
-    """Tests for run_migration_phase() heap-to-columnstore migration."""
-
     def _make_mock_conn(self, table_names: list[str], storage_before: int = 8192, storage_after: int = 4096):
-        """Build a mock psycopg connection that satisfies run_migration_phase queries."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
 
-        # Responses: heap-table discovery, then (before, after) per table
         fetchall_response = [(t,) for t in table_names]
         fetchone_responses = []
         for _ in table_names:
-            fetchone_responses.append((storage_before,))  # before
-            fetchone_responses.append((storage_after,))  # after
+            fetchone_responses.append((storage_before,))
+            fetchone_responses.append((storage_after,))
 
         mock_cursor.fetchall.return_value = fetchall_response
         mock_cursor.fetchone.side_effect = fetchone_responses
         return mock_conn, mock_cursor
 
     def test_returns_none_when_no_tables(self, pg_mooncake_stubs):
-        """run_migration_phase should return None when table_names is empty."""
         adapter = PgMooncakeAdapter()
         mock_conn = Mock()
         mock_cursor = Mock()
@@ -727,7 +659,6 @@ class TestPgMooncakeMigrationPhase:
         assert result is None
 
     def test_returns_none_when_auto_discovery_finds_nothing(self, pg_mooncake_stubs):
-        """run_migration_phase should return None when schema has no heap tables."""
         adapter = PgMooncakeAdapter()
         mock_conn = Mock()
         mock_cursor = Mock()
@@ -739,7 +670,6 @@ class TestPgMooncakeMigrationPhase:
         assert result is None
 
     def test_migrates_provided_tables(self, pg_mooncake_stubs):
-        """run_migration_phase should ALTER TABLE for each provided table."""
         from benchbox.core.results.models import MigrationPhase
 
         adapter = PgMooncakeAdapter()
@@ -755,7 +685,6 @@ class TestPgMooncakeMigrationPhase:
         assert "orders" in result.per_table_stats
 
     def test_storage_delta_computed_correctly(self, pg_mooncake_stubs):
-        """Migration phase should record correct storage before/after/delta."""
         adapter = PgMooncakeAdapter()
         mock_conn, mock_cursor = self._make_mock_conn(["lineitem"], storage_before=8192, storage_after=4096)
 
@@ -770,7 +699,6 @@ class TestPgMooncakeMigrationPhase:
         assert tbl.storage_delta_bytes == -4096
 
     def test_failed_table_recorded_as_partial(self, pg_mooncake_stubs):
-        """When one table fails, status should be 'partial' not 'completed'."""
         from benchbox.core.results.models import MigrationPhase
 
         adapter = PgMooncakeAdapter()
@@ -778,11 +706,10 @@ class TestPgMooncakeMigrationPhase:
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
 
-        # lineitem succeeds, orders raises
         mock_cursor.fetchone.side_effect = [
-            (8192,),  # lineitem before
-            (4096,),  # lineitem after
-            (8192,),  # orders before - fetched before the ALTER fails
+            (8192,),
+            (4096,),
+            (8192,),
         ]
 
         call_count = [0]
@@ -804,12 +731,10 @@ class TestPgMooncakeMigrationPhase:
         assert result.per_table_stats["orders"].error_message is not None
 
     def test_all_failed_status_is_failed(self, pg_mooncake_stubs):
-        """When all tables fail, status should be 'failed'."""
         adapter = PgMooncakeAdapter()
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
-        # Storage size query succeeds; ALTER TABLE fails
         mock_cursor.fetchone.return_value = (8192,)
 
         def execute_side_effect(sql, *args):

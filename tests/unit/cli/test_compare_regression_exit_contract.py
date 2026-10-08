@@ -1,11 +1,3 @@
-"""`benchbox compare --fail-on-regression` exit-code contract.
-
-Scripts and CI jobs branch on this exit status, so it is a public contract even
-though it is only two integers. `one-engine-unify-regression-policy` moved the
-predicate behind it into benchbox.core.results.regression_policy; these tests
-pin the observable behavior across that move.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -48,7 +40,6 @@ class TestRegressionExitCode:
         assert _check_regression_threshold(_comparison(query_change=-40.0), 0.10) is None
 
     def test_omitted_threshold_never_exits(self):
-        """Without --fail-on-regression the command must stay exit 0."""
         assert _check_regression_threshold(_comparison(query_change=500.0), None) is None
 
     def test_metric_level_regression_also_exits(self):
@@ -98,7 +89,6 @@ class TestFailOnRegressionUsesTheSharedPolicy:
         assert _check_regression(_comparison(query_change=change), 0.10) is is_regression(change, 10.0)
 
     def test_caller_threshold_overrides_the_default(self):
-        """A 7% slowdown is a regression at --fail-on-regression 5%, not at 10%."""
         assert _check_regression(_comparison(query_change=7.0), 0.05) is True
         assert _check_regression(_comparison(query_change=7.0), 0.10) is False
 

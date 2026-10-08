@@ -1,5 +1,3 @@
-"""Shared cohort ranking helpers for explorer read models."""
-
 from __future__ import annotations
 
 import math
@@ -11,8 +9,6 @@ from _project.scripts.explorer_pipeline.models import BenchmarkSummary, Platform
 
 @dataclass(frozen=True)
 class RankedPlatform:
-    """A platform row plus its cohort-relative ranking metrics."""
-
     row: PlatformRow
     metric_value: float | None
     rank: int | None
@@ -24,8 +20,6 @@ class RankedPlatform:
 
 @dataclass(frozen=True)
 class RankedCohort:
-    """Canonical ranking result for a benchmark/scale/phase cohort."""
-
     rows: list[RankedPlatform]
     primary_metric: str
     primary_order: str
@@ -36,12 +30,6 @@ class RankedCohort:
 
 
 def rank_platforms(summary: BenchmarkSummary) -> RankedCohort:
-    """Rank a benchmark summary with standard competition ranking.
-
-    Tied rows share the same rank and the next distinct row skips by the tie
-    size. Rows that are not ranking-eligible, or have null/non-positive primary
-    metrics, sort after rankable rows and receive no rank.
-    """
 
     ranking = summary.ranking
     primary_metric = ranking.primary_metric if ranking else "display_geomean_ms"

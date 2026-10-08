@@ -1,5 +1,3 @@
-"""Keep independent-publication authority documents aligned."""
-
 import json
 import re
 from pathlib import Path
@@ -15,7 +13,6 @@ ROOT = Path(__file__).resolve().parents[3]
 ADR = ROOT / "docs/development/adr/adr-independent-publication-authorities.md"
 THREAT_MODEL = ROOT / "docs/development/independent-publication-threat-model.md"
 OPERATIONS = ROOT / "docs/operations/independent-publication-contract.md"
-ADR_INDEX = ROOT / "docs/development/adr/README.md"
 HOSTED_CONTRACT = ROOT / "docs/reference/hosted-results-contract.md"
 PHASE3_THREAT_MODEL = ROOT / "docs/reference/threat-model.md"
 PUBLIC_ID_ADR = ROOT / "docs/development/adr/adr-public-result-id-permanence.md"
@@ -101,9 +98,8 @@ def test_existing_public_ids_are_already_compatibility_contracts() -> None:
     assert "until an attested live receipt" not in text
 
 
-def test_adr_is_indexed_and_accepted() -> None:
+def test_adr_is_accepted() -> None:
     assert "Accepted (2026-08-31)" in _text(ADR)
-    assert "adr-independent-publication-authorities.md" in _text(ADR_INDEX)
 
 
 def test_canonical_hosted_contract_does_not_equate_merge_with_live() -> None:

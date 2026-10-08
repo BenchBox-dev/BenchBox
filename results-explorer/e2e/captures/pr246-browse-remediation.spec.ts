@@ -1,11 +1,3 @@
-/**
- * PR #246 browse/platform remediation captures.
- *
- * Skipped by default; opt in with PR246_BROWSE_CAPTURE=1. The output mirrors
- * the PR #246 benchmark/platform evidence matrix and writes a small manifest
- * so the TODO closeout can cite durable after-screenshots.
- */
-
 import { mkdirSync, writeFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";

@@ -1,5 +1,3 @@
-"""Unit tests for cli/commands/publish.py compliance guardrails."""
-
 from __future__ import annotations
 
 import importlib
@@ -37,11 +35,6 @@ def _partial_query_failure_result() -> SimpleNamespace:
     result.failed_queries = 1
     result.validation_status = "PARTIAL"
     return result
-
-
-# ---------------------------------------------------------------------------
-# publish run - compliance guardrail
-# ---------------------------------------------------------------------------
 
 
 def test_publish_run_refuses_unofficial_subscale_without_label(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -88,7 +81,7 @@ def test_publish_run_allows_unofficial_with_correct_label(monkeypatch: pytest.Mo
         "load_result_file",
         lambda *_a, **_k: (_fake_result("unofficial_subscale"), {}),
     )
-    # Patch the publisher so we don't actually write anything
+
     monkeypatch.setattr(
         pub,
         "BundlePublisher",
@@ -105,7 +98,6 @@ def test_publish_run_allows_unofficial_with_correct_label(monkeypatch: pytest.Mo
 
 
 def test_publish_run_label_check_is_case_insensitive(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """--label Unofficial-Research (mixed case) should not trigger the refusal."""
     src = tmp_path / "tpcds_subscale.json"
     src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
 
@@ -123,9 +115,6 @@ def test_publish_run_label_check_is_case_insensitive(monkeypatch: pytest.MonkeyP
     )
     monkeypatch.setattr(pub, "PublicationStore", lambda: SimpleNamespace())
 
-    # Click's case_sensitive=False normalizes the stored value through the Choice
-    # validator but may pass the token as typed. We test that the guardrail itself
-    # handles mixed-case values correctly regardless.
     result = CliRunner().invoke(pub.publish_run, [str(src), "--label", "unofficial-research"])
 
     assert "refused" not in result.output.lower()
@@ -150,11 +139,6 @@ def test_publish_run_refuses_partial_query_failure(monkeypatch: pytest.MonkeyPat
     assert "1 failed query" in result.output
 
 
-# ---------------------------------------------------------------------------
-# publish_bundle - programmatic entry point guardrail
-# ---------------------------------------------------------------------------
-
-
 def test_publish_bundle_refuses_unofficial_without_label(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     src = tmp_path / "tpcds_subscale.json"
     src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
@@ -167,7 +151,6 @@ def test_publish_bundle_refuses_unofficial_without_label(monkeypatch: pytest.Mon
 
     result = pub.publish_bundle(src, label="maintainer-run")
 
-    # publish_bundle returns None on refusal
     assert result is None
 
 

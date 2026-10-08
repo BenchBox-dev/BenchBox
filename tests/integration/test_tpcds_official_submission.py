@@ -1,5 +1,3 @@
-"""End-to-end proof that an official TPC-DS run is submit-admissible."""
-
 from __future__ import annotations
 
 import json
@@ -17,7 +15,7 @@ pytestmark = [
 
 
 def test_official_tpcds_run_produces_a_submittable_bundle(tmp_path: Path) -> None:
-    """A real SF1 official run must classify as official and pass submission gating."""
+
     output_root = tmp_path / "benchmark-runs"
     env = {
         "BENCHBOX_OUTPUT_DIR": str(output_root),

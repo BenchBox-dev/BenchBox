@@ -1,11 +1,3 @@
-"""Shared mixin for Hive-style external table creation (Trino, Presto).
-
-Provides common type mapping, column definition building, location
-construction, and the full ``create_external_tables`` lifecycle for
-platforms that use ``CREATE TABLE ... WITH (external_location=...,
-format='PARQUET')`` syntax.
-"""
-
 from __future__ import annotations
 
 import re
@@ -14,24 +6,11 @@ from typing import Any
 
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
-# Regex for safe SQL identifiers (letters, digits, underscores, hyphens).
 _IDENTIFIER_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_-]*$")
 
 
 class HiveExternalTableMixin:
-    """Mixin providing external table support for Hive-style connectors.
-
-    The consuming adapter **must** provide:
-    - ``self.staging_root: str | None``
-    - ``self.catalog: str``
-    - ``self.schema: str``
-    - ``self.platform_name: str``
-    - ``self._resolve_data_files(benchmark, data_dir) -> dict``
-    - ``self._validate_identifier(identifier: str) -> bool``
-    """
-
     def validate_external_table_requirements(self) -> None:
-        """Validate external table prerequisites."""
         if not getattr(self, "staging_root", None):
             platform = getattr(self, "platform_name", type(self).__name__)
             raise ValueError(
@@ -41,7 +20,6 @@ class HiveExternalTableMixin:
 
     @staticmethod
     def _map_external_column_type(column_type: str) -> str:
-        """Map schema types to Hive-connector-compatible external table types."""
         normalized = str(column_type).strip().upper()
         if not normalized:
             return "VARCHAR"
@@ -64,7 +42,6 @@ class HiveExternalTableMixin:
         return "VARCHAR"
 
     def _build_external_column_definitions(self, benchmark: Any, table_name: str) -> str:
-        """Build external table column definitions from benchmark schema."""
         platform = getattr(self, "platform_name", type(self).__name__)
         if not hasattr(benchmark, "get_schema"):
             raise ValueError(
@@ -100,7 +77,6 @@ class HiveExternalTableMixin:
         return ", ".join(column_defs)
 
     def _build_external_location(self, table_name: str) -> str:
-        """Build external data location for a table."""
         staging_root = getattr(self, "staging_root", None)
         assert staging_root is not None
         escaped = staging_root.rstrip("/").replace("'", "''")
@@ -109,7 +85,6 @@ class HiveExternalTableMixin:
     def create_external_tables(
         self, benchmark: Any, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Create external tables backed by staged Parquet files."""
         self.validate_external_table_requirements()
 
         target_catalog = getattr(self, "catalog", "")

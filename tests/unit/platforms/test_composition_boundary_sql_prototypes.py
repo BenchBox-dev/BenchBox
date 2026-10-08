@@ -1,5 +1,3 @@
-"""Executable characterization prototypes for the SQL composition boundary."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -45,8 +43,6 @@ class _Connection:
 
 
 class _CoreHooks:
-    """Minimal hooks required by the core mixin prototype."""
-
     def __init__(self) -> None:
         self.messages: list[str] = []
 
@@ -61,7 +57,7 @@ class _CoreHooks:
 
 
 class _CoreSqlPrototype(CursorValidationQueryExecutionMixin, _CoreHooks):
-    """Option A prototype: core owns cursor-based SQL execution behavior."""
+    pass
 
 
 def _incumbent_platform_helper(
@@ -71,11 +67,7 @@ def _incumbent_platform_helper(
     benchmark_type: str | None = None,
     stream_id: int | None = None,
 ) -> dict[str, Any]:
-    """Incumbent platform helper with injected core result callbacks.
 
-    This is not Option B. Option B in the ADR is a rejected ``benchbox.runtime``
-    package. This function characterizes ``execute_sql_query`` as it exists today.
-    """
     return execute_sql_query(
         connection_or_cursor,
         "SELECT 1",
@@ -97,7 +89,7 @@ def _passed_validation() -> MagicMock:
 
 
 def test_sql_prototypes_characterize_success_contracts() -> None:
-    """The two incumbents differ even on a successful one-row query."""
+
     core_cursor = _Cursor(rows=[(1,)])
     core_connection = _Connection(core_cursor)
     core_result = _CoreSqlPrototype().execute_query(core_connection, "SELECT 1", "q1")
@@ -114,7 +106,7 @@ def test_sql_prototypes_characterize_success_contracts() -> None:
 
 
 def test_sql_prototypes_characterize_failure_recovery_contracts() -> None:
-    """The platform helper rolls back failures; the core mixin does not."""
+
     core_cursor = _Cursor(error=RuntimeError("core failure"))
     core_connection = _Connection(core_cursor)
     core_result = _CoreSqlPrototype().execute_query(core_connection, "SELECT 1", "q1")
@@ -134,7 +126,7 @@ def test_sql_prototypes_characterize_failure_recovery_contracts() -> None:
 
 
 def test_sql_prototypes_characterize_helper_owned_cursor_close() -> None:
-    """When the helper receives a connection, it closes the cursor it created."""
+
     cursor = _Cursor(rows=[(1,)])
     connection = _Connection(cursor)
     _incumbent_platform_helper(connection, hooks=_CoreHooks())
@@ -142,7 +134,7 @@ def test_sql_prototypes_characterize_helper_owned_cursor_close() -> None:
 
 
 def test_sql_prototypes_characterize_validation_logging_and_digest() -> None:
-    """Mixin logs validation; helper can pass a gated digest and stays silent."""
+
     proto = _CoreSqlPrototype()
     platform_hooks = _CoreHooks()
     validation = _passed_validation()

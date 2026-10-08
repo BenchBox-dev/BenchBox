@@ -45,7 +45,6 @@ interface ResultDetailProps extends RoutableProps {
   source?: "public" | "local";
 }
 
-/** Per-query rows to render on a run page before the pass table truncates. */
 const PASS_STRIP_DETAIL_LIMIT = 200;
 
 type MedianSortKey = "query_id" | "display_ms" | "sample_count";
@@ -61,8 +60,6 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
   const samplesScrollerRef = useRef<HTMLDivElement>(null);
   const [detailState, setDetailState] = useState<DetailState | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Bumped by the ErrorMessage retry button so a reader can re-issue this
-  // read after a DuckDB worker fault without reloading the page.
   const [detailRetryToken, setDetailRetryToken] = useState(0);
   const [sort, setSort] = useState<SortState<MedianSortKey>>({
     key: "query_id",
@@ -72,7 +69,6 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
     key: "query_id",
     direction: "asc",
   });
-  // Tuning sidecar lazy-load state - hooks must precede any early return.
   const [tuningExpanded, setTuningExpanded] = useState(false);
   const [tuningData, setTuningData] = useState<Record<string, unknown> | null>(null);
   const [tuningLoading, setTuningLoading] = useState(false);
@@ -92,7 +88,6 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
       setError("No result ID provided.");
       return;
     }
-    // Clear stale state so a previous error or detail does not flash during navigation.
     setDetailState(null);
     setError(null);
     setTuningExpanded(false);
@@ -140,8 +135,6 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
     };
   }, [isLocal, localResultState.preview, resultId, detailRetryToken]);
 
-  // Hooks must run in the same order on every render - compute memos before
-  // any conditional return, guarding inside the factory for the null case.
   const chartContext = useMemo<ChartContext | null>(
     () => (detail ? { kind: "detail" as const, detail, primaryMetric } : null),
     [detail, primaryMetric],
@@ -197,8 +190,6 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
   if (!detail || !chartContext) return <LoadingSpinner message="Loading result..." />;
 
   const benchmarkLabel = humanizeBenchmark(detail.benchmark);
-  // An accepted override is never a clean pass, even when the recorded
-  // validation status alone would hide this badge.
   const detailOverrideRules = parseOverrideRules(detail.override_rules);
 
   function toggleSort(key: MedianSortKey) {
@@ -237,9 +228,6 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
     return rawSort.direction === "asc" ? "ascending" : "descending";
   }
 
-  // The tuning a run requested lives in the bundle, at platform.tuning. It used
-  // to be a `.tuning.json` sidecar derived from this URL; that file is no longer
-  // published, so the bundle itself is the source.
   const tuningUrl = detail.has_tuning ? detail.bundle_download_url : null;
 
   function handleTuningExpand() {
@@ -265,14 +253,7 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
   }
 
   const showTuningSection = true;
-  // How many queries the pass table can actually report on. Zero means it
-  // renders nothing, and the median-latency table is the only per-query view.
   const passSummaries = summarizeQueryPasses(detail.queries);
-  // The pass table reports the same per-query median next to the passes it was
-  // reduced from, so the three-column median table is redundant — but only for
-  // the queries the pass table can render. A query with a published median and
-  // no execution rows appears in no pass summary, so the median table stays
-  // whenever one exists rather than dropping that query from the page.
   const passQueryIds = new Set(passSummaries.map((summary) => summary.queryId));
   const passesCoverAllTimings =
     passSummaries.length > 0 &&
@@ -379,9 +360,6 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
         }
       />
 
-      {/* One row of cards. The tuning card used to sit in a left sidebar that
-          took a third of the page from `lg` up, so the charts got NARROWER as
-          the window got wider while the sidebar held one small card. */}
       <section aria-label="Result summary" class="mb-8">
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-[repeat(auto-fit,minmax(12rem,1fr))]">
           {hasPrimaryMetric && (
@@ -464,17 +442,10 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
       </section>
 
       <div class="space-y-6">
-          {/* The same open layout the cohort and comparison pages use: a run's
-              charts are the point of the page, not something to go looking for
-              behind a row of controls. */}
           {hasTimings && (
             <ChartPanel
               context={chartContext}
               summaryLayout="long"
-              // A single run cannot be led, ranked against, or compared: a
-              // one-bar bar chart, a one-row sparkline table, and a rank table
-              // where everything is first say nothing the summary does not.
-              // The per-query matrix is the "Query timings" table below.
               excludeChartIds={["performance_bar", "power_bar", "sparkline_table", "rank_table", "query_heatmap"]}
             />
           )}
@@ -614,9 +585,6 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
 }
 
 function extractTuningBlock(bundle: Record<string, unknown>): Record<string, unknown> {
-  // `platform.tuning` holds the requested configuration and the applied ledger.
-  // A bundle published before they were folded in has only the summary fields,
-  // which are still worth showing, so an absent block is not an error.
   const platform = bundle?.platform;
   if (platform && typeof platform === "object" && !Array.isArray(platform)) {
     const tuning = (platform as Record<string, unknown>).tuning;

@@ -1,9 +1,6 @@
-"""Tests for DuckDB platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import contextlib
 import tempfile
@@ -21,10 +18,7 @@ pytestmark = [
 
 
 class TestDuckDBAdapter:
-    """Test DuckDB platform adapter functionality."""
-
     def test_initialization_success(self):
-        """Test successful adapter initialization."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter(
                 database_path="/tmp/test.db",
@@ -40,7 +34,6 @@ class TestDuckDBAdapter:
             assert adapter.enable_progress_bar is True
 
     def test_initialization_with_defaults(self):
-        """Test initialization with default configuration."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
             assert adapter.database_path == ":memory:"
@@ -50,7 +43,6 @@ class TestDuckDBAdapter:
 
     @pytest.mark.parametrize("value", ["2GiB", "2 GB", "2 gigabytes", "2e3 MB", "976.5 KiB"])
     def test_initialization_accepts_duckdb_memory_size_syntax(self, value):
-        """Direct adapter configuration must preserve DuckDB's supported spellings."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter(memory_limit=value, max_temp_directory_size=value)
 
@@ -65,13 +57,11 @@ class TestDuckDBAdapter:
 
     @pytest.mark.parametrize("value", ["2", "2 tebibytes", "2GB'; DROP TABLE results; --", "/tmp/secret"])
     def test_initialization_rejects_invalid_or_unsafe_memory_size(self, value):
-        """Invalid SET values must fail before they can reach SQL construction."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             with pytest.raises(ValueError, match="memory_limit"):
                 DuckDBAdapter(memory_limit=value)
 
     def test_create_external_tables_uses_read_parquet_views(self, tmp_path):
-        """External mode should create views over read_parquet() sources."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
 
@@ -104,7 +94,6 @@ class TestDuckDBAdapter:
         assert adapter.external_format == "parquet"
 
     def test_create_external_tables_uses_delta_scan_for_delta_sources(self, tmp_path):
-        """Delta directories should be mapped to delta_scan() views."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
 
@@ -138,7 +127,6 @@ class TestDuckDBAdapter:
         assert adapter.external_format == "delta"
 
     def test_create_external_tables_detects_tbl_format(self, tmp_path):
-        """TBL text files should set external_format to 'tbl'."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
 
@@ -170,7 +158,6 @@ class TestDuckDBAdapter:
         assert adapter.external_format == "tbl"
 
     def test_create_external_tables_uses_read_vortex_views(self, tmp_path):
-        """External mode should create views over read_vortex() sources."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
 
@@ -203,7 +190,6 @@ class TestDuckDBAdapter:
         assert adapter.external_format == "vortex"
 
     def test_create_external_tables_vortex_extension_failure_is_explicit(self, tmp_path):
-        """A missing vortex DuckDB extension should raise a clear external-mode error."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
 
@@ -229,7 +215,6 @@ class TestDuckDBAdapter:
             adapter.create_external_tables(benchmark, connection, tmp_path)
 
     def test_create_external_tables_vortex_probe_failure_gives_clear_error(self, tmp_path):
-        """When read_vortex probe fails, adapter should raise a clear RuntimeError (no repair)."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
 
@@ -255,7 +240,6 @@ class TestDuckDBAdapter:
             adapter.create_external_tables(benchmark, connection, tmp_path)
 
     def test_from_config_forwards_plan_display_and_capture_flags(self):
-        """from_config must not drop show_query_plans or the capture keys."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             config = {
                 "benchmark": "tpch",
@@ -271,7 +255,6 @@ class TestDuckDBAdapter:
             assert adapter.plan_query_filter == {"1", "6"}
 
     def test_from_config_skips_none_plan_keys(self):
-        """Explicit None plan keys must fall back to adapter defaults, not crash int(None)."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter.from_config(
                 {
@@ -290,7 +273,6 @@ class TestDuckDBAdapter:
             assert adapter.plan_max_depth == DEFAULT_PLAN_MAX_DEPTH
 
     def test_from_config_passes_through_temp_size_and_progress_bar(self):
-        """from_config must not drop max_temp_directory_size or progress_bar."""
         with patch("benchbox.platforms.duckdb.duckdb") as mock_duckdb:
             mock_connection = Mock()
             mock_duckdb.connect.return_value = mock_connection
@@ -310,7 +292,6 @@ class TestDuckDBAdapter:
             mock_connection.execute.assert_any_call("SET enable_progress_bar = true")
 
     def test_from_config_with_output_dir_places_db_under_databases(self, tmp_path):
-        """Auto-generated DB path should use a databases/ subdirectory for output_dir."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             config = {
                 "benchmark": "tpch",
@@ -323,14 +304,12 @@ class TestDuckDBAdapter:
             assert ".duckdb" in adapter.database_path
 
     def test_initialization_missing_driver(self):
-        """Test initialization when DuckDB driver is not available."""
         with patch("benchbox.platforms.duckdb.duckdb", None):
             with pytest.raises(ImportError, match="DuckDB not installed"):
                 DuckDBAdapter()
 
     @patch("benchbox.platforms.duckdb.load_driver_module")
     def test_initialization_with_runtime_contract_uses_materialized_module(self, mock_load_driver_module):
-        """Runtime contract should materialize and bind the requested DuckDB module."""
         mock_duckdb_module = Mock()
         mock_duckdb_module.__version__ = "0.9.2"
         mock_load_driver_module.return_value = mock_duckdb_module
@@ -350,14 +329,6 @@ class TestDuckDBAdapter:
 
     @patch("benchbox.platforms.duckdb.load_driver_module")
     def test_auto_install_preference_does_not_trigger_purge(self, mock_load_driver_module):
-        """driver_auto_install=True without driver_auto_install_used must not trigger module purge.
-
-        Regression test for SIGSEGV caused by conflating user preference flag
-        (driver_auto_install) with actual installation state (driver_auto_install_used).
-        When the requested version is already installed, auto_install_used is False and
-        load_driver_module must receive auto_install_used=False to avoid purging the
-        C extension module (which causes a segfault on reimport via dlopen).
-        """
         mock_duckdb_module = Mock()
         mock_duckdb_module.__version__ = "1.2.2"
         mock_load_driver_module.return_value = mock_duckdb_module
@@ -368,7 +339,6 @@ class TestDuckDBAdapter:
                 driver_version="1.2.2",
                 driver_version_resolved="1.2.2",
                 driver_runtime_strategy="current-process",
-                # User requested auto-install, but version already matched so it wasn't used.
                 driver_auto_install=True,
                 driver_auto_install_used=False,
             )
@@ -382,7 +352,6 @@ class TestDuckDBAdapter:
 
     @patch("benchbox.platforms.duckdb.load_driver_module")
     def test_create_connection_uses_materialized_duckdb_module(self, mock_load_driver_module):
-        """Connection creation should use the runtime-bound DuckDB module."""
         mock_connection = Mock()
         mock_duckdb_module = Mock()
         mock_duckdb_module.__version__ = "1.2.2"
@@ -406,58 +375,41 @@ class TestDuckDBAdapter:
         mock_duckdb_module.connect.assert_called_once_with(":memory:")
 
     def test_get_database_path(self):
-        """Test database path configuration."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter(database_path="/tmp/test.db")
 
-            # Test with override
             path = adapter.get_database_path(database_path="/tmp/override.db")
             assert path == "/tmp/override.db"
 
-            # Test with default
             path = adapter.get_database_path()
             assert path == "/tmp/test.db"
 
-            # Test fallback to memory
             adapter_none = DuckDBAdapter(database_path=None)
             path = adapter_none.get_database_path()
             assert path == ":memory:"
 
     def test_get_database_path_with_explicit_none_falls_back_to_instance_path(self):
-        """Test that explicit None in connection_config falls back to instance path.
-
-        Regression test: When run_config.connection["database_path"] is explicitly
-        set to None (which happens when platform_config doesn't include database_path),
-        the adapter should fall back to self.database_path instead of ":memory:".
-        This ensures database persistence works correctly.
-        """
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter(database_path="/tmp/persistent.db")
 
-            # Simulate what happens when run_config.connection has explicit None
-            # (this is what the runner passes when platform_config lacks database_path)
             path = adapter.get_database_path(database_path=None)
 
-            # Should fall back to instance path, NOT to ":memory:"
             assert path == "/tmp/persistent.db"
             assert path != ":memory:"
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_create_connection_memory_database(self, mock_duckdb):
-        """Test connection creation with memory database."""
         mock_connection = Mock()
         mock_duckdb.connect.return_value = mock_connection
 
         adapter = DuckDBAdapter(database_path=":memory:", memory_limit="2GB", thread_limit=2)
 
-        # Mock handle_existing_database
         with patch.object(adapter, "handle_existing_database"):
             connection = adapter.create_connection()
 
         assert connection == mock_connection
         mock_duckdb.connect.assert_called_once_with(":memory:")
 
-        # Check DuckDB settings were applied
         expected_calls = [
             call("SET memory_limit = '2GB'"),
             call("SET threads TO 2"),
@@ -468,7 +420,6 @@ class TestDuckDBAdapter:
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_create_connection_file_database(self, mock_duckdb):
-        """Test connection creation with file database."""
         mock_connection = Mock()
         mock_duckdb.connect.return_value = mock_connection
 
@@ -482,7 +433,6 @@ class TestDuckDBAdapter:
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_create_connection_with_profiling(self, mock_duckdb):
-        """Test connection creation with query profiling enabled."""
         mock_connection = Mock()
         mock_duckdb.connect.return_value = mock_connection
 
@@ -491,12 +441,10 @@ class TestDuckDBAdapter:
         with patch.object(adapter, "handle_existing_database"):
             adapter.create_connection()
 
-        # Should enable profiling
         mock_connection.execute.assert_any_call("SET enable_profiling = 'query_tree_optimizer'")
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_create_connection_failure(self, mock_duckdb):
-        """Test connection creation failure."""
         mock_duckdb.connect.side_effect = Exception("Connection failed")
 
         adapter = DuckDBAdapter()
@@ -507,7 +455,6 @@ class TestDuckDBAdapter:
 
     @patch("benchbox.platforms.duckdb.load_driver_module")
     def test_create_connection_records_live_runtime_version(self, mock_load_driver_module):
-        """Live connection version should be captured as driver_version_actual."""
         mock_connection = Mock()
         version_result = Mock()
         version_result.fetchone.return_value = ("v1.2.2",)
@@ -541,7 +488,6 @@ class TestDuckDBAdapter:
 
     @patch("benchbox.platforms.duckdb.load_driver_module")
     def test_create_connection_raises_on_live_runtime_version_mismatch(self, mock_load_driver_module):
-        """Adapter should fail fast if requested version differs from live runtime."""
         mock_connection = Mock()
         version_result = Mock()
         version_result.fetchone.return_value = ("v1.4.3",)
@@ -574,7 +520,6 @@ class TestDuckDBAdapter:
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_create_schema_with_constraints(self, mock_duckdb):
-        """Test schema creation with centralized constraint configuration."""
         mock_connection = Mock()
         mock_duckdb.connect.return_value = mock_connection
 
@@ -586,7 +531,6 @@ class TestDuckDBAdapter:
 
         adapter = DuckDBAdapter()
 
-        # Mock the effective tuning configuration to return constraint settings
         mock_config = Mock()
         mock_config.primary_keys.enabled = True
         mock_config.foreign_keys.enabled = True
@@ -597,21 +541,17 @@ class TestDuckDBAdapter:
         assert isinstance(schema_time, float)
         assert schema_time >= 0
 
-        # Should call get_create_tables_sql with standardized signature
         mock_benchmark.get_create_tables_sql.assert_called_once_with(dialect="duckdb", tuning_config=mock_config)
 
-        # Should execute CREATE TABLE statements
         assert mock_connection.execute.call_count >= 2
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_create_schema_without_constraint_support(self, mock_duckdb):
-        """Test schema creation fallback for benchmarks without constraint support."""
         mock_connection = Mock()
         mock_duckdb.connect.return_value = mock_connection
 
         mock_benchmark = Mock()
 
-        # Simulate benchmark without new signature support
         def side_effect(*args, **kwargs):
             if "dialect" in kwargs or "tuning_config" in kwargs:
                 raise TypeError("unexpected keyword")
@@ -625,14 +565,12 @@ class TestDuckDBAdapter:
             schema_time = adapter.create_schema(mock_benchmark, mock_connection)
 
             assert isinstance(schema_time, float)
-            # Should first try with new signature, then fall back to simple call
             calls = mock_benchmark.get_create_tables_sql.call_args_list
             assert len(calls) == 2
-            assert calls[1] == call()  # Fallback call without parameters
+            assert calls[1] == call()
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_create_schema_tpcds_foreign_key_removal(self, mock_duckdb):
-        """Test TPC-DS schema creation removes foreign key constraints."""
         mock_connection = Mock()
         mock_duckdb.connect.return_value = mock_connection
 
@@ -650,14 +588,11 @@ class TestDuckDBAdapter:
         schema_time = adapter.create_schema(mock_benchmark, mock_connection)
 
         assert isinstance(schema_time, float)
-        # Should execute CREATE TABLE after removing REFERENCES clauses
         mock_connection.execute.assert_called()
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_load_data_with_benchmark_tables(self, mock_duckdb):
-        """Test data loading with benchmark tables."""
         mock_connection = Mock()
-        # Call sequence for pipe-delimited .tbl: pragma, COUNT before, INSERT, COUNT after
         pragma_r = Mock()
         pragma_r.fetchall.return_value = [("col1",), ("col2",)]
         before_r = Mock()
@@ -670,7 +605,6 @@ class TestDuckDBAdapter:
 
         mock_benchmark = Mock()
 
-        # Create temporary test file in the expected location
         import tempfile
 
         temp_dir = Path(tempfile.mkdtemp())
@@ -681,7 +615,6 @@ class TestDuckDBAdapter:
 
         try:
             mock_benchmark.tables = {"test_table": str(temp_path)}
-            # Mock get_table_loading_order method
             mock_benchmark.get_table_loading_order.return_value = ["test_table"]
 
             adapter = DuckDBAdapter()
@@ -694,7 +627,6 @@ class TestDuckDBAdapter:
             assert "test_table" in table_stats
             assert table_stats["test_table"] == 100
 
-            # Should execute INSERT INTO with read_csv
             execute_calls = [str(call) for call in mock_connection.execute.call_args_list]
             assert any("INSERT INTO test_table" in call for call in execute_calls)
             assert any("read_csv" in call for call in execute_calls)
@@ -706,9 +638,7 @@ class TestDuckDBAdapter:
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_load_data_with_parallel_files(self, mock_duckdb):
-        """Test data loading with parallel data files."""
         mock_connection = Mock()
-        # Call sequence for pipe-delimited .tbl: pragma, COUNT before, INSERT, COUNT after
         pragma_r = Mock()
         pragma_r.fetchall.return_value = [("col1",), ("col2",)]
         before_r = Mock()
@@ -721,7 +651,6 @@ class TestDuckDBAdapter:
 
         mock_benchmark = Mock()
 
-        # Create multiple test files for parallel loading
         temp_files = []
         try:
             for i in range(2):
@@ -731,7 +660,6 @@ class TestDuckDBAdapter:
                     f.write(f"{i + 1}|test{i + 1}|\n{i + 3}|test{i + 3}|\n")
                     temp_files.append(Path(f.name))
 
-            # Rename files to match parallel pattern
             base_name = temp_files[0].stem.split("_")[0]
             parallel_files = []
             for i, temp_file in enumerate(temp_files):
@@ -740,7 +668,6 @@ class TestDuckDBAdapter:
                 parallel_files.append(new_name)
 
             mock_benchmark.tables = {base_name: str(parallel_files[0])}
-            # Mock get_table_loading_order method
             mock_benchmark.get_table_loading_order.return_value = [base_name]
 
             adapter = DuckDBAdapter()
@@ -752,7 +679,6 @@ class TestDuckDBAdapter:
             assert isinstance(table_stats, dict)
             assert table_stats[base_name] == 200
 
-            # Should execute INSERT INTO with array syntax for multiple files
             execute_calls = [str(call) for call in mock_connection.execute.call_args_list]
             insert_calls = [call for call in execute_calls if "INSERT INTO" in call]
             assert len(insert_calls) > 0
@@ -764,20 +690,17 @@ class TestDuckDBAdapter:
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_load_data_empty_files(self, mock_duckdb):
-        """Test data loading with empty files."""
         mock_connection = Mock()
         mock_duckdb.connect.return_value = mock_connection
 
         mock_benchmark = Mock()
 
-        # Create empty test file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False, encoding="utf-8") as f:
-            pass  # Empty file
+            pass
         temp_path = Path(f.name)
 
         try:
             mock_benchmark.tables = {"empty_table": str(temp_path)}
-            # Mock get_table_loading_order method
             mock_benchmark.get_table_loading_order.return_value = ["empty_table"]
 
             adapter = DuckDBAdapter()
@@ -791,9 +714,7 @@ class TestDuckDBAdapter:
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_load_data_with_sharded_zstd_files(self, mock_duckdb):
-        """DuckDB adapter should handle '*.tbl.1.zst' file naming."""
         mock_connection = Mock()
-        # Call sequence for pipe-delimited .tbl.1.zst: pragma, COUNT before, INSERT, COUNT after
         pragma_r = Mock()
         pragma_r.fetchall.return_value = [("col1",), ("col2",)]
         before_r = Mock()
@@ -810,12 +731,6 @@ class TestDuckDBAdapter:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp = Path(tmpdir)
-            # The DuckDB connection is mocked, but the contents ARE read: the
-            # loader probes the first line for a trailing delimiter to decide
-            # parser arity. This previously wrote plain text under a .zst name
-            # and only passed because the probe swallowed the decompression
-            # failure and guessed "no trailing delimiter". That swallow is gone,
-            # so the fixture has to be genuinely compressed.
             import zstandard
 
             fpath = tmp / "customer.tbl.1.zst"
@@ -828,13 +743,11 @@ class TestDuckDBAdapter:
             table_stats, _, _ = adapter.load_data(mock_benchmark, mock_connection, tmp)
 
             assert table_stats["customer"] == 123
-            # Ensure SQL used read_csv (DuckDB native path chosen)
             exec_calls = "\n".join(str(c) for c in mock_connection.execute.call_args_list)
             assert "read_csv" in exec_calls
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_configure_for_benchmark_olap(self, mock_duckdb):
-        """Test OLAP benchmark configuration."""
         mock_connection = Mock()
         mock_duckdb.connect.return_value = mock_connection
 
@@ -842,18 +755,13 @@ class TestDuckDBAdapter:
 
         adapter.configure_for_benchmark(mock_connection, "olap")
 
-        # Current implementation only applies profiling when show_query_plans is enabled
-        # No specific OLAP optimizations are applied by default
-        # Only execute calls should be for profiling if enabled
         if adapter.show_query_plans:
             mock_connection.execute.assert_called_with("SET enable_profiling = 'query_tree'")
         else:
-            # No execute calls should be made if profiling not enabled
             mock_connection.execute.assert_not_called()
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_configure_for_benchmark_tpcds(self, mock_duckdb):
-        """Test TPC-DS specific configuration."""
         mock_connection = Mock()
         mock_duckdb.connect.return_value = mock_connection
 
@@ -861,18 +769,13 @@ class TestDuckDBAdapter:
 
         adapter.configure_for_benchmark(mock_connection, "tpcds")
 
-        # Current implementation only applies profiling when show_query_plans is enabled
-        # No specific TPC-DS optimizations are applied by default
-        # Only execute calls should be for profiling if enabled
         if adapter.show_query_plans:
             mock_connection.execute.assert_called_with("SET enable_profiling = 'query_tree'")
         else:
-            # No execute calls should be made if profiling not enabled
             mock_connection.execute.assert_not_called()
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_configure_for_benchmark_primitives(self, mock_duckdb):
-        """Test primitives benchmark configuration."""
         mock_connection = Mock()
         mock_duckdb.connect.return_value = mock_connection
 
@@ -880,12 +783,10 @@ class TestDuckDBAdapter:
 
         adapter.configure_for_benchmark(mock_connection, "read_primitives")
 
-        # Should enable query tree profiling for primitives
         mock_connection.execute.assert_any_call("SET enable_profiling = 'query_tree'")
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_configure_for_benchmark_transaction_primitives_serializes_execution(self, mock_duckdb):
-        """Transaction primitives avoid DuckDB's parallel DML invalidation path."""
         mock_connection = Mock()
         mock_duckdb.connect.return_value = mock_connection
 
@@ -897,7 +798,6 @@ class TestDuckDBAdapter:
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_execute_query_success(self, mock_duckdb):
-        """Test successful query execution."""
         mock_connection = Mock()
         mock_result = Mock()
         mock_result.fetchall.return_value = [(1, "test"), (2, "test2")]
@@ -906,7 +806,6 @@ class TestDuckDBAdapter:
 
         adapter = DuckDBAdapter()
 
-        # Mock display_query_plan_if_enabled
         with patch.object(adapter, "display_query_plan_if_enabled"):
             result = adapter.execute_query(mock_connection, "SELECT * FROM test", "q1")
 
@@ -920,7 +819,6 @@ class TestDuckDBAdapter:
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_execute_query_with_profiling(self, mock_duckdb):
-        """Test query execution with profiling enabled."""
         mock_connection = Mock()
         mock_result = Mock()
         mock_result.fetchall.return_value = [(1,)]
@@ -934,19 +832,17 @@ class TestDuckDBAdapter:
 
         assert result["status"] == "SUCCESS"
 
-        # Should enable and disable profiling
         mock_connection.execute.assert_any_call("PRAGMA enable_profiling = 'query_tree'")
         mock_connection.execute.assert_any_call("PRAGMA disable_profiling")
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_execute_query_failure(self, mock_duckdb):
-        """Test query execution failure."""
         mock_connection = Mock()
 
         def mock_execute(query):
             if "INVALID SQL" in query:
                 raise Exception("Query failed")
-            return Mock()  # For profiling queries
+            return Mock()
 
         mock_connection.execute.side_effect = mock_execute
         mock_duckdb.connect.return_value = mock_connection
@@ -965,12 +861,6 @@ class TestDuckDBAdapter:
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_show_plans_displays_without_capture(self, mock_duckdb):
-        """--show-plans is decoupled from --capture-plans.
-
-        With show_query_plans=True and capture_plans=False the plan is displayed
-        to the console but NOT captured into the result bundle, exercising the
-        flag decoupling (run.py no longer ties show_query_plans to capture_plans).
-        """
         mock_connection = Mock()
         mock_result = Mock()
         mock_result.fetchall.return_value = [(1,)]
@@ -986,19 +876,11 @@ class TestDuckDBAdapter:
             result = adapter.execute_query(mock_connection, "SELECT 1", "q1")
 
         assert result["status"] == "SUCCESS"
-        # Display fires for show_query_plans=True, capture_plans=False.
         mock_display.assert_called_once()
-        # Capture must not run when capture_plans is False.
         mock_capture.assert_not_called()
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_capture_no_display_suppresses_plan_display(self, mock_duckdb):
-        """--capture-plans suppresses console display to avoid a double EXPLAIN.
-
-        With capture_plans=True and show_query_plans=False the plan is captured
-        into the result bundle but the display call is suppressed (the guard in
-        execute_query), so get_query_plan/EXPLAIN runs once, not twice.
-        """
         mock_connection = Mock()
         mock_result = Mock()
         mock_result.fetchall.return_value = [(1,)]
@@ -1014,18 +896,14 @@ class TestDuckDBAdapter:
             result = adapter.execute_query(mock_connection, "SELECT 1", "q1")
 
         assert result["status"] == "SUCCESS"
-        # Display suppressed while capturing (prevents the double-EXPLAIN path).
         mock_display.assert_not_called()
-        # Capture runs exactly once.
         mock_capture.assert_called_once()
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_get_query_plan(self, mock_duckdb):
-        """Test query plan retrieval via EXPLAIN (ANALYZE, FORMAT JSON) / EXPLAIN (FORMAT JSON)."""
         mock_connection = Mock()
         mock_duckdb.connect.return_value = mock_connection
 
-        # Default (analyze_plans=False): uses EXPLAIN (FORMAT JSON) - estimated plan only
         estimated_payload = '{"name": "SEQ_SCAN", "timing": null}'
         mock_connection.execute.return_value.fetchall.return_value = [("explain_key", estimated_payload)]
         adapter_default = DuckDBAdapter()
@@ -1035,7 +913,6 @@ class TestDuckDBAdapter:
         assert "ANALYZE" not in call_sql
         assert "FORMAT JSON" in call_sql
 
-        # analyze_plans=True (opt-in): uses EXPLAIN (ANALYZE, FORMAT JSON)
         mock_connection.execute.reset_mock()
         json_payload = '{"operator_type": "SEQ_SCAN", "operator_timing": 0.001}'
         mock_connection.execute.return_value.fetchall.return_value = [("explain_key", json_payload)]
@@ -1046,18 +923,16 @@ class TestDuckDBAdapter:
         assert "ANALYZE" in call_sql
         assert "FORMAT JSON" in call_sql
 
-        # Exception during EXPLAIN → returns None
         mock_connection.execute.side_effect = Exception("explain failed")
         plan = adapter.get_query_plan(mock_connection, "SELECT * FROM test")
         assert plan is None
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_get_platform_metadata(self, mock_duckdb):
-        """Test platform metadata collection."""
         mock_connection = Mock()
         mock_connection.execute.return_value.fetchall.side_effect = [
-            [("memory_limit", "4GB"), ("threads", "4")],  # Settings
-            [("test.db", "1MB", "2024-01-01")],  # Database size
+            [("memory_limit", "4GB"), ("threads", "4")],
+            [("test.db", "1MB", "2024-01-01")],
         ]
         mock_duckdb.__version__ = "0.9.2"
         mock_duckdb.connect.return_value = mock_connection
@@ -1073,7 +948,6 @@ class TestDuckDBAdapter:
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_get_platform_info_prefers_live_connection_version(self, mock_duckdb):
-        """Platform info should prefer live connection runtime version when available."""
         mock_connection = Mock()
         version_result = Mock()
         version_result.fetchone.return_value = ("v0.9.2",)
@@ -1089,7 +963,6 @@ class TestDuckDBAdapter:
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_analyze_tables(self, mock_duckdb):
-        """Test table analysis for query optimization."""
         mock_connection = Mock()
         mock_connection.execute.return_value.fetchall.return_value = [
             ("table1",),
@@ -1101,16 +974,13 @@ class TestDuckDBAdapter:
 
         adapter.analyze_tables(mock_connection)
 
-        # Should query tables and run ANALYZE on each
         mock_connection.execute.assert_any_call("ANALYZE table1")
         mock_connection.execute.assert_any_call("ANALYZE table2")
 
     def test_supports_tuning_type(self):
-        """Test tuning type support checking."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
 
-            # Mock TuningType
             with patch("benchbox.core.tuning.interface.TuningType") as mock_tuning_type:
                 mock_tuning_type.SORTING = "sorting"
                 mock_tuning_type.PARTITIONING = "partitioning"
@@ -1121,29 +991,24 @@ class TestDuckDBAdapter:
                 assert adapter.supports_tuning_type(mock_tuning_type.CLUSTERING) is False
 
     def test_generate_tuning_clause(self):
-        """Test tuning clause generation (limited support in DuckDB)."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
 
             mock_table_tuning = Mock()
 
-            # DuckDB doesn't have explicit CREATE TABLE tuning clauses
             clause = adapter.generate_tuning_clause(mock_table_tuning)
             assert clause == ""
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_apply_table_tunings_with_sorting(self, mock_duckdb):
-        """Test applying table tunings with sorting."""
         mock_connection = Mock()
         mock_duckdb.connect.return_value = mock_connection
 
         adapter = DuckDBAdapter()
 
-        # Mock table tuning
         mock_tuning = Mock()
         mock_tuning.has_any_tuning.return_value = True
 
-        # Mock sorting column
         mock_column = Mock()
         mock_column.name = "sort_key"
         mock_column.order = 1
@@ -1163,19 +1028,16 @@ class TestDuckDBAdapter:
 
             adapter.apply_table_tunings("test_table", mock_tuning, mock_connection)
 
-            # Should create index for sorting optimization
             execute_calls = [str(call) for call in mock_connection.execute.call_args_list]
             assert any("CREATE INDEX" in call and "sort" in call for call in execute_calls)
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_apply_table_tunings_with_clustering(self, mock_duckdb):
-        """Test applying table tunings with clustering."""
         mock_connection = Mock()
         mock_duckdb.connect.return_value = mock_connection
 
         adapter = DuckDBAdapter()
 
-        # Mock table tuning with clustering
         mock_tuning = Mock()
         mock_tuning.has_any_tuning.return_value = True
 
@@ -1198,19 +1060,16 @@ class TestDuckDBAdapter:
 
             adapter.apply_table_tunings("test_table", mock_tuning, mock_connection)
 
-            # Should create cluster index
             execute_calls = [str(call) for call in mock_connection.execute.call_args_list]
             assert any("CREATE INDEX" in call and "cluster" in call for call in execute_calls)
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_apply_unified_tuning(self, mock_duckdb):
-        """Test unified tuning configuration application."""
         mock_connection = Mock()
         mock_duckdb.connect.return_value = mock_connection
 
         adapter = DuckDBAdapter()
 
-        # Mock unified tuning config
         mock_config = Mock()
         mock_config.table_tunings = {"test_table": Mock()}
 
@@ -1220,29 +1079,24 @@ class TestDuckDBAdapter:
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_apply_platform_optimizations(self, mock_duckdb):
-        """Test platform optimizations application."""
         mock_connection = Mock()
         mock_duckdb.connect.return_value = mock_connection
 
         adapter = DuckDBAdapter()
 
-        # Mock tuning config
         mock_config = Mock()
         mock_config.platform_optimizations = Mock()
         mock_config.table_tunings = {}
 
-        # Should not raise exception
         adapter.apply_platform_optimizations(mock_config, mock_connection)
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_apply_constraint_configuration(self, mock_duckdb):
-        """Test constraint configuration application."""
         mock_connection = Mock()
         mock_duckdb.connect.return_value = mock_connection
 
         adapter = DuckDBAdapter()
 
-        # Mock tuning config
         mock_config = Mock()
         mock_config.primary_keys = Mock()
         mock_config.primary_keys.enabled = True
@@ -1253,19 +1107,15 @@ class TestDuckDBAdapter:
         mock_config.check_constraints = Mock()
         mock_config.check_constraints.enabled = False
 
-        # Should not raise exception
         adapter.apply_constraint_configuration(mock_config, "test_table", mock_connection)
 
     def test_run_power_test(self):
-        """Test power test execution without TPC method."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
             mock_benchmark = Mock()
 
-            # Mock benchmark without run_power_test method
             del mock_benchmark.run_power_test
 
-            # Mock run_benchmark method
             class MockResult:
                 def __init__(self):
                     self.status = "SUCCESS"
@@ -1286,15 +1136,12 @@ class TestDuckDBAdapter:
                 mock_run.assert_called_once_with(mock_benchmark)
 
     def test_run_throughput_test(self):
-        """Test throughput test execution without TPC method."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
             mock_benchmark = Mock()
 
-            # Mock benchmark without run_throughput_test method
             del mock_benchmark.run_throughput_test
 
-            # Mock run_power_test method
             with patch.object(adapter, "run_power_test") as mock_power:
                 mock_power.return_value = {"status": "SUCCESS"}
 
@@ -1304,15 +1151,12 @@ class TestDuckDBAdapter:
                 mock_power.assert_called_once_with(mock_benchmark)
 
     def test_run_maintenance_test_fallback(self):
-        """Test maintenance test fallback when benchmark has no TPC maintenance method."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
             mock_benchmark = Mock()
 
-            # Mock benchmark without maintenance test method (triggers fallback)
             del mock_benchmark.run_maintenance_test
 
-            # Mock run_benchmark method for fallback
             class MockResult:
                 def __init__(self):
                     self.status = "SUCCESS"
@@ -1332,7 +1176,6 @@ class TestDuckDBAdapter:
                 mock_run.assert_called_once_with(mock_benchmark)
 
     def test_get_target_dialect(self):
-        """Test target dialect retrieval."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
 
@@ -1341,7 +1184,6 @@ class TestDuckDBAdapter:
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_connection_optimization_settings(self, mock_duckdb):
-        """Test that connection optimization settings are properly applied."""
         mock_connection = Mock()
         mock_duckdb.connect.return_value = mock_connection
 
@@ -1350,7 +1192,6 @@ class TestDuckDBAdapter:
         with patch.object(adapter, "handle_existing_database"):
             adapter.create_connection()
 
-        # Verify optimization settings were applied
         expected_calls = [
             call("SET memory_limit = '8GB'"),
             call("SET threads TO 8"),
@@ -1363,16 +1204,13 @@ class TestDuckDBAdapter:
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_table_loading_order(self, mock_duckdb):
-        """Test table loading order optimization."""
         mock_connection = Mock()
         mock_connection.execute.return_value.fetchone.return_value = [50]
         mock_duckdb.connect.return_value = mock_connection
 
         mock_benchmark = Mock()
-        # Mock get_table_loading_order method
         mock_benchmark.get_table_loading_order.return_value = ["table2", "table1"]
 
-        # Create test files
         temp_files = {}
         try:
             for table in ["table1", "table2"]:
@@ -1386,7 +1224,6 @@ class TestDuckDBAdapter:
 
             table_stats, load_time, _ = adapter.load_data(mock_benchmark, mock_connection, Path("/tmp"))
 
-            # Should respect loading order from benchmark
             mock_benchmark.get_table_loading_order.assert_called_once()
             assert isinstance(table_stats, dict)
 
@@ -1397,28 +1234,24 @@ class TestDuckDBAdapter:
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_load_data_error_handling(self, mock_duckdb):
-        """Test data loading error handling."""
         mock_connection = Mock()
         mock_connection.execute.side_effect = Exception("Load failed")
         mock_duckdb.connect.return_value = mock_connection
 
         mock_benchmark = Mock()
 
-        # Create test file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False, encoding="utf-8") as f:
             f.write("1|test|\n")
             temp_path = Path(f.name)
 
         try:
             mock_benchmark.tables = {"error_table": str(temp_path)}
-            # Mock get_table_loading_order method
             mock_benchmark.get_table_loading_order.return_value = ["error_table"]
 
             adapter = DuckDBAdapter()
 
             table_stats, load_time, _ = adapter.load_data(mock_benchmark, mock_connection, Path("/tmp"))
 
-            # Should handle error gracefully
             assert table_stats["error_table"] == 0
             assert isinstance(load_time, float)
 
@@ -1426,16 +1259,13 @@ class TestDuckDBAdapter:
             temp_path.unlink()
 
     def test_run_power_test_with_connection_parameter(self):
-        """Test power test execution with connection parameter in kwargs."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
             mock_benchmark = Mock()
             mock_connection = Mock()
 
-            # Mock benchmark that doesn't have run_power_test method
             del mock_benchmark.run_power_test
 
-            # Mock run_benchmark method
             class MockResult:
                 def __init__(self):
                     self.status = "SUCCESS"
@@ -1450,43 +1280,35 @@ class TestDuckDBAdapter:
             with patch.object(adapter, "run_benchmark") as mock_run:
                 mock_run.return_value = mock_result
 
-                # Should not raise "multiple values for keyword argument 'connection'"
                 result = adapter.run_power_test(mock_benchmark, connection=mock_connection, other_param="value")
 
                 assert result == {"status": "SUCCESS", "power_score": 100.0}
                 mock_run.assert_called_once_with(mock_benchmark, connection=mock_connection, other_param="value")
 
     def test_run_throughput_test_with_connection_parameter(self):
-        """Test throughput test execution with connection parameter handling."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
             mock_benchmark = Mock()
             mock_connection = Mock()
 
-            # Mock benchmark without throughput test method (falls back to power test)
             del mock_benchmark.run_throughput_test
 
             with patch.object(adapter, "run_power_test") as mock_power:
                 mock_power.return_value = {"status": "SUCCESS"}
 
-                # Should not raise "multiple values for keyword argument 'connection'"
                 result = adapter.run_throughput_test(mock_benchmark, connection=mock_connection, stream_count=4)
 
                 assert result == {"status": "SUCCESS"}
-                # Should pass all parameters to run_power_test
                 mock_power.assert_called_once_with(mock_benchmark, connection=mock_connection, stream_count=4)
 
     def test_run_maintenance_test_with_connection_parameter(self):
-        """Test maintenance test execution with connection parameter handling."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
             mock_benchmark = Mock()
             mock_connection = Mock()
 
-            # Mock benchmark without maintenance test method
             del mock_benchmark.run_maintenance_test
 
-            # Mock run_benchmark method
             class MockResult:
                 def __init__(self):
                     self.status = "SUCCESS"
@@ -1514,32 +1336,26 @@ class TestDuckDBAdapter:
                 )
 
     def test_tpcds_power_test_method_availability(self):
-        """Test that _execute_tpcds_power_test method is available in DuckDBAdapter."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
 
-            # This method should be inherited from PlatformAdapter base class
             assert hasattr(adapter, "_execute_tpcds_power_test"), (
                 "DuckDBAdapter should inherit _execute_tpcds_power_test method from PlatformAdapter"
             )
 
-            # Method should be callable
             method = adapter._execute_tpcds_power_test
             assert callable(method), "_execute_tpcds_power_test should be callable"
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_tpcds_power_test_execution(self, mock_duckdb):
-        """Test that TPC-DS power test can be executed without errors."""
         mock_connection = Mock()
         mock_duckdb.connect.return_value = mock_connection
 
         adapter = DuckDBAdapter()
 
-        # Create a mock benchmark
         mock_benchmark = Mock()
-        mock_benchmark.scale_factor = 0.01  # Very small scale factor for testing
+        mock_benchmark.scale_factor = 0.01
 
-        # Create mock run configuration
         run_config = {
             "scale_factor": 0.01,
             "seed": 1,
@@ -1548,12 +1364,10 @@ class TestDuckDBAdapter:
             "timeout": 30,
         }
 
-        # Mock the TPCDSPowerTest class to avoid full test execution
         with patch("benchbox.core.tpcds.power_test.TPCDSPowerTest") as mock_power_test_class:
             mock_power_test = Mock()
             mock_power_test_class.return_value = mock_power_test
 
-            # Mock the power test result
             mock_result = Mock()
             mock_result.success = True
             mock_result.queries_executed = 99
@@ -1573,15 +1387,12 @@ class TestDuckDBAdapter:
             ]
             mock_power_test.run.return_value = mock_result
 
-            # Execute the TPC-DS power test method
             try:
                 result = adapter._execute_tpcds_power_test(mock_benchmark, mock_connection, run_config)
 
-                # Verify result structure
                 assert isinstance(result, list), "Result should be a list of query results"
                 assert len(result) > 0, "Should return at least one query result"
 
-                # Check first result structure
                 query_result = result[0]
                 required_keys = [
                     "query_id",
@@ -1602,7 +1413,6 @@ class TestDuckDBAdapter:
                 pytest.fail(f"_execute_tpcds_power_test should not raise exceptions during normal execution: {e}")
 
     def test_create_external_tables_uses_iceberg_scan_for_iceberg_sources(self, tmp_path):
-        """Iceberg directories (with metadata/) should be mapped to iceberg_scan() views."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
 
@@ -1637,7 +1447,6 @@ class TestDuckDBAdapter:
         assert adapter.external_format == "iceberg"
 
     def test_create_external_tables_iceberg_extension_loaded_once(self, tmp_path):
-        """Iceberg extension should only be installed/loaded once for multiple tables."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
 
@@ -1672,14 +1481,12 @@ class TestDuckDBAdapter:
         assert executed_sql.count("LOAD iceberg") == 1
 
     def test_create_external_tables_delta_not_confused_with_iceberg(self, tmp_path):
-        """A directory with _delta_log/ should use delta_scan, not iceberg_scan."""
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
 
-        # Directory has _delta_log - should be detected as Delta, not Iceberg
         delta_dir = tmp_path / "lineitem_delta"
         (delta_dir / "_delta_log").mkdir(parents=True)
-        (delta_dir / "metadata").mkdir(parents=True)  # Also has metadata/ - Delta wins
+        (delta_dir / "metadata").mkdir(parents=True)
 
         benchmark = Mock()
         benchmark.tables = {"lineitem": delta_dir}
@@ -1707,8 +1514,6 @@ class TestDuckDBAdapter:
 
 
 class TestMCPThreadsReachTheEffectiveSetting:
-    """The public MCP `threads` option must change DuckDB execution."""
-
     @staticmethod
     def _adapter_from_mcp_request(tmp_path: Path, options: dict):
         from benchbox.core.run_service import (
@@ -1728,14 +1533,12 @@ class TestMCPThreadsReachTheEffectiveSetting:
         )
 
     def test_from_config_preserves_the_translated_thread_limit(self, tmp_path: Path):
-        """`from_config` rebuilds its config from a key list; `threads` must survive it."""
         adapter = self._adapter_from_mcp_request(tmp_path, {"threads": 7})
 
         assert adapter.thread_limit == 7
         assert adapter.get_platform_info()["configuration"]["thread_limit"] == 7
 
     def test_connection_emits_the_thread_setting(self, tmp_path: Path):
-        """A deterministic connection spy proves the SET statement is issued."""
         adapter = self._adapter_from_mcp_request(tmp_path, {"threads": 7})
 
         connection = Mock()
@@ -1750,7 +1553,6 @@ class TestMCPThreadsReachTheEffectiveSetting:
         assert call("SET threads TO 7") in connection.execute.call_args_list
 
     def test_a_real_connection_reports_the_requested_thread_count(self, tmp_path: Path):
-        """The strongest evidence: DuckDB itself reports the setting."""
         adapter = self._adapter_from_mcp_request(tmp_path, {"threads": 3})
 
         connection = adapter.create_connection()
@@ -1761,7 +1563,6 @@ class TestMCPThreadsReachTheEffectiveSetting:
                 connection.close()
 
     def test_without_the_option_duckdb_keeps_its_own_default(self, tmp_path: Path):
-        """The mapping must not impose a thread limit on requests that omit it."""
         adapter = self._adapter_from_mcp_request(tmp_path, {})
 
         assert adapter.thread_limit is None

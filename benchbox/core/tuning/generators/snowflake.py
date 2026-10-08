@@ -1,25 +1,6 @@
-"""Snowflake DDL Generator.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Generates CREATE TABLE statements with Snowflake-specific physical tuning:
-- Automatic clustering (CLUSTER BY)
-- Search optimization (via post-create ALTER statements)
-
-Example:
-    >>> from benchbox.core.tuning.generators.snowflake import SnowflakeDDLGenerator
-    >>> generator = SnowflakeDDLGenerator()
-    >>> clauses = generator.generate_tuning_clauses(table_tuning)
-    >>> emit(generator.generate_create_table_ddl("lineitem", columns, clauses))
-    CREATE TABLE lineitem (
-        l_orderkey NUMBER(38,0) NOT NULL,
-        l_shipdate DATE,
-        ...
-    )
-    CLUSTER BY (l_shipdate, l_orderkey);
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -43,34 +24,12 @@ logger = logging.getLogger(__name__)
 
 
 class SearchOptimizationType(str, Enum):
-    """Snowflake search optimization types."""
-
-    EQUALITY = "EQUALITY"  # Optimizes equality predicates (=, IN)
-    SUBSTRING = "SUBSTRING"  # Optimizes LIKE, REGEXP searches
-    GEO = "GEO"  # Optimizes geospatial queries
+    EQUALITY = "EQUALITY"
+    SUBSTRING = "SUBSTRING"
+    GEO = "GEO"
 
 
 class SnowflakeDDLGenerator(BaseDDLGenerator):
-    """DDL generator for Snowflake physical tuning.
-
-    Supports:
-    - CLUSTER BY for automatic clustering
-    - Search optimization via post-create ALTER statements
-    - Mapping of partitioning/sorting hints to clustering
-
-    Snowflake Tuning Notes:
-    - Snowflake automatically creates micro-partitions (~16MB each)
-    - Clustering keys help organize data within micro-partitions
-    - Automatic clustering is enabled by default for clustered tables
-    - Don't over-cluster (3-4 columns max recommended)
-
-    Tuning Configuration Mapping:
-    - clustering → CLUSTER BY (direct mapping)
-    - sorting → CLUSTER BY (Snowflake uses clustering instead of sorting)
-    - partitioning → Logged as info (Snowflake handles automatically)
-    - distribution → Not applicable (logged as warning)
-    """
-
     IDENTIFIER_QUOTE = '"'
     SUPPORTS_IF_NOT_EXISTS = True
     STATEMENT_TERMINATOR = ";"
@@ -78,12 +37,6 @@ class SnowflakeDDLGenerator(BaseDDLGenerator):
     SUPPORTED_TUNING_TYPES = frozenset({"clustering", "sorting"})
 
     def __init__(self, max_cluster_columns: int = 4):
-        """Initialize the Snowflake DDL generator.
-
-        Args:
-            max_cluster_columns: Maximum number of clustering columns to use.
-                Snowflake recommends 3-4 columns max for efficiency.
-        """
         self._max_cluster_columns = max_cluster_columns
 
     @property
@@ -95,15 +48,6 @@ class SnowflakeDDLGenerator(BaseDDLGenerator):
         table_tuning: TableTuning | None,
         platform_opts: PlatformOptimizationConfiguration | None = None,
     ) -> TuningClauses:
-        """Generate Snowflake tuning clauses.
-
-        Args:
-            table_tuning: Table tuning configuration.
-            platform_opts: Platform-specific options (may contain search_optimization).
-
-        Returns:
-            TuningClauses with cluster_by for Snowflake clustering.
-        """
         clauses = TuningClauses()
 
         if not table_tuning:
@@ -111,7 +55,6 @@ class SnowflakeDDLGenerator(BaseDDLGenerator):
 
         from benchbox.core.tuning.interface import TuningType
 
-        # Handle distribution warning (not applicable for Snowflake)
         distribution_columns = table_tuning.get_columns_by_type(TuningType.DISTRIBUTION)
         if distribution_columns:
             logger.warning(
@@ -121,7 +64,6 @@ class SnowflakeDDLGenerator(BaseDDLGenerator):
                 f"Configured columns {[c.name for c in distribution_columns]} will be ignored."
             )
 
-        # Handle partitioning info (automatic in Snowflake, but may map to clustering)
         partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
         if partition_columns:
             logger.info(
@@ -131,8 +73,6 @@ class SnowflakeDDLGenerator(BaseDDLGenerator):
                 f"Consider using these columns for clustering instead."
             )
 
-        # Collect clustering columns (from both clustering and sorting config)
-        # Snowflake uses clustering for both purposes
         cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
         sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)
 
@@ -141,7 +81,6 @@ class SnowflakeDDLGenerator(BaseDDLGenerator):
         if all_cluster_cols:
             sorted_cols = sorted(all_cluster_cols, key=lambda c: c.order)
 
-            # Limit to max recommended columns
             if len(sorted_cols) > self._max_cluster_columns:
                 logger.warning(
                     f"Snowflake recommends max {self._max_cluster_columns} clustering columns. "
@@ -152,7 +91,6 @@ class SnowflakeDDLGenerator(BaseDDLGenerator):
             col_names = [c.name for c in sorted_cols]
             clauses.cluster_by = f"CLUSTER BY ({', '.join(col_names)})"
 
-        # Handle search optimization (via post-create statements)
         if platform_opts:
             search_opt = getattr(platform_opts, "search_optimization", None)
             if search_opt:
@@ -174,11 +112,6 @@ class SnowflakeDDLGenerator(BaseDDLGenerator):
         if_not_exists: bool = False,
         schema: str | None = None,
     ) -> str:
-        """Generate Snowflake CREATE TABLE statement.
-
-        Snowflake DDL places CLUSTER BY after the column list:
-        CREATE TABLE t (...) CLUSTER BY (col1, col2);
-        """
         parts = ["CREATE TABLE"]
 
         if if_not_exists:
@@ -188,11 +121,9 @@ class SnowflakeDDLGenerator(BaseDDLGenerator):
 
         statement = " ".join(parts)
 
-        # Column definitions
         col_list = self.generate_column_list(columns)
         statement = f"{statement} (\n    {col_list}\n)"
 
-        # Add CLUSTER BY clause
         if tuning and tuning.cluster_by:
             statement = f"{statement}\n{tuning.cluster_by}"
 
@@ -201,15 +132,6 @@ class SnowflakeDDLGenerator(BaseDDLGenerator):
         return statement
 
     def generate_clustering_info_query(self, table_name: str, cluster_columns: list[str]) -> str:
-        """Generate query to check clustering health.
-
-        Args:
-            table_name: Table name (can be fully qualified).
-            cluster_columns: List of clustering column names.
-
-        Returns:
-            SQL query string for SYSTEM$CLUSTERING_INFORMATION.
-        """
         col_spec = ", ".join(cluster_columns)
         return f"SELECT SYSTEM$CLUSTERING_INFORMATION('{table_name}', '({col_spec})')"
 
@@ -218,15 +140,6 @@ class SnowflakeDDLGenerator(BaseDDLGenerator):
         table_name: str,
         schema: str | None = None,
     ) -> str:
-        """Generate ALTER TABLE RESUME RECLUSTER statement.
-
-        Args:
-            table_name: Target table name.
-            schema: Schema name for qualified table name.
-
-        Returns:
-            ALTER TABLE statement to resume automatic reclustering.
-        """
         qualified_name = self.format_qualified_name(table_name, schema)
         return f"ALTER TABLE {qualified_name} RESUME RECLUSTER{self.STATEMENT_TERMINATOR}"
 
@@ -237,17 +150,6 @@ class SnowflakeDDLGenerator(BaseDDLGenerator):
         opt_type: SearchOptimizationType = SearchOptimizationType.EQUALITY,
         schema: str | None = None,
     ) -> str:
-        """Generate ALTER TABLE ADD SEARCH OPTIMIZATION statement.
-
-        Args:
-            table_name: Target table name.
-            column: Column to optimize.
-            opt_type: Type of search optimization.
-            schema: Schema name for qualified table name.
-
-        Returns:
-            ALTER TABLE statement for search optimization.
-        """
         qualified_name = self.format_qualified_name(table_name, schema)
         return f"ALTER TABLE {qualified_name} ADD SEARCH OPTIMIZATION ON {opt_type.value}({column}){self.STATEMENT_TERMINATOR}"
 

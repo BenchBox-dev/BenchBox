@@ -1,14 +1,6 @@
-"""Unit tests for native ClickHouse Delta Lake SQL builders.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Server-free: these tests pin the exact SQL BenchBox generates for native
-Delta reads (``deltaLake`` table function, ``deltaLakeLocal``, and the
-``DeltaLake`` engine), including quoting and validation. Live execution
-against a real server is covered by the Docker-gated native suite.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -262,7 +254,7 @@ class TestSupportProbe:
 
     def test_local_alias_is_probed_individually(self) -> None:
         assert has_local_delta_registration(["deltaLake", "deltaLakeLocal"]) is True
-        # Base registration alone does not imply the local alias.
+
         assert has_local_delta_registration(["deltaLake", "deltaLakeS3", "deltaLakeAzure"]) is False
         assert has_local_delta_registration([]) is False
 
@@ -273,10 +265,10 @@ class TestClassifyDeltaLocation:
         assert classify_delta_location("S3://bucket/table") == "s3"
 
     def test_https_s3_forms(self) -> None:
-        # Virtual-hosted style (including the public Delta example URL).
+
         assert classify_delta_location("https://clickhouse-public-datasets.s3.amazonaws.com/delta_lake/hits/") == "s3"
         assert classify_delta_location("https://bucket.s3.us-east-1.amazonaws.com/table") == "s3"
-        # Path style, either scheme.
+
         assert classify_delta_location("https://s3.us-east-1.amazonaws.com/bucket/table") == "s3"
         assert classify_delta_location("https://s3.amazonaws.com/bucket/table") == "s3"
         assert classify_delta_location("http://bucket.s3.amazonaws.com/table") == "s3"
@@ -321,8 +313,7 @@ class TestResolveDeltaReader:
         assert local.source_sql == "deltaLakeLocal('/data/orders')"
 
     def test_local_without_local_alias_falls_back_to_snapshot(self) -> None:
-        # Base registration alone must not select deltaLakeLocal: the alias is
-        # deployment-dependent, so fail closed to the executable snapshot.
+
         local = resolve_delta_reader("/data/orders", native_available=True)
         assert local.kind == "parquet-snapshot"
         assert local.source_sql == ""
@@ -332,9 +323,7 @@ class TestResolveDeltaReader:
         assert local.kind == "parquet-snapshot"
 
     def test_remote_without_native_reads_raises(self) -> None:
-        # Remote snapshot export is not provided, so a remote location without
-        # native reads has no executable path: raise instead of returning a
-        # snapshot that cannot run.
+
         for location in (
             "s3://bucket/orders",
             "https://bucket.s3.amazonaws.com/table",
@@ -345,8 +334,7 @@ class TestResolveDeltaReader:
                 resolve_delta_reader(location, native_available=False)
 
     def test_azure_and_gcs_raise_even_when_native_available(self) -> None:
-        # No committed native selection exists for these location forms, and
-        # the snapshot fallback cannot execute remotely.
+
         for location in ("abfss://c@a.dfs.core.windows.net/t", "gs://bucket/table"):
             with pytest.raises(ValueError, match="No executable Delta read path"):
                 resolve_delta_reader(location, native_available=True)

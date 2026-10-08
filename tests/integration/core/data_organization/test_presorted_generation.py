@@ -1,5 +1,3 @@
-"""Integration tests for pre-sorted data generation."""
-
 from __future__ import annotations
 
 import importlib.util

@@ -1,5 +1,3 @@
-"""Resource-heavy benchmark API contract checks."""
-
 from __future__ import annotations
 
 import subprocess
@@ -15,7 +13,6 @@ pytestmark = [
 
 
 def test_benchmark_registry_import_does_not_instantiate_probe_benchmarks() -> None:
-    """Static metadata should not instantiate benchmark classes during registry import."""
 
     script = r"""
 import importlib
@@ -52,7 +49,7 @@ def wrapped(name, package=None):
     return mod
 
 importlib.import_module = wrapped
-import benchbox.core.benchmark_registry  # noqa: F401
+import benchbox.core.benchmark_registry
 print(len(calls))
 """
     result = subprocess.run([sys.executable, "-c", script], text=True, capture_output=True, check=True)

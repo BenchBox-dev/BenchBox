@@ -1,5 +1,3 @@
-"""LakeSail execution-filter rules for unsupported TPC-Havoc variants."""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.actions import CompatAction

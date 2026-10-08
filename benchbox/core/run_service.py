@@ -1,21 +1,3 @@
-"""Shared run service: the one engine below the CLI and MCP surfaces.
-
-Per `docs/development/adr/adr-one-engine-scoped-surfaces.md`, all benchmark
-business logic lives in `benchbox.core` below both surfaces. This module is
-where run orchestration lands.
-
-Layering is the constraint that shapes every signature here: core sits below
-`benchbox.platforms` and `benchbox.cli`, so this module must import neither.
-Anything a surface owns -- an adapter, a directory layout, a console, an
-interactive prompt -- arrives as a resolved input or an injected factory. That
-is why :func:`resolve_run_config` takes an already-computed ``database_path``
-instead of a ``DirectoryManager``: the manager is CLI-layer, the path is data.
-
-This module covers configuration resolution and execution orchestration.
-Everything that needs a console, an interactive prompt, or a concrete adapter
-class stays in the surface layer.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -29,17 +11,10 @@ from benchbox.core.constants import (
     QUERY_PHASES,
 )
 
-# TPC-compliant scale factors — moved from ``benchbox.cli.commands.run_official``
-# so the validation lives in core beside the run service.
 TPC_ALLOWED_SCALE_FACTORS: frozenset[int | float] = frozenset({1, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000})
 
 
 def validate_tpc_scale_factor(scale: float) -> None:
-    """Validate that ``scale`` is TPC-compliant.
-
-    Raises:
-        ValueError: If scale is not in :data:`TPC_ALLOWED_SCALE_FACTORS`.
-    """
     if scale not in TPC_ALLOWED_SCALE_FACTORS:
         raise ValueError(f"Scale factor {scale} is not TPC-compliant. Allowed: {sorted(TPC_ALLOWED_SCALE_FACTORS)}")
 
@@ -86,13 +61,6 @@ if TYPE_CHECKING:
 
 
 class VerbosityLike(Protocol):
-    """The verbosity surface :func:`resolve_run_config` reads.
-
-    Structural rather than nominal so the CLI's ``VerbositySettings`` satisfies
-    it without core depending on the concrete type, and so a caller with no
-    verbosity concept can pass :class:`SilentVerbosity`.
-    """
-
     @property
     def verbose(self) -> bool: ...
 
@@ -111,13 +79,6 @@ class VerbosityLike(Protocol):
 
 @dataclass(frozen=True)
 class SilentVerbosity:
-    """Verbosity for callers that have no console.
-
-    MCP suppresses console output and returns structured JSON, so it has no
-    verbosity flags to forward; this is the value it will pass rather than
-    inventing CLI-shaped settings.
-    """
-
     verbose: bool = False
     level: int = 0
     verbose_enabled: bool = False
@@ -127,8 +88,6 @@ class SilentVerbosity:
 
 @dataclass(frozen=True)
 class UnsupportedExecutionMode:
-    """Surface-neutral description of an unsupported platform mode."""
-
     platform: str
     mode: str
     supported: tuple[str, ...]
@@ -140,23 +99,6 @@ def resolve_run_config(
     database_path: str | Path,
     verbosity: VerbosityLike,
 ) -> RunConfig:
-    """Build the :class:`RunConfig` for one benchmark run.
-
-    Moved verbatim from ``BenchmarkOrchestrator._prepare_run_config``; the only
-    changes are that the two surface-owned inputs it used to reach for through
-    ``self`` are now parameters:
-
-    - ``database_path`` replaces ``self.directory_manager.get_database_path(...)``,
-      because ``DirectoryManager`` is CLI-layer and core may not import it. The
-      caller computes the path; the tuning-aware naming rules stay where they
-      already live, in ``benchbox.utils.database_naming``.
-    - ``verbosity`` replaces ``self._verbosity``.
-
-    Every value derivation below -- the ``or DEFAULT`` fallbacks, the clamps,
-    and the ``is not None`` seed check that preserves a zero seed -- is
-    unchanged, and is pinned by
-    ``tests/unit/cli/test_run_config_resolution_characterization.py``.
-    """
     options = config.options or {}
     iterations = int(
         options.get("power_iterations", GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS)
@@ -191,23 +133,11 @@ def resolve_run_config(
         cancel_on_timeout=bool(options.get("cancel_on_timeout", False)),
         client_region=getattr(config, "client_region", None) or options.get("client_region"),
         client_cloud=getattr(config, "client_cloud", None) or options.get("client_cloud"),
-        # RunConfig.link_probe defaults True, so the toggle always resolves
-        # from config; there is intentionally no options fallback.
         link_probe=is_probe_requested(getattr(config, "link_probe", None)),
     )
 
 
 class AdapterFactory(Protocol):
-    """Builds the platform adapter for one run.
-
-    This is the injection point the layering contract forces. Constructing an
-    adapter means importing ``benchbox.platforms``, which core sits below, so
-    the surface supplies a callable instead. The CLI passes a closure over its
-    console and verbosity; MCP will pass one over its own adapter resolution.
-
-    Returning None is meaningful: a data-only run has no database to adapt.
-    """
-
     def __call__(
         self,
         *,
@@ -218,11 +148,6 @@ class AdapterFactory(Protocol):
 
 
 def resolve_lifecycle_phases(phases_to_run: list[str] | None) -> LifecyclePhases:
-    """Map a requested phase list onto the runner's lifecycle flags.
-
-    ``None`` means the standard lifecycle -- generate, load, execute -- with the
-    statistics phase staying opt-in.
-    """
     if not phases_to_run:
         return LifecyclePhases(generate=True, load=True, execute=True)
 
@@ -235,7 +160,6 @@ def resolve_lifecycle_phases(phases_to_run: list[str] | None) -> LifecyclePhases
 
 
 def resolve_validation_options(options: Mapping[str, Any] | None) -> ValidationOptions:
-    """Read the three validation toggles out of a benchmark's options."""
     opts = options or {}
     return ValidationOptions(
         enable_preflight_validation=bool(opts.get("enable_preflight_validation")),
@@ -245,12 +169,6 @@ def resolve_validation_options(options: Mapping[str, Any] | None) -> ValidationO
 
 
 def resolve_execution_mode(database_config: Any) -> str | None:
-    """Determine the execution mode for a run, or None with no database.
-
-    An explicit ``execution_mode`` on the database config wins. Otherwise the
-    platform registry's default applies, upgraded to ``dataframe`` when the
-    config describes a DataFrame execution.
-    """
     if database_config is None:
         return None
 
@@ -265,13 +183,6 @@ def resolve_execution_mode(database_config: Any) -> str | None:
 
 
 def is_dataframe_execution(database_config: Any) -> bool:
-    """Return whether a database configuration selects DataFrame execution.
-
-    This mode predicate belongs beside run-plan resolution, not in the
-    deprecated compatibility DataFrame runner. The core platform registry
-    remains the authority for default modes, while the suffix handling keeps
-    the legacy ``adapter_factory.is_dataframe_mode`` behavior intact.
-    """
     if database_config is None:
         return False
 
@@ -289,16 +200,10 @@ def is_dataframe_execution(database_config: Any) -> bool:
 
 
 def get_execution_mode(database_config: Any) -> str:
-    """Return the concrete execution-mode label for a database configuration."""
     return "dataframe" if is_dataframe_execution(database_config) else "sql"
 
 
 def stamp_requested_phases(config: BenchmarkConfig, phases_to_run: list[str] | None) -> None:
-    """Record the exact phases requested on the config's options.
-
-    Combined mode reads this downstream to run only what was asked for, rather
-    than everything the execution type implies.
-    """
     if not phases_to_run:
         return
     options = dict(getattr(config, "options", {}) or {})
@@ -320,18 +225,6 @@ def execute_run(
     monitor: Any = None,
     execution_context: ExecutionContext | None = None,
 ) -> BenchmarkResults:
-    """Run one benchmark through the core lifecycle.
-
-    Every input is already resolved by the surface: the benchmark instance, the
-    platform config, and the output root all arrive built. The adapter is the
-    one thing this function asks for, through ``adapter_factory``, because
-    building it requires ``benchbox.platforms``.
-
-    Moved from ``BenchmarkOrchestrator.execute_benchmark``. What did NOT move is
-    everything interaction-scoped: console output, the cloud-platform
-    load-phase warning, and the credential-setup retry all stay in the CLI,
-    which is where the new contract puts them.
-    """
     reject_single_stream_throughput(getattr(config, "concurrency", None), phases_to_run)
     stamp_requested_phases(config, phases_to_run)
 
@@ -358,23 +251,11 @@ def execute_run(
         execution_context=execution_context,
     )
 
-    # Canonical runtime metadata enrichment for every run path.
     apply_driver_metadata(result, database_config=database_config, platform_adapter=adapter)
     return result
 
 
-# ---------------------------------------------------------------------------
-# Helpers migrated from MCP for one-engine (w1)
-# ---------------------------------------------------------------------------
-
-
 def translate_platform_options_for_adapter(platform: str, options: dict) -> dict:
-    """Translate validated platform options to adapter kwargs.
-
-    ClickHouse profile resolution stays surface-owned because it needs server
-    configuration. This function handles generic DuckDB and Databricks
-    rewrites that are independent of the calling surface.
-    """
     normalized = dict(options)
     platform_name = platform.lower().removesuffix("-df")
     if platform_name == "duckdb" and "threads" in normalized:
@@ -390,7 +271,6 @@ def translate_platform_options_for_adapter(platform: str, options: dict) -> dict
 
 
 def build_databricks_clustering_intent(options: dict[str, object]):
-    """Build a validated Databricks layout intent without surface coupling."""
     strategy = options.get("databricks_clustering_strategy")
     columns = options.get("liquid_clustering_columns")
     if strategy is None and columns is None:
@@ -420,7 +300,6 @@ def build_databricks_clustering_intent(options: dict[str, object]):
 
 
 def resolve_mode_with_registry(platform: str, mode: str | None):
-    """Resolve a requested mode against the shared platform registry."""
     if mode is not None:
         mode = mode.lower()
         if mode in ("datagen", "generate"):
@@ -448,14 +327,10 @@ def resolve_mode_with_registry(platform: str, mode: str | None):
 
 
 def map_phases_to_execution_type(phases: list[str]) -> str:
-    """Map the requested phases to the shared benchmark execution type."""
     phases_set = set(phases)
     query_phases = set(QUERY_PHASES)
     selected_query_phases = phases_set & query_phases
     if selected_query_phases:
-        # Any mixed query-phase request must use combined mode so the runner
-        # executes exactly the requested subset instead of silently selecting
-        # the first phase in a priority chain.
         if len(selected_query_phases) > 1:
             return "combined"
         if "power" in selected_query_phases:
@@ -473,8 +348,6 @@ def map_phases_to_execution_type(phases: list[str]) -> str:
         return "standard"
 
 
-# Sorted so that additions land in one obvious place and a missing export is
-# visible on inspection rather than by grepping the call sites.
 __all__ = [
     "AdapterFactory",
     "build_databricks_clustering_intent",

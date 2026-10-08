@@ -1,5 +1,3 @@
-"""Unit tests for client_link metadata wiring in adapters and runtime_metadata."""
-
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -241,7 +239,6 @@ def test_collect_client_link_metadata_surprise_error_degrades() -> None:
             side_effect=RuntimeError("IMDS cache poisoned"),
         ),
     ):
-        # Collection must never break a run that already succeeded.
         adapter._collect_client_link_metadata(conn, {"link_probe": True})
         mock_probe.assert_called_once()
 
@@ -275,7 +272,6 @@ def test_collect_client_link_metadata_failed_probe_without_region_is_unavailable
     ):
         adapter._collect_client_link_metadata(conn, {"link_probe": True})
 
-    # Nothing recorded on either half: unavailable, not partial.
     assert adapter._client_link_metadata is not None
     assert adapter._client_link_metadata["collection_status"] == "unavailable"
     assert adapter._client_link_metadata["statement_overhead_ms"] is None

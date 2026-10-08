@@ -26,13 +26,10 @@ The Read Primitives benchmark tests **157 fundamental database read operations**
 from benchbox import ReadPrimitives
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Create benchmark
 benchmark = ReadPrimitives(scale_factor=1.0)
 
-# Generate data
 benchmark.generate_data()
 
-# Run on platform
 adapter = DuckDBAdapter()
 results = benchmark.run_with_platform(adapter)
 
@@ -40,6 +37,8 @@ print(f"Completed {results.total_queries} queries in {results.total_execution_ti
 ```
 
 The DuckDB adapter needs the `duckdb` package. Scale factor 1.0 generates about 6 million `lineitem` rows (about 1 GB).
+
+Shared query and category contracts are maintained in {doc}`/reference/python-api/benchmarks/mixins`.
 
 ## API Reference
 
@@ -49,7 +48,7 @@ The DuckDB adapter needs the `duckdb` package. Scale factor 1.0 generates about 
 
 <span id="benchbox.read_primitives.ReadPrimitives"></span>
 
-Creates a Read Primitives benchmark that generates the TPC-H tables and serves 157 single-purpose read queries in 31 categories.
+Creates a Read Primitives benchmark that generates the TPC-H tables and serves 157 single-purpose read queries in 31 categories. It offers catalog-driven read operations over the TPC-H schema. The query and category methods that it inherits from `QueryFacadeMixin` and `QueryCategoryFacadeMixin` remain part of the supported surface. Their maintained contracts are in {doc}`/reference/python-api/benchmarks/mixins`, and shared lifecycle behavior is in {doc}`/reference/python-api/base`.
 
 **Import:** `from benchbox import ReadPrimitives` · **Extras:** none
 
@@ -90,7 +89,7 @@ tpch
 
 ##### Compatibility
 
-`benchbox.read_primitives.ReadPrimitives` is the same class. The class attribute `DATA_SOURCE_BENCHMARK` is `None` on the wrapper; `get_data_source_benchmark()` returns `"tpch"`. The old claim of "109 queries in 26 categories" does not hold for 0.4.1.
+`benchbox.read_primitives.ReadPrimitives` is the same class. The class attribute `DATA_SOURCE_BENCHMARK` is `None` on the wrapper; `get_data_source_benchmark()` returns `"tpch"`.
 
 ### Constructor
 
@@ -113,15 +112,15 @@ tpch
 The files are pipe-delimited `.tbl` files (`lineitem.tbl`), written by the TPC-H `dbgen` tool, so the directory also holds `dists.dss` and `_datagen_manifest.json`. At scale factor 0.01 all eight files are written even when `tables` names two of them; the result holds only the named ones.
 
 ```python
-# Generate all tables
 table_files = benchmark.generate_data()
 
-# Name specific tables
 table_files = benchmark.generate_data(tables=["lineitem", "orders"])
 
 for table_name, file_path in table_files.items():
     print(f"{table_name}: {file_path}")
 ```
+
+The first call generates all tables. The second names two tables.
 
 ### get_query(query_id, \*, params=None)
 
@@ -137,13 +136,10 @@ for table_name, file_path in table_files.items():
 Raises `ValueError` for an unknown id (`Invalid query ID: zz. Available: ...`) and for non-`None` `params` (`Read Primitives queries are static and don't accept parameters`).
 
 ```python
-# Get simple aggregation query
 q1 = benchmark.get_query("aggregation_simple")
 
-# Get window function query
 q2 = benchmark.get_query("window_rank")
 
-# Get join query
 q3 = benchmark.get_query("broadcast_join_two_tables")
 ```
 
@@ -156,16 +152,14 @@ q3 = benchmark.get_query("broadcast_join_two_tables")
 With a `dialect`, each query is translated with SQLGlot, or replaced by a hand-written variant for that dialect where one exists (45 queries have variants). Queries that cannot run on the dialect are left out, so the result can be smaller than 157: 153 for `duckdb`, 157 for `postgres`, 147 for `clickhouse`, 154 for `snowflake` and 144 for `bigquery`. An unknown dialect name returns all 157 queries unchanged. Translation problems are logged as warnings.
 
 ```python
-# Get all queries
 queries = benchmark.get_queries()
 print(f"Total queries: {len(queries)}")
-# Total queries: 157
 
-# Get with dialect translation
 queries_sf = benchmark.get_queries(dialect="snowflake")
 print(len(queries_sf))
-# 154
 ```
+
+The first call gets all queries and prints `Total queries: 157`. The second gets them with dialect translation and prints `154`.
 
 ### get_queries_by_category(category)
 
@@ -174,15 +168,14 @@ print(len(queries_sf))
 `get_queries_by_category(category) -> dict[str, str]` returns the queries in one category, keyed by name. An unknown category returns `{}` without an error.
 
 ```python
-# Get all aggregation queries
 agg_queries = benchmark.get_queries_by_category("aggregation")
 
-# Get all window function queries
 window_queries = benchmark.get_queries_by_category("window")
 
 print(len(agg_queries), len(window_queries))
-# 15 9
 ```
+
+This prints `15 9`.
 
 ### get_query_categories()
 
@@ -228,17 +221,16 @@ for table_name, table_def in schema.items():
 Raises `RuntimeError` when `tuning_config` lacks `primary_keys` or `foreign_keys` attributes.
 
 ```python
-# Standard SQL
 create_sql = benchmark.get_create_tables_sql()
 
-# With dialect
 create_sql_pg = benchmark.get_create_tables_sql(dialect="postgres")
 
-# With tuning configuration
 from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 tuning = UnifiedTuningConfiguration()
 create_sql_tuned = benchmark.get_create_tables_sql(tuning_config=tuning)
 ```
+
+The three calls return standard SQL, SQL for a specific dialect, and SQL with a tuning configuration.
 
 ### run_benchmark(connection, queries=None, iterations=1, categories=None)
 
@@ -263,25 +255,23 @@ conn = adapter.create_connection()
 adapter.create_schema(benchmark, conn)
 adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-# Run all queries
 results = benchmark.run_benchmark(conn)
 
-# Run specific queries
 results = benchmark.run_benchmark(
     conn,
     queries=["aggregation_simple", "window_rank"],
     iterations=3
 )
 
-# Run specific categories
 results = benchmark.run_benchmark(
     conn,
     categories=["aggregation", "window"],
     iterations=3
 )
 print(len(results["queries"]))
-# 24
 ```
+
+The first call runs all queries. The second runs two named queries three times each. The third runs the `aggregation` and `window` categories, so `results["queries"]` holds 15 plus 9 entries and the example prints `24`.
 
 ### run_category_benchmark(connection, category, iterations=1)
 
@@ -290,15 +280,14 @@ print(len(results["queries"]))
 `run_category_benchmark(connection, category, iterations=1) -> dict` runs every query of one category and returns the same structure as `run_benchmark(..., categories=[category])`. An unknown category returns a result with an empty `queries` dict.
 
 ```python
-# Run all aggregation queries
 agg_results = benchmark.run_category_benchmark(conn, "aggregation", iterations=3)
 
-# Run all window function queries
 window_results = benchmark.run_category_benchmark(conn, "window", iterations=3)
 
 print(len(agg_results["queries"]), len(window_results["queries"]))
-# 15 9
 ```
+
+This prints `15 9`.
 
 ### load_data_to_database(connection, tables=None)
 
@@ -320,11 +309,11 @@ Raises `ValueError` (`No data generated. Call generate_data() first.`) before `g
 `execute_query(query_id, connection, params=None)` runs one query on the connection and returns the rows from `fetchall()`, a list of tuples. `params` is ignored. Raises `ValueError` for an unknown id.
 
 ```python
-# Execute single query
 result = benchmark.execute_query("aggregation_simple", conn)
 print(len(result))
-# 1
 ```
+
+This prints `1`, because the query returns one row.
 
 ### get_benchmark_info()
 
@@ -384,7 +373,7 @@ Every other member comes from `BaseBenchmark`. See {doc}`/reference/python-api/b
 | Data and configuration | <span id="benchbox.read_primitives.ReadPrimitives.output_dir"></span>`output_dir` | property | The resolved directory from the constructor argument, but see the `output_dir` row in the Parameters table for the default. |
 | Data and configuration | <span id="benchbox.read_primitives.ReadPrimitives.run_with_platform_api_surface"></span>`run_with_platform_api_surface` | class attribute | |
 | Data and configuration | <span id="benchbox.read_primitives.ReadPrimitives.scale_factor"></span>`scale_factor` | instance attribute | The constructor argument. |
-| Data and configuration | <span id="benchbox.read_primitives.ReadPrimitives.SKIP_DATA_LOADING"></span>`SKIP_DATA_LOADING` | class attribute | Not defined in the released 0.4.1 wheel. Source builds after 0.4.1 define it on `BaseBenchmark`, default `False`. |
+| Data and configuration | <span id="benchbox.read_primitives.ReadPrimitives.SKIP_DATA_LOADING"></span>`SKIP_DATA_LOADING` | class attribute | Defined on `BaseBenchmark` from 0.4.2, default `False`. Set it to `True` for a benchmark that needs schema objects but no data files. |
 | Data and configuration | <span id="benchbox.read_primitives.ReadPrimitives.tables"></span>`tables` | property | Empty until `generate_data()` has run, then the table-to-path mapping. |
 
 ## Usage Examples
@@ -395,21 +384,19 @@ Every other member comes from `BaseBenchmark`. See {doc}`/reference/python-api/b
 from benchbox import ReadPrimitives
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Create benchmark with scale factor 0.1 (about 600,000 lineitem rows)
 benchmark = ReadPrimitives(scale_factor=0.1)
 
-# Generate data
 benchmark.generate_data()
 
-# Run on DuckDB
 adapter = DuckDBAdapter()
 results = benchmark.run_with_platform(adapter)
 
-# Print results
 print(f"Benchmark: {results.benchmark_name}")
 print(f"Total time: {results.total_execution_time:.2f}s")
 print(f"Queries: {results.successful_queries}/{results.total_queries}")
 ```
+
+Scale factor 0.1 generates about 100 MB of data.
 
 ### Category-Based Execution
 
@@ -423,14 +410,11 @@ benchmark.generate_data()
 adapter = DuckDBAdapter()
 conn = adapter.create_connection()
 
-# Load data
 adapter.create_schema(benchmark, conn)
 adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-# Get all categories
 categories = benchmark.get_query_categories()
 
-# Run each category
 category_results = {}
 
 for category in categories:
@@ -451,7 +435,6 @@ for category in categories:
     print(f"  Total time: {total_time:.2f}s")
     print(f"  Successful: {len(successful)}/{len(results['queries'])}")
 
-# Print category summary
 print("\n" + "="*60)
 print("Category Performance Summary")
 print("="*60)
@@ -469,13 +452,11 @@ import time
 benchmark = ReadPrimitives(scale_factor=0.1)
 adapter = DuckDBAdapter()
 
-# Setup
 benchmark.generate_data()
 conn = adapter.create_connection()
 adapter.create_schema(benchmark, conn)
 adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-# Run specific queries
 selected_queries = [
     "aggregation_simple",
     "aggregation_groupby_small",
@@ -497,7 +478,6 @@ for query_id in selected_queries:
     query_times[query_id] = duration
     print(f"  {query_id:25s}: {duration:.3f}s")
 
-# Summary
 total_time = sum(query_times.values())
 avg_time = total_time / len(query_times)
 print(f"\nTotal: {total_time:.2f}s, Average: {avg_time:.3f}s")
@@ -513,27 +493,20 @@ import json
 benchmark = ReadPrimitives(scale_factor=0.1)
 adapter = DuckDBAdapter()
 
-# Setup
 benchmark.generate_data()
 conn = adapter.create_connection()
 adapter.create_schema(benchmark, conn)
 adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-# Run baseline benchmark
 print("Running baseline benchmark...")
 baseline_results = benchmark.run_benchmark(conn, categories=["aggregation", "window"], iterations=3)
 
-# Save baseline
 with open("baseline_results.json", "w") as f:
     json.dump(baseline_results, f, indent=2)
 
-# ... make changes to database configuration ...
-
-# Run comparison benchmark
 print("\nRunning comparison benchmark...")
 comparison_results = benchmark.run_benchmark(conn, categories=["aggregation", "window"], iterations=3)
 
-# Compare results
 print("\nPerformance Comparison:")
 print(f"{'Query':<30s} {'Baseline':<12s} {'Current':<12s} {'Change':<10s}")
 print("-" * 70)
@@ -550,6 +523,8 @@ for query_id, baseline in baseline_results["queries"].items():
           f"{change_pct:>+7.1f}% {status}")
 ```
 
+Between the baseline run and the comparison run, change the database configuration that you want to test. The example as written runs both benchmarks back to back without a change, so it shows only run-to-run variation. A query counts as a regression when its average time rises by more than 10%.
+
 ### Multi-Category Analysis
 
 ```python
@@ -560,13 +535,11 @@ import pandas as pd
 benchmark = ReadPrimitives(scale_factor=0.1)
 adapter = DuckDBAdapter()
 
-# Setup
 benchmark.generate_data()
 conn = adapter.create_connection()
 adapter.create_schema(benchmark, conn)
 adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-# Run selected categories
 categories_to_test = ["aggregation", "window", "filter", "string"]
 
 results_data = []
@@ -589,13 +562,11 @@ for category in categories_to_test:
         "success_rate": (len(successful) / len(queries)) * 100
     })
 
-# Create DataFrame for analysis
 df = pd.DataFrame(results_data)
 
 print("\nCategory Analysis:")
 print(df.to_string(index=False))
 
-# Identify slowest categories
 df_sorted = df.sort_values("avg_time", ascending=False)
 print("\nSlowest categories:")
 for idx, row in df_sorted.head(3).iterrows():
@@ -643,12 +614,10 @@ print(df)
 ```python
 from benchbox import ReadPrimitives
 
-# Extend with custom primitives
 class CustomPrimitives(ReadPrimitives):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Add custom queries
         self._custom_queries = {
             "custom_complex_join": """
                 SELECT l.l_orderkey, o.o_custkey, c.c_name, p.p_name
@@ -673,23 +642,19 @@ class CustomPrimitives(ReadPrimitives):
         }
 
     def get_query(self, query_id, *, params=None):
-        # Check custom queries first
         if query_id in self._custom_queries:
             return self._custom_queries[query_id]
 
-        # Fall back to standard primitives
         return super().get_query(query_id, params=params)
 
-# Use custom primitives
 custom_bench = CustomPrimitives(scale_factor=0.1)
 custom_bench.generate_data()
 
-# Execute custom query
 custom_query = custom_bench.get_query("custom_complex_join")
 print(f"Custom query: {custom_query}")
 ```
 
-Only `get_query()` sees the custom queries. `execute_query()`, `get_queries()` and `run_benchmark()` use the implementation's own query set, so they do not know the custom names.
+The subclass adds custom queries and checks them first in `get_query`. Any other query ID falls back to the standard primitives. Only `get_query()` sees the custom queries. `execute_query()`, `get_queries()` and `run_benchmark()` use the implementation's own query set, so they do not know the custom names.
 
 ## DataFrame Support
 

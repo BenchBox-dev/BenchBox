@@ -1,13 +1,6 @@
-"""External-table-mode tests for AWSGlueAdapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Verifies the SparkExternalTableMixin wiring with mocked boto3 clients:
-capability flag, Glue catalog registration reuse, and the end-to-end
-create_external_tables flow with row counts.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -85,7 +78,7 @@ class TestRegisterExternalTable:
 
 class TestJobScript:
     def test_script_resolves_job_run_id(self, adapter):
-        """The runner script must list JOB_RUN_ID or every run fails with KeyError."""
+
         mock_s3 = MagicMock()
         with patch.object(adapter, "_get_s3_client", return_value=mock_s3):
             adapter._upload_job_script()

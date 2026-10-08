@@ -1,14 +1,3 @@
-"""Integration smoke test: DDL drift check must report zero unregistered transforms.
-
-Verifies that every platform adapter that performs DDL optimization
-(via known names or CREATE TABLE rewrite behavior) has a registered
-Phase.DDL_OPTIMIZE rule in the compatibility registry, or is explicitly
-exempted.
-
-Uses check_ddl_drift() directly rather than the CLI so the test is
-isolated from unrelated inventory validation failures.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -25,7 +14,6 @@ _BENCHBOX_ROOT = Path(__file__).parent.parent.parent / "benchbox"
 
 
 def test_ddl_drift_check_is_clean():
-    """check_ddl_drift() must return zero findings for the current codebase."""
     from benchbox.sql_compat.inventory import check_ddl_drift
 
     drift = check_ddl_drift(_BENCHBOX_ROOT)
@@ -43,7 +31,6 @@ def test_ddl_drift_check_is_clean():
 
 
 def test_behavior_detector_catches_custom_named_create_table_rewrites(tmp_path):
-    """CREATE TABLE rewrites are detected even when the method name is not canonical."""
     from benchbox.sql_compat.inventory import collect_ddl_governance_statuses
 
     root = tmp_path / "benchbox"
@@ -70,7 +57,6 @@ def test_behavior_detector_catches_custom_named_create_table_rewrites(tmp_path):
 
 
 def test_ddl_rule_does_not_blanket_cover_unmapped_new_platform_function(tmp_path):
-    """A platform rule covers named behavior, not every future rewrite in the same file."""
     from benchbox.sql_compat.inventory import collect_ddl_governance_statuses
 
     root = tmp_path / "benchbox"
@@ -97,7 +83,6 @@ def test_ddl_rule_does_not_blanket_cover_unmapped_new_platform_function(tmp_path
 
 
 def test_ddl_governance_statuses_distinguish_runtime_governance_and_no_rewrite_platforms():
-    """Inventory status explains whether detected behavior is dispatched or governance-only."""
     from benchbox.sql_compat.inventory import collect_ddl_governance_statuses
 
     statuses = collect_ddl_governance_statuses(_BENCHBOX_ROOT)
@@ -112,7 +97,6 @@ def test_ddl_governance_statuses_distinguish_runtime_governance_and_no_rewrite_p
 
 
 def test_bigquery_runtime_ddl_rewrite_is_represented_in_governance_inventory():
-    """BigQuery's local CREATE TABLE conversion has runtime coverage and a governance status."""
     from benchbox.platforms.bigquery import BigQueryAdapter
     from benchbox.sql_compat.inventory import collect_ddl_governance_statuses
 
@@ -136,7 +120,6 @@ def test_bigquery_runtime_ddl_rewrite_is_represented_in_governance_inventory():
 
 
 def test_athena_runtime_ddl_rewrite_is_represented_in_governance_inventory():
-    """Athena's local CREATE TABLE conversion has runtime coverage and a governance status."""
     from benchbox.platforms.athena import AthenaAdapter
     from benchbox.sql_compat.inventory import collect_ddl_governance_statuses
 
@@ -165,7 +148,6 @@ def test_athena_runtime_ddl_rewrite_is_represented_in_governance_inventory():
 
 
 def test_singlestore_ddl_rules_resolve_via_base_optimizer():
-    """SingleStore (the BaseDdlOptimizer canary) resolves all 4 DDL_OPTIMIZE rules."""
     import importlib
     import pkgutil
 
@@ -207,7 +189,6 @@ def test_singlestore_ddl_rules_resolve_via_base_optimizer():
 
 
 def test_base_ddl_optimizer_dispatches_correctly():
-    """BaseDdlOptimizer dispatches SingleStore transforms and produces correct DDL."""
     from benchbox.platforms.singlestore import SingleStoreAdapter
 
     with patch("benchbox.platforms.singlestore._s2", MagicMock()):
@@ -227,12 +208,6 @@ def test_base_ddl_optimizer_dispatches_correctly():
 
 
 def test_every_rule_file_loads_via_base_optimizer():
-    """For every {platform_key}_ddl_rewrites.py, _ensure_platform_rules_loaded must register rules.
-
-    Locks the file-naming contract: BaseDdlOptimizer constructs the module name as
-    f"benchbox.sql_compat.rules.ddl_optimize.{platform_key}_ddl_rewrites", so file stems
-    that diverge from the registered platform_key would silently fail at runtime.
-    """
     from benchbox.platforms.base.ddl_optimizer import _clear_load_cache, _ensure_platform_rules_loaded
     from benchbox.sql_compat.context import Phase
     from benchbox.sql_compat.registry import REGISTRY
@@ -252,22 +227,12 @@ def test_every_rule_file_loads_via_base_optimizer():
         )
 
 
-# Adapter classes whose runtime DDL transforms are dispatched via BaseDdlOptimizer.
-# Adapters not in this set must mark their rule(s) governance_only=True (the rewrite
-# happens via a different code path; the rule exists only for compat_lint governance).
 _DISPATCHED_ADAPTERS: dict[str, str] = {
     "singlestore": "benchbox.platforms.singlestore.SingleStoreAdapter",
 }
 
 
 def test_runtime_dispatch_or_governance_only():
-    """Every DDL_OPTIMIZE rule must be governance_only=True OR name a callable adapter method.
-
-    This is the structural analogue of the SingleStore-specific
-    test_transformer_id_is_callable_on_adapter check, applied to every registered rule.
-    Catches the failure mode where a platform migrates to BaseDdlOptimizer but its
-    transformer_id points at a method that does not exist on the adapter class.
-    """
     import importlib
     import pkgutil
 

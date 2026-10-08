@@ -72,13 +72,13 @@ def test_resolve_clickhouse_deployment_mode_falls_back_to_legacy_embedded_flag()
 
 
 def test_resolve_empty_string_deployment_mode_falls_through_to_legacy_keys() -> None:
-    """YAML `deployment_mode:` with no value produces empty string; must fall through."""
+
     assert resolve_clickhouse_deployment_mode({"deployment_mode": "", "mode": "server"}) == "server"
     assert resolve_clickhouse_deployment_mode({"deployment_mode": "", "mode": ""}) == "local"
 
 
 def test_resolve_none_embedded_falls_through_to_default() -> None:
-    """embedded: None (YAML `embedded:` with no value) should not trigger boolean path."""
+
     assert resolve_clickhouse_deployment_mode({"embedded": None}) == "local"
 
 
@@ -145,13 +145,8 @@ def test_clickhouse_adapter_rejects_cloud_legacy_mode_alias() -> None:
         ClickHouseAdapter(mode="cloud")
 
 
-# ---------------------------------------------------------------------------
-# MRO / get_platform_info through adapter
-# ---------------------------------------------------------------------------
-
-
 def test_adapter_get_platform_info_emits_mode_compat_alias() -> None:
-    """get_platform_info via the adapter MRO must include the `mode` compat alias."""
+
     from benchbox.platforms.clickhouse import ClickHouseAdapter
 
     fake_chdb = types.ModuleType("chdb")
@@ -168,7 +163,7 @@ def test_adapter_get_platform_info_emits_mode_compat_alias() -> None:
 
 
 def test_adapter_get_platform_info_server_emits_mode_compat_alias() -> None:
-    """Server mode get_platform_info must also include the `mode` compat alias."""
+
     from benchbox.platforms.clickhouse import ClickHouseAdapter
 
     with patch("benchbox.platforms.clickhouse.adapter.check_platform_dependencies", return_value=(True, [])):
@@ -182,11 +177,10 @@ def test_adapter_get_platform_info_server_emits_mode_compat_alias() -> None:
 
 
 def test_adapter_get_platform_info_resolves_to_metadata_mixin() -> None:
-    """Verify the MRO resolves get_platform_info to ClickHouseMetadataMixin."""
+
     from benchbox.platforms.clickhouse import ClickHouseAdapter
     from benchbox.platforms.clickhouse.metadata import ClickHouseMetadataMixin
 
-    # Walk MRO to find which class provides get_platform_info
     for cls in ClickHouseAdapter.__mro__:
         if "get_platform_info" in cls.__dict__:
             assert cls is ClickHouseMetadataMixin, (
@@ -196,7 +190,7 @@ def test_adapter_get_platform_info_resolves_to_metadata_mixin() -> None:
 
 
 def test_cloud_adapter_get_platform_info_emits_cloud_deployment() -> None:
-    """ClickHouseCloudAdapter.get_platform_info should report cloud deployment_mode."""
+
     from benchbox.platforms.clickhouse_cloud import ClickHouseCloudAdapter
 
     fake_cc = types.ModuleType("clickhouse_connect")
@@ -212,28 +206,11 @@ def test_cloud_adapter_get_platform_info_emits_cloud_deployment() -> None:
     assert info["connection_mode"] == "cloud"
 
 
-# ---------------------------------------------------------------------------
-# PlatformHookRegistry default
-# ---------------------------------------------------------------------------
-
-
 def test_platform_hook_registry_default_matches_normalizer_default() -> None:
-    """The CLI platform hook default for deployment_mode must agree with DEFAULT_CLICKHOUSE_DEPLOYMENT_MODE.
 
-    The authoritative registration is in benchbox/cli/platform_defaults.py
-    (``_register_clickhouse``), which registers default="server" for the legacy
-    ``clickhouse`` platform. The canonical default for the normalizer is "local"
-    (the deployment mode used when no explicit selection is given).
-
-    These two values intentionally differ: the CLI default for ``--platform clickhouse``
-    is "server" (to avoid accidentally running against a missing chDB install), while
-    the normalizer default is "local" (the embedded path). The test just verifies that
-    the platform_defaults registration is present and explicit.
-    """
     import ast
     from pathlib import Path
 
-    # CLI option registration is now in platform_defaults.py, not clickhouse/__init__.py
     defaults_path = Path(__file__).resolve().parents[3] / "benchbox" / "cli" / "platform_defaults.py"
     source = defaults_path.read_text()
 
@@ -256,7 +233,7 @@ def test_platform_hook_registry_default_matches_normalizer_default() -> None:
         "Could not find PlatformOptionSpec(name='deployment_mode') in platform_defaults.py. "
         "The clickhouse platform option registration must be in benchbox/cli/platform_defaults.py."
     )
-    # The CLI default for the legacy `clickhouse` platform is "server" (explicit).
+
     assert found_default in ("server", "local"), (
         f"Unexpected deployment_mode default '{found_default}' in platform_defaults.py"
     )

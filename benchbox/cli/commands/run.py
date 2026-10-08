@@ -1,5 +1,3 @@
-"""Implementation of the `benchbox run` command."""
-
 from __future__ import annotations
 
 import json
@@ -112,15 +110,6 @@ _GUIDED_CREDENTIAL_PLATFORMS = frozenset(
 
 
 def _reject_official_fallback(s: types.SimpleNamespace, resolution: TuningResolution) -> None:
-    """Refuse `tuned-fallback` resolutions under `--official` (ADR-2 §1).
-
-    A `--tuning tuned` run that could not find a template resolves to the
-    distinct `tuned-fallback` mode (see `TuningResolution.canonical_mode`)
-    rather than silently recording `tuned`. Official/TPC-compliant runs must
-    either find a real template or explicitly choose `notuning`/a custom
-    file -- they must never submit an unoptimized fallback config labeled as
-    if it were a genuine tuned run.
-    """
     if not s.official or resolution.canonical_mode != tuning_modes.TUNED_FALLBACK:
         return
     console.print("[red]❌ Error: --official runs cannot use a 'tuned-fallback' configuration[/red]")
@@ -141,7 +130,6 @@ def _apply_platform_optimization_overrides(
     sorted_ingestion_method: str | None,
     parsed_platform_options: dict[str, Any] | None = None,
 ) -> None:
-    """Apply CLI and platform-option overrides to platform optimization settings."""
     platform_optimizations = unified_tuning.platform_optimizations
     platform_options = parsed_platform_options or {}
 
@@ -160,10 +148,6 @@ def _apply_platform_optimization_overrides(
         strategy = str(resolved_strategy).lower()
         platform_optimizations.databricks_clustering_strategy = strategy
         platform_optimizations.liquid_clustering_enabled = strategy in {"liquid_clustering", "liquid_clustering_auto"}
-        # An explicit strategy override is authoritative over the template's reporting identity: drop the stale
-        # physical_rendering_id so it is re-derived from the new strategy downstream, preventing result JSON from
-        # claiming a rendering the executor no longer applies. Genuinely contradictory layout fields are still
-        # rejected by __post_init__ below rather than silently rewritten.
         platform_optimizations.physical_rendering_id = None
 
     resolved_liquid_columns = platform_options.get("liquid_clustering_columns")
@@ -177,7 +161,6 @@ def _apply_platform_optimization_overrides(
 
 
 def _build_data_organization_from_tuning(unified_tuning: Any) -> dict[str, Any] | None:
-    """Build data organization payload from unified tuning configuration."""
     if unified_tuning is None:
         return None
 
@@ -227,7 +210,6 @@ def _resolve_data_organization_payload(
     presort: str | None,
     tuning_payload: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
-    """Resolve effective data organization payload from tuning and CLI flags."""
     if presort not in {"parquet-sorted", "delta-sorted", "iceberg-sorted"}:
         return tuning_payload
 
@@ -246,8 +228,6 @@ def _resolve_data_organization_payload(
     }
     output_format = output_format_map[presort]
 
-    # Sort keys are benchmark knowledge: a benchmark supports --presort exactly
-    # when it declares presort_table_configs in the registry.
     table_configs = get_presort_table_configs(benchmark_key) if benchmark_key else None
     if table_configs:
         return {"table_configs": table_configs, "output_format": output_format}
@@ -263,7 +243,6 @@ def _render_post_run_charts(
     console: Any,
     quiet: bool,
 ) -> None:
-    """Render post-run summary charts to the console if applicable."""
     if quiet or not result.query_results:
         return
     try:
@@ -290,29 +269,6 @@ def _build_execution_context(
     non_interactive: bool,
     tuning: str | None,
 ) -> ExecutionContext:
-    """Build ExecutionContext from CLI parameters for result reproducibility.
-
-    Args:
-        phases_to_run: List of phases to execute
-        seed: Random seed for query generation
-        compression: Compression configuration
-        mode: Execution mode (sql/dataframe)
-        official: TPC-compliant mode flag
-        validation: Validation configuration
-        force: Force flags configuration
-        queries_to_run: Query subset
-        capture_plans: Whether to capture query plans
-        strict_plan_capture: Strict plan capture mode
-        non_interactive: Non-interactive mode flag
-        tuning: The already-resolved canonical `tuning_mode` (see
-            `_canonical_tuning_mode` / `TuningResolution.canonical_mode`) --
-            one of the ADR-2 pinned vocabulary values (tuned, tuned-fallback,
-            notuning, auto, custom), never a raw `--tuning` CLI argument or
-            local file path (ADR-2 §2 forbids raw paths as a recorded mode).
-
-    Returns:
-        ExecutionContext populated from CLI parameters
-    """
     return ExecutionContext(
         entry_point="cli",
         phases=phases_to_run,
@@ -334,19 +290,6 @@ def _build_execution_context(
 
 
 def _canonical_tuning_mode(s: types.SimpleNamespace) -> str | None:
-    """Read the ADR-2 canonical `tuning_mode` off `s` for recording, not raw `s.tuning`.
-
-    `s.tuning` is the raw `--tuning` CLI value (a keyword or a local file
-    path) and must never reach a result bundle verbatim (ADR-2 §2). Every
-    dispatch path sets `s.tuning_resolution` before calling
-    `_build_execution_context` (`_resolve_tuning`, the fallback-wizard branch
-    of `_load_unified_tuning_config`, `_interactive_tuning_step`, and the
-    quick-restart re-resolution all keep it current), so this always prefers
-    `TuningResolution.canonical_mode`. The raw-string fallback only guards
-    against a future dispatch path that forgets to set a resolution; it
-    intentionally excludes anything that looks like a file path so a bug
-    upstream fails closed (falls back to `custom`) rather than leaking a path.
-    """
     resolution = getattr(s, "tuning_resolution", None)
     if resolution is not None:
         return resolution.canonical_mode
@@ -370,7 +313,6 @@ def _execute_orchestrated_run(
     no_monitoring: bool,
     execution_context: ExecutionContext | None = None,
 ) -> Any:
-    """Execute benchmark through the canonical orchestrator path."""
     progress_enabled = not no_progress and should_show_progress()
     enable_monitoring = not no_monitoring
 
@@ -404,7 +346,6 @@ LOAD_FAILURE_MARKER = "BENCHBOX_LOAD_FAILURE_JSON="
 
 
 def _emit_load_failure_marker(result: Any) -> None:
-    """Emit one machine-readable line for UAT's durable load-failure sidecar."""
 
     details = getattr(result, "validation_details", None)
     payload = details.get("load_failure") if isinstance(details, dict) else None
@@ -426,11 +367,8 @@ def _export_orchestrated_result(
     funding: str | None = None,
     result_source: str | None = None,
 ) -> dict[str, Any]:
-    """Export a canonical run result using directory-manager naming."""
     from datetime import datetime
 
-    # Attach declared provenance before export so it lands in the bundle. Absent
-    # values leave the result untouched (no provenance block emitted).
     if funding:
         result.funding = funding
     if result_source:
@@ -457,8 +395,6 @@ def _export_orchestrated_result(
 
 
 class PlatformOptionParamType(click.ParamType):
-    """Click parameter type for key=value platform options."""
-
     name = "key=value"
 
     def convert(self, value: str, param, ctx) -> tuple[str, str]:
@@ -472,8 +408,6 @@ class PlatformOptionParamType(click.ParamType):
 
 
 class BenchmarkOptionParamType(click.ParamType):
-    """Click parameter type for key=value benchmark options."""
-
     name = "key=value"
 
     def convert(self, value: str, param, ctx) -> tuple[str, str]:
@@ -486,13 +420,6 @@ class BenchmarkOptionParamType(click.ParamType):
         return key, raw.strip()
 
     def shell_complete(self, ctx, param, incomplete: str):
-        """Complete registered benchmark-option keys and choice values.
-
-        KEYs come from the BenchmarkHookRegistry specs for the selected
-        --benchmark (so it must precede --benchmark-option on the command
-        line); after KEY=, specs declaring choices complete allowed values.
-        Keys already given on the command line are omitted.
-        """
         from click.shell_completion import CompletionItem
 
         specs = _benchmark_specs_for_completion(ctx)
@@ -508,7 +435,6 @@ class BenchmarkOptionParamType(click.ParamType):
 
 
 def _benchmark_specs_for_completion(ctx) -> dict[str, Any]:
-    """Return registry specs for the --benchmark already on the command line."""
     from benchbox.cli.benchmark_hooks import BenchmarkHookRegistry
 
     params = getattr(ctx, "params", None) or {}
@@ -521,14 +447,6 @@ def _benchmark_specs_for_completion(ctx) -> dict[str, Any]:
 
 
 def _ensure_benchmark_specs(benchmark: str) -> None:
-    """Import the selected benchmark module so its option specs register.
-
-    Benchmark modules load lazily, so in a fresh CLI process only
-    incidentally-imported benchmarks have specs; without this, completion
-    offers nothing for benchmarks like nyctaxi. Mirrors the
-    `--help-topic benchmarks` eager-import path for one id. Unknown ids stay
-    silent — completion simply offers nothing.
-    """
     try:
         from benchbox.core.benchmark_loader import get_core_benchmark_class
 
@@ -538,7 +456,6 @@ def _ensure_benchmark_specs(benchmark: str) -> None:
 
 
 def _find_benchmark_spec(specs: dict[str, Any], key: str):
-    """Return the spec for a key or alias, or None when unknown."""
     lowered = str(key).strip().lower()
     for name, spec in specs.items():
         if lowered == name or lowered in {str(a).lower() for a in spec.aliases}:
@@ -547,7 +464,6 @@ def _find_benchmark_spec(specs: dict[str, Any], key: str):
 
 
 def _used_benchmark_option_keys(ctx, specs: dict[str, Any]) -> set[str]:
-    """Canonical benchmark-option keys already present on the command line."""
     params = getattr(ctx, "params", None) or {}
     used: set = set()
     for key, _raw in params.get("benchmark_option_pairs") or ():
@@ -558,7 +474,6 @@ def _used_benchmark_option_keys(ctx, specs: dict[str, Any]) -> set[str]:
 
 
 def _complete_benchmark_option_value(specs: dict[str, Any], key: str, value_prefix: str):
-    """Complete allowed values after KEY= for specs declaring choices."""
     from click.shell_completion import CompletionItem
 
     target = _find_benchmark_spec(specs, key)
@@ -577,28 +492,20 @@ def _complete_benchmark_option_value(specs: dict[str, Any], key: str, value_pref
 
 
 def _derive_execution_type(phases: list[str]) -> str:
-    """Derive benchmark execution type through the shared core service."""
     from benchbox.core.run_service import map_phases_to_execution_type
 
     return map_phases_to_execution_type(phases)
 
 
-from benchbox.cli.verbose_logging import setup_verbose_logging as setup_verbose_logging  # noqa: E402
-
-# ---------------------------------------------------------------------------
-# Run preamble helpers - split to keep per-function McCabe complexity < 18.
-# ---------------------------------------------------------------------------
+from benchbox.cli.verbose_logging import setup_verbose_logging as setup_verbose_logging
 
 
 def _apply_cli_adapter(s: types.SimpleNamespace) -> None:
-    """Map new composite CLI params to legacy variables used downstream."""
-    # Force config -> legacy flags
     force_config = s.force or ForceConfig()
     s.force_config = force_config
     s.force_regenerate = force_config.datagen
     s.force_upload = force_config.upload
 
-    # Compression config -> legacy variables
     comp_config = s.compression or CompressionConfig()
     s.comp_config = comp_config
     s.compression_cli_set = s.compression is not None
@@ -606,19 +513,16 @@ def _apply_cli_adapter(s: types.SimpleNamespace) -> None:
     s.compression_type = comp_config.type
     s.compression_level = comp_config.level
 
-    # Plan config -> legacy variables
     plan_cfg = s.plan_config or PlanCaptureConfig()
     s.plan_cfg = plan_cfg
     s.strict_plan_capture = plan_cfg.strict
     s.plan_queries_str = ",".join(plan_cfg.queries) if plan_cfg.queries else None
     s.show_query_plans = s.show_plans
 
-    # Table format config -> legacy variables
     s.table_format_value = s.table_format.format if s.table_format else None
     s.table_format_compression = s.table_format.compression if s.table_format else "snappy"
     s.table_format_partition_cols = tuple(s.table_format.partition_cols) if s.table_format else ()
 
-    # Validation config -> legacy variables
     val_config = s.validation or ValidationConfig()
     s.val_config = val_config
     s.validation_mode = val_config.mode if val_config.mode != "exact" or s.validation else None
@@ -631,7 +535,6 @@ def _apply_cli_adapter(s: types.SimpleNamespace) -> None:
 
 
 def _validate_initial_flags(s: types.SimpleNamespace) -> None:
-    """Validate quiet+verbose, official mode."""
     if s.quiet and s.verbose:
         console.print("[red]❌ --quiet cannot be used with -v/-vv flags[/red]")
         s.ctx.exit(2)
@@ -689,7 +592,6 @@ def _tuning_override_entries(s: types.SimpleNamespace) -> dict[str, Any]:
 
 
 def _validate_non_interactive(s: types.SimpleNamespace) -> None:
-    """Set env flag and validate required args for non-interactive mode."""
     if not s.non_interactive:
         return
     os.environ["BENCHBOX_NON_INTERACTIVE"] = "true"
@@ -718,7 +620,6 @@ def _validate_non_interactive(s: types.SimpleNamespace) -> None:
 
 
 def _parse_phases_list(s: types.SimpleNamespace) -> None:
-    """Parse and validate the --phases list into phases_to_run."""
     valid_phases = set(VALID_PHASES)
     phase_list = [p.strip() for p in s.phases.split(",") if p.strip()]
 
@@ -740,7 +641,6 @@ def _parse_phases_list(s: types.SimpleNamespace) -> None:
 
 
 def _parse_queries_list(s: types.SimpleNamespace) -> None:
-    """Parse and validate the --queries subset list into queries_to_run."""
     s.queries_to_run = None
     if s.queries is None:
         return
@@ -798,7 +698,6 @@ def _parse_queries_list(s: types.SimpleNamespace) -> None:
 
 
 def _derive_exec_type_and_banner(s: types.SimpleNamespace) -> None:
-    """Warn about stray --iterations, compute execution type, and print banner."""
     if s.iterations is not None and "power" not in s.phases_to_run and "standard" not in s.phases_to_run:
         console.print("[yellow]⚠️  Warning: --iterations has no effect without a power or standard phase.[/yellow]")
 
@@ -807,10 +706,6 @@ def _derive_exec_type_and_banner(s: types.SimpleNamespace) -> None:
         s.logger.debug(f"Test execution type: {s.test_execution_type}")
     s.execution_mode = s.test_execution_type
 
-    # Only show the "Interactive Benchmark Runner" header in actually-interactive
-    # contexts: a TTY and no explicit platform+benchmark args. Showing it when
-    # the user already provided --platform/--benchmark (or when piping output
-    # to a log) misrepresents the run as interactive.
     is_interactive = sys.stdin.isatty() and not (s.platform and s.benchmark)
     if not s.quiet and is_interactive:
         if (logo := rich_logo()) is not None:
@@ -824,7 +719,6 @@ def _derive_exec_type_and_banner(s: types.SimpleNamespace) -> None:
 
 
 def _resolve_tuning(s: types.SimpleNamespace, *, non_interactive_override: bool | None = None) -> None:
-    """Resolve tuning mode and load unified tuning configuration."""
     s.config = s.ctx.obj["config"]
     if s.logger:
         s.logger.debug(f"Loaded configuration from: {s.config.config_path}")
@@ -868,7 +762,6 @@ def _resolve_tuning(s: types.SimpleNamespace, *, non_interactive_override: bool 
 
 
 def _load_unified_tuning_config(s: types.SimpleNamespace, *, non_interactive_override: bool | None = None) -> None:
-    """Load unified tuning configuration into s.loaded_unified_config."""
     s.loaded_unified_config = None
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
@@ -912,10 +805,6 @@ def _load_unified_tuning_config(s: types.SimpleNamespace, *, non_interactive_ove
                     interactive=True,
                 )
                 s.tuning_enabled, s.tuning = infer_runtime_tuning_mode(s.loaded_unified_config)
-                # A wizard-produced config is no longer the barebones fallback
-                # constraints -- record it with `wizard` provenance (ADR-2 §1)
-                # so `canonical_mode` reports plain `tuned`, not
-                # `tuned-fallback`, for the run the user just configured.
                 if s.tuning_enabled:
                     tuning_resolution.mode = TuningMode.TUNED
                     tuning_resolution.source = TuningSource.INTERACTIVE_WIZARD
@@ -938,7 +827,6 @@ def _load_unified_tuning_config(s: types.SimpleNamespace, *, non_interactive_ove
 
 
 def _resolve_data_organization(s: types.SimpleNamespace, *, resolve_dataframe: bool = True) -> None:
-    """Apply platform optimizations, build data organization payload, resolve DF tuning config."""
     try:
         _apply_platform_optimization_overrides(
             s.loaded_unified_config,
@@ -984,7 +872,6 @@ def _resolve_data_organization(s: types.SimpleNamespace, *, resolve_dataframe: b
 
 
 def _resolve_compression_settings(s: types.SimpleNamespace) -> None:
-    """Resolve effective compression settings (CLI/env/config precedence)."""
     if s.no_compression:
         s.compress_data = False
         if s.compression_type != "none":
@@ -1040,7 +927,6 @@ def _resolve_compression_settings(s: types.SimpleNamespace) -> None:
 
 
 def _capture_resolved_run_plan(s: types.SimpleNamespace) -> ResolvedRunPlan:
-    """Take one immutable snapshot after all run-resolution stages succeed."""
     return capture_resolved_run_plan(s, canonical_tuning_mode=_canonical_tuning_mode(s))
 
 
@@ -1050,7 +936,6 @@ def _resolve_run_request(
     apply_default_scale: bool,
     tuning_non_interactive: bool | None = None,
 ) -> None:
-    """Resolve current request fields through the canonical pre-execution pipeline."""
     _apply_cli_adapter(s)
     if apply_default_scale:
         _apply_benchmark_default_scale(s)
@@ -1073,7 +958,6 @@ def _resolve_run_request(
 
 
 def _validate_output_dir(s: types.SimpleNamespace) -> None:
-    """Validate --output directory (including cloud storage)."""
     if not s.output:
         return
     try:
@@ -1094,18 +978,11 @@ def _validate_output_dir(s: types.SimpleNamespace) -> None:
 
 
 def _prepare_run_state(s: types.SimpleNamespace) -> None:
-    """Run the full preamble: normalize CLI params, validate, resolve configs."""
     s.run_request = _current_run_request(s)
     _resolve_run_request(s, apply_default_scale=True)
 
-    # Initialize configs - assigned in all live-run paths below; asserted non-None before use.
     s.database_config = None
     s.benchmark_config = None
-
-
-# ---------------------------------------------------------------------------
-# Branch helpers - one per mutually-exclusive execution path.
-# ---------------------------------------------------------------------------
 
 
 def _stream_timeout_config_entries(s: types.SimpleNamespace) -> dict[str, Any]:
@@ -1126,7 +1003,6 @@ def _build_benchmark_config(
     s: types.SimpleNamespace,
     benchmark_info: dict[str, Any],
 ) -> BenchmarkConfig:
-    """Build the canonical BenchmarkConfig from one resolved plan."""
     plan: ResolvedRunPlan = s.resolved_run_plan
     assert plan.benchmark is not None
     options: dict[str, Any] = {
@@ -1187,7 +1063,6 @@ def _build_benchmark_config(
 
 
 def _build_execution_context_from_plan(s: types.SimpleNamespace) -> ExecutionContext:
-    """Build canonical result metadata from the same plan used for execution."""
     plan: ResolvedRunPlan = s.resolved_run_plan
     return _build_execution_context(
         phases_to_run=list(plan.phases),
@@ -1210,7 +1085,6 @@ def _build_execution_context_from_plan(s: types.SimpleNamespace) -> ExecutionCon
 
 
 def _dry_run_validate_inputs(s: types.SimpleNamespace) -> None:
-    """Validate inputs specific to the --dry-run path (platform/benchmark/scale)."""
     ctx = s.ctx
     logger = s.logger
     if s.test_execution_type == "data_only":
@@ -1264,13 +1138,11 @@ def _warn_tpch_subscale(s: types.SimpleNamespace) -> None:
 
 
 def _warn_unofficial_subscale(s: types.SimpleNamespace) -> None:
-    """Warn on subscale runs for every compliance-gated TPC benchmark."""
     _warn_tpcds_subscale(s)
     _warn_tpch_subscale(s)
 
 
 def _run_dry_run(s: types.SimpleNamespace) -> None:
-    """Execute the --dry-run path."""
     ctx = s.ctx
     logger = s.logger
     if logger:
@@ -1351,7 +1223,6 @@ def _run_dry_run(s: types.SimpleNamespace) -> None:
 
 
 def _dry_run_build_db_config(s: types.SimpleNamespace, db_manager: DatabaseManager) -> DatabaseConfig | None:
-    """Create DatabaseConfig for dry run mode (skipped for data-only)."""
     ctx = s.ctx
     logger = s.logger
     if s.execution_mode == "data_only":
@@ -1386,7 +1257,6 @@ def _dry_run_build_db_config(s: types.SimpleNamespace, db_manager: DatabaseManag
 
 
 def _run_direct(s: types.SimpleNamespace) -> None:
-    """Execute the direct non-interactive SQL/DataFrame path."""
     ctx = s.ctx
     logger = s.logger
     if logger:
@@ -1490,7 +1360,6 @@ def _direct_handle_result(
     orchestrator: BenchmarkOrchestrator,
     benchmark_config: BenchmarkConfig,
 ) -> None:
-    """Export results and perform post-run actions for the direct branch."""
     non_clean_reason = result_non_clean_reason(result)
     if result.validation_status not in ["FAILED", "INTERRUPTED"]:
         if not s.quiet:
@@ -1558,7 +1427,7 @@ def _direct_handle_result(
             output=s.output,
             additional_options={"table_mode": s.table_mode},
         )
-        if result_cli_failure_reason(result):  # narrower than non_clean_reason; see status.py
+        if result_cli_failure_reason(result):
             s.ctx.exit(1)
     else:
         _emit_load_failure_marker(result)
@@ -1567,7 +1436,6 @@ def _direct_handle_result(
 
 
 def _data_or_load_build_db_config(s: types.SimpleNamespace, db_manager: DatabaseManager) -> DatabaseConfig | None:
-    """Create DatabaseConfig for load_only; return None for data_only."""
     if s.execution_mode != "load_only":
         return None
 
@@ -1595,7 +1463,6 @@ def _data_or_load_build_db_config(s: types.SimpleNamespace, db_manager: Database
 
 
 def _data_or_load_validate_inputs(s: types.SimpleNamespace) -> None:
-    """Validate platform/benchmark args for data_only / load_only branch."""
     ctx = s.ctx
     logger = s.logger
     if s.test_execution_type == "data_only":
@@ -1611,7 +1478,6 @@ def _data_or_load_validate_inputs(s: types.SimpleNamespace) -> None:
 
 
 def _run_data_or_load_only(s: types.SimpleNamespace) -> None:
-    """Execute the data-only / load-only path."""
     logger = s.logger
     if logger:
         logger.debug(f"Entering {s.execution_mode} mode")
@@ -1686,7 +1552,6 @@ def _run_data_or_load_only(s: types.SimpleNamespace) -> None:
 
 
 def _data_or_load_operation_status(result: Any, execution_mode: str) -> tuple[str, str]:
-    """Derive operation_status / operation_name for data_only / load_only results."""
     if execution_mode == "data_only":
         return "COMPLETED", "Data generation"
 
@@ -1705,7 +1570,6 @@ def _data_or_load_handle_result(
     orchestrator: BenchmarkOrchestrator,
     benchmark_config: BenchmarkConfig,
 ) -> None:
-    """Export results and persist quick-restart config for data/load-only branch."""
     ctx = s.ctx
     if result.validation_status not in ["FAILED", "INTERRUPTED"]:
         if not s.quiet:
@@ -1767,7 +1631,6 @@ def _data_or_load_handle_result(
 
 
 def _run_interactive(s: types.SimpleNamespace) -> None:
-    """Execute the full interactive wizard path."""
     ctx = s.ctx
     logger = s.logger
     if not sys.stdin.isatty() or not sys.stdout.isatty():
@@ -1812,7 +1675,6 @@ def _run_interactive(s: types.SimpleNamespace) -> None:
 
 
 def _explicit_run_fields(s: types.SimpleNamespace) -> frozenset[str]:
-    """Return run parameters explicitly supplied on the current command line."""
     if not hasattr(s.ctx, "get_parameter_source"):
         return frozenset({"table_mode"} if s.table_mode_cli_supplied else ())
 
@@ -1844,14 +1706,11 @@ def _resolve_quick_restart_atomically(
     s: types.SimpleNamespace,
     last_run: dict[str, Any],
 ) -> ResolvedRunPlan:
-    """Merge and resolve saved intent, rolling back every field on failure."""
     return resolve_quick_restart_atomically(
         s,
         last_run,
         current_request=getattr(s, "run_request", None) or _current_run_request(s),
         explicit_fields=_explicit_run_fields(s),
-        # Saved scale is resolved input; reapplying Click's DEFAULT provenance
-        # would replace it with the benchmark registry default.
         resolve=lambda state: _resolve_run_request(
             state,
             apply_default_scale=False,
@@ -1862,7 +1721,6 @@ def _resolve_quick_restart_atomically(
 
 
 def _interactive_try_quick_restart(s: types.SimpleNamespace) -> bool:
-    """Offer quick-restart using saved last-run config; populate configs if accepted."""
     from benchbox.cli.preferences import format_last_run_summary, load_last_run_config
 
     last_run = load_last_run_config()
@@ -1920,7 +1778,6 @@ def _interactive_try_quick_restart(s: types.SimpleNamespace) -> bool:
 
 
 def _interactive_normal_flow(s: types.SimpleNamespace, system_profile: Any) -> None:
-    """Run the interactive step-by-step configuration flow when not quick-restarting."""
     console.print("\n[bold]Step 2 of 6:[/bold] [cyan]Execution Style[/cyan]")
     console.print("Choose how you want to run benchmarks...")
     db_manager = DatabaseManager()
@@ -1965,7 +1822,6 @@ def _interactive_normal_flow(s: types.SimpleNamespace, system_profile: Any) -> N
 
 
 def _run_stages_through_cloud_storage(s: types.SimpleNamespace) -> bool:
-    """Whether this run's *deployment* stages remotely; firebolt Core, motherduck and starburst do not."""
     mode = resolved_deployment_mode(s.database_config)
     return PlatformRegistry.requires_cloud_storage_for_deployment(s.database_config.type, mode)
 
@@ -1979,7 +1835,6 @@ def _run_requires_platform_credentials(s: types.SimpleNamespace) -> bool:
 
 
 def _interactive_cloud_setup_if_needed(s: types.SimpleNamespace) -> None:
-    """Perform credential setup and, when required, remote output setup."""
     ctx = s.ctx
     stages_remotely = _run_stages_through_cloud_storage(s)
     if not stages_remotely and not _run_requires_platform_credentials(s):
@@ -1997,8 +1852,6 @@ def _interactive_cloud_setup_if_needed(s: types.SimpleNamespace) -> None:
             console.print(f"\n[dim]To configure later: benchbox setup --platform {s.database_config.type}[/dim]")
             ctx.exit(1)
     elif not stages_remotely:
-        # Server platforms validate credentials from their connection options;
-        # they do not have a CredentialManager setup flow.
         return
 
     if not stages_remotely or s.output:
@@ -2025,7 +1878,6 @@ def _interactive_cloud_setup_if_needed(s: types.SimpleNamespace) -> None:
 def _interactive_prompt_phases_queries(
     s: types.SimpleNamespace, bench_manager: BenchmarkManager, prompt_phases_fn: Any, prompt_query_subset_fn: Any
 ) -> None:
-    """Prompt for phases and optionally for the query subset in interactive mode."""
     s.phases_to_run = prompt_phases_fn(default_phases=s.phases_to_run)
     s.test_execution_type = _derive_execution_type(s.phases_to_run)
     s.execution_mode = s.test_execution_type
@@ -2044,7 +1896,6 @@ def _interactive_prompt_phases_queries(
 def _interactive_prompt_force_and_validation(
     s: types.SimpleNamespace, prompt_force_fn: Any, prompt_validation_fn: Any
 ) -> None:
-    """Prompt for force-regeneration and validation-mode selections if not CLI-set."""
     if s.force is None:
         force_mode_result = prompt_force_fn()
         if force_mode_result is not None:
@@ -2066,7 +1917,6 @@ def _interactive_prompt_output_and_format(
     prompt_output_fn: Any,
     prompt_table_format_fn: Any,
 ) -> None:
-    """Prompt for optional output directory and table-format selection."""
     if not s.output and not _run_stages_through_cloud_storage(s):
         custom_output = prompt_output_fn(default_output="benchmark_runs/")
         if custom_output:
@@ -2083,7 +1933,6 @@ def _interactive_prompt_output_and_format(
 def _interactive_collect_flags(
     s: types.SimpleNamespace, db_manager: DatabaseManager, bench_manager: BenchmarkManager
 ) -> None:
-    """Collect Step 3.5 interactive prompts: phases, queries, official, seed, force, etc."""
     from benchbox.cli.benchmarks import (
         prompt_capture_plans,
         prompt_force_regeneration,
@@ -2160,7 +2009,6 @@ def _interactive_prompt_platform_options(s: types.SimpleNamespace) -> None:
 
 
 def _interactive_prompt_seed(s: types.SimpleNamespace, prompt_seed_fn: Any) -> None:
-    """Prompt for seed (with official-mode treatment) and persist into config."""
     if s.seed is not None:
         return
     if s.official:
@@ -2181,7 +2029,6 @@ def _interactive_prompt_seed(s: types.SimpleNamespace, prompt_seed_fn: Any) -> N
 
 
 def _interactive_tuning_step(s: types.SimpleNamespace, system_profile: Any) -> None:
-    """Step 5: interactive tuning configuration and final config wiring."""
     console.print("\n[bold]Step 5 of 6:[/bold] [cyan]Tuning Configuration[/cyan]")
     console.print("Configure database optimizations for best performance...")
 
@@ -2216,11 +2063,6 @@ def _interactive_tuning_step(s: types.SimpleNamespace, system_profile: Any) -> N
         s.tuning_config_file = None
         s.use_auto_tuning = False
 
-    # This step never runs through `resolve_tuning()` (it's the fully
-    # interactive wizard path, not a `--tuning` CLI value), so build a fresh
-    # `TuningResolution` here rather than leaving the stale pre-wizard one
-    # from `_resolve_tuning()` in place -- otherwise `canonical_mode` could
-    # still read as the earlier resolution's mode/source pair.
     s.tuning_resolution = (
         TuningResolution(mode=TuningMode.TUNED, source=TuningSource.INTERACTIVE_WIZARD, enabled=True)
         if s.tuning_enabled
@@ -2230,7 +2072,7 @@ def _interactive_tuning_step(s: types.SimpleNamespace, system_profile: Any) -> N
     if s.table_mode == "external" and _tuning_arg_is_tuning_bearing(s.tuning):
         _reject_external_tuned(console, s.logger, s.ctx)
 
-    s.tuning_source_value, s.tuning_template_ref = tuning_source_value, None  # no template file here
+    s.tuning_source_value, s.tuning_template_ref = tuning_source_value, None
     if getattr(s.database_config, "options", None) is None:
         s.database_config.options = {}
     s.database_config.options["tuning_enabled"] = s.tuning_enabled
@@ -2267,7 +2109,6 @@ def _interactive_tuning_step(s: types.SimpleNamespace, system_profile: Any) -> N
 
 
 def _finalize_normal_interactive_plan(s: types.SimpleNamespace) -> None:
-    """Finalize wizard selections once, before either preview or execution."""
     assert s.database_config is not None
     assert s.benchmark_config is not None
     s.platform = s.database_config.type
@@ -2296,11 +2137,6 @@ def _finalize_normal_interactive_plan(s: types.SimpleNamespace) -> None:
     s.resolved_run_plan = _capture_resolved_run_plan(s)
 
     plan: ResolvedRunPlan = s.resolved_run_plan
-    # The wizard can turn official mode ON after `select_benchmark()` already
-    # built this config with `official=False` - `_interactive_collect_flags`
-    # updates only `s.official`. Without this copy `compliance_mode_kwargs()`
-    # reads the stale config value, so a run the wizard reported as official
-    # classifies as `unofficial_nonstandard` and `benchbox submit` refuses it.
     s.benchmark_config.official = bool(getattr(s, "official", False))
     s.benchmark_config.scale_factor = plan.scale
     s.benchmark_config.queries = list(plan.queries) if plan.queries is not None else None
@@ -2342,20 +2178,17 @@ def _finalize_normal_interactive_plan(s: types.SimpleNamespace) -> None:
 
 
 def _interactive_preflight_and_execute(s: types.SimpleNamespace, system_profile: Any) -> None:
-    """Run pre-flight cloud check, interactive preview, execution, and export."""
     ctx = s.ctx
     assert s.database_config is not None
     assert s.benchmark_config is not None
     if not getattr(s, "quick_restart_used", False):
         _finalize_normal_interactive_plan(s)
     else:
-        # Quick restart already finalized both configs from the atomic plan.
         s.benchmark_config.stats_reset = getattr(s, "stats_reset", None)
         s.benchmark_config.stats_per_table_timing = bool(getattr(s, "stats_per_table_timing", False))
         s.benchmark_config.client_region = getattr(s, "client_region", None)
         s.benchmark_config.client_cloud = getattr(s, "client_cloud", None)
         s.benchmark_config.link_probe = not getattr(s, "no_link_probe", False)
-        # Quick restart already finalized concurrency in its resolved plan.
         if getattr(s, "concurrency", None) is not None:
             s.benchmark_config.concurrency = s.concurrency
     if _run_stages_through_cloud_storage(s) and not s.output:
@@ -2420,7 +2253,6 @@ def _interactive_preflight_and_execute(s: types.SimpleNamespace, system_profile:
 
 
 def _interactive_show_preview(s: types.SimpleNamespace) -> None:
-    """Show the pre-execution interactive preview panel."""
     from benchbox.cli.dryrun import display_interactive_preview
 
     plan: ResolvedRunPlan = s.resolved_run_plan
@@ -2474,7 +2306,6 @@ def _interactive_show_preview(s: types.SimpleNamespace) -> None:
 
 
 def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrator: BenchmarkOrchestrator) -> None:
-    """Export results, render charts, publish, and save last-run config (interactive branch)."""
     ctx = s.ctx
     if result.validation_status not in ["FAILED", "INTERRUPTED"]:
         console.print("\n[bold]Step 5:[/bold] Export Results")
@@ -2546,8 +2377,28 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
         ctx.exit(1)
 
 
-@click.command("run", cls=BenchBoxCommand)
-# === Core Options (Tier 1 - Always visible) ===
+@click.command(
+    "run",
+    cls=BenchBoxCommand,
+    help=(
+        "Run benchmarks.\n\n\b\nExamples:\n"
+        "  benchbox run --platform duckdb --benchmark tpch\n"
+        "  benchbox run --platform duckdb --benchmark tpch --queries Q1,Q6,Q17\n"
+        "  benchbox run --dry-run ./preview --platform snowflake --benchmark tpch\n"
+        "  benchbox run --official --platform snowflake --benchmark tpch --scale 100 --seed 42\n"
+        "\n\b\nDeployment Targets:\n"
+        "  benchbox run --platform clickhouse:local --benchmark tpch    # ClickHouse local mode via chDB\n"
+        "  benchbox run --platform clickhouse:server --benchmark tpch   # ClickHouse server\n"
+        "  benchbox run --platform clickhouse-cloud --benchmark tpch    # ClickHouse Cloud\n"
+        "  benchbox run --platform firebolt:core --benchmark tpch       # Firebolt Core (Docker)\n"
+        "  benchbox run --platform firebolt:cloud --benchmark tpch      # Firebolt Cloud\n"
+        "\nPlatforms that declare no deployment modes (snowflake, databricks, polars,\n"
+        "sqlite, ...) accept only the ':local' suffix, which is equivalent to the\n"
+        "bare name (snowflake:local == snowflake) and does not mean local\n"
+        "execution. Any other suffix is rejected.\n"
+        "\nUse --help-topic examples for more, --help-topic all for advanced options."
+    ),
+)
 @click.option(
     "--platform",
     type=str,
@@ -2564,7 +2415,6 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     type=str,
     help="Output directory (required for cloud platforms). Supports: s3://, gs://, abfss://, dbfs:/Volumes/",
 )
-# === Common Options (Tier 2 - Always visible) ===
 @click.option(
     "--phases",
     type=str,
@@ -2623,8 +2473,6 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     is_flag=True,
     help="TPC-compliant mode: validates scale factors, requires seed for reproducibility",
 )
-# === Advanced Options (Tier 3 - Hidden, shown with --help-all) ===
-# Plan Capture
 @advanced_option(
     "--capture-plans",
     is_flag=True,
@@ -2673,7 +2521,6 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
         "differing only in literal constants collapse to the same value. Requires --capture-plans."
     ),
 )
-# Statistics Phase (requires --phases ...,statistics)
 @advanced_option(
     "--stats-reset/--no-stats-reset",
     "stats_reset",
@@ -2697,14 +2544,12 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
         "build falls back to a per-table ANALYZE loop; omitted otherwise)."
     ),
 )
-# Compression
 @advanced_option(
     "--compression",
     type=COMPRESSION,
     default=None,
     help="Compression: zstd, zstd:9, gzip:6, none",
 )
-# Format Conversion
 @advanced_option(
     "--table-format",
     type=TABLE_FORMAT,
@@ -2717,7 +2562,6 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     default=None,
     help="Pre-sort data into open table formats (parquet-sorted, delta-sorted, iceberg-sorted).",
 )
-# Validation
 @advanced_option(
     "--validation",
     type=VALIDATION,
@@ -2729,7 +2573,6 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     is_flag=True,
     help="Fail when SQL dialect translation falls back instead of returning source SQL.",
 )
-# Platform-specific
 @click.option(
     "--platform-option",
     "platform_option_pairs",
@@ -2782,7 +2625,6 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     default=None,
     help="Number of power test measurement iterations (default: 3). Power phase only.",
 )
-# Output Control
 @advanced_option("--no-monitoring", is_flag=True, help="Disable metrics collection")
 @advanced_option("--no-progress", is_flag=True, help="Disable progress bars")
 @advanced_option("--ignore-memory-warnings", is_flag=True, help="Proceed despite insufficient memory warnings")
@@ -2899,30 +2741,6 @@ def run(
     client_cloud: str | None = None,
     no_link_probe: bool = False,
 ) -> None:
-    """Run benchmarks.
-
-    \b
-    Examples:
-      benchbox run --platform duckdb --benchmark tpch
-      benchbox run --platform duckdb --benchmark tpch --queries Q1,Q6,Q17
-      benchbox run --dry-run ./preview --platform snowflake --benchmark tpch
-      benchbox run --official --platform snowflake --benchmark tpch --scale 100 --seed 42
-
-    \b
-    Deployment Targets:
-      benchbox run --platform clickhouse:local --benchmark tpch    # ClickHouse local mode via chDB
-      benchbox run --platform clickhouse:server --benchmark tpch   # ClickHouse server
-      benchbox run --platform clickhouse-cloud --benchmark tpch    # ClickHouse Cloud
-      benchbox run --platform firebolt:core --benchmark tpch       # Firebolt Core (Docker)
-      benchbox run --platform firebolt:cloud --benchmark tpch      # Firebolt Cloud
-
-    Platforms that declare no deployment modes (snowflake, databricks, polars,
-    sqlite, ...) accept only the ':local' suffix, which is equivalent to the
-    bare name (snowflake:local == snowflake) and does not mean local
-    execution. Any other suffix is rejected.
-
-    Use --help-topic examples for more, --help-topic all for advanced options.
-    """
     s = types.SimpleNamespace(
         ctx=ctx,
         platform=platform,

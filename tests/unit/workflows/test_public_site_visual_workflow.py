@@ -1,5 +1,3 @@
-"""Contract tests for the public-site visual baseline workflow."""
-
 from __future__ import annotations
 
 import os
@@ -21,7 +19,7 @@ CAPTURE_SPEC = REPO_ROOT / "results-explorer" / "e2e" / "captures" / "public-sit
 CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 CLASSIFY_STEP = "Classify site inputs and validate recovery source"
 GATE_STEP = "Require comparison for affected develop trees"
-RUNBOOK = REPO_ROOT / "docs" / "development" / "results-explorer-browser-testing.md"
+RUNBOOK = REPO_ROOT / "docs" / "operations" / "public-site-visual-baseline.md"
 
 
 def _workflow() -> dict[str, Any]:
@@ -119,8 +117,6 @@ def test_download_accepts_site_equivalent_ancestors_and_compare_binds_the_used_s
     assert download["env"]["PUBLIC_SITE_VISUAL_BASELINE_CANDIDATES"] == (
         "${{ needs.visual-inputs.outputs.baseline_candidates }}"
     )
-    # The compare step checks the downloaded manifest against the SHA the
-    # lookup actually used, which the download step publishes.
     assert compare["env"]["PUBLIC_SITE_VISUAL_BASE_SHA"] == "${{ steps.baseline.outputs.baseline_sha }}"
 
 
@@ -160,8 +156,6 @@ def test_baseline_candidates_stop_at_the_first_site_input_change(tmp_path: Path)
     result = subprocess.run(["bash", "-c", classifier], cwd=tmp_path, env=env, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     lines = dict(line.split("=", 1) for line in output.read_text().splitlines())
-    # The base, then non-site ancestors, then the last commit that changed a
-    # site input (identical site inputs from that commit onward); nothing older.
     assert lines["baseline_candidates"].split() == [base, quiet_one, site_change]
 
 
@@ -215,7 +209,6 @@ def test_public_results_capture_waits_for_data_before_digesting() -> None:
 
 
 def test_docs_workflow_keeps_baselines_and_ci_reports_the_comparison() -> None:
-    """docs.yml captures protected-develop baselines on push; ci.yml runs the comparison."""
     workflow = _workflow()
     triggers = workflow.get("on", workflow.get(True))
     assert "pull_request" not in triggers

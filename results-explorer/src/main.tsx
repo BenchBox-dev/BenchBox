@@ -17,7 +17,6 @@ if (
       window.history.replaceState(null, "", restoredRoute);
     }
   } catch {
-    // Ignore sessionStorage failures and fall back to the default route.
   }
 }
 

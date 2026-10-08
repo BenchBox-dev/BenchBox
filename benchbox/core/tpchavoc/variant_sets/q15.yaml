@@ -146,7 +146,7 @@ variants:
         from
             supplier
         where
-            false -- This part will never execute, but maintains UNION structure
+            false
     ) combined_results
     where result_group = 1
     order by

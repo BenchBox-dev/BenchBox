@@ -1,17 +1,3 @@
-# Plugin and CLI tool allowlist for the dependency audit.
-#
-# Packages listed here are expected to have ZERO direct `import` sites in
-# benchbox/, scripts/, tests/, or docs/. They are invoked as CLI tools,
-# pytest plugins, or build-time plugins activated via config files rather
-# than Python imports.
-#
-# Each entry MUST include a `reason` explaining why zero import sites is correct.
-# Reference the relevant config surface where this tool is activated.
-
-# --------------------------------------------------------------------------
-# pytest plugins - activated via pytest.ini / pyproject.toml [tool.pytest],
-# not via import statements in test files (pytest auto-discovers them).
-# --------------------------------------------------------------------------
 pytest:
   reason: "Test runner CLI; invoked as `pytest` or via -m pytest. Not imported."
 
@@ -30,9 +16,6 @@ pytest-timeout:
 pytest-json-report:
   reason: "JSON report plugin for pytest; activated via --json-report/--json-report-file CLI flags (see .github/workflows/cross-platform-validation.yml). Not imported."
 
-# --------------------------------------------------------------------------
-# Linting and type-checking CLI tools - invoked as shell commands.
-# --------------------------------------------------------------------------
 ruff:
   reason: "Linter/formatter CLI; invoked as `uv run ruff check/format`. Not imported."
 
@@ -54,10 +37,6 @@ pre-commit:
 import-linter:
   reason: "Import-layering CLI; invoked as `uv run -- lint-imports` (see `make lint-imports`). Configured via [tool.importlinter] in pyproject.toml. Not imported."
 
-# --------------------------------------------------------------------------
-# Sphinx and documentation build plugins - activated via docs/conf.py
-# extensions list or as theme packages.
-# --------------------------------------------------------------------------
 furo:
   reason: "Sphinx HTML theme; activated via html_theme='furo' in docs/conf.py. Not imported."
 

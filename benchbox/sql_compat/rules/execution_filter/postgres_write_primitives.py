@@ -1,5 +1,3 @@
-"""PostgreSQL-family execution-filter rules for write_primitives operation gaps."""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.actions import CompatAction
@@ -20,7 +18,7 @@ POSTGRES_WRITE_PRIMITIVES_OPERATION_SKIPS = {
     "merge_overlap_90pct": "PostgreSQL MERGE requires an explicit INSERT VALUES clause; the catalog uses DuckDB shorthand.",
     "merge_no_overlap_all_insert": "PostgreSQL MERGE requires an explicit INSERT VALUES clause; the catalog uses DuckDB shorthand.",
     "merge_conditional_update": "PostgreSQL MERGE requires an explicit INSERT VALUES clause; the catalog uses DuckDB shorthand.",
-    "merge_returning_clause": "pg_duckdb rejects the catalog's MERGE RETURNING form in UAT.",
+    "merge_returning_clause": "pg_duckdb rejects the catalog's MERGE RETURNING form.",
     "merge_error_handling": "PostgreSQL MERGE requires an explicit INSERT VALUES clause; the catalog uses DuckDB shorthand.",
 }
 
@@ -94,13 +92,6 @@ _SKIPS_BY_QUERY_ID = {
     **POSTGRES_WRITE_PRIMITIVES_OPERATION_SKIPS,
 }
 
-# NOTE: The runtime skip decision is made by ``_get_effective_write_sql`` reading
-# the CATEGORY/OPERATION skip dicts above directly; nothing resolves the
-# EXECUTION_FILTER registry phase at execution time today. Unlike the DuckDB rule
-# (whose skip set is a dynamic MERGE INTO token match and is therefore NOT
-# registered), this loop enumerates exactly the same static skip set the dicts
-# hold, so the registry and the runtime cannot disagree. It is registered for any
-# future registry-driven coverage consumer; the dicts remain the source of truth.
 for _query_id, _reason in _SKIPS_BY_QUERY_ID.items():
     REGISTRY.register(
         CompatibilityDecision(

@@ -1,10 +1,3 @@
-"""Behavioral tests for core/dryrun.py: helper functions and save logic.
-
-Targets uncovered paths (particularly _extract_df_write_tuning,
-_build_table_ddl_entry, _resolve_execution_mode, and the
-_extract_dataframe_queries branch) to push coverage from ~71% toward 82%.
-"""
-
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -19,11 +12,6 @@ from benchbox.core.dryrun import (
 from benchbox.core.tuning.ddl_generator import TuningClauses
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
-
-
-# ---------------------------------------------------------------------------
-# _extract_df_write_tuning
-# ---------------------------------------------------------------------------
 
 
 class TestExtractDfWriteTuning:
@@ -90,21 +78,7 @@ class TestExtractDfWriteTuning:
         assert result["dictionary_columns"] == ["status", "priority"]
 
 
-# ---------------------------------------------------------------------------
-# _build_table_ddl_entry
-# ---------------------------------------------------------------------------
-
-
 class TestBuildTableDdlEntry:
-    """Uses the real TuningClauses dataclass (not a MagicMock double).
-
-    Each DDL generator formats its own clause text into these fields (e.g.
-    DuckDB's sort_by already reads "ORDER BY ..."; Redshift's distribute_by
-    already reads "DISTSTYLE ... DISTKEY (...)"), so _build_table_ddl_entry
-    must pass them through via TuningClauses.get_inline_clauses() rather than
-    re-wrapping bare values with its own labels.
-    """
-
     def test_empty_clauses(self):
         tc = TuningClauses()
         result = _build_table_ddl_entry(tc)
@@ -149,11 +123,6 @@ class TestBuildTableDdlEntry:
         assert "PARTITION BY (region)" in result["ddl_clauses"]
 
 
-# ---------------------------------------------------------------------------
-# DryRunExecutor._resolve_execution_mode
-# ---------------------------------------------------------------------------
-
-
 class TestResolveExecutionMode:
     def test_none_database_config_returns_sql(self):
         mode = DryRunExecutor._resolve_execution_mode(None)
@@ -172,11 +141,6 @@ class TestResolveExecutionMode:
         db_config.execution_mode = "sql"
         mode = DryRunExecutor._resolve_execution_mode(db_config)
         assert mode == "sql"
-
-
-# ---------------------------------------------------------------------------
-# DryRunExecutor._extract_queries - dataframe / maintenance branches
-# ---------------------------------------------------------------------------
 
 
 class TestExtractQueriesBranches:
@@ -210,11 +174,6 @@ class TestExtractQueriesBranches:
         assert "_maintenance_not_supported" in result
 
 
-# ---------------------------------------------------------------------------
-# DryRunExecutor._generate_dataframe_schema
-# ---------------------------------------------------------------------------
-
-
 class TestGenerateDataframeSchema:
     def setup_method(self):
         self.executor = DryRunExecutor()
@@ -241,11 +200,6 @@ class TestGenerateDataframeSchema:
         cfg.options = {}
         result = self.executor._generate_dataframe_schema(bm, cfg)
         assert result is None
-
-
-# ---------------------------------------------------------------------------
-# save_dry_run_results - additional edge cases
-# ---------------------------------------------------------------------------
 
 
 class TestSaveDryRunResultsExtended:
@@ -284,7 +238,7 @@ class TestSaveDryRunResultsExtended:
         saved = executor.save_dry_run_results(result)
         assert "json" in saved
         assert "yaml" in saved
-        # queries_dir should still be created (empty)
+
         assert "queries_dir" in saved
         sql_files = list(saved["queries_dir"].glob("*"))
         assert len(sql_files) == 0
@@ -320,11 +274,6 @@ class TestSaveDryRunResultsExtended:
         assert "ANALYZE" in post_load_content
 
 
-# ---------------------------------------------------------------------------
-# DryRunExecutor._estimate_data_size - additional benchmarks
-# ---------------------------------------------------------------------------
-
-
 class TestEstimateDataSizeExtended:
     def setup_method(self):
         self.executor = DryRunExecutor()
@@ -337,7 +286,7 @@ class TestEstimateDataSizeExtended:
     def test_h2odb(self):
         bm = self._make_benchmark(1.0)
         result = self.executor._estimate_data_size(bm, "h2odb")
-        # h2odb uses a specific multiplier; just verify it is positive
+
         assert result > 0
 
     def test_tpcdi(self):

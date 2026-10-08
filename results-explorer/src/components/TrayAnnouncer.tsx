@@ -19,8 +19,6 @@ export function TrayAnnouncer({ count }: TrayAnnouncerProps) {
       isInitialMount.current = false;
       return;
     }
-    // Guidance section (aria-live inside Benchmark/Platform pages) already announces 0/1 states.
-    // TrayAnnouncer only needs to announce tray-specific transitions and 2+ readiness.
     const shouldAnnounce = count >= 2 || (prevCount >= 2 && count < 2);
     if (!shouldAnnounce) return;
     if (timerRef.current) clearTimeout(timerRef.current);

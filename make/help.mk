@@ -1,4 +1,3 @@
-# Help
 help:
 	@echo "BenchBox Makefile"
 	@echo "----------------"

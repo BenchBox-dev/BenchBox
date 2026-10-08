@@ -1,33 +1,6 @@
-"""Microsoft Fabric Spark platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Microsoft Fabric is Microsoft's unified analytics platform providing SaaS Spark,
-Data Factory, Power BI, and more. This adapter integrates with Fabric's Spark
-pools via the Livy API for benchmark execution.
-
-Key Features:
-- SaaS: Fully managed, no infrastructure to configure
-- OneLake: Unified storage with automatic lakehouse semantics
-- Entra ID: Azure Active Directory authentication
-- Livy: Apache Livy REST API for Spark session management
-
-Usage:
-    from benchbox.platforms.azure import FabricSparkAdapter
-
-    adapter = FabricSparkAdapter(
-        workspace_id="your-workspace-id",
-        lakehouse_id="your-lakehouse-id",
-        tenant_id="your-tenant-id",
-    )
-
-    # Run TPC-H benchmark
-    adapter.create_schema("tpch_sf1")
-    adapter.load_data(["lineitem", "orders", ...], source_dir)
-    result = adapter.execute_query("SELECT * FROM lineitem LIMIT 10")
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -90,8 +63,6 @@ logger = logging.getLogger(__name__)
 
 
 class LivySessionState:
-    """Livy session state constants."""
-
     NOT_STARTED = "not_started"
     STARTING = "starting"
     IDLE = "idle"
@@ -104,35 +75,10 @@ class LivySessionState:
 
 
 class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
-    """Microsoft Fabric Spark platform adapter.
-
-    Fabric Spark provides SaaS Spark execution within the Microsoft Fabric
-    ecosystem. This adapter uses the Livy REST API for session and statement
-    management, with OneLake for data staging.
-
-    Execution Model:
-    - Create Livy session in Fabric Spark pool
-    - Execute Spark SQL statements via Livy
-    - Results returned via Livy statement output
-    - OneLake (ADLS Gen2) for data staging
-
-    Key Features:
-    - SaaS: Fully managed, no infrastructure
-    - OneLake: Unified lakehouse storage
-    - Delta Lake: Native Delta format support
-    - Entra ID: Azure AD authentication
-
-    Billing:
-    - Capacity Units (CU) per workspace
-    - Spark compute charged per CU-second
-    - OneLake storage separate
-    """
-
     plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 
-    # Fabric API endpoints
     FABRIC_API_BASE = "https://api.fabric.microsoft.com/v1"
     ONELAKE_DFS_BASE = "https://onelake.dfs.fabric.microsoft.com"
 
@@ -150,23 +96,6 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
         adaptive_enabled: bool = True,
         **kwargs: Any,
     ) -> None:
-        """Initialize the Fabric Spark adapter.
-
-        Args:
-            workspace_id: Fabric workspace GUID (required).
-            lakehouse_id: Fabric Lakehouse GUID (required).
-            tenant_id: Azure tenant ID for authentication.
-            livy_endpoint: Custom Livy endpoint URL (auto-derived if not provided).
-            onelake_path: OneLake path for data staging (auto-derived if not provided).
-            spark_pool_name: Spark pool name (default: uses workspace default).
-            timeout_minutes: Statement timeout in minutes (default: 60).
-            spark_config: Additional Spark configuration.
-            table_format: Table format for benchmark tables (delta, parquet, iceberg).
-            adaptive_enabled: Adaptive Query Execution on/off (default: True).
-                Rendered explicitly in both directions at Livy session build;
-                an explicit user spark_config entry still wins.
-            **kwargs: Additional platform options.
-        """
         if not AZURE_IDENTITY_AVAILABLE:
             deps_satisfied, missing = check_platform_dependencies("fabric-spark")
             if not deps_satisfied:
@@ -187,16 +116,12 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
         self.user_spark_config = spark_config or {}
         self.adaptive_enabled = adaptive_enabled
 
-        # Derive Livy endpoint if not provided
         self.livy_endpoint = livy_endpoint or self._derive_livy_endpoint()
 
-        # Derive OneLake path if not provided
         self.onelake_path = onelake_path or self._derive_onelake_path()
 
-        # Initialize staging using cloud-spark shared infrastructure
         self._staging: CloudSparkStaging | None = None
         try:
-            # OneLake supports abfss:// protocol
             staging_uri = (
                 f"abfss://{self.workspace_id}@onelake.dfs.fabric.microsoft.com/{self.lakehouse_id}/Files/benchbox"
             )
@@ -204,22 +129,18 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
         except Exception as e:
             logger.warning("Failed to initialize OneLake staging: %s", e)
 
-        # Credential (lazy initialization) - shared helper owns state.
         self._token_provider = AzureTokenProvider(
             scope="https://api.fabric.microsoft.com/.default",
             credential_class=DefaultAzureCredential,
             tenant_id=self.tenant_id,
         )
 
-        # Session management
         self._session_id: int | None = None
         self._session_created_by_us = False
 
-        # Metrics tracking
         self._query_count = 0
         self._total_statement_time_seconds = 0.0
 
-        # Benchmark configuration (set via configure_for_benchmark)
         self._benchmark_type: str | None = None
         self._scale_factor: float = 1.0
         self._spark_config: dict[str, str] = {}
@@ -227,31 +148,18 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
         super().__init__(**kwargs)
 
     def _derive_livy_endpoint(self) -> str:
-        """Derive the Livy endpoint from workspace ID."""
-        # Fabric Livy endpoint format
         return f"https://api.fabric.microsoft.com/v1/workspaces/{self.workspace_id}/lakehouses/{self.lakehouse_id}/livyApi/versions/2023-12-01/sessions"
 
     def _derive_onelake_path(self) -> str:
-        """Derive the OneLake path for data staging."""
         return f"abfss://{self.workspace_id}@onelake.dfs.fabric.microsoft.com/{self.lakehouse_id}"
 
     def _get_access_token(self) -> str:
-        """Get a valid access token, refreshing if needed."""
         return self._token_provider.access_token()
 
     def _get_headers(self) -> dict[str, str]:
-        """Get HTTP headers with authentication."""
         return self._token_provider.auth_headers()
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Return platform metadata.
-
-        Args:
-            connection: Not used (Fabric Spark manages sessions internally).
-
-        Returns:
-            Dict with platform information including name, version, and capabilities.
-        """
         return {
             "platform": "fabric-spark",
             "display_name": "Microsoft Fabric Spark",
@@ -267,24 +175,14 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
         }
 
     def _create_session(self) -> int:
-        """Create a new Livy session.
-
-        Returns:
-            The session ID.
-        """
         if not REQUESTS_AVAILABLE:
             raise ConfigurationError("requests package is required for Fabric Spark")
 
-        # Build session configuration
         session_config: dict[str, Any] = {
             "kind": "spark",
-            # AQE keys explicit in both directions: Spark enables AQE by
-            # default since 3.2.0, so omitting them would silently leave it
-            # on when adaptive_enabled is False.
             "conf": spark_aqe_conf_entries(self.adaptive_enabled),
         }
 
-        # Table format session extensions (Delta is native on Fabric, no extra config needed)
         if self.table_format == "iceberg":
             session_config["conf"]["spark.sql.extensions"] = (
                 "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
@@ -292,13 +190,9 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
             session_config["conf"]["spark.sql.catalog.spark_catalog"] = "org.apache.iceberg.spark.SparkSessionCatalog"
             session_config["conf"]["spark.sql.catalog.spark_catalog.type"] = "hive"
 
-        # Add benchmark-specific configuration first so an explicit
-        # user-provided Spark config wins (mirrors the resolve-then-apply
-        # precedence of the local Spark-family adapters).
         if self._spark_config:
             session_config["conf"].update(self._spark_config)
 
-        # Add user-provided Spark config last so explicit overrides are kept.
         session_config["conf"].update(self.user_spark_config)
 
         if self.spark_pool_name:
@@ -319,7 +213,6 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
         session = response.json()
         session_id = session["id"]
 
-        # Wait for session to be ready
         self._wait_for_session_state(session_id, [LivySessionState.IDLE])
         self._session_created_by_us = True
 
@@ -332,16 +225,6 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
         target_states: list[str],
         timeout_seconds: int = 600,
     ) -> str:
-        """Wait for session to reach a target state.
-
-        Args:
-            session_id: Session ID to wait for.
-            target_states: List of acceptable target states.
-            timeout_seconds: Maximum wait time.
-
-        Returns:
-            The final session state.
-        """
         start_time = mono_time()
         session_url = f"{self.livy_endpoint}/{session_id}"
 
@@ -368,13 +251,7 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
         raise ConfigurationError(f"Timeout waiting for session {session_id}")
 
     def _ensure_session(self) -> int:
-        """Ensure a Livy session exists and is ready.
-
-        Returns:
-            The session ID.
-        """
         if self._session_id is not None:
-            # Verify session is still valid
             session_url = f"{self.livy_endpoint}/{self._session_id}"
             try:
                 response = requests.get(
@@ -387,10 +264,8 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
                     if session["state"] == LivySessionState.IDLE:
                         return self._session_id
                     if session["state"] == LivySessionState.BUSY:
-                        # Wait for it to become idle
                         self._wait_for_session_state(self._session_id, [LivySessionState.IDLE])
                         return self._session_id
-                    # Session is in a terminal state (ERROR, DEAD, KILLED) - close it
                     logger.warning("Session %s is in state %s, closing", self._session_id, session.get("state"))
                     try:
                         requests.delete(session_url, headers=self._get_headers(), timeout=30)
@@ -404,24 +279,13 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
                     pass
             self._session_id = None
 
-        # Create new session
         self._session_id = self._create_session()
         return self._session_id
 
     def create_connection(self, **kwargs: Any) -> Any:
-        """Verify Azure connectivity and workspace access.
-
-        Returns:
-            Dict with connection status and workspace info.
-
-        Raises:
-            ConfigurationError: If Azure connection fails.
-        """
         try:
-            # Test credential by getting a token
             self._get_access_token()
 
-            # Test workspace access
             workspace_url = f"{self.FABRIC_API_BASE}/workspaces/{self.workspace_id}"
             response = requests.get(
                 workspace_url,
@@ -457,20 +321,6 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
             raise ConfigurationError(f"Failed to connect to Fabric: {e}") from e
 
     def create_schema(self, benchmark: Any, connection: Any) -> float:
-        """Create schema in Lakehouse.
-
-        Fabric Lakehouse manages schemas automatically through Delta tables.
-        This method ensures the database context is set. The connection
-        parameter is accepted for interface compatibility but unused; sessions
-        are managed internally via the Livy API.
-
-        Args:
-            benchmark: Benchmark instance (provides schema/database name).
-            connection: Database connection (unused - Livy sessions are internal).
-
-        Returns:
-            Time taken to create schema in seconds.
-        """
         start_time = mono_time()
         database = getattr(benchmark, "name", None) or "default"
 
@@ -490,19 +340,6 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
         connection: Any,
         data_dir: Path,
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Upload benchmark data to OneLake and create Delta tables.
-
-        The connection parameter is accepted for interface compatibility but
-        unused; sessions are managed internally via the Livy API.
-
-        Args:
-            benchmark: Benchmark instance (provides table names via benchmark.tables).
-            connection: Database connection (unused - Livy sessions are internal).
-            data_dir: Directory containing data files.
-
-        Returns:
-            Tuple of (table_row_counts, load_time_seconds, per_table_timings).
-        """
         start_time = mono_time()
 
         data_files = getattr(benchmark, "tables", {}) or {}
@@ -532,7 +369,6 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
                     file_format="parquet",
                 )
 
-        # Create tables from uploaded data
         per_table_timings: dict[str, Any] = {}
         for table in tables:
             tbl_start = mono_time()
@@ -553,11 +389,6 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
 
     @staticmethod
     def _has_explicit_data_files(data_files: Any) -> bool:
-        """Return True when benchmark.tables contains concrete file mappings.
-
-        Placeholder metadata (e.g. ``{"orders": None}``) returns False so
-        the caller falls back to legacy parquet discovery.
-        """
         if not isinstance(data_files, Mapping) or not data_files:
             return False
 
@@ -581,23 +412,6 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute a SQL query via Livy.
-
-        The connection parameter is accepted for interface compatibility but
-        unused; sessions are managed internally via the Livy API.
-
-        Args:
-            connection: Database connection (unused - Livy sessions are internal).
-            query: SQL query to execute.
-            query_id: Query identifier for result tracking.
-            benchmark_type: Benchmark type (unused, for interface compatibility).
-            scale_factor: Scale factor (unused, for interface compatibility).
-            validate_row_count: Whether to validate row counts (unused for Spark).
-            stream_id: Stream identifier for multi-stream benchmarks.
-
-        Returns:
-            Dict with query results matching the standard PlatformAdapter contract.
-        """
         start_time = mono_time()
 
         try:
@@ -623,7 +437,6 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
             }
 
     def close(self) -> None:
-        """Clean up resources and close Livy session."""
         if self._session_id is not None and self._session_created_by_us:
             try:
                 session_url = f"{self.livy_endpoint}/{self._session_id}"
@@ -639,16 +452,7 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
                 self._session_id = None
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for Fabric Spark.
-
-        Fabric Spark uses Spark SQL dialect.
-
-        Returns:
-            The dialect string "spark".
-        """
         return "spark"
-
-    # --- Configuration Methods ---
 
     def configure_for_benchmark(
         self,
@@ -657,22 +461,10 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
         scale_factor: float | None = None,
         **options: Any,
     ) -> None:
-        """Configure adapter for specific benchmark.
-
-        The connection parameter is accepted for interface compatibility but
-        unused; sessions are managed internally via the Livy API.
-
-        Args:
-            connection: Database connection (unused - Livy sessions are internal).
-            benchmark_type: Benchmark name (tpch, tpcds, ssb).
-            scale_factor: Data scale factor (updates internal scale if provided).
-            **options: Additional benchmark options.
-        """
         self._benchmark_type = benchmark_type.lower()
         if scale_factor is not None:
             self._scale_factor = scale_factor
 
-        # Get optimized Spark configuration
         if self._benchmark_type == "tpch":
             config = SparkConfigOptimizer.for_tpch(
                 scale_factor=self._scale_factor,
@@ -692,7 +484,6 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
                 adaptive_enabled=self.adaptive_enabled,
             )
         else:
-            # Default to TPC-H config for unknown benchmarks
             config = SparkConfigOptimizer.for_tpch(
                 scale_factor=self._scale_factor,
                 platform=CloudPlatform.FABRIC,
@@ -706,12 +497,6 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
         self,
         config: PlatformOptimizationConfiguration,
     ) -> None:
-        """Apply platform-specific tuning configuration.
-
-        Args:
-            config: Platform optimization configuration.
-        """
-        # Extract Spark-relevant settings from config
         if hasattr(config, "spark_config") and config.spark_config:
             self._spark_config.update(config.spark_config)
 
@@ -720,27 +505,11 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
         unified_config: UnifiedTuningConfiguration,
         connection: Any,
     ) -> None:
-        """Apply unified tuning configuration.
-
-        Args:
-            unified_config: Unified tuning configuration.
-            connection: Database connection (unused - Livy sessions are internal).
-        """
         if hasattr(unified_config, "platform_optimization"):
             self.apply_platform_tuning(unified_config.platform_optimization)
 
-    # apply_primary_keys, apply_foreign_keys, apply_platform_optimizations,
-    # and apply_constraint_configuration are inherited from SparkTuningMixin
-
-    # --- CLI Methods ---
-
     @classmethod
     def add_cli_arguments(cls, parser: Any) -> None:
-        """Add Fabric Spark CLI arguments.
-
-        Args:
-            parser: Argument parser to add arguments to.
-        """
         group = parser.add_argument_group("Fabric Spark Arguments")
         group.add_argument(
             "--workspace-id",
@@ -779,14 +548,6 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> FabricSparkAdapter:
-        """Create adapter from configuration dictionary.
-
-        Args:
-            config: Configuration dictionary.
-
-        Returns:
-            FabricSparkAdapter instance.
-        """
         params: dict[str, Any] = {
             "workspace_id": config.get("workspace_id"),
             "lakehouse_id": config.get("lakehouse_id"),
@@ -800,7 +561,6 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
             "adaptive_enabled": adaptive_enabled_from_config(config),
         }
 
-        # Pass through tuning provenance/config
         for key in [
             "tuning_config",
             "tuning_enabled",

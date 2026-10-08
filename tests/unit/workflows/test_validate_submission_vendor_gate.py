@@ -1,13 +1,3 @@
-"""Pin the vendor-subtree governance gate in validate-submission.yml.
-
-The vendor-supplied trust label is ranking-eligible and is granted purely by a
-bundle living under results-data/bundles/vendor/. The ENFORCED control that a
-community contributor cannot self-grant it is a step in the published-results
-submission workflow that rejects non-maintainer additions under vendor/ (the
-manifest result_source check in benchbox/validation/bundle.py is advisory only).
-This test pins that step so it cannot silently regress.
-"""
-
 from __future__ import annotations
 
 import os
@@ -37,8 +27,6 @@ def _vendor_gate_step() -> dict:
 
 def test_workflow_targets_published_results_submission_prs() -> None:
     workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
-    # PyYAML parses the `on:` key as the boolean True. A2 w2 migrates to
-    # pull_request_target for trusted base checkout; allow either during migration.
     trigger = workflow[True].get("pull_request_target") or workflow[True].get("pull_request")
     assert trigger is not None
     assert "published-results" in trigger["branches"]
@@ -53,8 +41,6 @@ def test_vendor_gate_step_exists_and_guards_vendor_subtree() -> None:
 
 def test_vendor_gate_uses_author_association_not_pr_content() -> None:
     step = _vendor_gate_step()
-    # The maintainer check must come from GitHub's author_association, which the
-    # PR cannot set, not from a manifest field or commit trailer.
     assert step["env"]["AUTHOR_ASSOCIATION"] == "${{ github.event.pull_request.author_association }}"
     script = step["run"]
     for role in ("OWNER", "MEMBER", "COLLABORATOR"):
@@ -63,20 +49,11 @@ def test_vendor_gate_uses_author_association_not_pr_content() -> None:
 
 def test_vendor_gate_fails_the_pr() -> None:
     script = _vendor_gate_step()["run"]
-    # A non-maintainer vendor/ addition must hard-fail the job.
     assert "exit 1" in script
     assert "::error::" in script
 
 
 def test_vendor_gate_allows_trusted_same_repo_mirror() -> None:
-    """#1041 review: a maintainer vendor/ addition on develop is published
-    through a same-repo auto/results-mirror-* PR opened by
-    sync-results-data-to-published.yml with secrets.GITHUB_TOKEN, authored by
-    github-actions[bot] - never OWNER/MEMBER/COLLABORATOR. The gate must let
-    that trusted mirror through instead of blocking it, gated on the same
-    unforgeable head.repo.fork signal the "Validate bundles" step's manifest
-    waiver uses (github.head_ref alone is attacker-controlled on fork PRs).
-    """
     step = _vendor_gate_step()
     env = step.get("env") or {}
     run = step["run"]

@@ -1,5 +1,3 @@
-"""Check the standalone extraction reproducer's result and error reporting."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -54,7 +52,7 @@ def test_execution_report(monkeypatch, capsys, translated, expected, exit_code, 
     ],
 )
 def test_translated_counterexamples_gate_verdict(monkeypatch, capsys, trap_translated, trap_expected, exit_code):
-    """A translated trap mismatch must fail the harness even when projections pass."""
+
     path = Path(__file__).resolve().parents[3] / "_project/sqlglot-upstream/repros/sqlite_extract.py"
     spec = importlib.util.spec_from_file_location("sqlite_extract_repro_traps", path)
     assert spec and spec.loader

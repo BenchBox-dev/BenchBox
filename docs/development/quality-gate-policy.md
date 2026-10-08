@@ -16,6 +16,7 @@ one is not evidence that another ran.
 | --- | --- | --- | --- | --- | --- | --- |
 | Configured Ruff lint | `uv run ruff check .`; tracked Python discovered from the repository root | Enabled rules fail. C901 fails only when `CC > 18`. | None: a selected Ruff diagnostic is hard. | 34 global rule ignores, 5 per-file entries, and 8 discovery exclusions. `_project` is **not** excluded. | 0 diagnostics | Develop PR `guard-ruff`, release lint/test, nightly, and `make ci-lint` (also develop post-merge) |
 | Ruff format | `uv run ruff format --check .`; configured discovery scope | Any formatting diff fails. | None | Same discovery rules as configured Ruff | 0 files | Same workflow surfaces as configured Ruff |
+| Test coverage | `make ci-test`, `test.yml` and `ci.yml` run the fast suite with `--cov=benchbox` | Suite-wide coverage below 70% fails through `--cov-fail-under=70`; 70 is the blocking CI floor. | `tests/conftest.py` prints a non-failing warning below 80%. The 80% threshold is intentionally advisory. | None | Measured on each run | `make ci-test`, `test.yml`, `ci.yml` |
 | Custom complexity policy | `make complexity-check`; scans `benchbox` with isolated Ruff C901 measurement at threshold 1 | Unexcepted `CC > 20` fails. Invalid, stale, unowned, drifted, overlong, or expired exception metadata always fails. Missing policy/target and empty or unparseable measurements also fail. | Every `12 <= CC <= 20` score is printed, including targets of any future hard exception. | 0 current hard exceptions | 6,442 functions with `CC > 1`; 180 advisory; 0 hard | Develop PR `guard-complexity-policy` and `make ci-lint` |
 | Repository ty pass | `uv run ty check`; configured `benchbox` and `tests` scope | Configured error rules fail. | Warnings are printed without failing. | 7 globally ignored rule families | 641 warnings, 0 errors | Develop PR, release lint/test, nightly, and `make ci-lint` |
 | Quality-governance strict type island | `make quality-governance-typecheck`; only `_project/scripts/check_complexity.py` | `ty check --error all`; every rule is hard | None | No architecture or production modules; those remain owned by their existing TODOs | 0 diagnostics | Develop PR `guard-quality-governance-typecheck` and `make ci-lint` |
@@ -181,6 +182,29 @@ Fresh measurement after that correction is `6,198/282 -> 6,187/281` (`-11`),
 so both delta and absolute gates pass. The historical failure remains useful
 evidence that the delta gate caught a real regression and governance did not
 weaken or absorb it.
+
+## Cross-surface known-divergence baseline
+
+`benchbox/core/equivalence/cross_surface_baseline.yaml` lists the cells that the
+cross-surface SQL and DataFrame equivalence gates tolerate. Each entry is a
+`<gate>: {<query>_<backend>: <reason>}` mapping for one understood, verified and
+non-discriminating presentational difference. It is not a general ignore list:
+an entry mutes regressions on that exact cell.
+
+The gate fails when an entry stops reproducing its divergence, so stale entries
+cannot mask a different regression on the same key. Prune them with
+`make cross-surface-update-baseline BENCHMARK=<gate>`, which removes only entries
+that no longer reproduce and refuses to write when the run has any other failure.
+Commit the pruned file in a reviewed change.
+
+An entry that needs an executable acceptance predicate, such as a
+`ClassifiedDivergence` pinned to a column position, numeric bound or error text,
+stays in `benchbox/core/equivalence/cross_surface.py`. The `h2odb`,
+`read_primitives` and `clickbench` gates merge their section of this file with
+their in-code entries.
+
+Sections are keyed by gate name. The file is currently empty (`{}`): no gate
+tolerates a baseline-only divergence today.
 
 ## Rejected alternatives and deferrals
 

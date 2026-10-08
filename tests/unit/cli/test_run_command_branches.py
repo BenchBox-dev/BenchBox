@@ -1,10 +1,3 @@
-"""Coverage tests for benchbox/cli/exceptions.py and benchbox/cli/commands/run.py.
-
-Wave: coverage-per-module-50-remaining (w9)
-Target: push benchbox/cli/commands/run.py from 47% to >=50%.
-benchbox/cli/exceptions.py is already at 72%.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -19,12 +12,6 @@ from click.testing import CliRunner
 
 from benchbox.cli.run_resolution import ResolvedRunPlan, RunRequest
 
-# benchbox.cli.commands.__init__ re-exports `run` (a Click Command) under the
-# same name as the run submodule.  On Python 3.10 mock's string-based patch()
-# resolves the target via getattr(benchbox.cli.commands, "run"), which returns
-# the Command object, not the submodule.  Seeding sys.modules here via
-# __import__ and using patch.object() avoids the ambiguity on all Python
-# versions.
 __import__("benchbox.cli.commands.run")
 _run_module = _sys.modules["benchbox.cli.commands.run"]
 __import__("benchbox.cli.run_platform_resolution")
@@ -37,7 +24,6 @@ pytestmark = [
 
 
 def _minimal_resolved_run_plan() -> ResolvedRunPlan:
-    """Canonical plan fixture for tests that enter a post-resolution helper directly."""
     request = RunRequest(
         platform="duckdb",
         benchmark="tpch",
@@ -82,11 +68,6 @@ def _minimal_resolved_run_plan() -> ResolvedRunPlan:
     )
 
 
-# ===================================================================
-# normalize_benchmark_name
-# ===================================================================
-
-
 class TestNormalizeBenchmarkName:
     @pytest.mark.parametrize(
         ("raw", "expected"),
@@ -108,11 +89,6 @@ class TestNormalizeBenchmarkName:
         from benchbox.cli.commands.run import normalize_benchmark_name
 
         assert normalize_benchmark_name("custom_benchmark") == "custom_benchmark"
-
-
-# ===================================================================
-# PlatformOptionParamType
-# ===================================================================
 
 
 class TestPlatformOptionParamType:
@@ -161,11 +137,6 @@ class TestPlatformOptionParamType:
         assert pt.name == "key=value"
 
 
-# ===================================================================
-# _build_execution_context
-# ===================================================================
-
-
 class TestBuildExecutionContext:
     def test_basic(self):
         from benchbox.cli.commands.run import _build_execution_context
@@ -193,7 +164,7 @@ class TestBuildExecutionContext:
         assert ctx.compression_level == 3
         assert ctx.mode == "sql"
         assert ctx.official is False
-        assert ctx.validation_mode is None  # "exact" produces None
+        assert ctx.validation_mode is None
         assert ctx.force_datagen is False
         assert ctx.query_subset == ["Q1", "Q6"]
         assert ctx.capture_plans is True
@@ -271,11 +242,6 @@ class TestBuildExecutionContext:
         assert ctx.tuning_mode == "auto"
 
 
-# ===================================================================
-# _apply_platform_optimization_overrides
-# ===================================================================
-
-
 class TestApplyPlatformOptimizationOverrides:
     def test_databricks_platform_options_update_unified_tuning(self):
         from benchbox.cli.commands.run import _apply_platform_optimization_overrides
@@ -348,8 +314,6 @@ class TestApplyPlatformOptimizationOverrides:
         from benchbox.cli.commands.run import _apply_platform_optimization_overrides
         from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
-        # A liquid template carries physical_rendering_id=databricks_liquid_auto; overriding to z_order must drop
-        # it so the reported rendering identity follows the authoritative strategy instead of diverging.
         unified = UnifiedTuningConfiguration()
         unified.platform_optimizations.databricks_clustering_strategy = "liquid_clustering_auto"
         unified.platform_optimizations.liquid_clustering_enabled = True
@@ -381,11 +345,6 @@ class TestApplyPlatformOptimizationOverrides:
                 sorted_ingestion_method="ctas",
                 parsed_platform_options={},
             )
-
-
-# ===================================================================
-# _render_post_run_charts
-# ===================================================================
 
 
 class TestRenderPostRunCharts:
@@ -436,11 +395,6 @@ class TestRenderPostRunCharts:
         ):
             _render_post_run_charts(mock_result, mock_console, quiet=False)
         mock_console.print.assert_not_called()
-
-
-# ===================================================================
-# _direct_handle_result
-# ===================================================================
 
 
 class TestDirectHandleResult:
@@ -498,11 +452,6 @@ class TestDirectHandleResult:
         ctx.exit.assert_called_once_with(1)
 
 
-# ===================================================================
-# setup_verbose_logging
-# ===================================================================
-
-
 class TestSetupVerboseLogging:
     def test_quiet_mode(self):
         from benchbox.cli.commands.run import setup_verbose_logging
@@ -550,11 +499,6 @@ class TestSetupVerboseLogging:
         vs = VerbositySettings.from_flags(1, False)
         logger_result, settings = setup_verbose_logging(verbose=vs, quiet=True)
         assert settings.quiet is True
-
-
-# ===================================================================
-# CLI exceptions: ErrorHandler branch coverage
-# ===================================================================
 
 
 class TestErrorHandlerBranches:
@@ -707,11 +651,6 @@ class TestErrorHandlerBranches:
         assert handler.console.print.called
 
 
-# ===================================================================
-# ValidationRules
-# ===================================================================
-
-
 class TestValidationRules:
     def test_validate_scale_factor_negative(self):
         from benchbox.cli.exceptions import ValidationError, ValidationRules
@@ -772,11 +711,6 @@ class TestValidationRules:
                     ValidationRules.validate_output_directory("s3://bucket/path")
 
 
-# ===================================================================
-# ErrorContext
-# ===================================================================
-
-
 class TestErrorContext:
     def test_basic_creation(self):
         from benchbox.cli.exceptions import ErrorContext
@@ -799,11 +733,6 @@ class TestErrorContext:
         )
         assert ctx.benchmark_name == "tpch"
         assert ctx.database_type == "duckdb"
-
-
-# ===================================================================
-# BenchboxCLIError source location
-# ===================================================================
 
 
 class TestBenchboxCLIErrorSourceLocation:
@@ -829,11 +758,6 @@ class TestBenchboxCLIErrorSourceLocation:
         assert err.source_file is not None
 
 
-# ===================================================================
-# create_error_handler
-# ===================================================================
-
-
 class TestCreateErrorHandler:
     def test_default(self):
         from benchbox.cli.exceptions import ErrorHandler, create_error_handler
@@ -848,11 +772,6 @@ class TestCreateErrorHandler:
         handler = create_error_handler(mock)
         assert isinstance(handler, ErrorHandler)
         assert handler.console is mock
-
-
-# ===================================================================
-# run command branch coverage
-# ===================================================================
 
 
 class TestRunCommandBranchCoverage:
@@ -932,27 +851,13 @@ class TestRunCommandBranchCoverage:
         assert "Non-interactive mode requires all parameters" in result.output
 
 
-# ===================================================================
-# _derive_execution_type  (regression tests for operator-precedence fix)
-# ===================================================================
-
-
 class TestDeriveExecutionType:
-    """Unit tests for _derive_execution_type.
-
-    These cover the operator-precedence bug that was fixed in the
-    load_only and data_only branches (previously `not set(phases) & X`
-    parsed as `not ((set(phases) & X[0]) | X[1])`, always returning False
-    for non-empty sets).
-    """
-
     @pytest.fixture(autouse=True)
     def _import(self):
         from benchbox.cli.commands.run import _derive_execution_type
 
         self.fn = _derive_execution_type
 
-    # --- query-phase branch ---
     @pytest.mark.parametrize(
         ("phases", "expected"),
         [
@@ -966,32 +871,29 @@ class TestDeriveExecutionType:
     def test_query_phases(self, phases, expected):
         assert self.fn(phases) == expected
 
-    # --- load_only branch (was affected by precedence bug) ---
     @pytest.mark.parametrize(
         "phases",
         [
             ["load"],
-            ["generate", "load"],  # generate present but load present → not data_only
+            ["generate", "load"],
             ["load", "warmup"],
-            ["load", "statistics"],  # statistics is not a query phase → still load_only
+            ["load", "statistics"],
             ["generate", "load", "statistics"],
         ],
     )
     def test_load_only(self, phases):
         assert self.fn(phases) == "load_only"
 
-    # --- data_only branch (was affected by precedence bug) ---
     @pytest.mark.parametrize(
         "phases",
         [
             ["generate"],
-            ["generate", "warmup"],  # previously misclassified as "standard"
+            ["generate", "warmup"],
         ],
     )
     def test_data_only(self, phases):
         assert self.fn(phases) == "data_only"
 
-    # --- generate with load or query phases → not data_only ---
     @pytest.mark.parametrize(
         "phases",
         [
@@ -1004,25 +906,12 @@ class TestDeriveExecutionType:
     def test_generate_with_load_or_query_not_data_only(self, phases):
         assert self.fn(phases) != "data_only"
 
-    # --- fallback ---
     def test_standard_fallback(self):
         assert self.fn(["warmup"]) == "standard"
         assert self.fn(["load", "power"]) == "power"
 
 
-# ===================================================================
-# _apply_dataframe_suffix_mode / _resolve_platform_mode
-# ===================================================================
-
-
 class TestDataFrameSuffixModeResolution:
-    """A -df platform suffix must select DataFrame mode without an explicit --mode.
-
-    Regression for the v0.3.0 PLATFORM_ALIASES erasure: `datafusion-df` was
-    normalized to `datafusion` before mode resolution, so the registry SQL
-    default silently selected the SQL adapter (flagged by review on PR #1029).
-    """
-
     def _resolved_state(self, platform: str, mode: str | None = None) -> SimpleNamespace:
         from benchbox.cli.commands.run import _apply_dataframe_suffix_mode, _resolve_platform_mode
         from benchbox.cli.platform import normalize_platform_name
@@ -1035,8 +924,6 @@ class TestDataFrameSuffixModeResolution:
             logger=None,
             platform_manager=MagicMock(),
         )
-        # Same ordering as _prepare_run_state: suffix inference, alias
-        # normalization, then mode resolution.
         _apply_dataframe_suffix_mode(s)
         s.platform_key = normalize_platform_name(s.platform)
         _resolve_platform_mode(s)
@@ -1057,7 +944,6 @@ class TestDataFrameSuffixModeResolution:
         assert s.resolved_mode == expected
 
     def test_explicit_mode_flag_wins_over_df_suffix(self):
-        # Matches adapter-factory precedence: explicit mode > -df suffix > default.
         s = self._resolved_state("datafusion-df", mode="sql")
         assert s.resolved_mode == "sql"
 
@@ -1077,8 +963,6 @@ class TestDataFrameSuffixModeResolution:
 
 
 class TestPlatformDeploymentSelectorAvailability:
-    """`--platform <name>:<mode>` must be checked against the platform it resolves to."""
-
     @staticmethod
     def _resolve(platform: str, available: dict[str, bool], *, dry_run: bool = False, mode: str | None = None):
         from benchbox.cli.platform import PlatformManager, normalize_platform_name
@@ -1208,7 +1092,6 @@ class TestPlatformDeploymentSelectorAvailability:
 
     @pytest.mark.parametrize("selector", ["polars:local", "databricks:local", "snowflake:local", "sqlite:local"])
     def test_local_selector_on_a_platform_without_modes_agrees_with_the_adapter_factory(self, selector: str):
-        """The registry treats ``local`` as the implicit deployment of a platform that declares none."""
         from benchbox.cli.platform import resolve_platform_selector
         from benchbox.core.platform_registry import PlatformRegistry
         from benchbox.platforms.adapter_factory import _normalize_platform_name
@@ -1231,7 +1114,6 @@ class TestPlatformDeploymentSelectorAvailability:
 
     @pytest.mark.parametrize("platform_key", ["clickhouse-local", "clickhouse:local"])
     def test_benchmark_gate_applies_to_the_resolved_platform(self, platform_key: str):
-        """A selector must not slip past the registry's benchmark block for its platform."""
         s = SimpleNamespace(platform_key=platform_key, benchmark="metadata_primitives", logger=None, ctx=MagicMock())
         printed = MagicMock()
         with patch.object(_platform_module, "console", printed):

@@ -1,5 +1,3 @@
-"""Tests for release canary freshness gating."""
-
 from __future__ import annotations
 
 import io

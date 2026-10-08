@@ -1,24 +1,4 @@
 #!/usr/bin/env python3
-"""Enforce the generated-rerun-shard retention policy.
-
-Rerun shards under ``tests/uat/configs/generated-rerun-shards/`` are frozen
-operational scratch from a named sweep, not reusable templates. They
-accumulate without expiry: every checked-in shard keeps corpus-guard coverage
-(load + enumerate on every fast-lane run) forever, even years after its sweep.
-
-Policy: a shard expires ``RETENTION_DAYS`` after the sweep date encoded in
-its filename stem (``-<YYYYMMDD>``). An expired shard fails this check with
-the exact archive command. Archival is ``git mv`` into
-``_project/_archive/generated-rerun-shards-<YYYYMMDD>/`` (tracked evidence
-outside corpus discovery) plus a README note naming the sweep.
-
-Exit status: 0 all shards within retention; 1 expired or undated shard(s) need
-action; 2 the shard directory is missing.
-
-Usage:
-    uv run -- python scripts/check_rerun_shard_retention.py            # check (CI mode)
-    uv run -- python scripts/check_rerun_shard_retention.py --retention-days N
-"""
 
 from __future__ import annotations
 
@@ -27,6 +7,28 @@ import re
 import sys
 from datetime import date
 from pathlib import Path
+
+CLI_DESCRIPTION = (
+    "Enforce the generated-rerun-shard retention policy.\n"
+    "\n"
+    "Rerun shards under ``tests/uat/configs/generated-rerun-shards/`` are frozen\n"
+    "operational scratch from a named sweep, not reusable templates. They\n"
+    "accumulate without expiry: every checked-in shard keeps corpus-guard coverage\n"
+    "(load + enumerate on every fast-lane run) forever, even years after its sweep.\n"
+    "\n"
+    "Policy: a shard expires ``RETENTION_DAYS`` after the sweep date encoded in\n"
+    "its filename stem (``-<YYYYMMDD>``). An expired shard fails this check with\n"
+    "the exact archive command. Archival is ``git mv`` into\n"
+    "``_project/_archive/generated-rerun-shards-<YYYYMMDD>/`` (tracked evidence\n"
+    "outside corpus discovery) plus a README note naming the sweep.\n"
+    "\n"
+    "Exit status: 0 all shards within retention; 1 expired or undated shard(s) need\n"
+    "action; 2 the shard directory is missing.\n"
+    "\n"
+    "Usage:\n"
+    "    uv run -- python scripts/check_rerun_shard_retention.py            # check (CI mode)\n"
+    "    uv run -- python scripts/check_rerun_shard_retention.py --retention-days N\n"
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SHARD_DIR = REPO_ROOT / "tests" / "uat" / "configs" / "generated-rerun-shards"
@@ -38,7 +40,6 @@ _STEM_DATE_RE = re.compile(r"-(\d{8})$")
 
 
 def shard_sweep_date(path: Path) -> date | None:
-    """Parse the ``-<YYYYMMDD>`` sweep date from a shard filename stem."""
     match = _STEM_DATE_RE.search(path.stem)
     if not match:
         return None
@@ -50,13 +51,6 @@ def shard_sweep_date(path: Path) -> date | None:
 
 
 def find_expired(today: date, retention_days: int) -> tuple[list[tuple[Path, date, int]], list[Path]]:
-    """Return ``(expired, undated)`` for shards in the shard directory.
-
-    ``expired`` holds ``(path, sweep_date, age_days)`` for shards at or past
-    retention, sorted. ``undated`` holds shards whose filename carries no
-    parseable ``-<YYYYMMDD>`` sweep date; those fail the check too, since an
-    undated shard can never expire on its own.
-    """
     expired: list[tuple[Path, date, int]] = []
     undated: list[Path] = []
     for path in sorted(SHARD_DIR.glob("*.yaml")) + sorted(SHARD_DIR.glob("*.yml")):
@@ -71,7 +65,7 @@ def find_expired(today: date, retention_days: int) -> tuple[list[tuple[Path, dat
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument(
         "--retention-days",
         type=int,
@@ -81,8 +75,6 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if not SHARD_DIR.is_dir():
-        # A missing directory would otherwise read as "no expired shards" and
-        # disable the policy silently; its README keeps it tracked when empty.
         print(f"rerun shards: shard directory not found: {SHARD_DIR}", file=sys.stderr)
         return 2
 

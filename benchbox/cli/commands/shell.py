@@ -1,5 +1,3 @@
-"""Interactive SQL shell command."""
-
 from __future__ import annotations
 
 import sys
@@ -17,33 +15,17 @@ from benchbox.utils.database_naming import parse_database_name
 
 
 def _get_platform_from_extension(extension: str) -> str:
-    """Get platform type from file extension.
-
-    Uses the same extension mapping as generate_database_filename() in database_naming.py.
-
-    Args:
-        extension: File extension (e.g., ".duckdb", ".sqlite")
-
-    Returns:
-        Platform name (e.g., "duckdb", "sqlite") or "unknown"
-    """
-    # Extension mapping from benchbox.utils.database_naming.generate_database_filename()
-    # Each platform has a unique extension to prevent collisions
     extension_to_platform = {
-        # SQL databases
         ".duckdb": "duckdb",
         ".sqlite": "sqlite",
         ".chdb": "clickhouse",
-        # DataFrame platforms (SQL mode)
         ".datafusion": "datafusion",
         ".polars": "polars",
         ".pandas": "pandas",
-        # DataFrame platforms (native API mode)
         ".polars-df": "polars-df",
         ".pandas-df": "pandas-df",
         ".cudf-df": "cudf-df",
         ".dask-df": "dask-df",
-        # Other platforms
         ".cudf": "cudf",
         ".spark": "spark",
     }
@@ -53,23 +35,10 @@ def _get_platform_from_extension(extension: str) -> str:
 
 
 def discover_local_databases(base_dir: Path | None = None) -> list[dict[str, Any]]:
-    """Discover all local database files using DirectoryManager infrastructure.
-
-    Searches multiple standard locations for all supported database extensions.
-
-    Args:
-        base_dir: Base directory to search (defaults to benchmark_runs)
-
-    Returns:
-        List of database metadata dicts with keys: path, platform, benchmark, scale, etc.
-    """
-    # Use DirectoryManager with custom base_dir if provided
-    # This ensures consistent path handling with run command
     dir_mgr = DirectoryManager(base_dir=str(base_dir) if base_dir else None)
 
     databases = []
 
-    # All supported extensions - must match database_naming.py
     supported_extensions = [
         ".duckdb",
         ".sqlite",
@@ -85,12 +54,9 @@ def discover_local_databases(base_dir: Path | None = None) -> list[dict[str, Any
         ".spark",
     ]
 
-    # Search both standard locations where databases can exist
     search_locations = []
     for ext in supported_extensions:
-        # Recursive search in datagen subdirs
         search_locations.append((dir_mgr.datagen_dir, f"**/*{ext}"))
-        # Flat search in databases dir
         search_locations.append((dir_mgr.databases_dir, f"*{ext}"))
 
     for search_dir, pattern in search_locations:
@@ -101,18 +67,14 @@ def discover_local_databases(base_dir: Path | None = None) -> list[dict[str, Any
             if not db_path.is_file():
                 continue
 
-            # Use database_naming utilities for parsing
             metadata = parse_database_name(db_path.name)
 
-            # Get platform from extension using consistent logic
             platform = _get_platform_from_extension(db_path.suffix)
 
-            # Get file stats
             stat = db_path.stat()
             size_mb = stat.st_size / (1024 * 1024)
             modified = datetime.fromtimestamp(stat.st_mtime)
 
-            # Handle None values from parse_database_name
             if metadata is None:
                 metadata = {}
 
@@ -129,7 +91,6 @@ def discover_local_databases(base_dir: Path | None = None) -> list[dict[str, Any
                 }
             )
 
-    # Sort by modified time (most recent first)
     databases.sort(key=lambda d: d["modified"], reverse=True)
 
     return databases
@@ -141,20 +102,6 @@ def filter_databases(
     benchmark: str | None = None,
     scale: float | None = None,
 ) -> list[dict[str, Any]]:
-    """Filter databases by criteria using consistent comparison logic.
-
-    Uses the same scale factor formatting as DirectoryManager to ensure
-    consistent matching with how paths are constructed.
-
-    Args:
-        databases: List of database metadata dicts
-        platform: Filter by platform (duckdb, sqlite)
-        benchmark: Filter by benchmark name
-        scale: Filter by scale factor
-
-    Returns:
-        Filtered list of databases
-    """
     from benchbox.utils.scale_factor import format_scale_factor
 
     filtered = databases
@@ -168,8 +115,6 @@ def filter_databases(
         filtered = [db for db in filtered if db["benchmark"].lower() == benchmark_lower]
 
     if scale is not None:
-        # Use scale factor formatting for consistent comparison
-        # This matches how DirectoryManager formats scale factors in paths
         target_sf_str = format_scale_factor(scale)
 
         result = []
@@ -185,11 +130,6 @@ def filter_databases(
 
 
 def display_database_table(databases: list[dict[str, Any]]) -> None:
-    """Display databases in a Rich table.
-
-    Args:
-        databases: List of database metadata dicts
-    """
     if not databases:
         console.print("[yellow]No databases found[/yellow]")
         return
@@ -220,26 +160,15 @@ def display_database_table(databases: list[dict[str, Any]]) -> None:
 
 
 def select_database_interactive(databases: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """Prompt user to select a database from the list.
-
-    Args:
-        databases: List of database metadata dicts
-
-    Returns:
-        Selected database metadata dict, or None if cancelled
-    """
     if not databases:
         return None
 
     if len(databases) == 1:
-        # Auto-select if only one option
         console.print(f"[green]Using database: {databases[0]['path']}[/green]")
         return databases[0]
 
-    # Show table
     display_database_table(databases)
 
-    # Prompt for selection
     console.print("\n[dim]Enter database number, or press Ctrl+C to cancel[/dim]")
 
     try:
@@ -249,7 +178,6 @@ def select_database_interactive(databases: list[dict[str, Any]]) -> dict[str, An
             show_default=True,
         )
 
-        # Parse selection
         try:
             idx = int(selection)
             if 1 <= idx <= len(databases):
@@ -266,7 +194,51 @@ def select_database_interactive(databases: list[dict[str, Any]]) -> dict[str, An
         return None
 
 
-@click.command("shell")
+@click.command(
+    "shell",
+    help=(
+        "Launch an interactive SQL shell for a database platform.\n"
+        "\n"
+        "Opens an interactive SQL prompt connected to the specified platform,\n"
+        "useful for debugging queries, inspecting benchmark data, and exploring\n"
+        "database state after benchmark execution.\n"
+        "\n"
+        "Supports automatic database discovery from benchmark_runs/datagen/ or\n"
+        "a custom output directory. Can filter by benchmark name and scale factor.\n"
+        "\n"
+        "Supported platforms: DuckDB, SQLite, ClickHouse (more coming soon)\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    # Interactive selection from available databases\n"
+        "    benchbox shell\n"
+        "\n"
+        "\b\n"
+        "    # List available databases\n"
+        "    benchbox shell --list\n"
+        "\n"
+        "\b\n"
+        "    # Connect to most recent database\n"
+        "    benchbox shell --last\n"
+        "\n"
+        "\b\n"
+        "    # Filter and select\n"
+        "    benchbox shell --benchmark tpch --scale 1.0\n"
+        "\n"
+        "\b\n"
+        "    # Direct connection\n"
+        "    benchbox shell --platform duckdb --database benchmark.duckdb\n"
+        "\n"
+        "\b\n"
+        "    # Use database from specific output directory\n"
+        "    benchbox shell --output benchmark_runs/results/tpch_20250101_120000\n"
+        "\n"
+        "\b\n"
+        "    # ClickHouse shell\n"
+        "    benchbox shell --platform clickhouse --host localhost --port 9000 \\\n"
+        "      --user default --database benchbox"
+    ),
+)
 @click.option(
     "--platform",
     type=str,
@@ -325,69 +297,22 @@ def select_database_interactive(databases: list[dict[str, Any]]) -> dict[str, An
 )
 @click.pass_context
 def shell(ctx, platform, database, benchmark, scale, list_only, last, output, host, port, user, password):
-    """Launch an interactive SQL shell for a database platform.
-
-    Opens an interactive SQL prompt connected to the specified platform,
-    useful for debugging queries, inspecting benchmark data, and exploring
-    database state after benchmark execution.
-
-    Supports automatic database discovery from benchmark_runs/datagen/ or
-    a custom output directory. Can filter by benchmark name and scale factor.
-
-    Supported platforms: DuckDB, SQLite, ClickHouse (more coming soon)
-
-    \b
-    Examples:
-        # Interactive selection from available databases
-        benchbox shell
-
-    \b
-        # List available databases
-        benchbox shell --list
-
-    \b
-        # Connect to most recent database
-        benchbox shell --last
-
-    \b
-        # Filter and select
-        benchbox shell --benchmark tpch --scale 1.0
-
-    \b
-        # Direct connection
-        benchbox shell --platform duckdb --database benchmark.duckdb
-
-    \b
-        # Use database from specific output directory
-        benchbox shell --output benchmark_runs/results/tpch_20250101_120000
-
-    \b
-        # ClickHouse shell
-        benchbox shell --platform clickhouse --host localhost --port 9000 \\
-          --user default --database benchbox
-    """
-    # Determine base directory for database discovery
     base_dir = Path(output) if output else None
 
-    # Path 1: Direct database path provided
     if database:
         _shell_direct_connection(database, platform, host, port, user, password)
         return
 
-    # Path 2: Remote platform (ClickHouse) - requires explicit connection params
     if platform and platform.lower() in {"clickhouse", "clickhouse-server"}:
         _launch_clickhouse_shell(host, port, user, password, database)
         return
 
-    # Path 3: Database discovery and selection
     filtered = _shell_discover_databases(base_dir, output, platform, benchmark, scale)
 
-    # Path 3a: List only
     if list_only:
         display_database_table(filtered)
         return
 
-    # Path 3b/3c: Select and launch
     selected = _shell_select_database(filtered, last)
     _launch_shell_for_platform(selected["platform"], str(selected["path"]))
 
@@ -400,7 +325,6 @@ def _shell_direct_connection(
     user: str | None,
     password: str | None,
 ) -> None:
-    """Handle direct database path connection."""
     if not platform:
         db_path = Path(database)
         platform = _get_platform_from_extension(db_path.suffix.lower())
@@ -426,7 +350,6 @@ def _shell_discover_databases(
     benchmark: str | None,
     scale: float | None,
 ) -> list[dict[str, Any]]:
-    """Discover and filter local databases, exiting on failure."""
     console.print("[blue]Discovering local databases...[/blue]")
 
     if output:
@@ -458,7 +381,6 @@ def _shell_discover_databases(
 
 
 def _shell_select_database(filtered: list[dict[str, Any]], last: bool) -> dict[str, Any]:
-    """Select a database from filtered results."""
     if last:
         selected = filtered[0]
         console.print(f"[green]Connecting to most recent database: {selected['path']}[/green]")
@@ -472,7 +394,6 @@ def _shell_select_database(filtered: list[dict[str, Any]], last: bool) -> dict[s
 
 
 def _launch_shell_for_platform(platform: str, db_path: str) -> None:
-    """Launch the appropriate shell for a given platform."""
     if platform == "duckdb":
         _launch_duckdb_shell(db_path)
     elif platform == "sqlite":
@@ -483,7 +404,6 @@ def _launch_shell_for_platform(platform: str, db_path: str) -> None:
 
 
 def _launch_duckdb_shell(database: str | None) -> None:
-    """Launch DuckDB interactive shell with enhanced features."""
     try:
         import duckdb
     except ImportError:
@@ -497,14 +417,10 @@ def _launch_duckdb_shell(database: str | None) -> None:
     try:
         conn = duckdb.connect(db_path, read_only=False)
 
-        # Display database info
         _display_database_info_duckdb(conn, db_path)
 
-        # Show available commands
         console.print("\n[dim]Commands: .quit, .tables, .schema [table], .info, SQL queries[/dim]")
         console.print("[dim]Press Ctrl+C to cancel current input, Ctrl+D or .quit to exit[/dim]\n")
-
-        # Enhanced REPL with command history
 
         while True:
             try:
@@ -514,7 +430,6 @@ def _launch_duckdb_shell(database: str | None) -> None:
 
                 query_lower = query.strip().lower()
 
-                # Handle special commands
                 if query_lower in [".quit", ".exit", "exit", "quit"]:
                     break
                 elif query_lower == ".tables":
@@ -529,24 +444,19 @@ def _launch_duckdb_shell(database: str | None) -> None:
                     _display_database_info_duckdb(conn, db_path)
                     continue
 
-                # Execute SQL query with timing
                 import time
 
                 start = time.perf_counter()
                 result = conn.execute(query).fetchall()
                 elapsed_ms = (time.perf_counter() - start) * 1000
 
-                # Display results
                 if result:
-                    # Get column names
                     desc = conn.description
                     if desc:
                         col_names = [d[0] for d in desc]
-                        # Display header
                         console.print("[cyan]" + " | ".join(col_names) + "[/cyan]")
                         console.print("[dim]" + "-" * (len(" | ".join(col_names))) + "[/dim]")
 
-                    # Display rows
                     for row in result:
                         console.print(" | ".join(str(v) for v in row))
 
@@ -558,7 +468,7 @@ def _launch_duckdb_shell(database: str | None) -> None:
                 console.print("\n[dim]Use .quit to exit[/dim]")
                 continue
             except EOFError:
-                console.print()  # Newline for clean exit
+                console.print()
                 break
             except Exception as e:
                 console.print(f"[red]Error: {e}[/red]")
@@ -572,16 +482,13 @@ def _launch_duckdb_shell(database: str | None) -> None:
 
 
 def _display_database_info_duckdb(conn: Any, db_path: str) -> None:
-    """Display database information for DuckDB."""
     try:
-        # Get database size
         if db_path != ":memory:":
             db_file = Path(db_path)
             if db_file.exists():
                 size_mb = db_file.stat().st_size / (1024 * 1024)
                 console.print(f"[dim]Database size: {size_mb:.2f} MB[/dim]")
 
-        # Get table count and row counts
         tables = conn.execute("SHOW TABLES").fetchall()
         console.print(f"[dim]Tables: {len(tables)}[/dim]")
 
@@ -597,11 +504,10 @@ def _display_database_info_duckdb(conn: Any, db_path: str) -> None:
                 console.print(f"[dim]Total rows: {total_rows:,}[/dim]")
 
     except Exception:
-        pass  # Silently ignore errors in info display
+        pass
 
 
 def _show_tables_duckdb(conn: Any) -> None:
-    """Show all tables in DuckDB database."""
     try:
         tables = conn.execute("SHOW TABLES").fetchall()
         if not tables:
@@ -622,17 +528,14 @@ def _show_tables_duckdb(conn: Any) -> None:
 
 
 def _show_schema_duckdb(conn: Any, table: str | None) -> None:
-    """Show schema for table(s) in DuckDB database."""
     try:
         if table:
-            # Show specific table schema
             result = conn.execute(f"DESCRIBE {table}").fetchall()
             console.print(f"\n[cyan]Schema for {table}:[/cyan]")
             for row in result:
                 console.print(f"  {row[0]:30} {row[1]}")
             console.print()
         else:
-            # Show all tables
             tables = conn.execute("SHOW TABLES").fetchall()
             if not tables:
                 console.print("[yellow]No tables found[/yellow]")
@@ -649,7 +552,6 @@ def _show_schema_duckdb(conn: Any, table: str | None) -> None:
 
 
 def _launch_sqlite_shell(database: str | None) -> None:
-    """Launch SQLite interactive shell with enhanced features."""
     try:
         import sqlite3
     except ImportError:
@@ -669,17 +571,13 @@ def _launch_sqlite_shell(database: str | None) -> None:
 
     try:
         conn = sqlite3.connect(str(db_path))
-        conn.row_factory = sqlite3.Row  # Enable column access by name
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        # Display database info
         _display_database_info_sqlite(conn, db_path)
 
-        # Show available commands
         console.print("\n[dim]Commands: .quit, .tables, .schema [table], .info, SQL queries[/dim]")
         console.print("[dim]Press Ctrl+C to cancel current input, Ctrl+D or .quit to exit[/dim]\n")
-
-        # Enhanced REPL with command history
 
         while True:
             try:
@@ -689,7 +587,6 @@ def _launch_sqlite_shell(database: str | None) -> None:
 
                 query_lower = query.strip().lower()
 
-                # Handle special commands
                 if query_lower in [".quit", ".exit", "exit", "quit"]:
                     break
                 elif query_lower == ".tables":
@@ -704,7 +601,6 @@ def _launch_sqlite_shell(database: str | None) -> None:
                     _display_database_info_sqlite(conn, db_path)
                     continue
 
-                # Execute SQL query with timing
                 import time
 
                 start = time.perf_counter()
@@ -712,16 +608,12 @@ def _launch_sqlite_shell(database: str | None) -> None:
                 result = cursor.fetchall()
                 elapsed_ms = (time.perf_counter() - start) * 1000
 
-                # Display results
                 if result:
-                    # Get column names
                     col_names = [description[0] for description in cursor.description]
 
-                    # Display header
                     console.print("[cyan]" + " | ".join(col_names) + "[/cyan]")
                     console.print("[dim]" + "-" * (len(" | ".join(col_names))) + "[/dim]")
 
-                    # Display rows
                     for row in result:
                         console.print(" | ".join(str(v) for v in row))
 
@@ -735,7 +627,7 @@ def _launch_sqlite_shell(database: str | None) -> None:
                 console.print("\n[dim]Use .quit to exit[/dim]")
                 continue
             except EOFError:
-                console.print()  # Newline for clean exit
+                console.print()
                 break
             except Exception as e:
                 console.print(f"[red]Error: {e}[/red]")
@@ -749,14 +641,11 @@ def _launch_sqlite_shell(database: str | None) -> None:
 
 
 def _display_database_info_sqlite(conn: Any, db_path: Path) -> None:
-    """Display database information for SQLite."""
     try:
-        # Get database size
         if db_path.exists():
             size_mb = db_path.stat().st_size / (1024 * 1024)
             console.print(f"[dim]Database size: {size_mb:.2f} MB[/dim]")
 
-        # Get table count and row counts
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
         tables = cursor.fetchall()
@@ -775,11 +664,10 @@ def _display_database_info_sqlite(conn: Any, db_path: Path) -> None:
                 console.print(f"[dim]Total rows: {total_rows:,}[/dim]")
 
     except Exception:
-        pass  # Silently ignore errors in info display
+        pass
 
 
 def _show_tables_sqlite(cursor: Any) -> None:
-    """Show all tables in SQLite database."""
     try:
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
         tables = cursor.fetchall()
@@ -803,10 +691,8 @@ def _show_tables_sqlite(cursor: Any) -> None:
 
 
 def _show_schema_sqlite(cursor: Any, table: str | None) -> None:
-    """Show schema for table(s) in SQLite database."""
     try:
         if table:
-            # Show specific table schema
             cursor.execute(f"PRAGMA table_info({table})")
             result = cursor.fetchall()
 
@@ -817,7 +703,6 @@ def _show_schema_sqlite(cursor: Any, table: str | None) -> None:
                 console.print(f"  {col_name:30} {col_type}")
             console.print()
         else:
-            # Show all tables
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
             tables = cursor.fetchall()
 
@@ -842,7 +727,6 @@ def _show_schema_sqlite(cursor: Any, table: str | None) -> None:
 def _launch_clickhouse_shell(
     host: str | None, port: int | None, user: str | None, password: str | None, database: str | None
 ) -> None:
-    """Launch ClickHouse interactive shell."""
     console.print("[yellow]ClickHouse shell not yet implemented[/yellow]")
     console.print("Use the ClickHouse client directly for now:")
     console.print(f"  clickhouse-client --host {host or 'localhost'} --port {port or 9000}")

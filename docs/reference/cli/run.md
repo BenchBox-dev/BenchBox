@@ -58,15 +58,13 @@ benchbox run [OPTIONS]
   - **Valid Ranges**: TPC-H (1-22), TPC-DS (1-99), SSB (1-13)
   - **Examples**:
     ```bash
-    # Single query for debugging
     benchbox run --platform duckdb --benchmark tpch --queries "Q6"
 
-    # Multiple queries in specific order
     benchbox run --platform postgres --benchmark tpch --queries "Q1,Q6,Q17"
 
-    # With verbose logging for development
     benchbox run --platform duckdb --benchmark tpcds --queries "Q42" --verbose --phases power
     ```
+    The first example runs a single query for debugging. The second runs several queries in the order given. The third adds verbose logging for development.
 
 **Tuning and Optimization:**
 - `--tuning TEXT`: Tuning mode (default: "notuning")
@@ -156,129 +154,131 @@ benchbox run [OPTIONS]
 ### Basic Local Benchmark
 
 ```bash
-# Simple TPC-H benchmark on DuckDB
 benchbox run --platform duckdb --benchmark tpch --scale 0.01
 
-# With default settings
 benchbox run --platform duckdb --benchmark tpch
 ```
+
+The first command is a simple TPC-H benchmark on DuckDB. The second uses the default settings.
 
 ### Cloud Platform Examples
 
 ```bash
-# Databricks with custom output location
 benchbox run --platform databricks --benchmark tpch --scale 0.1 \
   --output dbfs:/Volumes/workspace/raw/benchmarks/
 
-# BigQuery with verbose logging
 benchbox run --platform bigquery --benchmark tpcds --scale 0.01 \
   --verbose --phases power
 
-# Snowflake with tuning enabled
 benchbox run --platform snowflake --benchmark tpch --scale 1 \
   --tuning tuned
 ```
 
+The examples use Databricks with a custom output location, BigQuery with verbose logging, and Snowflake with tuning enabled.
+
 ### DataFrame Platform Examples
 
 ```bash
-# Polars DataFrame with auto-tuning
 benchbox run --platform polars-df --benchmark tpch --scale 1 \
   --tuning auto
 
-# Pandas DataFrame with PyArrow backend
 benchbox run --platform pandas-df --benchmark tpch --scale 0.1 \
   --platform-option dtype_backend=pyarrow
 
-# PySpark DataFrame (local mode)
 benchbox run --platform pyspark-df --benchmark tpch --scale 1 \
   --platform-option driver_memory=8g
 
-# Compare SQL vs DataFrame on same workload
-benchbox run --platform polars --benchmark tpch --scale 0.1     # SQL mode
-benchbox run --platform polars-df --benchmark tpch --scale 0.1  # DataFrame mode
+benchbox run --platform polars --benchmark tpch --scale 0.1
+benchbox run --platform polars-df --benchmark tpch --scale 0.1
 ```
+
+The examples use Polars DataFrame with auto-tuning, Pandas DataFrame with the PyArrow backend, and PySpark DataFrame in local mode. The last two commands compare SQL mode (`polars`) against DataFrame mode (`polars-df`) on the same workload.
 
 ### Advanced Phase Control
 
 ```bash
-# Data generation only
 benchbox run --benchmark tpch --scale 0.1 --phases generate \
   --output ./tpch-data
 
-# Load data into database
 benchbox run --platform duckdb --benchmark tpch --scale 0.1 \
   --phases load
 
-# Full TPC-DS power and throughput test
 benchbox run --platform duckdb --benchmark tpcds --scale 0.01 \
   --phases power,throughput --seed 42
 ```
 
+The commands, in order, generate data only, load data into the database, and run the full TPC-DS power and throughput test.
+
 ### Dry Run and Preview
 
 ```bash
-# Preview configuration without execution
 benchbox run --platform duckdb --benchmark tpch --scale 0.1 \
   --dry-run ./preview
 
-# Preview with specific seed for reproducible queries
 benchbox run --platform snowflake --benchmark tpcds \
   --phases power --dry-run ./debug --seed 7
 ```
 
+The first command previews the configuration without running it. The second previews with a specific seed so the queries are reproducible.
+
 ### Benchmark-Specific Options
 
 ```bash
-# NYC Taxi: load only yellow and green trips from 2022
 benchbox run --platform duckdb --benchmark nyctaxi \
   --benchmark-option taxi_types=yellow,green \
   --benchmark-option year=2022
 
-# TPC-H Skew: use heavy skew distribution
 benchbox run --platform duckdb --benchmark tpch_skew --scale 1 \
   --benchmark-option skew_preset=heavy
 
-# TSBS Devops: custom host count and interval
 benchbox run --platform duckdb --benchmark tsbs_devops \
   --benchmark-option num_hosts=100 \
   --benchmark-option interval_seconds=30
 
-# TPC-DI: enable parallel ETL with 4 workers
 benchbox run --platform duckdb --benchmark tpcdi \
   --benchmark-option enable_parallel=true \
   --benchmark-option max_workers=4
 
-# Data Vault: use SHA-256 hashing
 benchbox run --platform duckdb --benchmark datavault \
   --benchmark-option hash_algorithm=sha256
 
-# List all benchmark options
 benchbox run --help-topic benchmarks
 ```
+
+The examples, in order:
+
+- NYC Taxi: load only yellow and green trips from 2022.
+- TPC-H Skew: use the heavy skew distribution.
+- TSBS Devops: set a custom host count and interval.
+- TPC-DI: enable parallel ETL with 4 workers.
+- Data Vault: use SHA-256 hashing.
+- The last command lists all benchmark options.
 
 ### Platform-Specific Options
 
 ```bash
-# ClickHouse with local mode and TLS
 benchbox run --platform clickhouse-local --benchmark tpch \
   --platform-option mode=local \
   --platform-option secure=true
 
-# Pin driver version (any platform)
 benchbox run --platform duckdb --benchmark tpch \
   --platform-option driver_version=1.2.0 \
   --platform-option driver_auto_install=true
 
-# Athena Spark: select Spark engine version
 benchbox run --platform athena-spark --benchmark tpch --scale 1.0 \
   --platform-option workgroup=my-spark-workgroup \
   --platform-option s3_staging_dir=s3://my-bucket/benchbox \
   --platform-option "engine_version=PySpark engine version 3"
 
-# Show platform details and capabilities
 benchbox platforms status clickhouse
 ```
+
+The examples, in order:
+
+- ClickHouse with local mode and TLS.
+- Pin the driver version, which works on any platform.
+- Athena Spark: select the Spark engine version.
+- The last command shows platform details and capabilities.
 
 ## Table Storage Options
 
@@ -307,11 +307,12 @@ These flags control cloud data-organization strategy selection across supported 
 - `--sorted-ingestion-method [auto|ctas|z_order|hilbert|liquid_clustering|vacuum_sort]`: Override the clustering method used during sorted ingestion
 
 ```bash
-# Snowflake with forced CTAS-based sorted ingestion
 benchbox run --platform snowflake --benchmark tpch --scale 1 \
   --sorted-ingestion-mode force \
   --sorted-ingestion-method ctas
 ```
+
+This runs Snowflake with forced CTAS-based sorted ingestion.
 
 ## Databricks Clustering Options
 
@@ -321,19 +322,18 @@ These overrides are Databricks-specific and are passed via `--platform-option`.
 - `--platform-option liquid_clustering_columns=col1,col2`: Comma-separated liquid clustering columns
 
 ```bash
-# Databricks with Z-order clustering
 benchbox run --platform databricks --benchmark tpch --scale 1 \
   --platform-option databricks_clustering_strategy=z_order
 
-# Databricks with liquid clustering on specific columns
 benchbox run --platform databricks --benchmark tpch --scale 1 \
   --platform-option databricks_clustering_strategy=liquid_clustering \
   --platform-option liquid_clustering_columns=l_shipdate,l_orderkey
 
-# Databricks with automatic liquid clustering
 benchbox run --platform databricks --benchmark tpch --scale 1 \
   --platform-option databricks_clustering_strategy=liquid_clustering_auto
 ```
+
+The commands, in order, run Databricks with Z-order clustering, with liquid clustering on specific columns, and with automatic liquid clustering.
 
 ## Execution Control Options
 

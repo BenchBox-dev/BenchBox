@@ -1,13 +1,3 @@
-// ---------------------------------------------------------------------------
-// SparklineTable - compact metrics table with inline spark bars
-//
-// One row per platform, columns: platform name, geomean_ms (bar+value),
-// power_score (bar+value, when applicable), P99 latency, normalized cost.
-// Inline bars make relative sizes visible at a glance.
-//
-// Python reference: textcharts.sparkline_table.SparklineTable
-// ---------------------------------------------------------------------------
-
 import type { BenchmarkSummary } from "@/types";
 import { paletteColor } from "@/lib/chartTheme";
 import { costModelDisclosure, costStatusLabel, normalizedCostValue } from "@/lib/costDisplay";
@@ -33,11 +23,6 @@ function fmtScore(s: number | null): string {
   return formatPowerScore(s, { missingText: "-" }).valueText;
 }
 
-// Inline bar: the bar fills its own cell, and the cell takes whatever width
-// the table has. A fixed pixel bar made the whole table render at its mobile
-// size on a desktop-width page, wasting most of the row.
-// MIN_FRAC reserves a small stub for the worst value so the row never
-// collapses to zero width and the slowest platform is still visually located.
 const MIN_FRAC = 0.08;
 
 interface SparkProps {
@@ -49,9 +34,6 @@ interface SparkProps {
 
 function SparkBar({ value, max, color, higherIsBetter = false }: SparkProps) {
   if (value === null || max <= 0) return <span class="text-[var(--bb-data-fg-subtle)]">-</span>;
-  // For higher-is-better (power_score): best = full bar, worst → MIN_FRAC.
-  // For lower-is-better (latency):     best = full bar, worst → MIN_FRAC.
-  // Either way, best=1.0 and worst=MIN_FRAC so relative spread is visible.
   const ratio = value / max;
   const scaled = higherIsBetter ? ratio : 1 - ratio;
   const barFraction = MIN_FRAC + Math.max(0, Math.min(1, scaled)) * (1 - MIN_FRAC);
@@ -69,10 +51,6 @@ export function SparklineTable({ summary }: Props) {
   const { platforms } = summary;
   if (platforms.length === 0) return null;
 
-  // Primary metric comes from the canonical DuckDB-persisted ranking row
-  // (pipeline writes `benchmark_rankings.primary_metric`). Fall back to
-  // geomean when the summary has no ranking config (synthetic summaries
-  // built from a single DetailResult where geomean is always defined).
   const metric = normalizePrimaryMetric(summary.ranking?.primary_metric);
   const scoreMetric = metric === "throughput_at_size" ? "throughput_at_size" : "power_score";
   const scoreLabel = scoreMetric === "throughput_at_size" ? "Throughput@Size" : "Power@Size";
@@ -106,9 +84,6 @@ export function SparklineTable({ summary }: Props) {
       >
         <thead>
           <tr class="border-b border-[var(--bb-data-border)]">
-            {/* Keep labels compact on wide screens and wrap long cohort
-                identities on phones. The table scrolls horizontally when
-                its minimum readable width exceeds the available space. */}
             <th class="text-left px-2 py-1.5 text-[var(--bb-data-fg-muted)] font-normal w-px whitespace-normal sm:whitespace-nowrap">Platform</th>
             <th class="text-right px-2 py-1.5 text-[var(--bb-data-fg-muted)] font-normal whitespace-nowrap" colSpan={2}>
               Geomean
@@ -145,14 +120,12 @@ export function SparklineTable({ summary }: Props) {
                   />
                   {cohortLabels[i] ?? p.platform}
                 </td>
-                {/* Geomean spark + value */}
                 <td class="w-2/5 px-1 py-1.5">
                   <SparkBar value={geomeanValue} max={maxGeomean} color={color} />
                 </td>
                 <td class="w-px whitespace-nowrap px-2 py-1.5 text-right font-mono text-[var(--bb-data-fg-primary)]">
                   {fmtMs(geomeanValue)}
                 </td>
-                {/* Power score spark + value */}
                 {showPower && (
                   <>
                     <td class="w-2/5 px-1 py-1.5">
@@ -168,13 +141,11 @@ export function SparklineTable({ summary }: Props) {
                     </td>
                   </>
                 )}
-                {/* P99 */}
                 {showP99 && (
                   <td class="px-2 py-1.5 text-right font-mono text-[var(--bb-data-fg-muted)]">
                     {fmtMs(p99Value)}
                   </td>
                 )}
-                {/* Cost */}
                 {showCost && (
                   <td class="px-2 py-1.5 text-right font-mono text-[var(--bb-data-fg-muted)]">
                     {normalizedCostValue(p) !== null ? formatUsd(normalizedCostValue(p)).valueText : costStatusLabel(p)}

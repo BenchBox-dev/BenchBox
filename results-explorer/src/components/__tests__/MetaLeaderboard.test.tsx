@@ -520,8 +520,6 @@ describe("MetaLeaderboard", () => {
       ],
     };
     render(<MetaLeaderboard data={dataWithNa} mode="ranks" onModeChange={vi.fn()} />);
-    // "No run" appears both in a missing-cell and in the legend caption; assert
-    // both surfaces are present rather than relying on a single-match query.
     expect(screen.getAllByText("No run").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("0/1 rankings")).toBeTruthy();
     expect(screen.getByText("No score")).toBeTruthy();
@@ -617,8 +615,6 @@ describe("MetaLeaderboard", () => {
     fireEvent.keyDown(firstRowCell, { key: " " });
     expect(routeMock).toHaveBeenLastCalledWith("/results/p/duckdb/");
 
-    // Arrow down into SQLite row, Enter should navigate to sqlite - matches
-    // the row's mouse-click destination.
     fireEvent.keyDown(firstRowCell, { key: "ArrowDown" });
     const activeCell = document.querySelector<HTMLElement>('[data-cell="1-0"]');
     expect(activeCell).not.toBeNull();
@@ -816,9 +812,6 @@ describe("MetaLeaderboard", () => {
       }),
     );
     const cell = screen.getByRole("gridcell", { name: /Polars has published evidence for TPC-H SF0\.1/ });
-    // Unranked (never a "ranked" cellState), so trust/funding stay hidden here -
-    // but the validation badge, the one signal that flags a non-clean result,
-    // must still surface.
     expect(cell.querySelector('[data-role="trust"]')).toBeNull();
     const badge = cell.querySelector('[data-role="validation"]');
     expect(badge?.textContent).toBe("no validation");
@@ -921,7 +914,7 @@ describe("MetaLeaderboard", () => {
         {
           platform_id: "polars",
           platform: "Polars",
-          ranks: {}, // <- the contradiction: result exists, ranks map is empty
+          ranks: {},
           avg_rank: 0,
           n_cohorts: 0,
         },

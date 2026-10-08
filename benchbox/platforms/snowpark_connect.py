@@ -1,44 +1,3 @@
-"""Snowpark Connect platform adapter for PySpark-compatible execution on Snowflake.
-
-Snowpark Connect provides a PySpark DataFrame API compatibility layer that executes
-on Snowflake's native query engine. This is NOT Apache Spark - it translates
-DataFrame operations to Snowflake SQL, providing a familiar API without requiring
-a Spark cluster.
-
-Key Features:
-- PySpark DataFrame API compatibility
-- Native Snowflake query execution
-- No Spark cluster required
-- Snowflake's query optimization
-
-Limitations (compared to Apache Spark):
-- RDD APIs not supported
-- DataFrame.hint() is a no-op
-- DataFrame.repartition() is a no-op
-- Some advanced Spark features unavailable
-
-Usage:
-    from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
-
-    adapter = SnowparkConnectAdapter(
-        account="my-account",
-        user="my-user",
-        password="my-password",
-        warehouse="COMPUTE_WH",
-        database="BENCHBOX",
-    )
-
-    # Run TPC-H benchmark with PySpark API
-    session = adapter.create_connection()
-    adapter.create_schema(benchmark, session)
-    adapter.load_data(benchmark, session, source_dir)
-    result = adapter.execute_query(session, "SELECT * FROM lineitem LIMIT 10", "Q1")
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -73,35 +32,6 @@ logger = logging.getLogger(__name__)
 
 
 class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
-    """Snowpark Connect adapter for PySpark-compatible execution on Snowflake.
-
-    Snowpark Connect provides a PySpark DataFrame API that executes natively
-    on Snowflake. Unlike traditional Spark platforms, there is no Spark cluster -
-    DataFrame operations are translated to Snowflake SQL.
-
-    Execution Model:
-    - Create Snowpark Session with Snowflake credentials
-    - Execute DataFrame operations (translated to SQL)
-    - Results retrieved directly from Snowflake
-    - No Spark cluster startup/shutdown
-
-    Key Features:
-    - PySpark-compatible DataFrame API
-    - Native Snowflake query optimization
-    - Zero Spark infrastructure management
-    - Instant "startup" (no cluster provisioning)
-
-    Limitations:
-    - RDD APIs not supported (DataFrame only)
-    - DataFrame.hint() is a no-op
-    - DataFrame.repartition() is a no-op
-    - Some Spark UDFs may not be compatible
-
-    Billing:
-    - Standard Snowflake credit consumption
-    - Based on warehouse size and query duration
-    """
-
     plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
@@ -122,23 +52,6 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
         session_parameters: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
-        """Initialize the Snowpark Connect adapter.
-
-        Args:
-            account: Snowflake account identifier (e.g., "xy12345.us-east-1").
-            user: Snowflake username.
-            password: Snowflake password.
-            warehouse: Virtual warehouse name (default: COMPUTE_WH).
-            database: Database name (default: BENCHBOX).
-            schema: Schema name (default: PUBLIC).
-            role: Role to use for the session.
-            authenticator: Authentication method (snowflake, externalbrowser, oauth).
-            private_key_path: Path to private key for key pair authentication.
-            private_key_passphrase: Passphrase for private key.
-            warehouse_size: Warehouse size (default: MEDIUM).
-            session_parameters: Additional Snowpark session parameters.
-            **kwargs: Additional platform options.
-        """
         if not SNOWPARK_AVAILABLE:
             deps_satisfied, missing = check_platform_dependencies("snowpark-connect")
             if not deps_satisfied:
@@ -153,7 +66,6 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
         if not user:
             raise ConfigurationError("user is required for Snowpark Connect.")
 
-        # Password or key-based auth required
         if not password and not private_key_path:
             raise ConfigurationError("Either password or private_key_path is required for authentication.")
 
@@ -170,25 +82,17 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
         self.warehouse_size = warehouse_size
         self.session_parameters = session_parameters or {}
 
-        # Snowpark Session (lazy initialization)
         self._session: Any = None
 
-        # Metrics tracking
         self._query_count = 0
         self._total_execution_time_seconds = 0.0
 
-        # Benchmark configuration
         self._benchmark_type: str | None = None
         self._scale_factor: float = 1.0
 
         super().__init__(**kwargs)
 
     def _build_connection_parameters(self) -> dict[str, Any]:
-        """Build Snowpark connection parameters.
-
-        Returns:
-            Dict of connection parameters for Snowpark Session.
-        """
         params = {
             "account": self.account,
             "user": self.user,
@@ -207,7 +111,6 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
             params["authenticator"] = self.authenticator
 
         if self.private_key_path:
-            # Load private key for key pair authentication
             from cryptography.hazmat.backends import default_backend
             from cryptography.hazmat.primitives import serialization
 
@@ -222,14 +125,6 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
         return params
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Return platform metadata.
-
-        Args:
-            connection: Not used (Snowpark Connect manages sessions internally).
-
-        Returns:
-            Dict with platform information including name, version, and capabilities.
-        """
         return {
             "platform": "snowpark-connect",
             "display_name": "Snowpark Connect for Spark",
@@ -249,17 +144,6 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
         }
 
     def create_connection(self, **kwargs: Any) -> Any:
-        """Create a Snowpark Session.
-
-        Returns:
-            Snowpark Session object.
-
-        Raises:
-            ConfigurationError: If connection fails.
-            RuntimeError: If ``force_recreate`` is set: the adapter accepts the flag but has no
-                docs-supported automatic drop, so it fails closed instead of silently reusing
-                the database.
-        """
         self.fail_closed_on_force_recreate(
             platform_label="Snowpark Connect",
             database=kwargs.get("database", self.database),
@@ -267,25 +151,21 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
         )
         try:
             if self._session is not None:
-                # Check if session is still valid
                 try:
                     self._session.sql("SELECT 1").collect()
                     logger.info("Using existing Snowpark session")
                     return self._session
                 except Exception:
-                    # Session invalid, create new one
                     self._session = None
 
             logger.info(f"Creating Snowpark session for {self.account}")
             connection_params = self._build_connection_parameters()
 
-            # Add session parameters
             if self.session_parameters:
                 connection_params["session_parameters"] = self.session_parameters
 
             self._session = Session.builder.configs(connection_params).create()
 
-            # Verify connection
             result = self._session.sql("SELECT CURRENT_VERSION()").collect()
             version = result[0][0] if result else "unknown"
 
@@ -298,13 +178,6 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
             raise ConfigurationError(f"Snowpark session creation failed: {e}") from e
 
     def create_schema(self, benchmark, connection: Any) -> float:
-        """Create database and schema if they don't exist.
-
-        Args:
-            benchmark: Benchmark instance. Snowpark Connect only needs the
-                configured database/schema here.
-            connection: Active Snowpark session.
-        """
         session = connection or self._session
         if session is None:
             raise ConfigurationError("No active session. Call create_connection() first.")
@@ -328,16 +201,6 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
         connection: Any,
         data_dir: Path,
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load benchmark data into Snowflake tables.
-
-        Args:
-            benchmark: Benchmark instance.
-            connection: Active Snowpark session.
-            data_dir: Local directory containing table data files.
-
-        Returns:
-            Tuple of table row counts, elapsed seconds, and optional per-table timings.
-        """
         session = connection or self._session
         if session is None:
             raise ConfigurationError("No active session. Call create_connection() first.")
@@ -353,35 +216,26 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
 
         for table in self._resolve_table_names(benchmark):
             table_start = mono_time()
-            # Find data files for this table
             table_files = list(source_path.glob(f"{table}.*")) + list(source_path.glob(f"{table}/*.parquet"))
 
             if not table_files:
                 logger.warning(f"No data files found for table {table}")
                 continue
 
-            # For Parquet files, use Snowpark DataFrame API
             if all(is_parquet_format(file_path) for file_path in table_files):
                 for file_path in table_files:
-                    # Create internal stage and upload
                     stage_name = f"@~/{table}"
                     session.sql(f"PUT file://{file_path} {stage_name} AUTO_COMPRESS=FALSE").collect()
 
-                # Create table from staged files
                 df = session.read.parquet(f"@~/{table}/")
                 df.write.mode("overwrite").save_as_table(table)
 
-                # Get row count
                 count_result = session.sql(f"SELECT COUNT(*) FROM {table}").collect()
                 row_count = count_result[0][0] if count_result else 0
                 table_stats[table] = row_count
                 logger.info(f"Loaded {row_count:,} rows into {table}")
 
             else:
-                # For CSV/TBL files, use COPY INTO as a full refresh: clear
-                # leftover stage files, re-upload, truncate the target, and
-                # COPY with FORCE so load history cannot skip the reload
-                # (parquet branch already overwrites via save_as_table).
                 try:
                     session.sql(f"REMOVE @~/{table}/").collect()
                 except Exception as e:
@@ -397,7 +251,6 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
                     if "does not exist or not authorized" not in str(e):
                         raise
 
-                # Create file format and COPY INTO
                 session.sql(
                     f"COPY INTO {table} FROM @~/{table}/ FILE_FORMAT = (TYPE = CSV FIELD_DELIMITER = '|') FORCE = TRUE"
                 ).collect()
@@ -421,16 +274,6 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute a SQL query using Snowpark.
-
-        Args:
-            connection: Active Snowpark session.
-            query: SQL query to execute.
-            query_id: Query identifier.
-
-        Returns:
-            Standard query result dictionary.
-        """
         session = connection or self._session
         if session is None:
             raise ConfigurationError("No active session. Call create_connection() first.")
@@ -474,14 +317,6 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
 
     @staticmethod
     def _rows_to_dicts(result: Any) -> list[dict[str, Any]]:
-        """Convert Snowpark Row objects or tuple rows to dictionaries.
-
-        Snowpark's collect() normally returns Row objects with ``asDict()``,
-        which yields the expected ``{column_name: value}`` mapping. The tuple
-        fallback (no ``asDict``) is only hit if a future Snowpark release or
-        a stub returns plain sequences; in that case we have no column-name
-        metadata, so positional integer keys are the safest non-empty form.
-        """
         if not result:
             return []
         if hasattr(result[0], "asDict"):
@@ -490,14 +325,6 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
 
     @staticmethod
     def _resolve_table_names(benchmark: Any) -> list[str]:
-        """Resolve table names from common BenchBox benchmark interfaces.
-
-        ``get_table_loading_order`` takes the discovered table list and
-        returns it in FK-safe order (TPCH/SSB/CoffeeShop/TPCDS all require
-        this argument); it cannot be used to discover the table list itself.
-        So the raw list is discovered first via the other interfaces, then
-        handed to ``get_table_loading_order`` for ordering if available.
-        """
         available: list[str] | None = None
         if hasattr(benchmark, "get_available_tables") and callable(benchmark.get_available_tables):
             available = list(benchmark.get_available_tables())
@@ -524,24 +351,6 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
         df_operation: Any,
         **kwargs: Any,
     ) -> list[dict[str, Any]]:
-        """Execute a Snowpark DataFrame operation.
-
-        This method supports PySpark-style DataFrame operations that are
-        translated to Snowflake SQL.
-
-        Args:
-            df_operation: Snowpark DataFrame with operations applied.
-            **kwargs: Additional options.
-
-        Returns:
-            Query results as list of dicts.
-
-        Note:
-            Some Spark operations are not supported or are no-ops:
-            - RDD operations: Not available
-            - hint(): No-op (Snowflake uses its own optimizer)
-            - repartition(): No-op (Snowflake handles partitioning)
-        """
         if self._session is None:
             raise ConfigurationError("No active session. Call create_connection() first.")
 
@@ -554,7 +363,6 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
             self._query_count += 1
             self._total_execution_time_seconds += elapsed
 
-            # Convert to list of dicts
             if result:
                 return [row.asDict() if hasattr(row, "asDict") else dict(row) for row in result]
 
@@ -564,21 +372,12 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
             raise RuntimeError(f"DataFrame execution failed: {e}") from e
 
     def get_dataframe(self, table_name: str) -> Any:
-        """Get a Snowpark DataFrame for a table.
-
-        Args:
-            table_name: Name of the table.
-
-        Returns:
-            Snowpark DataFrame.
-        """
         if self._session is None:
             raise ConfigurationError("No active session. Call create_connection() first.")
 
         return self._session.table(table_name)
 
     def close(self) -> None:
-        """Close the Snowpark session."""
         if self._session is not None:
             try:
                 self._session.close()
@@ -594,20 +393,6 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
 
     @staticmethod
     def add_cli_arguments(parser: Any) -> None:
-        """Add Snowpark Connect-specific CLI arguments.
-
-        WARNING — namespace collision risk: ``--account``, ``--user``,
-        ``--password``, ``--database``, ``--schema``, ``--warehouse``, and
-        ``--role`` are registered WITHOUT a ``--snowpark-`` prefix.  If this
-        parser is shared with other adapters those names will conflict.
-
-        These are legacy flags for the setup wizard (``benchbox platforms setup``).
-        The ``benchbox run`` flow uses ``--platform-option key=val`` instead
-        and does NOT call ``add_cli_arguments``.
-
-        Args:
-            parser: Argument parser to add arguments to.
-        """
         group = parser.add_argument_group("Snowpark Connect Options")
         group.add_argument(
             "--account",
@@ -648,14 +433,6 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> SnowparkConnectAdapter:
-        """Create adapter from configuration dict.
-
-        Args:
-            config: Configuration dictionary.
-
-        Returns:
-            Configured SnowparkConnectAdapter instance.
-        """
         params = {
             "account": config.get("account"),
             "user": config.get("user"),
@@ -670,7 +447,6 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
             "warehouse_size": config.get("warehouse_size", "MEDIUM"),
         }
 
-        # Pass through tuning provenance/config
         for key in [
             "tuning_config",
             "tuning_enabled",
@@ -681,8 +457,6 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
             if key in config:
                 params[key] = config[key]
 
-        # Forward the recreate flag so forced runs stay idempotent instead of
-        # silently falling back to the base default (False).
         if "force_recreate" in config:
             params["force_recreate"] = config["force_recreate"]
         elif config.get("force", False):
@@ -691,46 +465,14 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
         return cls(**params)
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
-        """Configure adapter for specific benchmark.
-
-        Args:
-            connection: Session object.
-            benchmark_type: Benchmark type (tpch, tpcds, ssb).
-        """
         self._benchmark_type = benchmark_type.lower()
         logger.info(f"Configuring Snowpark Connect for {benchmark_type} benchmark")
 
-        # Disable result cache for accurate benchmarking. This is benchmarking
-        # hygiene applied to every run, not tuning-derived, so it must never
-        # enter the applied-tuning ledger (recording it would falsely report
-        # baseline runs as applied_unverified). It runs on the raw session
-        # handle, and RecordingConnection only intercepts execute/cursor
-        # paths anyway, so a .sql() call cannot be captured either way.
         if self._session:
             self._session.sql("ALTER SESSION SET USE_CACHED_RESULT = FALSE").collect()
             logger.debug("Disabled result cache for benchmarking")
 
     def apply_platform_optimizations(self, config: Any) -> list[str]:
-        """Snowpark applies no tuning-derived session settings, so nothing is recorded.
-
-        Snowpark inherits the Spark mixin no-op signature (``(config) ->
-        list[str]``) rather than the ``PlatformAdapter`` 2-arg DDL hook: the
-        unified-tuning entrypoint Snowpark actually runs
-        (``TuningConfigMixin.apply_unified_tuning``) is itself a no-op and
-        never dispatches to ``apply_standard_unified_tuning``, so the 2-arg
-        call path the reviewer feared cannot reach this override at runtime.
-
-        None of the unified platform-optimization fields map to Snowflake
-        ALTER SESSION parameters. Warehouse sizing (``warehouse_size``) is
-        persistent account-level infrastructure, not a session setting, so it
-        stays behind an explicit opt-in that does not exist yet (see the
-        Snowpark tuning-surface follow-up). Requested optimizations are
-        recorded as dropped intents so the ledger surfaces the request
-        honestly instead of silently vanishing; the run still reports noop
-        for applied statements. The USE_CACHED_RESULT hygiene ALTER in
-        configure_for_benchmark is benchmarking hygiene on every run,
-        not tuning-derived, and must never enter the ledger either.
-        """
         logger.debug("Snowpark tuning surface is empty; no session settings applied")
         ledger = getattr(self, "_applied_tuning_ledger", None)
         if ledger is not None and config is not None:
@@ -744,12 +486,6 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
 
     @staticmethod
     def _requested_platform_optimization_names(config: Any) -> list[str]:
-        """Return the names of enabled optimizations in a platform config.
-
-        Reads the ``PlatformOptimizationConfiguration`` dataclass fields
-        without importing tuning internals: any truthy ``*_enabled`` flag or
-        non-empty layout field counts as requested.
-        """
         names: list[str] = []
         for key in (
             "z_ordering_enabled",
@@ -770,16 +506,5 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
                 names.append(f"{key}:{len(columns)}")
         return names
 
-    # apply_primary_keys, apply_foreign_keys, and apply_constraint_configuration
-    # are inherited from SparkTuningMixin. apply_platform_optimizations is
-    # overridden above: Snowpark has no Spark session config to apply.
-
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for Snowpark Connect.
-
-        Snowpark Connect uses Snowflake SQL.
-
-        Returns:
-            The dialect string "snowflake".
-        """
         return "snowflake"

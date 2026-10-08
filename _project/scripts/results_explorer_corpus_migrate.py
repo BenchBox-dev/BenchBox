@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-"""Deterministically migrate curated Explorer bundles to the public path contract.
-
-The default mode is a dry run.  ``--write`` atomically rewrites primary bundles,
-JSON companions, and their manifests with the same public anonymizer used by the
-Explorer publication boundary.  A migration manifest records old/new hashes and
-result IDs without copying any private value into the audit artifact.
-"""
 
 from __future__ import annotations
 
@@ -34,12 +27,21 @@ MANIFEST_SUFFIX = ".manifest.json"
 STRUCTURAL_MANIFEST_KEYS = frozenset({"bundle_file", "bundle_hash", "companion_hashes"})
 
 
+CLI_DESCRIPTION = (
+    "Deterministically migrate curated Explorer bundles to the public path contract.\n"
+    "\n"
+    "The default mode is a dry run.  ``--write`` atomically rewrites primary bundles,\n"
+    "JSON companions, and their manifests with the same public anonymizer used by the\n"
+    "Explorer publication boundary.  A migration manifest records old/new hashes and\n"
+    "result IDs without copying any private value into the audit artifact.\n"
+)
+
+
 def _sha256(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
 def _atomic_write(path: Path, payload: bytes) -> None:
-    """Replace one file in-place without exposing a partially-written JSON file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
     try:
@@ -56,7 +58,6 @@ def _atomic_write(path: Path, payload: bytes) -> None:
 
 
 def _queue_write(path: Path, payload: bytes, pending_writes: list[tuple[Path, bytes]], *, write: bool) -> None:
-    """Queue a write so an existing-manifest refusal cannot partially mutate inputs."""
     if write:
         pending_writes.append((path, payload))
 
@@ -69,7 +70,7 @@ def _load_json(path: Path) -> tuple[Any, bytes]:
 def _public_companion_payload(path: Path, payload: Any, manager: AnonymizationManager) -> Any:
     if path.name.endswith(".tuning.json") and isinstance(payload, dict):
         return manager.anonymize_tuning_payload(payload)
-    return manager.anonymize_result_payload(payload)  # type: ignore[arg-type]
+    return manager.anonymize_result_payload(payload)
 
 
 def _manifest_path(bundle_path: Path) -> Path | None:
@@ -81,12 +82,6 @@ def _manifest_path(bundle_path: Path) -> Path | None:
 
 
 def _sanitize_manifest(payload: dict[str, Any], manager: AnonymizationManager) -> dict[str, Any]:
-    """Scrub free-text manifest values while preserving hash/file structure.
-
-    Unread identifier keys are omitted by the public anonymizer rather than
-    rewritten; when a whole key is dropped the entry is removed from the
-    sanitized manifest instead of being re-read (which would KeyError).
-    """
     sanitized: dict[str, Any] = {}
     for key, value in payload.items():
         if key in STRUCTURAL_MANIFEST_KEYS:
@@ -95,12 +90,10 @@ def _sanitize_manifest(payload: dict[str, Any], manager: AnonymizationManager) -
         walked = manager.anonymize_result_payload({key: value})
         if key in walked:
             sanitized[key] = walked[key]
-        # else: drop-field key — omit from public manifest
     return sanitized
 
 
 def _semantic_signature(data: dict[str, Any]) -> dict[str, Any]:
-    """Fields that must remain byte-for-byte semantically equivalent."""
     benchmark = data.get("benchmark") if isinstance(data.get("benchmark"), dict) else {}
     platform = data.get("platform") if isinstance(data.get("platform"), dict) else {}
     run = data.get("run") if isinstance(data.get("run"), dict) else {}
@@ -217,11 +210,6 @@ def migrate(*, bundles_dir: Path, write: bool, manifest_path: Path) -> dict[str,
             existing = json.loads(manifest_path.read_text(encoding="utf-8"))
             if not isinstance(existing, dict) or existing.get("migration") != manifest["migration"]:
                 raise FileExistsError(f"refusing to overwrite an existing migration manifest: {manifest_path}")
-            # All three counts, not just bundles: a re-migration that rewrites
-            # only companions or only sidecar manifests still mutates the
-            # corpus, and gating on `changed_bundles` alone let that happen
-            # while the stale manifest was kept -- leaving the mutation with no
-            # audit entry recording its old/new hashes.
             summary = manifest["summary"]
             changed_counts = {
                 name: summary[name] for name in ("changed_bundles", "companion_changes", "manifest_changes")
@@ -240,7 +228,7 @@ def migrate(*, bundles_dir: Path, write: bool, manifest_path: Path) -> dict[str,
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--bundles-dir", type=Path, default=BUNDLES_DIR)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--write", action="store_true", help="rewrite bundles and companions atomically")

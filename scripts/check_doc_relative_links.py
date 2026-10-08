@@ -1,40 +1,6 @@
 #!/usr/bin/env python3
-"""Check repo-local relative links in Markdown docs resolve to real files.
-
-Closes the detection gap that let a broken source-relative link
-(`docs/contributing-results.md` -> `getting-started.rst`) ship undetected.
-That class of link evades the existing docs gates three ways:
-
-  1. The Sphinx ``linkcheck`` builder only validates *external* (http/https)
-     URLs -- it never checks local source-relative file links.
-  2. The HTML build runs ``sphinx-build -b html --keep-going`` without
-     ``-W``, so warnings never fail CI.
-  3. ``docs/conf.py`` sets ``suppress_warnings = ["myst.xref_missing",
-     "ref.myst"]``, suppressing the very warning a missing local target
-     would otherwise raise.
-
-This check scans ``docs/**/*.md`` (excluding the generated ``_build/``
-tree), extracts inline Markdown links ``[text](target)``, and asserts that
-every *repo-local relative* target exists on disk. External URLs, ``mailto:``
-and other schemes, bare ``#anchors``, and server-absolute ``/paths`` are left
-to the external linkcheck / site routing and are not inspected here.
-
-Pre-existing broken links are recorded in a baseline file so this gate blocks
-*new* breakage immediately without forcing a repo-wide cleanup. The baseline
-cannot rot: an entry whose target now resolves is reported as stale and must
-be removed (regenerate with ``--update-baseline``).
-
-Usage:
-    python scripts/check_doc_relative_links.py            # check (CI mode)
-    python scripts/check_doc_relative_links.py --update-baseline
-
-Exit codes:
-    0 - No new broken relative links; baseline is current
-    1 - New broken relative link(s) found, or baseline contains stale entries
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License.
 
 from __future__ import annotations
 
@@ -44,12 +10,48 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+CLI_DESCRIPTION = (
+    "Check repo-local relative links in Markdown docs resolve to real files.\n"
+    "\n"
+    "Closes the detection gap that let a broken source-relative link\n"
+    "(`docs/contributing-results.md` -> `getting-started.rst`) ship undetected.\n"
+    "That class of link evades the existing docs gates three ways:\n"
+    "\n"
+    "  1. The Sphinx ``linkcheck`` builder only validates *external* (http/https)\n"
+    "     URLs -- it never checks local source-relative file links.\n"
+    "  2. The HTML build runs ``sphinx-build -b html --keep-going`` without\n"
+    "     ``-W``, so warnings never fail CI.\n"
+    '  3. ``docs/conf.py`` sets ``suppress_warnings = ["myst.xref_missing",\n'
+    '     "ref.myst"]``, suppressing the very warning a missing local target\n'
+    "     would otherwise raise.\n"
+    "\n"
+    "This check scans ``docs/**/*.md`` (excluding the generated ``_build/``\n"
+    "tree), extracts inline Markdown links ``[text](target)``, and asserts that\n"
+    "every *repo-local relative* target exists on disk. External URLs, ``mailto:``\n"
+    "and other schemes, bare ``#anchors``, and server-absolute ``/paths`` are left\n"
+    "to the external linkcheck / site routing and are not inspected here.\n"
+    "\n"
+    "Pre-existing broken links are recorded in a baseline file so this gate blocks\n"
+    "*new* breakage immediately without forcing a repo-wide cleanup. The baseline\n"
+    "cannot rot: an entry whose target now resolves is reported as stale and must\n"
+    "be removed (regenerate with ``--update-baseline``).\n"
+    "\n"
+    "Usage:\n"
+    "    python scripts/check_doc_relative_links.py            # check (CI mode)\n"
+    "    python scripts/check_doc_relative_links.py --update-baseline\n"
+    "\n"
+    "Exit codes:\n"
+    "    0 - No new broken relative links; baseline is current\n"
+    "    1 - New broken relative link(s) found, or baseline contains stale entries\n"
+    "\n"
+    "Copyright 2026 Joe Harris / BenchBox Project\n"
+    "Licensed under the MIT License.\n"
+)
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DOCS_DIR = REPO_ROOT / "docs"
 BASELINE_PATH = REPO_ROOT / "scripts" / "doc_relative_link_baseline.txt"
 
-# Inline link [text](target ["title"]) but not images (![...]); target stops
-# at whitespace or the closing paren.
 _LINK_RE = re.compile(r"(?<!!)\[(?:[^\]]*)\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 _INLINE_CODE_RE = re.compile(r"`[^`]*`")
 _FENCE_RE = re.compile(r"^\s*(```|~~~)")
@@ -57,16 +59,10 @@ _SCHEME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*:")
 
 
 def iter_doc_files() -> list[Path]:
-    """Markdown files under docs/, excluding the generated _build/ tree."""
     return sorted(p for p in DOCS_DIR.rglob("*.md") if "_build" not in p.parts)
 
 
 def extract_relative_links(content: str) -> list[tuple[int, str]]:
-    """Return (line_number, target) for repo-local relative inline links.
-
-    Skips fenced and inline code spans, external URLs, other URI schemes,
-    bare ``#anchors``, and server-absolute ``/paths``.
-    """
     results: list[tuple[int, str]] = []
     in_fence = False
     for line_num, line in enumerate(content.splitlines(), 1):
@@ -80,22 +76,20 @@ def extract_relative_links(content: str) -> list[tuple[int, str]]:
             target = match.group(1).strip()
             if target.startswith(("#", "/")):
                 continue
-            if _SCHEME_RE.match(target):  # http:, https:, mailto:, etc.
+            if _SCHEME_RE.match(target):
                 continue
             results.append((line_num, target))
     return results
 
 
 def target_resolves(doc_file: Path, target: str) -> bool:
-    """Whether the relative target (fragment/query stripped) exists on disk."""
     core = target.split("#", 1)[0].split("?", 1)[0]
-    if not core:  # same-document anchor written as (path#frag) with empty path
+    if not core:
         return True
     return (doc_file.parent / core).exists()
 
 
 def collect_broken() -> list[tuple[str, int, str]]:
-    """All broken repo-local relative links as (rel_source, line, target)."""
     broken: list[tuple[str, int, str]] = []
     for doc_file in iter_doc_files():
         rel_source = doc_file.relative_to(REPO_ROOT).as_posix()
@@ -106,7 +100,6 @@ def collect_broken() -> list[tuple[str, int, str]]:
 
 
 def load_baseline() -> Counter[tuple[str, str]]:
-    """Known pre-existing broken link occurrences keyed by (rel_source, target)."""
     if not BASELINE_PATH.exists():
         return Counter()
     occurrences: Counter[tuple[str, str]] = Counter()
@@ -121,7 +114,6 @@ def load_baseline() -> Counter[tuple[str, str]]:
 
 
 def write_baseline(broken: list[tuple[str, int, str]]) -> int:
-    """Regenerate the baseline file from the current broken set."""
     pairs = sorted((source, target) for source, _, target in broken)
     lines = [
         "# Pre-existing broken repo-local relative link occurrences in docs/.",
@@ -137,7 +129,7 @@ def write_baseline(broken: list[tuple[str, int, str]]) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument(
         "--update-baseline",
         action="store_true",

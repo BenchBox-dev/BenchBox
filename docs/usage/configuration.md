@@ -13,8 +13,9 @@ If no file is present, BenchBox uses sensible defaults. You can generate a tunin
 
 ## Minimal Example
 
+Save the following as `benchbox.yaml`:
+
 ```yaml
-# benchbox.yaml
 benchmarks:
   default_scale: 0.1
   continue_on_error: false
@@ -57,7 +58,7 @@ Use these helpers when you need to inspect or persist configuration programmatic
 ```python
 from benchbox.cli.config import ConfigManager
 
-config = ConfigManager()             # auto-detects benchbox.yaml
+config = ConfigManager()
 scale = config.get("benchmarks.default_scale")
 config.set("execution.power_run.iterations", 5)
 config.save_config()
@@ -68,19 +69,27 @@ config.save_config()
 `benchbox.utils.ExecutionConfigHelper` wraps common tuning operations. It works with or without an existing config file.
 
 ```python
+from benchbox.cli.config import ConfigManager
 from benchbox.utils import ExecutionConfigHelper
 
-helper = ExecutionConfigHelper()
+config = ConfigManager()
+helper = ExecutionConfigHelper(config_manager=config)
 
-# Enable a quick power run profile
 helper.enable_power_run_iterations(iterations=3, warm_up_iterations=1)
 
-# Turn on concurrent streams and optimise for hardware
 helper.enable_concurrent_queries(max_concurrent=4)
 helper.optimize_for_system(cpu_cores=16, memory_gb=64)
+config.save_config()
 ```
 
-The helper updates the active configuration provider, so CLI runs pick up the changes once you call `config.save_config()` or invoke the helper with an explicit `ConfigManager` instance.
+`enable_power_run_iterations` enables a quick power run profile. `enable_concurrent_queries` turns on concurrent streams, and `optimize_for_system` optimizes for the hardware you give it.
+
+The helper updates the configuration object it captured at construction. This
+example passes the same `ConfigManager` that saves the changes. In standalone
+code without a registered provider, `ExecutionConfigHelper()` captures a fresh
+in-memory provider; its changes stay local to that helper and are not persisted.
+Later provider registrations do not replace an existing helper's captured
+provider. Pass a `ConfigManager` explicitly when you intend to save the settings.
 
 ## Environment Overrides
 
@@ -97,12 +106,12 @@ Point `BENCHBOX_TUNING_CONFIG` at a configuration checked into your repo to make
 Before running large jobs, dry-run the plan and validate dependencies:
 
 ```bash
-# Render the execution plan without running anything
 uv run -- benchbox run --dry-run ./plan --platform duckdb --benchmark tpch
 
-# Check platform requirements declared in the config
 uv run -- benchbox check-deps --matrix
 ```
+
+The first command renders the execution plan without running anything. The second checks the platform requirements declared in the config.
 
 `benchbox run` respects values from `benchbox.yaml`, so you can set project defaults once and execute repeatable runs with only a few flags.
 

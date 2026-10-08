@@ -1,5 +1,3 @@
-"""Metrics command group for benchmark performance calculations."""
-
 from __future__ import annotations
 
 import json
@@ -11,27 +9,65 @@ import click
 from benchbox.cli.shared import console
 
 
-@click.group("metrics")
+@click.group(
+    "metrics",
+    help=(
+        "Calculate benchmark performance metrics.\n"
+        "\n"
+        "The metrics command group provides tools for calculating\n"
+        "TPC Power@Size and Throughput@Size from benchmark results.\n"
+        "\n"
+        "Available subcommands:\n"
+        "\n"
+        "\x08\n"
+        "  qphh    Calculate Power@Size and Throughput@Size (no composite QphH)\n"
+        "\n"
+        "Examples:\n"
+        "    # Calculate Power@Size and Throughput@Size\n"
+        "    benchbox metrics qphh \\\n"
+        "      --power-results power.json \\\n"
+        "      --throughput-results throughput.json\n"
+    ),
+)
 def metrics_group():
-    """Calculate benchmark performance metrics.
-
-    The metrics command group provides tools for calculating
-    TPC Power@Size and Throughput@Size from benchmark results.
-
-    Available subcommands:
-
-    \b
-      qphh    Calculate Power@Size and Throughput@Size (no composite QphH)
-
-    Examples:
-        # Calculate Power@Size and Throughput@Size
-        benchbox metrics qphh \\
-          --power-results power.json \\
-          --throughput-results throughput.json
-    """
+    pass
 
 
-@metrics_group.command("qphh")
+@metrics_group.command(
+    "qphh",
+    help=(
+        "Calculate Power@Size and Throughput@Size from result files.\n"
+        "\n"
+        "The composite QphH@Size / QphDS@Size is not computed: BenchBox does not\n"
+        "yet run the TPC-H refresh functions or the TPC-DS data maintenance\n"
+        "phases that the composite requires. The command refuses result files\n"
+        "with suppressed metrics, failed queries or a failed throughput phase.\n"
+        "\n"
+        "Power@Size uses the final power iteration. Throughput@Size uses the\n"
+        "throughput phase wall-clock duration.\n"
+        "\n"
+        "\x08\n"
+        "Examples:\n"
+        "    # Calculate metrics from test results\n"
+        "    benchbox metrics qphh \\\n"
+        "      --power-results results/power/results.json \\\n"
+        "      --throughput-results results/throughput/results.json\n"
+        "\n"
+        "\x08\n"
+        "    # Specify scale factor explicitly\n"
+        "    benchbox metrics qphh \\\n"
+        "      --power-results power.json \\\n"
+        "      --throughput-results throughput.json \\\n"
+        "      --scale-factor 100\n"
+        "\n"
+        "\x08\n"
+        "    # Export to JSON\n"
+        "    benchbox metrics qphh \\\n"
+        "      --power-results power.json \\\n"
+        "      --throughput-results throughput.json \\\n"
+        "      --format json --output qphh.json\n"
+    ),
+)
 @click.option(
     "--power-results",
     type=click.Path(exists=True),
@@ -64,43 +100,11 @@ def metrics_group():
 )
 @click.pass_context
 def qphh(ctx, power_results, throughput_results, scale_factor, output_format, output_file):
-    """Calculate Power@Size and Throughput@Size from result files.
-
-    The composite QphH@Size / QphDS@Size is not computed: BenchBox does not
-    yet run the TPC-H refresh functions or the TPC-DS data maintenance
-    phases that the composite requires. The command refuses result files
-    with suppressed metrics, failed queries or a failed throughput phase.
-
-    Power@Size uses the final power iteration. Throughput@Size uses the
-    throughput phase wall-clock duration.
-
-    \b
-    Examples:
-        # Calculate metrics from test results
-        benchbox metrics qphh \\
-          --power-results results/power/results.json \\
-          --throughput-results results/throughput/results.json
-
-    \b
-        # Specify scale factor explicitly
-        benchbox metrics qphh \\
-          --power-results power.json \\
-          --throughput-results throughput.json \\
-          --scale-factor 100
-
-    \b
-        # Export to JSON
-        benchbox metrics qphh \\
-          --power-results power.json \\
-          --throughput-results throughput.json \\
-          --format json --output qphh.json
-    """
     result = _compute_qphh_result(power_results, throughput_results, scale_factor)
     _emit_qphh_output(result, output_format, output_file)
 
 
 def _load_result_files(power_results: str, throughput_results: str) -> tuple[dict, dict]:
-    """Load and parse power and throughput result JSON files."""
     try:
         with open(Path(power_results), encoding="utf-8") as f:
             power_data = json.load(f)
@@ -119,12 +123,6 @@ def _load_result_files(power_results: str, throughput_results: str) -> tuple[dic
 
 
 def _resolve_scale_factor(power_data: dict, throughput_data: dict, scale_factor: float | None) -> float:
-    """Auto-detect or validate scale factor from result data.
-
-    Thin CLI wrapper over :meth:`benchbox.core.results.metrics.TPCMetricsCalculator.resolve_scale_factor`.
-    Converts ``ValueError`` to the CLI's console+exit behaviour to keep
-    user-facing messages unchanged.
-    """
     from benchbox.core.results.metrics import TPCMetricsCalculator
 
     try:
@@ -137,21 +135,12 @@ def _resolve_scale_factor(power_data: dict, throughput_data: dict, scale_factor:
 def _derive_tpc_metrics(
     power_data: dict, throughput_data: dict, scale_factor: float
 ) -> tuple[float | None, float | None, float | None, float | None]:
-    """Extract or derive Power@Size and Throughput@Size metrics.
-
-    Thin CLI wrapper over :meth:`benchbox.core.results.metrics.TPCMetricsCalculator.derive_tpc_metrics`.
-    """
     from benchbox.core.results.metrics import TPCMetricsCalculator
 
     return TPCMetricsCalculator.derive_tpc_metrics(power_data, throughput_data, scale_factor)
 
 
 def _compute_qphh_result(power_results: str, throughput_results: str, scale_factor: float | None) -> dict:
-    """Compute the QphH result dictionary from power and throughput result files.
-
-    CLI keeps file I/O and output/error handling; derivation and composition
-    are delegated to :meth:`benchbox.core.results.metrics.TPCMetricsCalculator.compute_qphh_result`.
-    """
     power_data, throughput_data = _load_result_files(power_results, throughput_results)
     from benchbox.core.results.metrics import TPCMetricsCalculator
 
@@ -163,7 +152,6 @@ def _compute_qphh_result(power_results: str, throughput_results: str, scale_fact
 
 
 def _emit_qphh_output(result: dict, output_format: str, output_file: str | None) -> None:
-    """Format and emit QphH result to console or file."""
     if output_format == "text":
         content = _format_text_output(result)
     elif output_format == "json":
@@ -179,7 +167,6 @@ def _emit_qphh_output(result: dict, output_format: str, output_file: str | None)
 
 
 def _format_text_output(result: dict) -> str:
-    """Format QphH calculation as human-readable text."""
     lines = []
 
     lines.append("=" * 70)

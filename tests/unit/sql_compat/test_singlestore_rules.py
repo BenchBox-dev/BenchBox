@@ -1,11 +1,3 @@
-"""Unit tests for SingleStore DDL_OPTIMIZE registry rules.
-
-Verifies that each of the four registered rules has the correct rule_id,
-action type, payload type, and that its transformer_id names a callable
-method on SingleStoreAdapter.  These are governance/structure tests;
-behavioral tests live in tests/unit/platforms/test_singlestore_adapter.py.
-"""
-
 from __future__ import annotations
 
 import importlib
@@ -19,13 +11,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 @pytest.fixture(autouse=True)
 def _mock_singlestoredb(monkeypatch):
-    """Stub the singlestoredb SDK so SingleStoreAdapter() succeeds without the optional driver.
-
-    This file constructs SingleStoreAdapter() directly (no connection is opened),
-    but the constructor still raises ImportError when ``_s2 is None``. The autouse
-    _s2 mock that lives in test_singlestore_adapter.py is scoped to that file, so
-    we install our own here.
-    """
     fake_module = MagicMock(name="singlestoredb")
     monkeypatch.setitem(sys.modules, "singlestoredb", fake_module)
     monkeypatch.setattr("benchbox.platforms.singlestore._s2", fake_module, raising=False)
@@ -72,8 +57,6 @@ def singlestore_decisions():
 
 
 class TestSingleStoreRuleStructure:
-    """Each registered rule has the correct structure."""
-
     def test_exactly_four_rules_registered(self, singlestore_decisions):
         assert len(singlestore_decisions) == 4
 
@@ -96,9 +79,6 @@ class TestSingleStoreRuleStructure:
 
     @pytest.mark.parametrize("expected", _EXPECTED_RULES, ids=[r["rule_id"] for r in _EXPECTED_RULES])
     def test_transformer_id_is_callable_on_adapter(self, expected):
-        # _mock_singlestoredb (autouse, top of file) installs a stand-in for the
-        # singlestoredb SDK so SingleStoreAdapter() does not raise ImportError when
-        # the optional driver is not installed in the current environment.
         from benchbox.platforms.singlestore import SingleStoreAdapter
 
         adapter = SingleStoreAdapter()
@@ -116,7 +96,6 @@ class TestSingleStoreRuleStructure:
         assert decision.reason
 
     def test_rule_id_format_matches_convention(self, singlestore_decisions):
-        """All rule_ids follow ddl_optimize.<platform>.<scope>.<name> convention."""
         for decision in singlestore_decisions:
             parts = decision.rule_id.split(".")
             assert len(parts) == 4, f"rule_id {decision.rule_id!r} should have 4 dot-separated parts"
@@ -125,13 +104,6 @@ class TestSingleStoreRuleStructure:
 
 
 class TestSingleStoreResolveConflictGuard:
-    """SingleStore intentionally registers multiple rules at the same key.
-
-    REGISTRY.resolve() must raise CompatibilityRegistryConflict for this
-    platform so callers know to use resolve_all() instead.  This test
-    documents and enforces that contract.
-    """
-
     def test_resolve_raises_conflict_for_singlestore(self, singlestore_decisions):
         from benchbox.sql_compat.context import CompatibilityContext, Phase
         from benchbox.sql_compat.registry import REGISTRY, CompatibilityRegistryConflict

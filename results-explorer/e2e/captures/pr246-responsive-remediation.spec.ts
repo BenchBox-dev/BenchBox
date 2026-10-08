@@ -1,11 +1,3 @@
-/**
- * PR #246 responsive/navigation/overflow remediation captures.
- *
- * Skipped by default; opt in with PR246_RESPONSIVE_CAPTURE=1. Captures the
- * mobile/tablet route matrix named by the remediation TODO and writes a small
- * manifest for closeout evidence.
- */
-
 import { mkdirSync, writeFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";

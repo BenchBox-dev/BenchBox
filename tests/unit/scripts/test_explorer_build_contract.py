@@ -1,5 +1,3 @@
-"""Contract tests for the maintainer-only explorer publisher."""
-
 from __future__ import annotations
 
 import importlib
@@ -30,9 +28,6 @@ def test_explorer_build_contract_command_emits_expected_json() -> None:
 
 def test_explorer_build_contract_matches_duckdb_only_output_contract() -> None:
     outputs = EXPLORER_BUILD_CONTRACT["outputs"]
-    # Independent migration pin: a version bump must update this reviewed
-    # expectation and the compatibility matrix deliberately, not just copy a
-    # changed production constant into another consumer.
     current_read_model_version = 14
 
     assert EXPLORER_BUILD_CONTRACT["version"] == "6"

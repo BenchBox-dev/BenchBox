@@ -1,19 +1,5 @@
-"""Vector Search query variant rules for Phase.QUERY_SOURCE.
-
-All five supported platforms (StarRocks, Doris, PostgreSQL, ClickHouse,
-Snowflake) use native vector-distance functions that sqlglot cannot translate
-from DuckDB's array_cosine_similarity / array_distance. Each query_id gets a
-SELECT_VARIANT rule pointing to the platform-native SQL from QUERY_VARIANTS.
-
-StarRocks version gating for Q2 (l2_distance):
-  l2_distance requires StarRocks ≥3.2; earlier builds return a parse error.
-  Two version-gated rules handle known-version cases; the unversioned rule fires
-  when platform_version is None, preserving current behavior.
-"""
-
 from __future__ import annotations
 
-# SQL lives in the canonical QUERY_VARIANTS dict - no duplication needed.
 from benchbox.core.vector_search.queries import QUERY_VARIANTS
 from benchbox.sql_compat.actions import CompatAction
 from benchbox.sql_compat.context import Phase
@@ -38,10 +24,6 @@ _REASONS: dict[str, str] = {
     "snowflake": "Snowflake native VECTOR type uses VECTOR_COSINE_SIMILARITY / VECTOR_L2_DISTANCE",
 }
 
-# ---------------------------------------------------------------------------
-# One SELECT_VARIANT rule per (platform, query_id) - unversioned
-# _qid is uppercase ("Q1"-"Q6") matching QUERY_VARIANTS keys; rule_id uses lowercase slug.
-# ---------------------------------------------------------------------------
 
 for _platform, _reason in _REASONS.items():
     for _qid, _sql in QUERY_VARIANTS.get(_platform, {}).items():
@@ -60,9 +42,6 @@ for _platform, _reason in _REASONS.items():
             query_id=_qid,
         )
 
-# LakeSail/Sail lacks the DuckDB array_* vector functions and currently also
-# rejects Spark SQL lambda functions, so the Spark higher-order-array fallback
-# cannot run there.
 for _qid in ("Q1", "Q2", "Q3", "Q4", "Q5", "Q6"):
     REGISTRY.register(
         CompatibilityDecision(
@@ -89,11 +68,7 @@ for _qid in ("Q1", "Q2", "Q3", "Q4", "Q5", "Q6"):
         query_id=_qid,
     )
 
-# ---------------------------------------------------------------------------
-# Version-gated rules: StarRocks Q2 (l2_distance requires ≥3.2)
-# ---------------------------------------------------------------------------
 
-# StarRocks <3.2: l2_distance is not available - skip rather than fail at runtime.
 REGISTRY.register(
     CompatibilityDecision(
         rule_id="query_source.starrocks.vector_search.q2_lt_32_skip",
@@ -113,7 +88,6 @@ REGISTRY.register(
     max_version="3.1",
 )
 
-# StarRocks ≥3.2: l2_distance is available - versioned SELECT_VARIANT wins over the unversioned fallback.
 REGISTRY.register(
     CompatibilityDecision(
         rule_id="query_source.starrocks.vector_search.q2_ge_32_variant",

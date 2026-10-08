@@ -1,39 +1,3 @@
-"""Run TPC-H on StarRocks (self-hosted cluster).
-
-StarRocks is an open-source MPP (Massively Parallel Processing) OLAP database
-engine, graduated from the Linux Foundation. It delivers sub-second query
-latency on large-scale datasets using columnar storage, vectorized execution,
-and distributed hash partitioning. StarRocks connects via the MySQL protocol
-and uses Stream Load for high-throughput data ingestion over HTTP.
-
-Prerequisites:
-    1. Running StarRocks cluster with Frontend (FE) and Backend (BE) nodes
-    2. FE MySQL protocol port accessible (default: 9030)
-    3. BE HTTP port accessible for Stream Load (default: 8040)
-    4. Database user with CREATE/DROP/INSERT/SELECT privileges
-
-Required environment variables:
-    STARROCKS_HOST           StarRocks FE hostname or IP address
-
-Optional environment variables:
-    STARROCKS_PORT           MySQL protocol port (default: 9030)
-    STARROCKS_USER           Database username (default: root)
-    STARROCKS_PASSWORD       Database password (default: "")
-    STARROCKS_DATABASE       Target database name (default: benchbox)
-    STARROCKS_HTTP_PORT      BE HTTP port for Stream Load (default: 8040)
-
-Installation:
-    uv add benchbox --extra starrocks
-
-Usage:
-    export STARROCKS_HOST=192.168.1.100
-
-    python examples/getting_started/sql/starrocks_tpch.py
-
-    # Preview without execution
-    python examples/getting_started/sql/starrocks_tpch.py --dry-run ./preview
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -50,11 +14,6 @@ _OUTPUT_DIR = _PROJECT_ROOT / "benchmark_runs" / "getting_started" / "starrocks"
 
 
 def _require_env(var_name: str) -> str:
-    """Require a StarRocks environment variable.
-
-    StarRocks connection details should be provided via environment variables,
-    especially passwords. Never hardcode credentials in scripts.
-    """
     value = os.getenv(var_name)
     if not value:
         raise RuntimeError(
@@ -64,31 +23,6 @@ def _require_env(var_name: str) -> str:
 
 
 def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig]:
-    """Build benchmark and database configurations for StarRocks.
-
-    StarRocks Concepts:
-
-    1. MYSQL PROTOCOL
-       - StarRocks FE exposes a MySQL-compatible wire protocol on port 9030
-       - Standard MySQL clients and drivers (PyMySQL) connect directly
-       - SQL syntax is largely MySQL-compatible with OLAP extensions
-
-    2. STREAM LOAD
-       - High-throughput data ingestion via HTTP PUT to BE nodes
-       - Sends CSV/JSON data directly to Backend HTTP port (default: 8040)
-       - Supports parallel loading across multiple BE nodes
-       - BenchBox uses Stream Load automatically during the load phase
-
-    3. COLUMNAR STORAGE
-       - Data stored in columnar format for analytical query performance
-       - Duplicate Key model used for benchmark tables (no deduplication)
-       - Automatic compaction and compression for storage efficiency
-
-    4. DISTRIBUTED EXECUTION
-       - Queries distributed across Backend (BE) nodes via MPP engine
-       - Hash partitioning distributes data for parallel scans
-       - Pipeline execution engine with vectorized operators
-    """
     benchmark_config = BenchmarkConfig(
         name="tpch",
         display_name="TPC-H",
@@ -101,16 +35,11 @@ def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig
         type="starrocks",
         name="starrocks_tpch",
         options={
-            # FE host (required) - Frontend node hostname
             "host": _require_env("STARROCKS_HOST"),
-            # MySQL protocol port (optional, default: 9030)
             "port": int(os.getenv("STARROCKS_PORT", "9030")),
-            # Authentication (optional, StarRocks defaults to root with no password)
             "username": os.getenv("STARROCKS_USER", "root"),
             "password": os.getenv("STARROCKS_PASSWORD", ""),
-            # Target database (optional, default: benchbox)
             "database": os.getenv("STARROCKS_DATABASE", "benchbox"),
-            # BE HTTP port for Stream Load ingestion (optional, default: 8040)
             "http_port": int(os.getenv("STARROCKS_HTTP_PORT", "8040")),
         },
     )
@@ -119,14 +48,6 @@ def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig
 
 
 def run_example(scale_factor: float = 0.01, *, dry_run_output: Path | None = None) -> None:
-    """Execute TPC-H benchmark on StarRocks.
-
-    StarRocks provides:
-    - Sub-second OLAP query latency via vectorized execution
-    - MPP distributed query engine across multiple BE nodes
-    - MySQL protocol compatibility for standard tooling
-    - Stream Load for high-throughput parallel data ingestion
-    """
     _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     benchmark_config, database_config = _build_configs(scale_factor)
 

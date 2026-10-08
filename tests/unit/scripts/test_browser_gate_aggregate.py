@@ -1,5 +1,3 @@
-"""Contract tests for the fail-closed browser gate aggregation policy."""
-
 import pytest
 
 from _project.scripts.browser_gate_aggregate import evaluate_gate

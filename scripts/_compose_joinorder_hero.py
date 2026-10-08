@@ -1,15 +1,4 @@
 #!/usr/bin/env python3
-"""Compose post 14 hero ANSI text from real manifest + JSON values.
-
-Mimics the Rich color palette emitted by `benchbox run` (see /tmp/bb-hero-12.log
-for reference). Every number / hash / row count in the output is sourced from
-real artifacts:
-  - benchbox/core/joinorder/data_manifest.toml
-  - benchmark_runs/results/joinorder_sf1_duckdb_sql_20260518_161132_e392ddcb.json
-
-The layout is reconstructed because no real on-disk run output is captured for
-joinorder; the values are not.
-"""
 
 import json
 import tomllib
@@ -26,21 +15,19 @@ JSON_PATH = ROOT / "benchmark_runs" / "results" / "joinorder_sf1_duckdb_sql_2026
 ESC = "\x1b"
 RESET = f"{ESC}[0m"
 
-# Rich-compatible palette codes (matches /tmp/bb-hero-12.log usage)
 DIM = f"{ESC}[2m"
 BOLD = f"{ESC}[1m"
 BLUE = f"{ESC}[34m"
 GREEN = f"{ESC}[32m"
 CYAN = f"{ESC}[36m"
 YELLOW = f"{ESC}[33m"
-NUM = f"{ESC}[1;36m"  # bold cyan numerals
+NUM = f"{ESC}[1;36m"
 NUM_GREEN = f"{ESC}[1;32m"
-LABEL = f"{ESC}[1;35m"  # bold magenta for table names
+LABEL = f"{ESC}[1;35m"
 DULL = f"{ESC}[38;5;242m"
 
 
 def fmt_num(n: int) -> str:
-    """Render an integer with bold cyan thousands-separated digits."""
     s = f"{n:,}"
     out = []
     for ch in s:
@@ -55,7 +42,6 @@ def main() -> None:
     manifest = tomllib.loads(MANIFEST.read_text(encoding="utf-8"))
     data = json.loads(JSON_PATH.read_text(encoding="utf-8"))
 
-    # Real numbers
     dataset_version = manifest["dataset_version"]
     manifest_hash = manifest["manifest_hash"]
     data_archive_hash = manifest["data_archive_hash"]
@@ -66,11 +52,9 @@ def main() -> None:
     total_ms = data["summary"]["timing"]["total_ms"]
     qcounts = data["summary"]["queries"]
 
-    # Top tables by row count from the JSON (sorted desc)
     rows_by_table = sorted(data["tables"].items(), key=lambda kv: kv[1]["rows"], reverse=True)
-    top_tables = rows_by_table[:8]  # show the largest 8
+    top_tables = rows_by_table[:8]
 
-    # First 6 distinct query latencies from the JSON (warmup stream/iter 0)
     seen: dict[str, float] = {}
     for q in data["queries"]:
         qid = q["id"]
@@ -96,7 +80,6 @@ def main() -> None:
     a(f"{YELLOW}Loading benchmark data{RESET}{YELLOW}...{RESET}")
     for name, info in top_tables:
         rows_str = fmt_num(info["rows"])
-        # right-align the rendered number (account for ANSI noise: use raw digit count)
         raw = f"{info['rows']:,}"
         pad = " " * max(0, 14 - len(raw))
         a(f"  {GREEN}✅{RESET} Loaded {pad}{rows_str} rows into {LABEL}{name}{RESET}")

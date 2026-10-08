@@ -1,6 +1,3 @@
-# Polars DataFrame Tuning - Streaming Mode
-# For datasets larger than available memory
-
 execution:
   streaming_mode: true
   engine_affinity: streaming

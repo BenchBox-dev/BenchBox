@@ -1,5 +1,3 @@
-"""Tests for data_organization config and sorting module."""
-
 from __future__ import annotations
 
 from datetime import date
@@ -22,11 +20,6 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# SortOrder
-# ---------------------------------------------------------------------------
-
-
 class TestSortOrder:
     def test_from_string_asc(self):
         assert SortOrder.from_string("asc") == SortOrder.ASC
@@ -38,11 +31,6 @@ class TestSortOrder:
     def test_from_string_invalid(self):
         with pytest.raises(ValueError, match="Invalid sort order"):
             SortOrder.from_string("random")
-
-
-# ---------------------------------------------------------------------------
-# SortColumn
-# ---------------------------------------------------------------------------
 
 
 class TestSortColumn:
@@ -68,12 +56,7 @@ class TestSortColumn:
     def test_frozen(self):
         sc = SortColumn(name="x")
         with pytest.raises(AttributeError):
-            sc.name = "y"  # type: ignore[misc]
-
-
-# ---------------------------------------------------------------------------
-# DataOrganizationConfig
-# ---------------------------------------------------------------------------
+            sc.name = "y"
 
 
 class TestDataOrganizationConfig:
@@ -156,26 +139,12 @@ def _write_tbl(path: Path, rows: list[tuple[object, ...]]) -> None:
 
 
 def _write_tbl_clean(path: Path, rows: list[tuple[object, ...]]) -> None:
-    """Write TBL rows WITHOUT a trailing delimiter (post-normalization shape)."""
     with path.open("w", encoding="utf-8") as f:
         for row in rows:
             f.write("|".join(str(v) for v in row) + "\n")
 
 
 def _write_tbl_crlf(path: Path, rows: list[tuple[object, ...]], *, trailing_delimiter: bool = True) -> None:
-    """Write TBL rows with explicit CRLF line endings, either framing.
-
-    The other helpers open in text mode, so they emit the platform's native
-    line ending - LF on macOS/Linux, CRLF on Windows. These bytes are written
-    explicitly so the CRLF framing is exercised on every platform rather than
-    only on the Windows nightly leg.
-
-    ``trailing_delimiter`` selects the framing. Terminator and framing are
-    independent, and the clean/CRLF combination is the one that would otherwise
-    go unexercised: the LF clean case is covered by
-    ``test_reads_normalized_tbl_with_no_trailing_delimiter``, so without this
-    flag a reader that mishandled *only* clean CRLF input would pass everything.
-    """
     suffix = "|\r\n" if trailing_delimiter else "\r\n"
     payload = b"".join(("|".join(str(v) for v in row) + suffix).encode("utf-8") for row in rows)
     path.write_bytes(payload)
@@ -213,12 +182,6 @@ class TestSortedParquetWriterSingleColumn:
             writer.write_sorted_parquet("orders", [source], tmp_path)
 
     def test_reads_normalized_tbl_with_no_trailing_delimiter(self, tmp_path: Path):
-        """The bundled dbgen binaries emit clean rows (no trailing '|'), so
-        _apply_data_organization() must read N-field rows correctly. When a
-        schema is supplied, the reader used to unconditionally assume N+1 raw
-        fields (schema columns + a synthetic trailing-delimiter column), which
-        breaks on clean N-field rows with a PyArrow column-count mismatch.
-        Detect the file's actual framing instead of assuming it."""
         source = tmp_path / "lineitem.tbl"
         _write_tbl_clean(
             source,
@@ -240,13 +203,6 @@ class TestSortedParquetWriterSingleColumn:
         assert table.column("id").to_pylist() == [1, 2, 3]
 
     def test_reads_trailing_delimiter_tbl_with_crlf_line_endings(self, tmp_path: Path):
-        """Trailing-delimiter framing must be detected under CRLF line endings.
-
-        The framing probe used to read the file's last two bytes and look for
-        b"|\\n", which a CRLF file never matches - its tail is b"|\\r\\n". The
-        reader then omitted the synthetic trailing column and PyArrow failed
-        with "Expected N columns, got N+1". This only reproduced on the Windows
-        nightly leg, where the test helpers emit CRLF natively."""
         source = tmp_path / "lineitem.tbl"
         _write_tbl_crlf(
             source,
@@ -268,12 +224,6 @@ class TestSortedParquetWriterSingleColumn:
         assert table.column("id").to_pylist() == [1, 2, 3]
 
     def test_crlf_source_still_reports_unknown_sort_column(self, tmp_path: Path):
-        """Column validation must outrank a framing misread on CRLF input.
-
-        _read_tbl_files() runs before _sort_table(), so a framing misread threw
-        ArrowInvalid before the sort-column check could raise ValueError. That
-        is what made the "unknown column" assertions fail on Windows - the
-        error message never drifted, the exception type did."""
         source = tmp_path / "orders.tbl"
         _write_tbl_crlf(source, [(1, "2024-01-01")])
         schema_registry = {"orders": {"columns": [{"name": "o_orderkey"}, {"name": "o_orderdate"}]}}
@@ -284,16 +234,6 @@ class TestSortedParquetWriterSingleColumn:
             writer.write_sorted_parquet("orders", [source], tmp_path)
 
     def test_reads_clean_tbl_with_crlf_line_endings(self, tmp_path: Path):
-        r"""The fourth cell: CRLF *without* a trailing delimiter.
-
-        Framing and terminator are independent, so there are four combinations.
-        Three were already covered - LF/clean by
-        test_reads_normalized_tbl_with_no_trailing_delimiter, LF/trailing by the
-        ordinary fixtures, CRLF/trailing above. Without this case a reader that
-        mishandled only clean CRLF input would pass the whole suite: it would
-        add the synthetic column to a file that has N fields, and PyArrow would
-        fail with a column-count mismatch on the *correct* input.
-        """
         source = tmp_path / "lineitem.tbl"
         _write_tbl_crlf(
             source,
@@ -311,7 +251,6 @@ class TestSortedParquetWriterSingleColumn:
         output = writer.write_sorted_parquet("lineitem", [source], tmp_path)
 
         table = pq.read_table(output)
-        # No synthetic trailing column may survive into the output schema.
         assert table.column_names == ["id", "l_shipdate"]
         assert table.column("l_shipdate").to_pylist() == [date(1992, 1, 2), date(1996, 5, 17), date(1998, 3, 1)]
         assert table.column("id").to_pylist() == [1, 2, 3]
@@ -535,7 +474,7 @@ class TestSortedParquetWriterOpenTableFormatOptions:
                 self.output_dir = kwargs["output_dir"]
 
         class _FakeConverter:
-            def convert(self, source_files, table_name, schema, options):  # noqa: ARG002
+            def convert(self, source_files, table_name, schema, options):
                 output = options.output_dir / table_name
                 output.mkdir(parents=True, exist_ok=True)
                 return SimpleNamespace(output_files=[output])

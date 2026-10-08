@@ -1,5 +1,3 @@
-"""Modular TPC-DS schema package."""
-
 from .models import Column, DataType, Table
 from .registry import (
     TABLES,

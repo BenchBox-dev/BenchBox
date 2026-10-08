@@ -115,7 +115,6 @@ export function formatLatencyMs(value: number | null | undefined, options: Laten
   if (numeric === null) return missing(options.missingText ?? "N/A", "latency");
 
   const abs = Math.abs(numeric);
-  // Axis positions need distinct numeric labels even across narrow ranges.
   if (options.context === "axis") {
     const unit = abs >= 1000 ? "s" : "ms";
     const text = `${formatNumber(unit === "s" ? numeric / 1000 : numeric, { maximumSignificantDigits: options.maximumSignificantDigits ?? 12 })} ${unit}`;
@@ -139,7 +138,6 @@ export function formatLatencyMs(value: number | null | undefined, options: Laten
   return result(text, "ms", numeric, `${text} latency`);
 }
 
-/** Use the shortest precision that keeps every latency tick distinguishable. */
 export function formatLatencyAxisLabels(ticks: readonly number[]): string[] {
   const distinctValues = new Set(ticks).size;
   let labels: string[] = [];

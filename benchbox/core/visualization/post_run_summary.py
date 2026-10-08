@@ -1,12 +1,6 @@
-"""Post-run summary chart generation for automatic display after benchmark runs.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides a single shared function used by both CLI and MCP to render
-summary charts from a BenchmarkResults object.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -45,8 +39,6 @@ _SUMMARY_LABELS = {
 
 @dataclass
 class PostRunSummary:
-    """Rendered summary charts from a single benchmark run."""
-
     summary_box: str
     query_histogram: str
     charts: list[str] = field(default_factory=list)
@@ -60,18 +52,6 @@ def generate_post_run_summary(
     unicode: bool = True,
     max_width: int | None = None,
 ) -> PostRunSummary:
-    """Build summary charts from a single benchmark run result.
-
-    Args:
-        result: Completed benchmark results with query timing data.
-        theme: Color theme ("dark" or "light").
-        color: Whether to use ANSI colors.
-        unicode: Whether to use Unicode box-drawing characters.
-        max_width: Maximum chart width (None for auto-detect).
-
-    Returns:
-        PostRunSummary with rendered ASCII charts.
-    """
     options = ChartOptions(
         theme=theme,
         use_color=color,
@@ -80,17 +60,13 @@ def generate_post_run_summary(
     if max_width is not None:
         options.width = max_width
 
-    # Extract successful query results with timing data
     successful = [
         q for q in (result.query_results or []) if q.get("status") == "SUCCESS" and q.get("execution_time_ms")
     ]
 
     if not successful:
-        # Nothing to chart - return empty summary
         return PostRunSummary(summary_box="", query_histogram="", charts=[])
 
-    # Aggregate per-query: group by canonical query ID, compute mean latency.
-    # Multiple executions per query occur with multi-stream power runs.
     query_timings: dict[str, list[float]] = {}
     query_display_ids: dict[str, str] = {}
     query_order: list[str] = []
@@ -109,22 +85,19 @@ def generate_post_run_summary(
 
     mean_values = [query_means[qid] for qid in query_order]
 
-    # Geometric mean of per-query means
     log_sum = sum(math.log(max(t, 0.001)) for t in mean_values)
     geo_mean = math.exp(log_sum / len(mean_values))
 
     total_time = sum(mean_values)
     median_time = statistics.median(mean_values)
 
-    # Best (fastest) and worst (slowest) by per-query mean
     sorted_queries = sorted(query_order, key=lambda qid: query_means[qid])
     best = [(query_display_ids[qid], query_means[qid]) for qid in sorted_queries[:_SUMMARY_QUERY_COUNT]]
     worst = [(query_display_ids[qid], query_means[qid]) for qid in sorted_queries[-_SUMMARY_QUERY_COUNT:]]
-    worst.reverse()  # Slowest first
+    worst.reverse()
 
     title = f"{result.benchmark_name} on {result.platform} (SF {result.scale_factor})"
 
-    # Extract system environment and platform config from result
     environment = _extract_environment(result.system_profile)
     run_cfg = (result.execution_metadata or {}).get("run_config") or {}
     platform_config = _extract_platform_config(result.platform_info, run_cfg)
@@ -145,10 +118,6 @@ def generate_post_run_summary(
     summary_box_chart = SummaryBox(stats, options=options)
     summary_box_text = summary_box_chart.render()
 
-    # Build query latency chart - choose orientation based on label length.
-    # Vertical histogram works for short numeric IDs (Q1-Q22).
-    # Horizontal bars are more readable for long descriptive names
-    # (e.g., "aggregation_groupby_large").
     best_qid = sorted_queries[0] if sorted_queries else None
     worst_qid = sorted_queries[-1] if sorted_queries else None
     display_ids = [query_display_ids[qid] for qid in query_order]
@@ -186,9 +155,6 @@ def generate_post_run_summary(
     )
 
 
-# Median query-ID length above which horizontal bars are used instead of vertical.
-# 6 chars accommodates TPC-style IDs (Q1-Q22) vertically; longer benchmark IDs
-# (e.g., ClickBench "aggregation_groupby_large") switch to horizontal layout.
 _HORIZONTAL_LABEL_THRESHOLD = 6
 _VERTICAL_Y_AXIS_WIDTH = 8
 _VERTICAL_AXIS_PADDING = 2
@@ -197,11 +163,6 @@ _VERTICAL_MIN_BARS_PER_CHART = 5
 
 
 def _should_use_horizontal(display_ids: list[str]) -> bool:
-    """Return True if horizontal bars are preferable for these query labels.
-
-    Uses median label length: if the median exceeds the threshold, vertical
-    bars would truncate most labels to unreadable 2-3 character stubs.
-    """
     if not display_ids:
         return False
     median_len = statistics.median(len(qid) for qid in display_ids)
@@ -209,7 +170,6 @@ def _should_use_horizontal(display_ids: list[str]) -> bool:
 
 
 def _max_vertical_bars_for_labels(display_ids: list[str], options: ChartOptions) -> int:
-    """Return the vertical chunk size that lets labels fit without truncation."""
     if not display_ids:
         return Histogram.DEFAULT_MAX_BARS
 
@@ -233,7 +193,6 @@ def _render_horizontal_bars(
     worst_qid: str | None,
     options: ChartOptions,
 ) -> str:
-    """Render a horizontal bar chart for queries with long names."""
     bars = [
         BarData(
             label=query_display_ids[qid],
@@ -256,14 +215,6 @@ def _render_horizontal_bars(
 def _extract_environment(
     system_profile: dict | None,
 ) -> dict[str, str] | None:
-    """Build an ordered compute-environment dict from a system_profile dict.
-
-    Accepts both SystemProfile keys (os_name, cpu_cores_logical, memory_total_gb)
-    and SystemInfo.to_dict() keys (os_type, cpu_cores, total_memory_gb)
-    and loader.py keys (os_type, cpu_count, memory_gb).
-
-    Returns None if the profile is missing or has no usable fields.
-    """
     if not system_profile:
         return None
 
@@ -298,11 +249,6 @@ def _extract_platform_config(
     platform_info: dict | None,
     run_cfg: dict,
 ) -> dict[str, str] | None:
-    """Build a platform configuration dict for the summary box right column.
-
-    Includes driver version, table mode, and tuning mode.
-    Returns None if no config fields are available.
-    """
     cfg: dict[str, str] = {}
 
     if platform_info and isinstance(platform_info, dict):

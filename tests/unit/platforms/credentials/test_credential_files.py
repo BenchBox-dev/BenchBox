@@ -1,15 +1,3 @@
-"""Behavior-verifying tests for credential management using real files.
-
-Every test creates real YAML/JSON credential files in tmp_path and loads
-them through a real CredentialManager - no MagicMock on the credential path.
-
-Replaces the mock-heavy coverage tests:
-- test_snowflake_coverage.py
-- test_databricks_credentials_coverage.py
-- test_bigquery_coverage.py
-- test_redshift_coverage.py
-"""
-
 from __future__ import annotations
 
 import json
@@ -31,7 +19,6 @@ pytestmark = [
 
 @pytest.fixture()
 def cred_file(tmp_path):
-    """Return a factory that writes a credentials YAML and returns a CredentialManager."""
 
     def _make(data: dict) -> CredentialManager:
         path = tmp_path / "credentials.yaml"
@@ -46,11 +33,6 @@ def _make_module(name: str, **attrs) -> ModuleType:
     for key, value in attrs.items():
         setattr(module, key, value)
     return module
-
-
-# ---------------------------------------------------------------------------
-# CredentialManager: loading, env-var substitution, save/load, masking
-# ---------------------------------------------------------------------------
 
 
 class TestCredentialManagerLoading:
@@ -93,7 +75,7 @@ class TestCredentialManagerLoading:
 
     def test_case_insensitive_platform_lookup(self, cred_file):
         mgr = cred_file({"snowflake": {"account": "a"}})
-        # get_platform_credentials lowercases the key
+
         assert mgr.get_platform_credentials("Snowflake") is not None
         assert mgr.get_platform_credentials("SNOWFLAKE") is not None
         assert mgr.get_platform_credentials("snowflake") is not None
@@ -113,7 +95,6 @@ class TestCredentialManagerSaveLoad:
         )
         mgr.save_credentials()
 
-        # Reload from same file
         mgr2 = CredentialManager(credentials_path=path)
         creds = mgr2.get_platform_credentials("redshift")
         assert creds["host"] == "cluster.us-east-1.redshift.amazonaws.com"
@@ -190,9 +171,9 @@ class TestCredentialManagerMasking:
             }
         )
         display = mgr.get_display_credentials("snowflake")
-        assert display["account"] == "org-acct"  # not sensitive
-        assert display["username"] == "admin"  # not sensitive
-        assert "..." in display["password"]  # masked
+        assert display["account"] == "org-acct"
+        assert display["username"] == "admin"
+        assert "..." in display["password"]
         assert display["password"].startswith("supe")
         assert display["password"].endswith("123")
         assert "..." in display["access_token"]
@@ -221,11 +202,6 @@ class TestCredentialManagerRemove:
     def test_remove_nonexistent_returns_false(self, cred_file):
         mgr = cred_file({})
         assert mgr.remove_platform_credentials("snowflake") is False
-
-
-# ---------------------------------------------------------------------------
-# Platform-specific validation with real CredentialManager
-# ---------------------------------------------------------------------------
 
 
 class TestSnowflakeValidation:
@@ -894,7 +870,7 @@ class TestRedshiftValidation:
         assert err == "Connection timeout. Check VPC/security group settings and network connectivity."
 
     def test_env_var_credentials_through_real_manager(self, tmp_path, monkeypatch):
-        """Full path: env var in YAML -> CredentialManager substitution -> validation."""
+
         from benchbox.platforms.credentials import redshift as rs
 
         monkeypatch.setenv("RS_HOST", "cluster.redshift.amazonaws.com")
@@ -932,7 +908,6 @@ class TestRedshiftValidation:
 
         monkeypatch.setattr(rs.socket, "socket", lambda *args, **kwargs: FailingSocket())
 
-        # Validation should get past the "missing fields" check.
         ok, err = rs.validate_redshift_credentials(mgr, console=None)
-        # It will fail later in validation, but should NOT fail at missing fields.
+
         assert "Missing required fields" not in (err or "")

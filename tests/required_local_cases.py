@@ -1,20 +1,6 @@
-"""Required local-engine test cases and the value checks they share.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-``REQUIRED_LOCAL_CASES`` is the exact inventory of local-engine pytest node IDs
-that must run and pass, never skip. The helpers below enforce three properties
-of the SQLite fixed-seed case in ``test_local_platform_benchmark_matrix.py``:
-
-* conservation: the inventory and the successful measurement-ID multiset are
-  exact, so a missing, extra, duplicated, or failed entry is an error;
-* population: every authoritative TPC-H table holds at least one row;
-* value proof: SQLite rows equal a reference engine's rows within the
-  TPC-Havoc ``ResultValidator`` tolerance, so a same-cardinality wrong value
-  is caught.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -37,12 +23,9 @@ REQUIRED_LOCAL_CASES: tuple[str, ...] = (
     SQLITE_VALUE_PARITY_NODE,
 )
 
-# SQLite case parameters. The seed is fixed so query parameters are reproducible.
 SQLITE_CASE_SCALE_FACTOR = 0.01
 SQLITE_CASE_SEED = 42
 SQLITE_CASE_QUERY_IDS: tuple[str, ...] = ("1", "6", "14")
-# The power phase records one measurement row per query per iteration.
-# The case passes this count explicitly rather than relying on a CLI default.
 SQLITE_CASE_ITERATIONS = 3
 VALUE_TOLERANCE = 1e-10
 
@@ -50,11 +33,10 @@ TPCH_TABLE_NAMES: tuple[str, ...] = tuple(table.name for table in TABLES)
 
 
 class RequiredCaseError(AssertionError):
-    """A required-case conservation, population, or value check failed."""
+    pass
 
 
 def check_inventory(node_ids: Iterable[str]) -> None:
-    """Require ``node_ids`` to equal ``REQUIRED_LOCAL_CASES`` exactly, with no duplicates."""
     observed = Counter(node_ids)
     expected = Counter(REQUIRED_LOCAL_CASES)
     duplicates = sorted(node for node, count in observed.items() if count > 1)
@@ -67,11 +49,6 @@ def check_inventory(node_ids: Iterable[str]) -> None:
 
 
 def check_collected(collected: Iterable[str]) -> None:
-    """Require every required case to be a node ID that pytest actually collects.
-
-    The inventory is a list of strings, so on its own it cannot notice that a matrix
-    case was renamed, removed, or given a different parameter ID.
-    """
     present = set(collected)
     missing = sorted(node for node in REQUIRED_LOCAL_CASES if node not in present)
     if missing:
@@ -82,16 +59,10 @@ def expected_measurement_multiset(
     query_ids: Sequence[str] = SQLITE_CASE_QUERY_IDS,
     iterations: int = SQLITE_CASE_ITERATIONS,
 ) -> Counter[str]:
-    """Return the exact successful measurement-ID multiset for a power run."""
     return Counter({str(query_id): iterations for query_id in query_ids})
 
 
 def check_measurement_multiset(queries: Iterable[Mapping[str, Any]], expected: Counter[str]) -> None:
-    """Require the successful measurement rows to match ``expected`` exactly.
-
-    Any non-SUCCESS measurement row is an error on its own, so a failure cannot
-    hide behind a retry that happens to restore the count.
-    """
     measured = [q for q in queries if q.get("run_type") == "measurement"]
     failed = [str(q.get("id")) for q in measured if q.get("status") != "SUCCESS"]
     if failed:
@@ -105,7 +76,6 @@ def check_measurement_multiset(queries: Iterable[Mapping[str, Any]], expected: C
 
 
 def check_tables_populated(row_counts: Mapping[str, int], tables: Sequence[str] = TPCH_TABLE_NAMES) -> None:
-    """Require every authoritative table to be present with a positive row count."""
     missing = sorted(set(tables) - set(row_counts))
     empty = sorted(name for name in tables if name in row_counts and int(row_counts[name]) <= 0)
     if missing or empty:
@@ -118,11 +88,6 @@ def check_rows_match(
     query_id: str,
     tolerance: float = VALUE_TOLERANCE,
 ) -> None:
-    """Compare full result rows with the TPC-Havoc ``ResultValidator``.
-
-    An empty reference proves nothing, so it is rejected. Row-count and value
-    mismatches are re-raised as ``RequiredCaseError``.
-    """
     if not reference_rows:
         raise RequiredCaseError(f"Q{query_id}: reference result is empty; value proof is vacuous")
     validator = ResultValidator(tolerance=tolerance)

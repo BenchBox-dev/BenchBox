@@ -1,5 +1,3 @@
-"""Unit tests for the core validation service."""
-
 from unittest.mock import Mock
 
 import pytest

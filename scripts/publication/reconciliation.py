@@ -1,38 +1,4 @@
 #!/usr/bin/env python3
-"""Desired-Built-Deployed-Observed reconciliation and drift detector (A11 w1).
-
-Performs 4-way reconciliation across publication lifecycle states:
-1. Desired: Publication manifest pinning target generation, source commit, and artifacts.
-2. Built: Immutable assembly receipt with artifact digests and provenance.
-3. Deployed: Hosting provider deployment acknowledgement receipt.
-4. Observed: External attested live-observation receipt with public route probes.
-
-This tool never fabricates any of the four states. Every state must be supplied
-as a real input file. When a required input is absent, malformed, or collapses
-onto another state, the run fails closed (exit 1 or 2) and never reports a
-reconciled result. Per ``docs/operations/independent-publication-contract.md``
-lines 22-25, a green run of this canary does not prove live publication; it only
-proves that the four supplied receipts agree.
-
-Detects and classifies drift:
-- MANIFEST_DRIFT: manifest digests, source commits, or build closures mismatch.
-- ARTIFACT_DRIFT: manifest-required artifacts missing from the build, unexpected
-  extra artifacts, or built/observed checksums differ from manifest definitions.
-- GENERATION_DRIFT: deployed or observed generation lags or mismatches desired.
-- STALE_RECEIPT: live observation receipt is missing, undated, future-dated, or
-  exceeds max age.
-- RECEIPT_INCOMPLETE: the live receipt omits a field the contract mandates
-  (schema version, receipt ID, target, manifest digest, both source SHAs,
-  artifact identity, required route set with per-route status, nonce, freshness
-  window, attestor identity, or signature).
-- MISSING_OBSERVATION: no live-observation receipt or no public route probes.
-
-Exit codes:
-  0 - Fully reconciled, zero drift detected, all four real states supplied.
-  1 - Drift or reconciliation violation detected.
-  2 - Configuration, file reading, or argument error (including any missing
-      required input).
-"""
 
 from __future__ import annotations
 
@@ -57,7 +23,6 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_BASE_URL = "https://benchbox.dev"
 DEFAULT_MAX_AGE_HOURS = 24.0
 DEFAULT_TIMEOUT_SECONDS = 15.0
-# Clock-skew tolerance for future-dated receipts before it counts as a violation.
 FUTURE_SKEW_SECONDS = 300.0
 
 DEFAULT_PROBE_PATHS = (
@@ -67,19 +32,13 @@ DEFAULT_PROBE_PATHS = (
     "/results/data/results.duckdb",
 )
 
-# Receipt file names expected inside --receipts-dir. These are documented in
-# docs/operations/independent-publication-contract.md ("Reconciliation inputs").
 ASSEMBLY_RECEIPT_NAME = "assembly-receipt.json"
 DEPLOYMENT_RECEIPT_NAME = "deployment-receipt.json"
 LIVE_RECEIPT_NAME = "live-receipt.json"
 
-# This is a public verification key. The corresponding private key is held
-# only by the GitHub Actions secret documented in the operations contract.
 DEFAULT_ATTESTOR_PUBLIC_KEY = REPO_ROOT / "docs/operations/publication-attestor-public-key.pem"
 ATTESTOR_SIGNATURE_ALGORITHM = "ed25519"
 
-# Fields the contract (independent-publication-contract.md, "Required live
-# receipt fields") mandates on an attested live-observation receipt.
 REQUIRED_RECEIPT_FIELDS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("schema version", ("schema_version", "schemaVersion")),
     ("receipt ID", ("receipt_id", "id")),
@@ -101,8 +60,6 @@ REQUIRED_RECEIPT_FIELDS: tuple[tuple[str, tuple[str, ...]], ...] = (
 
 @dataclass(frozen=True)
 class DriftFinding:
-    """Individual drift finding with classification and expected vs actual values."""
-
     drift_type: str
     description: str
     expected: Any = None
@@ -121,8 +78,6 @@ class DriftFinding:
 
 @dataclass
 class EndpointObservation:
-    """External probe result for a publication route."""
-
     path: str
     url: str
     status_code: int = 0
@@ -137,8 +92,6 @@ class EndpointObservation:
 
 @dataclass
 class ReconciliationReport:
-    """Structured 4-way reconciliation and drift report."""
-
     reconciled: bool = True
     desired_generation: int | None = None
     deployed_generation: int | None = None
@@ -168,11 +121,10 @@ class ReconciliationReport:
 
 
 class ReconciliationInputError(ValueError):
-    """Raised when the four reconciliation states are missing or not distinct."""
+    pass
 
 
 def parse_iso_timestamp(ts_str: str) -> datetime | None:
-    """Parse an ISO-8601 UTC timestamp string."""
     if not ts_str:
         return None
     cleaned = ts_str.strip().replace("Z", "+00:00")
@@ -186,7 +138,6 @@ def parse_iso_timestamp(ts_str: str) -> datetime | None:
 
 
 def _normalize_generation(value: Any) -> int | str | None:
-    """Coerce a generation value to int, tolerating string encodings."""
     if value is None:
         return None
     if isinstance(value, bool):
@@ -197,9 +148,6 @@ def _normalize_generation(value: Any) -> int | str | None:
         try:
             return int(value.strip())
         except ValueError:
-            # Workflow receipts deliberately use an opaque, validated label
-            # (for example publication-123-1).  Treat it as a real value, not
-            # as an absent generation that can silently evade comparison.
             return value.strip()
     return None
 
@@ -212,11 +160,6 @@ def _first_present(data: dict[str, Any], keys: tuple[str, ...]) -> Any:
 
 
 def canonical_live_receipt_payload(receipt: dict[str, Any]) -> bytes:
-    """Return the deterministic byte payload an attestor signs for a receipt.
-
-    Signatures never sign themselves. Both accepted signature field spellings
-    are excluded so aliases cannot change the verified payload.
-    """
     payload = dict(receipt)
     payload.pop("signature", None)
     payload.pop("attestor_signature", None)
@@ -224,14 +167,6 @@ def canonical_live_receipt_payload(receipt: dict[str, Any]) -> bytes:
 
 
 def receipt_targets_benchbox_dev(receipt: dict[str, Any]) -> bool:
-    """Return True if a live receipt's target resolves to the production site.
-
-    Receipts built by the legacy candidate-builder workflow record ``target``
-    as the plain string ``"benchbox.dev"``. Receipts built by the transaction
-    writer (``scripts/publication/transaction.py``) record it as the
-    structured ``{"environment", "repository", "url"}`` mapping instead.
-    Accept either form rather than favoring one schema over the other.
-    """
     target = receipt.get("target")
     if target == "benchbox.dev":
         return True
@@ -241,11 +176,6 @@ def receipt_targets_benchbox_dev(receipt: dict[str, Any]) -> bool:
 
 
 def verify_live_receipt_signature(receipt: dict[str, Any], public_key_path: Path | None = None) -> tuple[bool, str]:
-    """Verify an Ed25519 receipt signature with the repository public key.
-
-    ``openssl pkeyutl`` is available on GitHub-hosted runners and avoids adding
-    a cryptography dependency solely for this verification boundary.
-    """
     public_key_path = public_key_path or DEFAULT_ATTESTOR_PUBLIC_KEY
     signature = _first_present(receipt, ("signature", "attestor_signature"))
     if not isinstance(signature, str) or not signature.strip():
@@ -298,7 +228,6 @@ def probe_live_endpoint(
     path: str,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
 ) -> EndpointObservation:
-    """Probe an external HTTP endpoint and compute status, latency, and SHA-256."""
     url = urllib.parse.urljoin(base_url.rstrip("/") + "/", path.lstrip("/"))
     t0 = time.perf_counter()
     req = urllib.request.Request(
@@ -341,7 +270,6 @@ def probe_live_endpoint(
 
 
 def extract_artifact_digests(manifest_or_receipt: dict[str, Any]) -> dict[str, str]:
-    """Extract identity-scoped artifact and endpoint digest mappings."""
     digests: dict[str, str] = {}
 
     artifacts = manifest_or_receipt.get("artifacts")
@@ -379,11 +307,6 @@ def _check_generation_drift(
     dep_gen: int | None,
     obs_gen: int | None,
 ) -> list[DriftFinding]:
-    """Detect generation lag or mismatch across desired, deployed, and observed.
-
-    All three pairwise comparisons are made so a missing intermediate value
-    cannot mask a desired<->observed mismatch.
-    """
     drifts: list[DriftFinding] = []
     pairs = (
         ("desired", des_gen, "deployed", dep_gen),
@@ -411,7 +334,6 @@ def _check_manifest_drift(
     deployed: dict[str, Any],
     observed: dict[str, Any],
 ) -> list[DriftFinding]:
-    """Detect commit or build closure drift across all publication states."""
     drifts: list[DriftFinding] = []
     binding_fields = (
         ("target", ("target",)),
@@ -436,9 +358,6 @@ def _check_manifest_drift(
                         )
                     )
 
-    # Artifact identity is part of the binding, not merely descriptive
-    # assembly metadata.  Compare the complete identity wherever a state
-    # supplies it so crossed receipts cannot reconcile successfully.
     identity_fields = (
         ("artifact_name", "artifact identity name"),
         ("artifact_run_id", "artifact workflow run"),
@@ -495,7 +414,6 @@ def _check_state_binding_completeness(
     deployed: dict[str, Any],
     observed: dict[str, Any],
 ) -> list[DriftFinding]:
-    """Require every publication state to identify the manifest and artifact it represents."""
     shared = (
         ("target", ("target",), "MANIFEST_DRIFT"),
         ("manifest digest", ("manifest_digest", "manifest_sha256"), "MANIFEST_DRIFT"),
@@ -534,7 +452,6 @@ def _check_state_binding_completeness(
 def _check_state_vs_desired(
     desired_digests: dict[str, str], state_digests: dict[str, str], state_name: str
 ) -> list[DriftFinding]:
-    """Full set comparison of manifest vs one publication state's digests."""
     if not desired_digests:
         return []
     drifts: list[DriftFinding] = []
@@ -602,7 +519,6 @@ def _run_live_probes(
 
 
 def _observation_to_probe(pr: dict[str, Any]) -> tuple[EndpointObservation | None, DriftFinding | None]:
-    """Convert one receipt probe record to an observation, or a drift if it lacks status."""
     path = pr.get("path") or pr.get("route") or ""
     status_code = pr.get("status_code")
     ok_field = pr.get("ok")
@@ -631,7 +547,6 @@ def _observation_to_probe(pr: dict[str, Any]) -> tuple[EndpointObservation | Non
 def _check_observed_probes(
     observed: dict[str, Any] | None,
 ) -> tuple[list[DriftFinding], list[EndpointObservation]]:
-    """Non-live path: the receipt must carry real probe records; never synthesize a pass."""
     drifts: list[DriftFinding] = []
     probes: list[EndpointObservation] = []
 
@@ -676,7 +591,6 @@ def _check_observed_probes(
                 )
             )
 
-    # Partial route success fails closed (contract line 61-62).
     for required in DEFAULT_PROBE_PATHS:
         if required not in seen_paths:
             drifts.append(
@@ -699,7 +613,6 @@ def _check_artifact_drift(
     live: bool,
     observed: dict[str, Any] | None,
 ) -> tuple[list[DriftFinding], list[EndpointObservation]]:
-    """Detect checksum and endpoint response drift across built and observed targets."""
     drifts = _check_state_vs_desired(desired_digests, built_digests, "built")
     drifts.extend(_check_state_vs_desired(desired_digests, deployed_digests, "deployed"))
     if observed is not None:
@@ -716,7 +629,6 @@ def _check_artifact_drift(
 
 
 def _check_receipt_contract_fields(observed: dict[str, Any] | None) -> list[DriftFinding]:
-    """Verify the live receipt carries every contract-mandated field."""
     drifts: list[DriftFinding] = []
     if observed is None:
         drifts.append(
@@ -755,7 +667,6 @@ def _check_receipt_contract_fields(observed: dict[str, Any] | None) -> list[Drif
             )
         )
 
-    # Route-set completeness with per-route status.
     routes = observed.get("routes") or observed.get("probes")
     if isinstance(routes, list) and routes:
         for pr in routes:
@@ -789,7 +700,6 @@ def _check_receipt_freshness(
     max_age_hours: float | None,
     now: datetime,
 ) -> tuple[list[DriftFinding], float | None]:
-    """Verify live observation receipt freshness and age (fails closed)."""
     drifts: list[DriftFinding] = []
     receipt_age_hours: float | None = None
 
@@ -866,7 +776,6 @@ def _check_receipt_freshness(
 def validate_live_receipt_contract(
     receipt: dict[str, Any], *, now: datetime | None = None, max_age_hours: float | None = DEFAULT_MAX_AGE_HOURS
 ) -> list[DriftFinding]:
-    """Validate the complete signed live-receipt contract and freshness boundary."""
     findings = _check_receipt_contract_fields(receipt)
     probe_findings, _ = _check_observed_probes(receipt)
     freshness, _ = _check_receipt_freshness(receipt, True, max_age_hours, now or datetime.now(timezone.utc))
@@ -883,13 +792,6 @@ def reconcile_states(
     max_age_hours: float = DEFAULT_MAX_AGE_HOURS,
     now_dt: datetime | None = None,
 ) -> ReconciliationReport:
-    """Perform 4-way reconciliation across desired, built, deployed, and observed states.
-
-    ``desired`` is required. ``built``, ``deployed``, and ``observed`` may be
-    ``None`` (each absence is recorded as fail-closed drift), but when supplied
-    they must be *distinct* objects from ``desired`` and from each other: a
-    reconciliation that compares a state against itself proves nothing.
-    """
     if not isinstance(desired, dict):
         raise ReconciliationInputError("desired manifest must be a JSON object")
 
@@ -973,7 +875,6 @@ def reconcile_states(
 
 
 def load_json_file(path: Path) -> dict[str, Any]:
-    """Load a JSON object from disk, raising on missing file or non-object payload."""
     if not path.is_file():
         raise FileNotFoundError(f"File not found: {path}")
     with path.open("r", encoding="utf-8") as f:

@@ -26,13 +26,10 @@ List all database platforms with their current status and availability.
 **Usage Examples:**
 
 ```bash
-# List enabled and available platforms
 benchbox platforms list
 
-# Show all platforms including unavailable
 benchbox platforms list --all
 
-# Simple list format
 benchbox platforms list --format simple
 ```
 
@@ -43,10 +40,8 @@ Display detailed status information for platforms, including library versions an
 **Usage:**
 
 ```bash
-# Show status for all platforms
 benchbox platforms status
 
-# Show detailed status for specific platform
 benchbox platforms status duckdb
 benchbox platforms status databricks
 ```
@@ -61,10 +56,8 @@ Enable a platform for use in benchmark execution.
 **Usage Examples:**
 
 ```bash
-# Enable a platform
 benchbox platforms enable clickhouse
 
-# Force enable (skip dependency check)
 benchbox platforms enable snowflake --force
 ```
 
@@ -75,7 +68,6 @@ Disable a platform to prevent its use in benchmarks.
 **Usage:**
 
 ```bash
-# Disable a platform
 benchbox platforms disable sqlite
 ```
 
@@ -89,10 +81,8 @@ Get step-by-step installation guidance for platform dependencies.
 **Usage Examples:**
 
 ```bash
-# Get installation guide for platform
 benchbox platforms install clickhouse
 
-# Show only installation commands
 benchbox platforms install databricks --dry-run
 ```
 
@@ -106,13 +96,10 @@ Check platform availability and configuration status. Useful for CI/CD validatio
 **Usage Examples:**
 
 ```bash
-# Check all platforms
 benchbox platforms check
 
-# Check only enabled platforms
 benchbox platforms check --enabled-only
 
-# Check specific platforms
 benchbox platforms check duckdb databricks bigquery
 ```
 
@@ -130,10 +117,8 @@ Launch an interactive wizard to configure platforms. Guides you through enabling
 **Usage Examples:**
 
 ```bash
-# Interactive platform setup
 benchbox platforms setup
 
-# Non-interactive: auto-enable all available platforms
 benchbox platforms setup --non-interactive
 ```
 
@@ -142,51 +127,51 @@ benchbox platforms setup --non-interactive
 ### First-Time Setup
 
 ```bash
-# 1. Check what's available
 benchbox platforms list
 
-# 2. Check detailed status
 benchbox platforms status
 
-# 3. Install missing dependencies
 benchbox platforms install clickhouse
 
-# 4. Enable platforms you want to use
 benchbox platforms enable clickhouse
 benchbox platforms enable duckdb
 
-# 5. Verify everything is ready
 benchbox platforms check --enabled-only
 ```
+
+In order, these commands:
+
+1. Check what is available.
+2. Check detailed status.
+3. Install missing dependencies.
+4. Enable the platforms you want to use.
+5. Verify that everything is ready.
 
 ### Cloud Platform Setup
 
 ```bash
-# 1. Enable the cloud platform
 benchbox platforms enable databricks
 
-# 2. Configure credentials (separate command)
 benchbox setup --platform databricks
 
-# 3. Verify availability
 benchbox platforms status databricks
 ```
+
+In order, these commands enable the cloud platform, configure credentials (a separate command) and verify availability.
 
 ### Troubleshooting
 
 ```bash
-# Check if platform dependencies are installed
 benchbox platforms status <platform>
 
-# Get installation guidance
 benchbox platforms install <platform>
 
-# Re-enable platform after installing dependencies
 benchbox platforms enable <platform>
 
-# Verify platform is working
 benchbox platforms check <platform>
 ```
+
+In order, these commands check whether the platform dependencies are installed, get installation guidance, re-enable the platform after installing dependencies and verify that the platform works.
 
 ## Platform Categories
 

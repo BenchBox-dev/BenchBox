@@ -4,7 +4,6 @@ interface EmptyStateProps {
   title: ComponentChildren;
   description?: ComponentChildren;
   action?: ComponentChildren;
-  /** When true, render in compact form (single line + action). */
   compact?: boolean;
   class?: string;
 }

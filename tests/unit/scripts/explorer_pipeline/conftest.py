@@ -1,5 +1,3 @@
-"""Shared fixtures for explorer pipeline tests."""
-
 from __future__ import annotations
 
 import copy
@@ -7,11 +5,6 @@ import json
 from pathlib import Path
 
 import pytest
-
-# ---------------------------------------------------------------------------
-# Minimal schema-v2 bundle that passes SchemaV2Validator.
-# Field names follow the actual JSON keys written by build_result_payload().
-# ---------------------------------------------------------------------------
 
 MINIMAL_BUNDLE: dict = {
     "version": "2.1",
@@ -157,7 +150,7 @@ def throughput_bundle(
 
 @pytest.fixture()
 def bundle_file(tmp_path: Path) -> Path:
-    """Write a minimal valid schema-v2 bundle to a temp file and return its path."""
+
     bundles_dir = tmp_path / "bundles"
     bundles_dir.mkdir()
     bundle_path = bundles_dir / "tpch_duckdb_sf0.1_20260315.json"
@@ -167,5 +160,5 @@ def bundle_file(tmp_path: Path) -> Path:
 
 @pytest.fixture()
 def data_dir(bundle_file: Path) -> Path:
-    """Return the data dir containing the bundles/ sub-directory."""
+
     return bundle_file.parent.parent

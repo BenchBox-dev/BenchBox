@@ -1,9 +1,3 @@
-"""Unit tests enforcing BenchBox version alignment and reporting.
-
-These tests ensure the published version string stays consistent across
-package metadata and CLI-facing diagnostics.
-"""
-
 from __future__ import annotations
 
 import json
@@ -30,7 +24,6 @@ PYPROJECT_PATH = PROJECT_ROOT / "pyproject.toml"
 
 
 def test_pyproject_version_matches_package() -> None:
-    """The version in pyproject.toml must match benchbox.__version__."""
 
     with PYPROJECT_PATH.open("rb") as handle:
         data = tomllib.load(handle)
@@ -40,19 +33,16 @@ def test_pyproject_version_matches_package() -> None:
 
 
 def test_format_version_report_includes_release_tag_and_docs() -> None:
-    """The CLI version report should expose release and documentation markers."""
 
     report = format_version_report()
     assert f"BenchBox Version: {benchbox.__version__}" in report
     assert f"Release Tag: v{benchbox.__version__}" in report
     assert "README.md Version:" in report
-    # Path separators differ between platforms - check for path components
     assert "docs" in report and "README.md Version:" in report
     assert "benchbox" in report and "VERSION_MANAGEMENT.md Version:" in report
 
 
 def test_format_version_report_supports_json_payload() -> None:
-    """JSON formatted report should include structured metadata."""
 
     report = format_version_report(as_json=True)
     payload = json.loads(report)
@@ -63,7 +53,6 @@ def test_format_version_report_supports_json_payload() -> None:
 
 
 def test_check_version_consistency_reports_clean_state() -> None:
-    """The consistency check should succeed when markers are aligned."""
 
     result = check_version_consistency()
     assert result.consistent, f"Expected consistent versions, got: {result.message} ({result.sources})"
@@ -73,7 +62,6 @@ def test_check_version_consistency_reports_clean_state() -> None:
 
 
 def test_check_version_consistency_normalizes_versions() -> None:
-    """Normalized sources should strip leading 'v' and punctuation."""
 
     result = check_version_consistency()
     values = {src: val for src, val in result.normalized_sources.items() if val}

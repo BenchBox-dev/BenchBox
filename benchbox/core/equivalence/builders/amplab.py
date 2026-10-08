@@ -1,5 +1,3 @@
-"""AMPLab cross-surface gate builder."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,7 +6,6 @@ from benchbox.core.equivalence.builders.base import CrossSurfaceData, _load_duck
 
 
 def build_amplab_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
-    """Generate AMPLab data, load it into in-memory DuckDB, and wire both surfaces."""
     from benchbox.core.amplab.benchmark import AMPLabBenchmark
     from benchbox.core.amplab.dataframe_queries import AMPLAB_DATAFRAME_QUERIES
     from benchbox.core.amplab.generator import AMPLabDataGenerator

@@ -17,13 +17,11 @@ Firebolt is a high-performance cloud analytics database with a vectorized query 
 
 ## Deployment Modes
 
-Firebolt supports two deployment modes, selectable via the colon syntax:
+Firebolt supports two deployment modes, selectable via the colon syntax. The first command uses Firebolt Core (local Docker, the default), and the second uses Firebolt Cloud (managed service):
 
 ```bash
-# Firebolt Core (local Docker, default)
 benchbox run --platform firebolt:core --benchmark tpch --scale 0.1
 
-# Firebolt Cloud (managed service)
 benchbox run --platform firebolt:cloud --benchmark tpch --scale 1.0
 ```
 
@@ -32,7 +30,6 @@ benchbox run --platform firebolt:cloud --benchmark tpch --scale 1.0
 Free, self-hosted version running in Docker with the same query engine as cloud:
 
 ```bash
-# Start Firebolt Core
 docker run -i --rm \
   --ulimit memlock=8589934592:8589934592 \
   --security-opt seccomp=unconfined \
@@ -57,10 +54,8 @@ Managed cloud service requiring OAuth authentication:
 ## Installation
 
 ```bash
-# Install Firebolt SDK
 pip install firebolt-sdk
 
-# Or via BenchBox extras
 pip install "benchbox[firebolt]"
 ```
 
@@ -76,21 +71,19 @@ benchbox run --platform firebolt --benchmark tpch --scale 0.1 \
 
 ### Firebolt Cloud
 
+Set credentials through environment variables (recommended). The `SERVICE_ACCOUNT_ID` and `SERVICE_ACCOUNT_SECRET` names are also supported as alternatives. Then run with the deployment mode syntax, or pass the credentials inline as CLI options (the last command):
+
 ```bash
-# Environment variables (recommended)
 export FIREBOLT_CLIENT_ID=your_client_id
 export FIREBOLT_CLIENT_SECRET=your_client_secret
 export FIREBOLT_ACCOUNT_NAME=your_account_name
 export FIREBOLT_ENGINE_NAME=your_engine_name
 
-# Alternative environment variable names (also supported)
 export SERVICE_ACCOUNT_ID=your_client_id
 export SERVICE_ACCOUNT_SECRET=your_client_secret
 
-# Run with deployment mode syntax
 benchbox run --platform firebolt:cloud --benchmark tpch --scale 1.0
 
-# Or with inline CLI options
 benchbox run --platform firebolt:cloud --benchmark tpch --scale 1.0 \
   --platform-option client_id=$FIREBOLT_CLIENT_ID \
   --platform-option client_secret=$FIREBOLT_CLIENT_SECRET \
@@ -115,11 +108,11 @@ benchbox run --platform firebolt:cloud --benchmark tpch --scale 1.0 \
 
 ### Firebolt Core
 
-```bash
-# Start Core container first
-docker run -d -p 3473:3473 ghcr.io/firebolt-db/firebolt-core:preview-rc
+Start the Core container first, then run the benchmark:
 
-# Run benchmark
+```bash
+docker run -d -p 127.0.0.1:3473:3473 ghcr.io/firebolt-db/firebolt-core:preview-rc
+
 benchbox run --platform firebolt --benchmark tpch --scale 0.1 \
   --platform-option url=http://localhost:3473
 ```
@@ -130,13 +123,11 @@ benchbox run --platform firebolt --benchmark tpch --scale 0.1 \
 from benchbox import TPCH
 from benchbox.platforms.firebolt import FireboltAdapter
 
-# Firebolt Core adapter
 adapter = FireboltAdapter(
     url="http://localhost:3473",
     database="benchbox",
 )
 
-# Load and run benchmark
 benchmark = TPCH(scale_factor=0.1)
 benchmark.generate_data()
 adapter.load_benchmark(benchmark)
@@ -149,7 +140,6 @@ results = adapter.run_benchmark(benchmark)
 from benchbox import TPCH
 from benchbox.platforms.firebolt import FireboltAdapter
 
-# Firebolt Cloud adapter
 adapter = FireboltAdapter(
     client_id="your_client_id",
     client_secret="your_client_secret",
@@ -158,7 +148,6 @@ adapter = FireboltAdapter(
     database="benchmarks",
 )
 
-# Load and run benchmark
 benchmark = TPCH(scale_factor=1.0)
 adapter.load_benchmark(benchmark)
 results = adapter.run_benchmark(benchmark)
@@ -171,7 +160,6 @@ results = adapter.run_benchmark(benchmark)
 Firebolt automatically creates sparse indexes for efficient data skipping:
 
 ```sql
--- Create table with primary index
 CREATE TABLE lineitem (
     l_orderkey BIGINT,
     l_partkey BIGINT,
@@ -206,7 +194,6 @@ CREATE AGGREGATING INDEX agg_revenue ON lineitem (
 ### Development (Core)
 
 ```bash
-# Quick local testing
 benchbox run --platform firebolt --benchmark tpch --scale 0.1 \
   --platform-option url=http://localhost:3473
 ```
@@ -214,7 +201,6 @@ benchbox run --platform firebolt --benchmark tpch --scale 0.1 \
 ### Production (Cloud)
 
 ```bash
-# Production benchmark
 benchbox run --platform firebolt --benchmark tpch --scale 10.0 \
   --platform-option engine_name=large_engine \
   --tuning tuned
@@ -225,20 +211,16 @@ benchbox run --platform firebolt --benchmark tpch --scale 10.0 \
 ### Core Connection Refused
 
 ```bash
-# Verify container is running
 docker ps | grep firebolt
 
-# Check logs
 docker logs <container_id>
 
-# Test connection
 curl http://localhost:3473/health
 ```
 
 ### Cloud Authentication Failed
 
 ```bash
-# Verify credentials
 curl -X POST "https://api.firebolt.io/oauth/token" \
   -d "client_id=$FIREBOLT_CLIENT_ID" \
   -d "client_secret=$FIREBOLT_CLIENT_SECRET" \
@@ -247,10 +229,7 @@ curl -X POST "https://api.firebolt.io/oauth/token" \
 
 ### Engine Not Running
 
-```bash
-# Start engine via API or console
-# Engines auto-stop after inactivity
-```
+Start the engine through the API or the Firebolt console. Engines auto-stop after inactivity.
 
 ## Related Documentation
 

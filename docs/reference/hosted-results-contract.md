@@ -1,8 +1,6 @@
 # Hosted Results Contract and Governance Model
 
 **Created:** 2026-04-01
-**Originating TODO:** `define-hosted-results-contract-and-governance-model`
-**Authoritative foundation:** `docs/development/benchbox-results-platform-strategy.md`
 
 ## Overview
 
@@ -82,12 +80,8 @@ The `public_result_id` is the only identifier that is stable across all phases
 and safe to use in external links. CLI tools and frontend must use this identifier
 for any URL or reference intended to be shared or bookmarked.
 
-**Pre-deploy alias note:** Before the first public Explorer deploy, no
-alias/redirect table is required for format or corpus rotations (documentation
-previously omitted `sha8`, but code has always minted it; no external product
-links used the wrong format). After first public deploy, any id-changing
-re-derivation of already-public published bytes needs an explicit
-compatibility mechanism — see the ADR.
+Any change that re-derives the ID of an already-public result needs an explicit
+alias or redirect so existing links keep resolving.
 
 #### Identifier Summary
 
@@ -101,9 +95,7 @@ compatibility mechanism — see the ADR.
 
 Submission processing, archive acceptance, presentation policy, and observed
 deployment are separate state dimensions. No single `published` flag determines
-whether a result is accepted, visible, ranking-eligible, or live. The normative
-authority is
-[`adr-independent-publication-authorities.md`](../development/adr/adr-independent-publication-authorities.md).
+whether a result is accepted, visible, ranking-eligible, or live.
 
 #### Status Definitions
 
@@ -193,8 +185,7 @@ Six visibility states control who can see a result and whether it appears in
 search indexes or compare views.
 
 Visibility is orthogonal to archive acceptance, provenance trust, withdrawal,
-ranking eligibility, and deployment state. Changing visibility does not create
-a second accepted-corpus authority on `develop`.
+ranking eligibility, and deployment state.
 
 | State | Who can see it | Indexed | Phase available |
 |---|---|---|---|
@@ -224,12 +215,9 @@ community contributor). The vendor has a direct interest in the outcome, so the
 result carries a distinct "Vendor Supplied" label (see Section 2.2). Unlike
 `public-self-reported`, vendor-reported results are ranking-eligible (see
 Section 3.4): the conflict of interest is disclosed via the badge rather than by
-excluding the result from ranked tables. The vendor label is applied under
-maintainer control and cannot be self-asserted through the community submission
-path: it is derived from a bundle living under `results-data/bundles/vendor/`,
-and the `published-results` submission CI (`validate-submission.yml`) rejects any
-pull request from a non-maintainer that adds under that path. The manifest
-`result_source` field is an advisory consistency check on top of that gate.
+excluding the result from ranked tables. The vendor label is applied by
+maintainers and cannot be self-asserted: vendor-reported results are accepted
+only from maintainers.
 
 **`public-curated`** - Fully public and indexed. Results generated and
 committed by BenchBox maintainers carry this visibility. This is the only
@@ -459,7 +447,7 @@ only the specific field value is hidden.
 
 | State or asset | Retention |
 |---|---|
-| Accepted source bundle | Retained indefinitely by default under the A0 preservation floor. No automatic expiry. |
+| Accepted source bundle | Retained indefinitely by default. No automatic expiry. |
 | `pending` / `validated` | Retained for 90 days from submission date, then purged if not promoted. |
 | `rejected` | Retained for 30 days from rejection date, then purged. |
 | `withdrawn` presentation | For a previously public result, its tombstone is retained indefinitely. For a never-public private result, no public tombstone exists. Non-sensitive audit evidence is retained indefinitely. Accepted source bytes remain preserved during the A0 freeze. |
@@ -493,8 +481,8 @@ no deadline. Withdrawal is available before and after publication.
    that no public-ID mapping, public route, or public index membership exists; only then is
    presentation recorded as `withdrawn` for the submitter. Because no public URL ever
    existed, no public tombstone is created.
-3. Derived public read models suppress the result. Accepted source bytes remain under the
-   A0 preservation floor unless a separately approved erasure incident supersedes it.
+3. Derived public read models suppress the result. Accepted source bytes are kept unless
+   a separately approved erasure request requires their deletion.
 4. For a result that had a public ID, a **tombstone** remains in the separate lookup
    registry indefinitely. The tombstone contains only: `public_result_id`,
    `status: withdrawn`, and `withdrawn_at` (date). All other fields are redacted. The
@@ -540,10 +528,6 @@ Downstream consumers are stricter than public ingest:
 | Runtime loader | `"2.0"`, `"2.1"`, `"2.2"` | Rejects with the runtime loader schema policy and asks for re-export. |
 | Explorer static pipeline | `"2.0"`, `"2.1"`, `"2.2"` | Rejects before manifest/detail projection to avoid silent field drops. |
 | Normalizer | `"2.0"`, `"2.1"`, `"2.2"` as v2; other shapes as legacy | Uses best-effort legacy extraction for v1.x and unknown shapes. |
-
-Any change to accepted versions or field semantics must update
-`benchbox.core.results.schema_policy`, this contract, and the public contract
-map in the same PR.
 
 ##### Allowed nested metadata blocks
 

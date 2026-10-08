@@ -1,38 +1,9 @@
-"""TPC-DI FinWire data processing system.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module processes FinWire data files containing financial market information
-in fixed-width format. FinWire data includes:
+# TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-DI specification.
 
-1. Company Fundamental Data (CMP records):
-   - Company earnings, market capitalization
-   - Industry classifications and S&P ratings
-   - Financial metrics and ratios
-
-2. Security Master Data (SEC records):
-   - Symbol changes and corporate actions
-   - Stock splits and dividend information
-   - Security status changes
-
-3. Daily Market Data (FIN records):
-   - OHLC (Open, High, Low, Close) prices
-   - Trading volume and value
-   - Market indicators
-
-4. Financial News (NEWS records):
-   - News headlines and summaries
-   - Analyst recommendations and ratings
-   - Market sentiment indicators
-
-The FinWire format uses fixed-width records with specific layouts
-for each record type, requiring careful parsing and validation.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DI specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import logging
 from collections.abc import Iterator
@@ -47,8 +18,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class FinWireRecord:
-    """Base class for FinWire record types."""
-
     record_type: str
     company_id: Optional[str] = None
     symbol: Optional[str] = None
@@ -56,15 +25,12 @@ class FinWireRecord:
     raw_data: str = ""
 
     def __post_init__(self):
-        """Validate record after initialization."""
         if not self.record_type:
             raise ValueError("Record type is required")
 
 
 @dataclass
 class CompanyFundamentalRecord(FinWireRecord):
-    """Company fundamental data record (CMP type)."""
-
     company_name: Optional[str] = None
     industry: Optional[str] = None
     sp_rating: Optional[str] = None
@@ -78,19 +44,16 @@ class CompanyFundamentalRecord(FinWireRecord):
     ceo: Optional[str] = None
     description: Optional[str] = None
 
-    # Financial metrics
     market_cap: Optional[Decimal] = None
     revenue: Optional[Decimal] = None
     net_income: Optional[Decimal] = None
-    eps: Optional[Decimal] = None  # Earnings per share
+    eps: Optional[Decimal] = None
     pe_ratio: Optional[Decimal] = None
     dividend_yield: Optional[Decimal] = None
 
 
 @dataclass
 class SecurityMasterRecord(FinWireRecord):
-    """Security master data record (SEC type)."""
-
     security_name: Optional[str] = None
     exchange: Optional[str] = None
     is_active: bool = True
@@ -105,8 +68,6 @@ class SecurityMasterRecord(FinWireRecord):
 
 @dataclass
 class DailyMarketRecord(FinWireRecord):
-    """Daily market data record (FIN type)."""
-
     open_price: Optional[Decimal] = None
     high_price: Optional[Decimal] = None
     low_price: Optional[Decimal] = None
@@ -114,7 +75,6 @@ class DailyMarketRecord(FinWireRecord):
     volume: Optional[int] = None
     adj_close_price: Optional[Decimal] = None
 
-    # Market indicators
     fifty_two_week_high: Optional[Decimal] = None
     fifty_two_week_low: Optional[Decimal] = None
     pe_ratio: Optional[Decimal] = None
@@ -123,8 +83,6 @@ class DailyMarketRecord(FinWireRecord):
 
 @dataclass
 class NewsRecord(FinWireRecord):
-    """Financial news record (NEWS type)."""
-
     headline: Optional[str] = None
     summary: Optional[str] = None
     source: Optional[str] = None
@@ -133,18 +91,15 @@ class NewsRecord(FinWireRecord):
 
 
 class FinWireParser:
-    """Parser for FinWire fixed-width format files."""
-
-    # Record layout specifications (field_name: (start_pos, length, type))
     CMP_LAYOUT = {
-        "pts": (0, 15, str),  # PTS (15 characters)
-        "rec_type": (15, 3, str),  # REC (3 characters)
+        "pts": (0, 15, str),
+        "rec_type": (15, 3, str),
         "company_name": (18, 60, str),
         "cik": (78, 10, str),
         "status": (88, 4, str),
         "industry_id": (92, 2, str),
         "sp_rating": (94, 4, str),
-        "founding_date": (98, 8, str),  # YYYYMMDD format
+        "founding_date": (98, 8, str),
         "addr_line1": (106, 80, str),
         "addr_line2": (186, 80, str),
         "postal_code": (266, 12, str),
@@ -164,7 +119,7 @@ class FinWireParser:
         "name": (40, 70, str),
         "ex_id": (110, 6, str),
         "sh_out": (116, 13, int),
-        "first_trade_date": (129, 8, str),  # YYYYMMDD
+        "first_trade_date": (129, 8, str),
         "first_trade_exchg": (137, 8, str),
         "dividend": (145, 12, Decimal),
         "co_name_or_cik": (157, 60, str),
@@ -175,8 +130,8 @@ class FinWireParser:
         "rec_type": (15, 3, str),
         "year": (18, 4, int),
         "quarter": (22, 1, int),
-        "qtrsartdate": (23, 8, str),  # YYYYMMDD
-        "postdate": (31, 8, str),  # YYYYMMDD
+        "qtrsartdate": (23, 8, str),
+        "postdate": (31, 8, str),
         "revenue": (39, 17, Decimal),
         "earnings": (56, 17, Decimal),
         "eps": (73, 12, Decimal),
@@ -191,19 +146,10 @@ class FinWireParser:
     }
 
     def __init__(self):
-        """Initialize the FinWire parser."""
         self.current_line_number = 0
         self.errors: list[str] = []
 
     def parse_file(self, file_path: Path) -> Iterator[FinWireRecord]:
-        """Parse a FinWire format file and yield records.
-
-        Args:
-            file_path: Path to the FinWire format file
-
-        Yields:
-            FinWireRecord objects for each valid record
-        """
         logger.info(f"Parsing FinWire file: {file_path}")
 
         try:
@@ -212,7 +158,7 @@ class FinWireParser:
                     self.current_line_number = line_number
                     line = line.rstrip("\n\r")
 
-                    if len(line) < 18:  # Minimum length for record type detection
+                    if len(line) < 18:
                         self.errors.append(f"Line {line_number}: Line too short")
                         continue
 
@@ -242,11 +188,9 @@ class FinWireParser:
             raise
 
     def _parse_cmp_record(self, line: str) -> CompanyFundamentalRecord:
-        """Parse a company fundamental record (CMP)."""
         try:
             fields = self._extract_fields(line, self.CMP_LAYOUT)
 
-            # Parse founding date
             founding_date = None
             founding_date_str = fields.get("founding_date", "").strip()
             if founding_date_str:
@@ -274,14 +218,11 @@ class FinWireParser:
             )
         except Exception as e:
             logger.error(f"Error parsing CMP record: {str(e)}")
-            # Return minimal record to allow processing to continue
             return CompanyFundamentalRecord(record_type="CMP", company_name="UNKNOWN", raw_data=line)
 
     def _parse_sec_record(self, line: str) -> SecurityMasterRecord:
-        """Parse a security master record (SEC)."""
         fields = self._extract_fields(line, self.SEC_LAYOUT)
 
-        # Parse first trade date
         first_trade_date = None
         if fields["first_trade_date"].strip():
             try:
@@ -289,7 +230,6 @@ class FinWireParser:
             except ValueError:
                 logger.warning(f"Invalid first trade date: {fields['first_trade_date']}")
 
-        # Parse dividend
         dividend = None
         if fields["dividend"] is not None and str(fields["dividend"]).strip():
             try:
@@ -314,10 +254,8 @@ class FinWireParser:
         )
 
     def _parse_fin_record(self, line: str) -> DailyMarketRecord:
-        """Parse a daily market/financial record (FIN)."""
         fields = self._extract_fields(line, self.FIN_LAYOUT)
 
-        # Parse quarter start date
         record_date = None
         if fields["qtrsartdate"].strip():
             try:
@@ -329,19 +267,15 @@ class FinWireParser:
             record_type="FIN",
             company_id=fields["co_name_or_cik"].strip(),
             record_date=record_date,
-            # Note: FIN records contain quarterly data, not daily OHLC
-            # The TPC-DI spec uses FIN for financial reports, not market data
             raw_data=line,
         )
 
     def _extract_fields(self, line: str, layout: dict[str, tuple[int, int, type]]) -> dict[str, Any]:
-        """Extract fields from a fixed-width line using the specified layout."""
         fields = {}
 
         for field_name, (start_pos, length, field_type) in layout.items():
             end_pos = start_pos + length
 
-            # Ensure line is long enough
             if len(line) < end_pos:
                 if field_type in (int, Decimal):
                     fields[field_name] = None
@@ -351,7 +285,6 @@ class FinWireParser:
 
             raw_value = line[start_pos:end_pos]
 
-            # Type conversion
             if field_type == str:
                 fields[field_name] = raw_value
             elif field_type == int:
@@ -371,30 +304,12 @@ class FinWireParser:
 
 
 class FinWireProcessor:
-    """High-level processor for FinWire data integration."""
-
     def __init__(self, connection: Any = None, dialect: str = "duckdb"):
-        """Initialize the FinWire processor.
-
-        Args:
-            connection: Database connection object (optional for testing)
-            dialect: SQL dialect for query generation
-        """
         self.connection = connection
         self.dialect = dialect
         self.parser = FinWireParser()
 
     def process_finwire_file(self, file_path: Path, batch_id: int = 1, validate_data: bool = True) -> dict[str, Any]:
-        """Process a FinWire file and load data into warehouse tables.
-
-        Args:
-            file_path: Path to the FinWire format file
-            batch_id: ETL batch identifier
-            validate_data: Whether to perform data quality validation
-
-        Returns:
-            Dictionary containing processing results and statistics
-        """
         logger.info(f"Processing FinWire file: {file_path}")
 
         start_time = datetime.now()
@@ -408,7 +323,6 @@ class FinWireProcessor:
         }
 
         try:
-            # Process records by type
             for record in self.parser.parse_file(file_path):
                 stats["records_processed"] += 1
 
@@ -422,7 +336,6 @@ class FinWireProcessor:
                     self._process_financial_record(record, batch_id)
                     stats["fin_records"] += 1
 
-            # Include parser errors in stats
             stats["errors"].extend(self.parser.errors)
 
             end_time = datetime.now()
@@ -449,20 +362,9 @@ class FinWireProcessor:
             return stats
 
     def _process_financial_record(self, record: DailyMarketRecord, batch_id: int) -> None:
-        """Process a financial record into FactMarketHistory or other fact tables."""
-        # Implementation would insert/update fact tables
-        # This is a placeholder for the actual ETL logic
         logger.debug(f"Processing financial record for: {record.company_id}")
 
     def process_batch(self, file_paths: list[Path]) -> dict[str, Any]:
-        """Process multiple FinWire files in batch.
-
-        Args:
-            file_paths: List of paths to FinWire format files
-
-        Returns:
-            Dictionary containing batch processing results and statistics
-        """
         logger.info(f"Processing FinWire batch: {len(file_paths)} files")
 
         start_time = datetime.now()
@@ -513,22 +415,11 @@ class FinWireProcessor:
         return batch_stats
 
     def process_file(self, file_path: Path, batch_id: int = 1) -> dict[str, Any]:
-        """Alias for process_finwire_file for compatibility."""
         return self.process_finwire_file(file_path, batch_id)
 
     def _process_company_record(self, record: CompanyFundamentalRecord, batch_id: int = 1) -> dict[str, Any]:
-        """Process a company fundamental record and return processing result.
-
-        Args:
-            record: Company fundamental record to process
-            batch_id: ETL batch identifier
-
-        Returns:
-            Dictionary containing processing results
-        """
         logger.debug(f"Processing company record: {record.company_name}")
 
-        # The current processor returns a normalized outcome payload; storage is handled elsewhere.
         return {
             "company_name": record.company_name,
             "industry": record.industry,
@@ -539,18 +430,8 @@ class FinWireProcessor:
         }
 
     def _process_security_record(self, record: SecurityMasterRecord, batch_id: int = 1) -> dict[str, Any]:
-        """Process a security master record and return processing result.
-
-        Args:
-            record: Security master record to process
-            batch_id: ETL batch identifier
-
-        Returns:
-            Dictionary containing processing results
-        """
         logger.debug(f"Processing security record: {record.symbol}")
 
-        # The current processor returns a normalized outcome payload; storage is handled elsewhere.
         return {
             "symbol": record.symbol,
             "issue": record.security_name,
@@ -561,7 +442,6 @@ class FinWireProcessor:
         }
 
     def get_processing_statistics(self) -> dict[str, Any]:
-        """Get comprehensive statistics about FinWire processing."""
         return {
             "parser_errors": len(self.parser.errors),
             "supported_record_types": ["CMP", "SEC", "FIN"],

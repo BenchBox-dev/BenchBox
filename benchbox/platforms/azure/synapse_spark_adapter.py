@@ -1,36 +1,3 @@
-"""Azure Synapse Spark platform adapter.
-
-Azure Synapse Analytics is Microsoft's enterprise analytics platform providing
-integrated Spark, SQL, and Data Explorer capabilities. This adapter integrates
-with Synapse Spark pools via the Livy API for benchmark execution.
-
-Key Features:
-- Enterprise: Mature platform with extensive enterprise features
-- ADLS Gen2: Azure Data Lake Storage for data staging
-- Entra ID: Azure Active Directory authentication
-- Livy: Apache Livy REST API for Spark session management
-- Spark Pools: Dedicated Spark pools with configurable sizing
-
-Usage:
-    from benchbox.platforms.azure import SynapseSparkAdapter
-
-    adapter = SynapseSparkAdapter(
-        workspace_name="my-synapse-workspace",
-        spark_pool_name="sparkpool1",
-        storage_account="mystorageaccount",
-        storage_container="benchbox",
-    )
-
-    # Run TPC-H benchmark
-    adapter.create_schema("tpch_sf1")
-    adapter.load_data(["lineitem", "orders", ...], source_dir)
-    result = adapter.execute_query("SELECT * FROM lineitem LIMIT 10")
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -86,8 +53,6 @@ logger = logging.getLogger(__name__)
 
 
 class SynapseLivySessionState:
-    """Synapse Livy session state constants."""
-
     NOT_STARTED = "not_started"
     STARTING = "starting"
     IDLE = "idle"
@@ -100,30 +65,6 @@ class SynapseLivySessionState:
 
 
 class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
-    """Azure Synapse Spark platform adapter.
-
-    Synapse Spark provides enterprise Spark execution within the Azure Synapse
-    Analytics workspace. This adapter uses the Livy REST API for session and
-    statement management, with ADLS Gen2 for data staging.
-
-    Execution Model:
-    - Create Livy session in Synapse Spark pool
-    - Execute Spark SQL statements via Livy
-    - Results returned via Livy statement output
-    - ADLS Gen2 for data staging
-
-    Key Features:
-    - Enterprise: Mature platform with enterprise features
-    - ADLS Gen2: Azure Data Lake Storage integration
-    - Spark Pools: Dedicated pools with configurable sizing
-    - Entra ID: Azure AD authentication
-
-    Billing:
-    - vCore-hours for Spark pools
-    - Storage charged separately (ADLS Gen2)
-    - Pool idle timeout billing
-    """
-
     plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
@@ -143,24 +84,6 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
         adaptive_enabled: bool = True,
         **kwargs: Any,
     ) -> None:
-        """Initialize the Synapse Spark adapter.
-
-        Args:
-            workspace_name: Synapse workspace name (required).
-            spark_pool_name: Spark pool name (required).
-            storage_account: ADLS Gen2 storage account name (required).
-            storage_container: ADLS Gen2 container name (required).
-            storage_path: Path within container for data staging (default: benchbox).
-            tenant_id: Azure tenant ID for authentication.
-            livy_endpoint: Custom Livy endpoint URL (auto-derived if not provided).
-            timeout_minutes: Statement timeout in minutes (default: 60).
-            spark_config: Additional Spark configuration.
-            table_format: Table format for benchmark tables (parquet, delta, iceberg).
-            adaptive_enabled: Adaptive Query Execution on/off (default: True).
-                Rendered explicitly in both directions at Livy session build;
-                an explicit user spark_config entry still wins.
-            **kwargs: Additional platform options.
-        """
         if not AZURE_IDENTITY_AVAILABLE:
             deps_satisfied, missing = check_platform_dependencies("synapse-spark")
             if not deps_satisfied:
@@ -190,37 +113,30 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
         self.user_spark_config = spark_config or {}
         self.adaptive_enabled = adaptive_enabled
 
-        # Derive Livy endpoint if not provided
         self.livy_endpoint = livy_endpoint or self._derive_livy_endpoint()
 
-        # Build ADLS Gen2 URI for staging
         self.adls_uri = (
             f"abfss://{self.storage_container}@{self.storage_account}.dfs.core.windows.net/{self.storage_path}"
         )
 
-        # Initialize staging using cloud-spark shared infrastructure
         self._staging: CloudSparkStaging | None = None
         try:
             self._staging = CloudSparkStaging.from_uri(self.adls_uri)
         except Exception as e:
             logger.warning(f"Failed to initialize ADLS staging: {e}")
 
-        # Credential (lazy initialization) - shared helper owns state.
         self._token_provider = AzureTokenProvider(
             scope="https://dev.azuresynapse.net/.default",
             credential_class=DefaultAzureCredential,
             tenant_id=self.tenant_id,
         )
 
-        # Session management
         self._session_id: int | None = None
         self._session_created_by_us = False
 
-        # Metrics tracking
         self._query_count = 0
         self._total_statement_time_seconds = 0.0
 
-        # Benchmark configuration (set via configure_for_benchmark)
         self._benchmark_type: str | None = None
         self._scale_factor: float = 1.0
         self._spark_config: dict[str, str] = {}
@@ -228,27 +144,15 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
         super().__init__(**kwargs)
 
     def _derive_livy_endpoint(self) -> str:
-        """Derive the Livy endpoint from workspace and pool names."""
-        # Synapse Livy endpoint format
         return f"https://{self.workspace_name}.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/{self.spark_pool_name}/sessions"
 
     def _get_access_token(self) -> str:
-        """Get a valid access token, refreshing if needed."""
         return self._token_provider.access_token()
 
     def _get_headers(self) -> dict[str, str]:
-        """Get HTTP headers with authentication."""
         return self._token_provider.auth_headers()
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Return platform metadata.
-
-        Args:
-            connection: Not used (Synapse Spark manages sessions internally).
-
-        Returns:
-            Dict with platform information including name, version, and capabilities.
-        """
         return {
             "platform": "synapse-spark",
             "display_name": "Azure Synapse Analytics Spark",
@@ -264,25 +168,15 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
         }
 
     def _create_session(self) -> int:
-        """Create a new Livy session.
-
-        Returns:
-            The session ID.
-        """
         if not REQUESTS_AVAILABLE:
             raise ConfigurationError("requests package is required for Synapse Spark")
 
-        # Build session configuration
         session_config: dict[str, Any] = {
             "kind": "spark",
             "name": f"benchbox-{self.spark_pool_name}",
-            # AQE keys explicit in both directions: Spark enables AQE by
-            # default since 3.2.0, so omitting them would silently leave it
-            # on when adaptive_enabled is False.
             "conf": spark_aqe_conf_entries(self.adaptive_enabled),
         }
 
-        # Table format session extensions
         if self.table_format == "delta":
             session_config["conf"]["spark.sql.extensions"] = "io.delta.sql.DeltaSparkSessionExtension"
             session_config["conf"]["spark.sql.catalog.spark_catalog"] = (
@@ -295,13 +189,9 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
             session_config["conf"]["spark.sql.catalog.spark_catalog"] = "org.apache.iceberg.spark.SparkSessionCatalog"
             session_config["conf"]["spark.sql.catalog.spark_catalog.type"] = "hive"
 
-        # Add benchmark-specific configuration first so an explicit
-        # user-provided Spark config wins (mirrors the resolve-then-apply
-        # precedence of the local Spark-family adapters).
         if self._spark_config:
             session_config["conf"].update(self._spark_config)
 
-        # Add user-provided Spark config last so explicit overrides are kept.
         session_config["conf"].update(self.user_spark_config)
 
         logger.info(f"Creating Livy session in Synapse workspace {self.workspace_name}")
@@ -319,7 +209,6 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
         session = response.json()
         session_id = session["id"]
 
-        # Wait for session to be ready
         self._wait_for_session_state(session_id, [SynapseLivySessionState.IDLE])
         self._session_created_by_us = True
 
@@ -332,16 +221,6 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
         target_states: list[str],
         timeout_seconds: int = 600,
     ) -> str:
-        """Wait for session to reach a target state.
-
-        Args:
-            session_id: Session ID to wait for.
-            target_states: List of acceptable target states.
-            timeout_seconds: Maximum wait time.
-
-        Returns:
-            The final session state.
-        """
         start_time = mono_time()
         session_url = f"{self.livy_endpoint}/{session_id}"
 
@@ -368,13 +247,7 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
         raise ConfigurationError(f"Timeout waiting for session {session_id}")
 
     def _ensure_session(self) -> int:
-        """Ensure a Livy session exists and is ready.
-
-        Returns:
-            The session ID.
-        """
         if self._session_id is not None:
-            # Verify session is still valid
             session_url = f"{self.livy_endpoint}/{self._session_id}"
             try:
                 response = requests.get(
@@ -387,12 +260,8 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
                     if session["state"] == SynapseLivySessionState.IDLE:
                         return self._session_id
                     if session["state"] == SynapseLivySessionState.BUSY:
-                        # Wait for it to become idle
                         self._wait_for_session_state(self._session_id, [SynapseLivySessionState.IDLE])
                         return self._session_id
-                    # Session is in a terminal state (ERROR, DEAD, KILLED) - close it.
-                    # Aligns Synapse cleanup with Fabric (was a pre-existing leak: the
-                    # falls-through path overwrote _session_id without DELETE-ing the dead one).
                     logger.warning("Session %s is in state %s, closing", self._session_id, session.get("state"))
                     try:
                         requests.delete(session_url, headers=self._get_headers(), timeout=30)
@@ -406,24 +275,13 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
                     pass
             self._session_id = None
 
-        # Create new session
         self._session_id = self._create_session()
         return self._session_id
 
     def create_connection(self, **kwargs: Any) -> Any:
-        """Verify Azure connectivity and workspace access.
-
-        Returns:
-            Dict with connection status and workspace info.
-
-        Raises:
-            ConfigurationError: If Azure connection fails.
-        """
         try:
-            # Test credential by getting a token
             self._get_access_token()
 
-            # Test Spark pool access via Synapse API
             pool_url = f"https://{self.workspace_name}.dev.azuresynapse.net/sparkPools/{self.spark_pool_name}"
             response = requests.get(
                 pool_url,
@@ -462,14 +320,6 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
             raise ConfigurationError(f"Failed to connect to Synapse: {e}") from e
 
     def create_schema(self, benchmark, connection: Any) -> float:
-        """Create schema/database for benchmark tables.
-
-        Synapse Spark uses the Spark catalog for database management.
-
-        Args:
-            benchmark: Benchmark instance.
-            connection: Active connection/session metadata; not used by Synapse Spark.
-        """
         start_time = mono_time()
         database = self.database
 
@@ -488,16 +338,6 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
         connection: Any,
         data_dir: Path,
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Upload benchmark data to ADLS Gen2 and create tables.
-
-        Args:
-            benchmark: Benchmark instance.
-            connection: Active connection/session metadata; not used by Synapse Spark.
-            data_dir: Local directory containing table data files.
-
-        Returns:
-            Tuple of table row-count placeholders, elapsed seconds, and table URI metadata.
-        """
         start_time = mono_time()
         source_path = Path(data_dir)
         tables = _resolve_benchmark_table_names(benchmark)
@@ -505,9 +345,7 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
         if not source_path.exists():
             raise ConfigurationError(f"Source directory not found: {data_dir}")
 
-        # Upload data to ADLS using staging infrastructure
         if self._staging:
-            # Check if tables already exist
             if self._staging.tables_exist(tables):
                 logger.info("Tables already exist in ADLS, skipping upload")
             else:
@@ -518,7 +356,6 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
                     file_format=file_format,
                 )
 
-        # Create external tables from uploaded data
         table_uris = {}
         for table in tables:
             table_uri = f"{self.adls_uri}/tables/{table}"
@@ -547,16 +384,6 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute a SQL query via Livy.
-
-        Args:
-            connection: Active connection/session metadata; not used by Synapse Spark.
-            query: SQL query to execute.
-            query_id: Query identifier.
-
-        Returns:
-            Dict with query results.
-        """
         start_time = mono_time()
 
         try:
@@ -587,7 +414,6 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
             }
 
     def close(self) -> None:
-        """Clean up resources and close Livy session."""
         if self._session_id is not None and self._session_created_by_us:
             try:
                 session_url = f"{self.livy_endpoint}/{self._session_id}"
@@ -603,16 +429,7 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
                 self._session_id = None
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for Synapse Spark.
-
-        Synapse Spark uses Spark SQL dialect.
-
-        Returns:
-            The dialect string "spark".
-        """
         return "spark"
-
-    # --- Configuration Methods ---
 
     def configure_for_benchmark(
         self,
@@ -620,17 +437,9 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
         scale_factor: float | None = None,
         **options: Any,
     ) -> None:
-        """Configure adapter for specific benchmark.
-
-        Args:
-            benchmark: Benchmark name (tpch, tpcds, ssb).
-            scale_factor: Data scale factor.
-            **options: Additional benchmark options.
-        """
         self._benchmark_type = benchmark.lower()
         self._scale_factor = scale_factor or 1.0
 
-        # Get optimized Spark configuration
         if self._benchmark_type == "tpch":
             config = SparkConfigOptimizer.for_tpch(
                 scale_factor=self._scale_factor,
@@ -650,14 +459,12 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
                 adaptive_enabled=self.adaptive_enabled,
             )
         else:
-            # Default to TPC-H config for unknown benchmarks
             config = SparkConfigOptimizer.for_tpch(
                 scale_factor=self._scale_factor,
                 platform=CloudPlatform.SYNAPSE,
                 adaptive_enabled=self.adaptive_enabled,
             )
 
-        # Convert SparkConfig to dict
         self._spark_config = config.to_dict()
         logger.info(f"Configured for {benchmark} at SF={self._scale_factor}")
 
@@ -665,11 +472,6 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
         self,
         config: PlatformOptimizationConfiguration,
     ) -> None:
-        """Apply platform-specific tuning configuration.
-
-        Args:
-            config: Platform optimization configuration.
-        """
         if hasattr(config, "spark_config") and config.spark_config:
             self._spark_config.update(config.spark_config)
 
@@ -678,14 +480,6 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
         primary_keys: list[PrimaryKeyConfiguration] | None = None,
         foreign_keys: list[ForeignKeyConfiguration] | None = None,
     ) -> None:
-        """Apply constraint configuration (no-op for Spark).
-
-        Spark does not enforce primary/foreign key constraints.
-
-        Args:
-            primary_keys: Primary key configurations (ignored).
-            foreign_keys: Foreign key configurations (ignored).
-        """
         if primary_keys:
             logger.debug(f"Ignoring {len(primary_keys)} primary key constraints (Spark no-op)")
         if foreign_keys:
@@ -696,27 +490,11 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
         unified_config: UnifiedTuningConfiguration,
         connection: Any,
     ) -> None:
-        """Apply unified tuning configuration.
-
-        Args:
-            unified_config: Unified tuning configuration.
-            connection: Database connection (unused - Livy sessions are internal).
-        """
         if hasattr(unified_config, "platform_optimization"):
             self.apply_platform_tuning(unified_config.platform_optimization)
 
-    # apply_primary_keys, apply_foreign_keys, apply_platform_optimizations,
-    # and apply_constraint_configuration are inherited from SparkTuningMixin
-
-    # --- CLI Methods ---
-
     @classmethod
     def add_cli_arguments(cls, parser: Any) -> None:
-        """Add Synapse Spark CLI arguments.
-
-        Args:
-            parser: Argument parser to add arguments to.
-        """
         parser.add_argument(
             "--workspace-name",
             help="Synapse workspace name",
@@ -766,14 +544,6 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> SynapseSparkAdapter:
-        """Create adapter from configuration dictionary.
-
-        Args:
-            config: Configuration dictionary.
-
-        Returns:
-            SynapseSparkAdapter instance.
-        """
         params: dict[str, Any] = {
             "workspace_name": config.get("workspace_name"),
             "spark_pool_name": config.get("spark_pool_name"),
@@ -788,7 +558,6 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
             "adaptive_enabled": adaptive_enabled_from_config(config),
         }
 
-        # Pass through tuning provenance/config
         for key in [
             "tuning_config",
             "tuning_enabled",

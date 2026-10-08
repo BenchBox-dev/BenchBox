@@ -1,5 +1,3 @@
-"""Streaming generation helpers for TPC-DS tables."""
-
 from __future__ import annotations
 
 import contextlib
@@ -12,19 +10,7 @@ from benchbox.utils.printing import emit
 
 
 class StreamingGenerationMixin:
-    """Mixin encapsulating streaming-oriented generation utilities."""
-
     def _generate_table_with_streaming(self, output_dir: Path, table_name: str) -> None:
-        """Generate a single table with streaming compression.
-
-        For parent tables that generate child tables (e.g., catalog_sales generates catalog_returns),
-        we need to handle the combined output stream.
-
-        Args:
-            output_dir: Output directory for data generation
-            table_name: Name of the table to generate
-        """
-        # Check if this is a parent table that generates child tables
         child_tables = {
             "catalog_sales": ["catalog_returns"],
             "store_sales": ["store_returns"],
@@ -32,15 +18,11 @@ class StreamingGenerationMixin:
         }
 
         if table_name in child_tables:
-            # For parent tables, we need to use traditional file-based generation then compress
-            # because dsdgen outputs multiple tables to stdout in a format that's hard to separate
             self._generate_parent_table_with_children(output_dir, table_name, child_tables[table_name])
         else:
-            # For single tables, generate file then compress (more robust across dsdgen builds)
             self._generate_single_table_streaming(output_dir, table_name)
 
     def _generate_single_table_streaming(self, output_dir: Path, table_name: str) -> None:
-        """Generate a single table to .dat then compress (robust path)."""
         cmd = [
             str(self.dsdgen_exe),
             tpcds_option("verbose") if self.verbose else tpcds_option("quiet"),
@@ -64,20 +46,17 @@ class StreamingGenerationMixin:
                 cwd=output_dir,
                 check=True,
                 env=env,
-                stdout=subprocess.DEVNULL,  # Always suppress spinner output to prevent log bloat
-                stderr=None if self.verbose else subprocess.PIPE,  # Show errors in verbose mode for debugging
+                stdout=subprocess.DEVNULL,
+                stderr=None if self.verbose else subprocess.PIPE,
             )
             if dat_file.exists() and self._is_valid_data_file(dat_file):
                 row_count = 0
 
-                # Check if compression is actually needed (avoid copying file to itself)
                 if dat_file.resolve() == compressed_path.resolve():
-                    # No compression needed - just count rows and update manifest
                     with open(dat_file, encoding="utf-8") as src:
                         for line in src:
                             row_count += 1
                 else:
-                    # Compression needed - copy and compress
                     with (
                         open(dat_file, encoding="utf-8") as src,
                         self.open_output_file(compressed_path, mode="wt") as dst,
@@ -85,13 +64,11 @@ class StreamingGenerationMixin:
                         for line in src:
                             dst.write(line)
                             row_count += 1
-                # Only delete the .dat file if we compressed it to a different file
                 if dat_file.resolve() != compressed_path.resolve():
                     with contextlib.suppress(OSError):
                         dat_file.unlink()
                 if self.verbose:
                     emit(f"✓ Generated and compressed {table_name} -> {compressed_path.name}")
-                # Thread-safe manifest update
                 with self._manifest_lock:
                     self._manifest_entries.setdefault(table_name, []).append(
                         {
@@ -114,17 +91,6 @@ class StreamingGenerationMixin:
     def _generate_parent_table_with_children(
         self, output_dir: Path, parent_table: str, child_tables: list[str]
     ) -> None:
-        """Generate a parent table and its child tables using streaming compression.
-
-        Instead of generating all tables together and then compressing, we generate each
-        table individually with streaming compression to maintain the requirement that
-        no raw .dat files are ever written when compression is enabled.
-
-        Args:
-            output_dir: Output directory for data generation
-            parent_table: Name of the parent table
-            child_tables: List of child table names generated with the parent
-        """
         try:
             env = os.environ.copy()
 
@@ -132,31 +98,27 @@ class StreamingGenerationMixin:
                 tables_str = f"{parent_table} + {', '.join(child_tables)}"
                 emit(f"Generating {tables_str} with streaming compression...")
 
-            # For parent tables with children, dsdgen outputs multiple tables mixed in stdout
-            # We need to generate to files first, then compress them to maintain data integrity
             cmd = [
                 str(self.dsdgen_exe),
                 tpcds_option("verbose") if self.verbose else tpcds_option("quiet"),
-                tpcds_option("force"),  # force overwrites
+                tpcds_option("force"),
                 tpcds_option("terminate"),
-                "n",  # disable trailing field delimiters
+                "n",
                 tpcds_option("scale"),
                 str(self.scale_factor),
                 tpcds_option("table"),
-                parent_table,  # generate parent table (and children automatically)
+                parent_table,
             ]
 
-            # Run dsdgen to generate files
             subprocess.run(
                 cmd,
                 cwd=output_dir,
                 check=True,
                 env=env,
-                stdout=subprocess.DEVNULL,  # Always suppress spinner output to prevent log bloat
-                stderr=None if self.verbose else subprocess.PIPE,  # Show errors in verbose mode for debugging
+                stdout=subprocess.DEVNULL,
+                stderr=None if self.verbose else subprocess.PIPE,
             )
 
-            # Now compress the generated files and remove originals while counting rows
             all_tables = [parent_table] + child_tables
             files_processed = 0
 
@@ -180,7 +142,6 @@ class StreamingGenerationMixin:
                         files_processed += 1
                         if self.verbose:
                             emit(f"✓ Generated and compressed {table_name} -> {compressed_path.name}")
-                        # Thread-safe manifest update
                         with self._manifest_lock:
                             self._manifest_entries.setdefault(table_name, []).append(
                                 {
@@ -195,7 +156,6 @@ class StreamingGenerationMixin:
                     dat_file.unlink()
                     emit(f"○ Skipped {table_name} (no data at scale factor {self.scale_factor})")
 
-            # If no files were processed, this is normal for small scale factors
             if files_processed == 0 and self.verbose:
                 tables_str = f"{parent_table} + {', '.join(child_tables)}"
                 emit(f"○ Skipped {tables_str} (no data at scale factor {self.scale_factor})")
@@ -209,13 +169,6 @@ class StreamingGenerationMixin:
             raise RuntimeError(f"Failed to generate TPC-DS table {parent_table}: {e}") from e
 
     def _generate_single_table_chunk_streaming(self, output_dir: Path, table_name: str, chunk_id: int) -> None:
-        """Generate a single table chunk with direct streaming compression.
-
-        Args:
-            output_dir: Output directory for data generation
-            table_name: Name of the table to generate
-            chunk_id: Chunk ID for parallel generation
-        """
         cmd = [
             str(self.dsdgen_exe),
             tpcds_option("verbose") if self.verbose else tpcds_option("quiet"),
@@ -278,11 +231,6 @@ class StreamingGenerationMixin:
             raise RuntimeError(f"Failed to generate TPC-DS table {table_name} chunk {chunk_id}: {e}") from e
 
     def _stream_process_output(self, process, output_file: Path) -> tuple[int, int]:
-        """Stream dsdgen stdout into a compressed output file.
-
-        Returns:
-            Tuple of (row_count, bytes_written).
-        """
         row_count = 0
         bytes_written = 0
         chunk_size = 65536
@@ -319,7 +267,6 @@ class StreamingGenerationMixin:
         row_count: int,
         bytes_written: int,
     ) -> None:
-        """Process the outcome of a streaming chunk generation."""
         if bytes_written > 0:
             if potential_dat_file.exists():
                 potential_dat_file.unlink()
@@ -360,18 +307,6 @@ class StreamingGenerationMixin:
         chunk_id: int,
         child_tables: list[str],
     ) -> None:
-        """Generate a parent table chunk that also generates child table chunks.
-
-        For parent tables, TPC-DS dsdgen automatically generates child tables when generating
-        the parent table chunk. We use file-based generation then compress the results because
-        child tables cannot be generated individually.
-
-        Args:
-            output_dir: Output directory for data generation
-            parent_table: Name of the parent table
-            chunk_id: Chunk ID for parallel generation
-            child_tables: List of child table names generated with the parent
-        """
         try:
             env = os.environ.copy()
 
@@ -379,34 +314,31 @@ class StreamingGenerationMixin:
                 tables_str = f"{parent_table} + {', '.join(child_tables)}"
                 emit(f"Generating {tables_str} chunk {chunk_id}/{self.parallel} with file-then-compress...")
 
-            # Generate parent table chunk (which automatically creates child tables)
             cmd = [
                 str(self.dsdgen_exe),
                 tpcds_option("verbose") if self.verbose else tpcds_option("quiet"),
-                tpcds_option("force"),  # force overwrites
+                tpcds_option("force"),
                 tpcds_option("terminate"),
-                "n",  # disable trailing field delimiters
+                "n",
                 tpcds_option("scale"),
                 str(self.scale_factor),
                 tpcds_option("table"),
-                parent_table,  # generate parent table (creates children automatically)
+                parent_table,
                 tpcds_option("child"),
-                str(chunk_id),  # chunk number (1-based)
+                str(chunk_id),
                 tpcds_option("parallel"),
                 str(self.parallel),
             ]
 
-            # Run dsdgen to generate files
             subprocess.run(
                 cmd,
                 cwd=output_dir,
                 check=True,
                 env=env,
-                stdout=subprocess.DEVNULL,  # Always suppress spinner output to prevent log bloat
-                stderr=None if self.verbose else subprocess.PIPE,  # Show errors in verbose mode for debugging
+                stdout=subprocess.DEVNULL,
+                stderr=None if self.verbose else subprocess.PIPE,
             )
 
-            # Now compress the generated files and remove originals
             all_tables = [parent_table] + child_tables
             files_processed = 0
 
@@ -416,16 +348,13 @@ class StreamingGenerationMixin:
 
                 if dat_file.exists() and self._is_valid_data_file(dat_file):
                     if self.should_use_compression():
-                        # Count rows before compression
                         row_count = 0
                         with open(dat_file, "rb") as f:
                             row_count = sum(1 for _ in f)
 
-                        # Compress the file and remove original
                         compressed_file = self.compress_existing_file(dat_file, remove_original=True)
                         files_processed += 1
 
-                        # Track in manifest (thread-safe)
                         with self._manifest_lock:
                             self._manifest_entries.setdefault(table_name, []).append(
                                 {
@@ -440,15 +369,12 @@ class StreamingGenerationMixin:
                                 f"✓ Generated and compressed {table_name} chunk {chunk_id}/{self.parallel} -> {compressed_file.name}"
                             )
                     else:
-                        # Keep original file when compression is disabled
-                        # Count rows for manifest tracking
                         row_count = 0
                         with open(dat_file, "rb") as f:
                             row_count = sum(1 for _ in f)
 
                         files_processed += 1
 
-                        # Track in manifest (thread-safe)
                         with self._manifest_lock:
                             self._manifest_entries.setdefault(table_name, []).append(
                                 {
@@ -461,12 +387,10 @@ class StreamingGenerationMixin:
                         if self.verbose:
                             emit(f"✓ Generated {table_name} chunk {chunk_id}/{self.parallel} -> {expected_filename}")
                 elif dat_file.exists():
-                    # Remove empty file if it exists
                     dat_file.unlink()
                     if self.verbose:
                         emit(f"○ Skipped {table_name} chunk {chunk_id}/{self.parallel} (no data in this chunk)")
 
-            # If no files were processed, this chunk had no data (normal for parallel generation)
             if files_processed == 0 and self.verbose:
                 tables_str = f"{parent_table} + {', '.join(child_tables)}"
                 emit(f"○ Skipped {tables_str} chunk {chunk_id}/{self.parallel} (no data in this chunk)")

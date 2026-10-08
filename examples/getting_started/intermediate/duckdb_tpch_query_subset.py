@@ -1,10 +1,3 @@
-"""Run a focused subset of TPC-H queries on DuckDB.
-
-This intermediate example builds on the minimal power test and
-introduces a common option: executing only a handful of queries. It is
-useful for quick smoke tests or verifying specific query translations.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -23,33 +16,25 @@ _OUTPUT_ROOT = _PROJECT_ROOT / "benchmark_runs" / "getting_started" / "duckdb"
 def run_example(
     *,
     scale_factor: float = 0.01,
-    queries: Iterable[str] = ("1", "6"),  # Default: two fast TPC-H queries for smoke testing
+    queries: Iterable[str] = ("1", "6"),
     force_regenerate: bool = False,
     dry_run_output: Path | None = None,
 ) -> None:
-    """Generate data if needed and execute only selected TPC-H queries."""
-    # Ensure output directory exists
     _OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
 
-    # Convert query iterable to list for use in both dry-run and execution
     query_list = list(queries)
 
-    # Dry-run mode: Preview which queries will be executed
-    # This is particularly useful when testing query subsets to ensure
-    # you've selected the right queries before committing to execution
     if dry_run_output is not None:
-        # Create benchmark configuration with query subset
         benchmark_config = BenchmarkConfig(
             name="tpch",
             display_name="TPC-H",
             scale_factor=scale_factor,
-            queries=query_list,  # KEY: Only these queries will be included
+            queries=query_list,
             options={
                 "force_regenerate": force_regenerate,
             },
         )
 
-        # Create database configuration
         database_config = DatabaseConfig(
             type="duckdb",
             name="duckdb_tpch_subset",
@@ -59,7 +44,6 @@ def run_example(
             },
         )
 
-        # Generate dry-run artifacts showing only the selected queries
         execute_example_dry_run(
             benchmark_config=benchmark_config,
             database_config=database_config,
@@ -68,11 +52,6 @@ def run_example(
         )
         return
 
-    # Normal execution mode: Run only the selected queries
-
-    # Step 1: Create benchmark (same as full TPC-H)
-    # Note: The data generation is the same - all 8 tables are created
-    # Only the query execution phase uses the subset
     benchmark = TPCH(
         scale_factor=scale_factor,
         output_dir=_OUTPUT_ROOT / f"tpch_subset_sf_{scale_factor}",
@@ -80,36 +59,16 @@ def run_example(
         verbose=False,
     )
 
-    # Step 2: Generate data (creates all 8 TPC-H tables)
-    # Even though we're running a subset of queries, we generate the full dataset
-    # because queries may reference any of the tables
     benchmark.generate_data()
 
-    # Step 3: Create adapter
     adapter = DuckDBAdapter(database_path=":memory:", force_recreate=force_regenerate)
 
-    # Step 4: Run benchmark with query subset
-    # KEY FEATURE: query_subset parameter limits which queries execute
-    #
-    # Why use query subsets?
-    # - Smoke testing: Run 2-3 fast queries to verify setup (< 10 seconds)
-    # - Debugging: Focus on specific problematic queries
-    # - CI/CD: Fast validation in pull requests (run subset instead of all 22)
-    # - Development: Iterate quickly when testing optimizations
-    # - Cost savings: Run subset on cloud platforms to reduce compute costs
-    #
-    # Common subset strategies:
-    # - Smoke test: ["1", "6"] (fastest, simplest queries)
-    # - Representative: ["1", "3", "6", "12", "14"] (covers different patterns)
-    # - Complex: ["2", "9", "17", "20", "21"] (stress test query optimizer)
-    # - Targeted: ["specific-query"] (debug one slow query)
     results = adapter.run_benchmark(
         benchmark,
         test_execution_type="standard",
-        query_subset=query_list,  # Only execute these queries
+        query_subset=query_list,
     )
 
-    # Step 5: Display results
     print(f"Executed queries: {', '.join(query_list)}")
     print(f"Successful queries: {results.successful_queries}/{results.total_queries}")
     print(f"Average time per query (s): {results.average_query_time:.2f}")

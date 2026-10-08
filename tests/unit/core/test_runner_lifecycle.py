@@ -1,5 +1,3 @@
-"""Unit tests for core lifecycle runner."""
-
 import json
 import logging
 import time
@@ -96,7 +94,6 @@ def test_data_only_mode_returns_result_without_adapter():
 
     assert isinstance(res, BenchmarkResults)
     assert res.platform == "data_only"
-    # No adapter interaction
 
 
 @pytest.mark.unit
@@ -175,10 +172,10 @@ def test_load_only_mode_invokes_adapter_load(tmp_path):
             self.schema_created = False
             self.closed = False
 
-        def create_connection(self, **kwargs):  # pragma: no cover - simple mock
+        def create_connection(self, **kwargs):  # pragma: no cover
             return Mock()
 
-        def close_connection(self, _conn):  # pragma: no cover - simple mock
+        def close_connection(self, _conn):  # pragma: no cover
             self.closed = True
 
         def create_schema(self, benchmark, connection):
@@ -210,7 +207,6 @@ def test_load_only_mode_invokes_adapter_load(tmp_path):
 
 @pytest.mark.unit
 def test_load_only_mode_runs_statistics_phase_when_requested(tmp_path):
-    """--phases load,statistics runs the adapter statistics hook after load."""
     from benchbox.core.results.models import StatisticsGatheringPhase
 
     cfg = BenchmarkConfig(name="tpch", display_name="TPC-H", test_execution_type="load_only")
@@ -265,8 +261,6 @@ def test_load_only_mode_runs_statistics_phase_when_requested(tmp_path):
             collect_per_table_timing=False,
         ):
             self.statistics_calls.append((benchmark_name, table_names))
-            # A substantial ANALYZE duration (5s) so an omission from
-            # duration_seconds would be obvious, not lost in rounding.
             return StatisticsGatheringPhase(
                 duration_ms=5000, status="COMPLETED", stats_mode="explicit", tables_analyzed=1
             )
@@ -291,10 +285,6 @@ def test_load_only_mode_runs_statistics_phase_when_requested(tmp_path):
         "stats_mode": "explicit",
         "tables_analyzed": 1,
     }
-    # P2 regression: the load-only result's duration_seconds must fold in the
-    # statistics phase's own wall-clock (schema 0.1s + load 0.5s + stats 5.0s),
-    # not just schema_time + load_time -- otherwise a load,statistics run
-    # underreports duration and disagrees with phases.statistics.duration_ms.
     assert captured_kwargs["duration_seconds"] == pytest.approx(5.6)
 
 
@@ -359,10 +349,10 @@ def test_load_only_external_mode_requires_adapter_support(tmp_path):
         platform_name = "duckdb"
         supports_external_tables = False
 
-        def create_connection(self, **kwargs):  # pragma: no cover - simple mock
+        def create_connection(self, **kwargs):  # pragma: no cover
             return Mock()
 
-        def close_connection(self, _conn):  # pragma: no cover - simple mock
+        def close_connection(self, _conn):  # pragma: no cover
             return None
 
         def create_schema(self, benchmark, connection):
@@ -418,10 +408,10 @@ def test_load_only_external_mode_reports_platform_specific_unsupported_errors(
         def platform_name(self):
             return platform_name
 
-        def create_connection(self, **kwargs):  # pragma: no cover - simple mock
+        def create_connection(self, **kwargs):  # pragma: no cover
             return Mock()
 
-        def close_connection(self, _conn):  # pragma: no cover - simple mock
+        def close_connection(self, _conn):  # pragma: no cover
             return None
 
     with (
@@ -477,10 +467,10 @@ def test_load_only_external_mode_invokes_adapter_runtime_validation_hook(tmp_pat
             self.validated_external = False
             self.external_created = False
 
-        def create_connection(self, **kwargs):  # pragma: no cover - simple mock
+        def create_connection(self, **kwargs):  # pragma: no cover
             return Mock()
 
-        def close_connection(self, _conn):  # pragma: no cover - simple mock
+        def close_connection(self, _conn):  # pragma: no cover
             return None
 
         def validate_external_table_requirements(self):
@@ -532,10 +522,10 @@ def test_load_only_external_mode_surfaces_adapter_validation_guidance(tmp_path):
         platform_name = "BigQuery"
         supports_external_tables = True
 
-        def create_connection(self, **kwargs):  # pragma: no cover - simple mock
+        def create_connection(self, **kwargs):  # pragma: no cover
             return Mock()
 
-        def close_connection(self, _conn):  # pragma: no cover - simple mock
+        def close_connection(self, _conn):  # pragma: no cover
             return None
 
         def validate_external_table_requirements(self):
@@ -812,7 +802,6 @@ def test_postload_validation_invoked(tmp_path):
 
 @pytest.mark.unit
 def test_run_benchmark_lifecycle_propagates_verbosity(tmp_path):
-    """Verbosity settings should reach both benchmark and adapter."""
 
     class StubBenchmark(VerbosityMixin):
         def __init__(self):
@@ -883,7 +872,6 @@ def test_run_benchmark_lifecycle_propagates_verbosity(tmp_path):
 
 @pytest.mark.unit
 def test_run_benchmark_lifecycle_propagates_capture_plans(tmp_path):
-    """capture_plans and strict_plan_capture must be forwarded to the adapter via RunConfig."""
 
     class StubBenchmark(VerbosityMixin):
         def __init__(self):
@@ -947,7 +935,6 @@ def test_run_benchmark_lifecycle_propagates_capture_plans(tmp_path):
 
 @pytest.mark.unit
 def test_manifest_reuse_accepts_data_source_alias(tmp_path):
-    """Manifest reuse should work when benchmark declares a data-source alias."""
 
     data_dir = tmp_path / "tpch_sf0_1"
     data_dir.mkdir()
@@ -983,7 +970,7 @@ def test_manifest_reuse_accepts_data_source_alias(tmp_path):
         def get_data_source_benchmark(self) -> str:
             return "tpch"
 
-        def generate_data(self):  # pragma: no cover - patched during test
+        def generate_data(self):  # pragma: no cover
             raise AssertionError("generate_data should not be called when manifest is reused")
 
         def get_queries(self, dialect: str | None = None):
@@ -1019,7 +1006,6 @@ def test_manifest_reuse_accepts_data_source_alias(tmp_path):
 
 @pytest.mark.unit
 def test_no_regenerate_respects_alias_manifest(tmp_path):
-    """no_regenerate should pass when shared manifest is valid."""
 
     data_dir = tmp_path / "tpch_sf0_1"
     data_dir.mkdir()
@@ -1053,7 +1039,7 @@ def test_no_regenerate_respects_alias_manifest(tmp_path):
         def get_data_source_benchmark(self) -> str:
             return "tpch"
 
-        def generate_data(self):  # pragma: no cover - patched during test
+        def generate_data(self):  # pragma: no cover
             raise AssertionError("generate_data should not run when no_regenerate is set")
 
         def get_queries(self, dialect: str | None = None):
@@ -1297,8 +1283,6 @@ def test_representative_benchmarks_standard_path(benchmark_id: str, tmp_path: Pa
 @pytest.mark.unit
 @pytest.mark.parametrize("benchmark_id", ["nyctaxi", "tsbs_devops"])
 def test_runner_propagates_benchmark_name_slug_to_adapter(benchmark_id: str, tmp_path: Path) -> None:
-    """Runner must pass benchmark_name (canonical slug from BenchmarkConfig.name)
-    to the SQL adapter so it never has to sniff identity from benchmark internals."""
     cfg = BenchmarkConfig(
         name=benchmark_id,
         display_name=benchmark_id.upper(),
@@ -1333,13 +1317,11 @@ def test_runner_propagates_benchmark_name_slug_to_adapter(benchmark_id: str, tmp
             platform_adapter=SlugCapturingAdapter(),
         )
 
-    # The canonical benchmark slug must reach the adapter via benchmark_name kwarg.
     assert received_kwargs.get("benchmark_name") == benchmark_id
 
 
 @pytest.mark.unit
 def test_standard_path_propagates_table_mode_to_adapter(tmp_path: Path) -> None:
-    """When table_mode=external with load+execute, adapter.table_mode must be set."""
     cfg = BenchmarkConfig(
         name="tpch",
         display_name="TPC-H",
@@ -1356,7 +1338,7 @@ def test_standard_path_propagates_table_mode_to_adapter(tmp_path: Path) -> None:
     class DummyAdapter:
         platform_name = "duckdb"
         supports_external_tables = True
-        table_mode = "native"  # default
+        table_mode = "native"
 
         def __init__(self):
             self.run_benchmark_called = False
@@ -1401,7 +1383,6 @@ def test_standard_path_propagates_table_mode_to_adapter(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_standard_path_propagates_conversion_settings_to_adapter(tmp_path: Path) -> None:
-    """Conversion settings should be included in adapter run_config kwargs."""
     cfg = BenchmarkConfig(
         name="tpch",
         display_name="TPC-H",
@@ -1463,7 +1444,6 @@ def test_standard_path_propagates_conversion_settings_to_adapter(tmp_path: Path)
 
 @pytest.mark.unit
 def test_unsupported_table_format_fails_fast(tmp_path):
-    """Platform that doesn't support the requested table format should fail immediately."""
     cfg = BenchmarkConfig(
         name="tpch",
         display_name="TPC-H",
@@ -1498,7 +1478,6 @@ def test_unsupported_table_format_fails_fast(tmp_path):
 
 @pytest.mark.unit
 def test_bigquery_external_delta_without_biglake_connection_fails_fast(tmp_path):
-    """BigQuery external Delta should fail before execution when BigLake config is missing."""
     cfg = BenchmarkConfig(
         name="tpch",
         display_name="TPC-H",
@@ -1534,7 +1513,6 @@ def test_bigquery_external_delta_without_biglake_connection_fails_fast(tmp_path)
 
 @pytest.mark.unit
 def test_snowflake_external_iceberg_without_volume_fails_fast(tmp_path):
-    """Snowflake external Iceberg should fail before execution when external volume config is missing."""
     cfg = BenchmarkConfig(
         name="tpch",
         display_name="TPC-H",
@@ -1566,3 +1544,157 @@ def test_snowflake_external_iceberg_without_volume_fails_fast(tmp_path):
             benchmark_instance=bench,
             platform_adapter=DummyAdapter(),
         )
+
+
+class _FakeClickHouseServer:
+    def __init__(self) -> None:
+        self.tables: dict[str, int] = {}
+        self.tuned: bool = False
+        self.drops: int = 0
+
+
+class _FakeClickHouseLoadAdapter:
+    platform_name = "clickhouse-server"
+    supports_external_tables = False
+
+    def __init__(self, server: _FakeClickHouseServer, *, tuning_enabled: bool) -> None:
+        self._server = server
+        self.tuning_enabled = tuning_enabled
+        self.table_mode = "native"
+        self.database_was_reused = False
+        self._existing_db_decided = False
+        self.schema_calls = 0
+        self.load_calls = 0
+
+    def create_connection(self, **kwargs):
+        self._existing_db_decided = True
+        if not self._server.tables:
+            self.database_was_reused = False
+        elif self.tuning_enabled != self._server.tuned:
+            self._server.tables.clear()
+            self._server.tuned = False
+            self._server.drops += 1
+            self.database_was_reused = False
+        else:
+            self.database_was_reused = True
+        return Mock()
+
+    def close_connection(self, _conn) -> None:
+        pass
+
+    def create_schema(self, benchmark, connection):
+        self.schema_calls += 1
+        for table in benchmark.get_schema():
+            if table in self._server.tables:
+                raise RuntimeError(f"Code: 57. DB::Exception: Table default.{table} already exists.")
+            self._server.tables[table] = 0
+        return 0.1
+
+    def load_data(self, benchmark, connection, data_dir):
+        self.load_calls += 1
+        stats = dict.fromkeys(benchmark.get_schema(), 10)
+        self._server.tables.update(stats)
+        if self.tuning_enabled:
+            self._server.tuned = True
+        return stats, 0.5, None
+
+    def get_table_row_count(self, connection, table: str) -> int:
+        return self._server.tables.get(table, 0)
+
+
+def _run_clickhouse_load_only(bench, adapter, tmp_path):
+    cfg = BenchmarkConfig(name="tpch", display_name="TPC-H", test_execution_type="load_only")
+    db = DatabaseConfig(type="clickhouse-server", name="test")
+    return run_benchmark_lifecycle(
+        benchmark_config=cfg,
+        database_config=db,
+        system_profile=_mk_system_profile(),
+        platform_config={},
+        phases=LifecyclePhases(generate=False, load=True, execute=False),
+        output_root=str(tmp_path),
+        benchmark_instance=bench,
+        platform_adapter=adapter,
+    )
+
+
+def _make_clickhouse_load_bench(tmp_path, captured):
+    bench = MagicMock()
+    bench.output_dir = tmp_path
+    bench.tables = None
+    bench.get_schema = MagicMock(return_value={"region": {}, "nation": {}})
+
+    def _create_enhanced(platform, query_results, **kwargs):
+        captured.update(kwargs)
+        return make_benchmark_results(
+            benchmark_name="TPC-H",
+            platform=platform,
+            execution_id="eid",
+            query_definitions={},
+            test_execution_type="load_only",
+        )
+
+    bench.create_enhanced_benchmark_result = _create_enhanced
+    bench.generate_data = MagicMock()
+    return bench
+
+
+@pytest.mark.unit
+def test_load_only_notuning_rerun_reuses_existing_tables(tmp_path):
+    server = _FakeClickHouseServer()
+    first = _FakeClickHouseLoadAdapter(server, tuning_enabled=False)
+    captured_first: dict = {}
+    res = _run_clickhouse_load_only(_make_clickhouse_load_bench(tmp_path, captured_first), first, tmp_path)
+    assert isinstance(res, BenchmarkResults)
+    assert first.schema_calls == 1
+    assert server.tables == {"region": 10, "nation": 10}
+
+    second = _FakeClickHouseLoadAdapter(server, tuning_enabled=False)
+    captured: dict = {}
+    res = _run_clickhouse_load_only(_make_clickhouse_load_bench(tmp_path, captured), second, tmp_path)
+    assert isinstance(res, BenchmarkResults)
+    assert server.drops == 0
+    assert server.tables == {"region": 10, "nation": 10}
+    assert second.schema_calls == 0
+    assert second.load_calls == 0
+    assert captured["phases"]["schema_creation"]["status"] == "SKIPPED"
+    assert captured["phases"]["data_loading"]["status"] == "SKIPPED"
+    assert captured["table_statistics"] == {"region": 10, "nation": 10}
+
+
+@pytest.mark.unit
+def test_load_only_tuned_rerun_reuses_compatible_tables(tmp_path):
+    server = _FakeClickHouseServer()
+    first = _FakeClickHouseLoadAdapter(server, tuning_enabled=True)
+    _run_clickhouse_load_only(_make_clickhouse_load_bench(tmp_path, {}), first, tmp_path)
+    assert first.schema_calls == 1
+    assert server.tuned is True
+
+    second = _FakeClickHouseLoadAdapter(server, tuning_enabled=True)
+    captured: dict = {}
+    res = _run_clickhouse_load_only(_make_clickhouse_load_bench(tmp_path, captured), second, tmp_path)
+    assert isinstance(res, BenchmarkResults)
+    assert server.drops == 0
+    assert second.schema_calls == 0
+    assert second.load_calls == 0
+    assert captured["phases"]["schema_creation"]["status"] == "SKIPPED"
+    assert captured["phases"]["data_loading"]["status"] == "SKIPPED"
+    assert captured["table_statistics"] == {"region": 10, "nation": 10}
+
+
+@pytest.mark.unit
+def test_load_only_tuned_run_recreates_mismatched_tables(tmp_path):
+    server = _FakeClickHouseServer()
+    baseline = _FakeClickHouseLoadAdapter(server, tuning_enabled=False)
+    _run_clickhouse_load_only(_make_clickhouse_load_bench(tmp_path, {}), baseline, tmp_path)
+    assert server.tuned is False
+
+    tuned = _FakeClickHouseLoadAdapter(server, tuning_enabled=True)
+    captured: dict = {}
+    res = _run_clickhouse_load_only(_make_clickhouse_load_bench(tmp_path, captured), tuned, tmp_path)
+    assert isinstance(res, BenchmarkResults)
+    assert server.drops == 1
+    assert tuned.schema_calls == 1
+    assert tuned.load_calls == 1
+    assert server.tables == {"region": 10, "nation": 10}
+    assert server.tuned is True
+    assert captured["phases"]["schema_creation"]["status"] == "COMPLETED"

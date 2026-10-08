@@ -1,9 +1,3 @@
-"""Canonical Join Order Benchmark query management.
-
-This module embeds the 113 SQL queries from the pinned gregrahn/JOB
-query set imported by the joinorder canonical foundation build.
-"""
-
 from __future__ import annotations
 
 import os
@@ -133,38 +127,24 @@ _DUCKDB_RESERVED_ALIAS_QUERY_IDS = {"15a", "15b", "15c", "15d"}
 
 
 def _normalize_portable_aliases(query_id: str, query: str) -> str:
-    """Avoid aliases that are reserved words on supported local engines."""
     if query_id not in _DUCKDB_RESERVED_ALIAS_QUERY_IDS:
         return query
-    # Table alias with or without AS (`aka_title AS at` and the legal
-    # `aka_title at`): normalize the declaration first so bare qualifiers
-    # below cannot orphan the alias.
     query = re.sub(r"\bAS\s+at\b", "AS at1", query)
     query = re.sub(r"(?i)(\bFROM\s+aka_title|\bJOIN\s+aka_title)\s+at\b(?!\.)", r"\1 at1", query)
     return re.sub(r"\bat\.", "at1.", query)
 
 
 class JoinOrderQueryManager:
-    """Manager for canonical Join Order Benchmark queries."""
-
     def __init__(self, queries_dir: Optional[str] = None) -> None:
-        """Initialize the Join Order query manager.
-
-        Args:
-            queries_dir: Path to directory containing Join Order Benchmark query files.
-                If None, uses embedded canonical queries.
-        """
         self._queries_dir = queries_dir
         self._queries = self._load_queries()
 
     def _load_queries(self) -> dict[str, str]:
-        """Load all Join Order Benchmark queries."""
         if self._queries_dir and os.path.exists(self._queries_dir):
             return self._load_queries_from_files()
         return self._load_embedded_queries()
 
     def _load_queries_from_files(self) -> dict[str, str]:
-        """Load queries from a Join Order Benchmark query directory."""
         queries: dict[str, str] = {}
         queries_path = Path(self._queries_dir or "")
 
@@ -181,33 +161,27 @@ class JoinOrderQueryManager:
         return queries
 
     def _load_embedded_queries(self) -> dict[str, str]:
-        """Load embedded canonical Join Order Benchmark queries."""
         return {
             query_id: _normalize_portable_aliases(query_id, query)
             for query_id, query in CANONICAL_JOINORDER_QUERIES.items()
         }
 
     def get_query(self, query_id: str) -> str:
-        """Get a Join Order Benchmark query by ID."""
         if query_id not in self._queries:
             available = ", ".join(sorted(self._queries.keys()))
             raise ValueError(f"Invalid query ID: {query_id}. Available: {available}")
         return self._queries[query_id]
 
     def get_all_queries(self) -> dict[str, str]:
-        """Get all Join Order Benchmark queries."""
         return self._queries.copy()
 
     def get_query_ids(self) -> list[str]:
-        """Get list of all query IDs in sorted order."""
         return sorted(self._queries.keys())
 
     def get_query_count(self) -> int:
-        """Get total number of queries."""
         return len(self._queries)
 
     def get_queries_by_complexity(self) -> dict[str, list[str]]:
-        """Categorize queries by rough complexity based on table count."""
         complexity_map = {"simple": [], "medium": [], "complex": []}
         for query_id, query_sql in self._queries.items():
             from_count = query_sql.upper().count("FROM")
@@ -229,7 +203,6 @@ class JoinOrderQueryManager:
         return complexity_map
 
     def get_queries_by_pattern(self) -> dict[str, list[str]]:
-        """Categorize queries by rough join pattern."""
         pattern_map = {
             "star_join": [],
             "chain_join": [],

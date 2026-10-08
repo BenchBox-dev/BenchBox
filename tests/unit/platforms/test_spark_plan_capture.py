@@ -1,9 +1,3 @@
-"""Wiring tests for Spark and Databricks query plan capture.
-
-Uses fakes that return the recorded EXPLAIN EXTENDED fixture for EXPLAIN
-statements, so no live Spark/Databricks cluster is required.
-"""
-
 from pathlib import Path
 
 import pytest
@@ -19,8 +13,6 @@ _FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "query_plans"
 _PLAN_TEXT = (_FIXTURES / "spark_explain_sample.txt").read_text()
 
 
-# --- Spark (SparkSession-style) fakes ------------------------------------------------
-# PySpark Rows are tuple subclasses; use real tuples so tuple(row) terminates.
 class _DF:
     def __init__(self, rows):
         self._rows = rows
@@ -40,7 +32,6 @@ class _FakeSpark:
         return _DF([(1,)])
 
 
-# --- Databricks (DBAPI cursor-style) fakes -------------------------------------------
 class _FakeCursor:
     def __init__(self):
         self.last = ""
@@ -73,7 +64,7 @@ def spark_adapter():
     from benchbox.platforms.spark import SparkAdapter
 
     adapter = SparkAdapter(capture_plans=True)
-    adapter.disable_cache = False  # avoid spark.catalog.clearCache() on the fake session
+    adapter.disable_cache = False
     return adapter
 
 
@@ -111,8 +102,7 @@ class TestSparkPlanCapture:
         assert not any(q.strip().upper().startswith("EXPLAIN") for q in spark.queries)
 
     def test_graceful_when_explain_fails(self, spark_adapter, monkeypatch):
-        # When no plan is available (get_query_plan returns None), capture yields no
-        # plan and the query still succeeds without plan fields.
+
         monkeypatch.setattr(spark_adapter, "get_query_plan", lambda *a, **k: None)
         result = spark_adapter._execute_query_spark(
             connection=_FakeSpark(), query="SELECT 1", query_id="sq3", validate_row_count=False

@@ -1,10 +1,3 @@
-"""Test helper: configurable stand-in for DataFrameWriteOperationsManager.
-
-Lets unit tests for ``WritePrimitivesBenchmark._execute_aggregate_state_op``
-exercise dispatch without spinning up a JVM. Each test injects whatever
-DataFrameWriteResult shape it needs for persist + merge.
-"""
-
 from __future__ import annotations
 
 import time
@@ -27,7 +20,6 @@ def make_result(
     metrics: dict[str, Any] | None = None,
     duration_ms: float = 1.0,
 ) -> DataFrameWriteResult:
-    """Build a DataFrameWriteResult for use in dispatch tests."""
     now = time.time()
     return DataFrameWriteResult(
         operation_type=operation_type,
@@ -43,13 +35,6 @@ def make_result(
 
 @dataclass
 class MockDataFrameWriteOperationsManager:
-    """Configurable mock returning preset persist/merge results.
-
-    Tests typically construct one with explicit results, attach to
-    ``get_dataframe_write_manager`` via monkeypatch, and assert against
-    the dispatch fork's returned envelope.
-    """
-
     persist_result: DataFrameWriteResult | None = None
     merge_result: DataFrameWriteResult | None = None
     persist_raises: BaseException | None = None

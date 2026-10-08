@@ -1,17 +1,3 @@
-"""w7 regression: cost.total_usd must survive a load → re-export round trip.
-
-Pre-w7, ``_extract_cost_summary`` only returned ``total_cost`` and
-``cost_model`` (no ``normalized_cost``), and the schema-side guard
-``_normalized_cost_allows_direct_total`` rejected any non-dict
-``normalized_cost``. The combination silently dropped ``cost.total_usd``
-for every legacy bundle on every re-export.
-
-These tests cover both halves:
-  - ``_extract_cost_summary`` preserves the normalized_cost block.
-  - ``_normalized_cost_allows_direct_total`` distinguishes "missing"
-    (legacy → allow) from "rejected" (e.g. cost_status=unavailable → block).
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -56,9 +42,6 @@ class TestExtractCostSummaryPreservesNormalizedCost:
 
 class TestNormalizedCostAllowsDirectTotal:
     def test_missing_block_allows_direct_total_for_legacy_bundles(self) -> None:
-        """Legacy bundles produced before normalized_cost existed have no
-        block at all — the direct ``cost.total_usd`` is the only signal,
-        and re-exports must preserve it. Pre-w7 the schema rejected this."""
         assert _normalized_cost_allows_direct_total(None) is True
 
     def test_normalized_status_allows_direct_total(self) -> None:
@@ -79,6 +62,6 @@ class TestNormalizedCostAllowsDirectTotal:
         assert _normalized_cost_allows_direct_total({"cost_status": "normalized", "normalized_cost_usd": None}) is False
 
     def test_non_dict_non_none_value_blocks_direct_total(self) -> None:
-        # Defensive: anything other than None or a dict shape is suspect.
+
         assert _normalized_cost_allows_direct_total("normalized") is False
         assert _normalized_cost_allows_direct_total(42) is False

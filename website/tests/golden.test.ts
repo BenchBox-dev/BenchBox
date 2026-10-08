@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 import { buildSite } from "../src/converter/build.ts";
+import { EXCLUSIONS_FILE } from "../src/converter/sources.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const goldenRoot = path.join(here, "golden");
@@ -44,6 +45,7 @@ describe.each(cases)("golden %s", (name) => {
     const target = path.join(workDir, "docs");
     rmSync(target, { recursive: true, force: true });
     cpSync(path.join(root, "docs"), target, { recursive: true });
+    if (!existsSync(path.join(target, EXCLUSIONS_FILE))) writeFileSync(path.join(target, EXCLUSIONS_FILE), "");
     for (const [fixture, real] of Object.entries(sources)) {
       mkdirSync(path.dirname(path.join(target, fixture)), { recursive: true });
       copyFileSync(path.join(realDocs, real), path.join(target, fixture));

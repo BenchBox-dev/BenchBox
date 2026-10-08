@@ -1,12 +1,6 @@
-"""TPC-Havoc DataFrame variants for Q4.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Implements 10 structurally diverse variants of TPC-H Q4 (Order Priority Checking).
-Q4 uses a semi-join pattern: find orders with at least one late lineitem.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -20,10 +14,6 @@ from benchbox.core.tpch.dataframe_queries import (
 )
 from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_SUBQUERY, build_yaml_variants
 
-# ---------------------------------------------------------------------------
-# v1: baseline
-# ---------------------------------------------------------------------------
-
 
 def q4_v1_expression_impl(ctx: DataFrameContext) -> Any:
     return _q4_expr_base(ctx)
@@ -31,11 +21,6 @@ def q4_v1_expression_impl(ctx: DataFrameContext) -> Any:
 
 def q4_v1_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q4_pandas_base(ctx)
-
-
-# ---------------------------------------------------------------------------
-# v2: pre-filter - pre-filter orders and lineitem before semi-join
-# ---------------------------------------------------------------------------
 
 
 def q4_v2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -48,10 +33,8 @@ def q4_v2_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Pre-filter orders first
     filtered_orders = orders.filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
 
-    # Pre-filter lineitem
     late_orders = lineitem.filter(col("l_commitdate") < col("l_receiptdate")).select("l_orderkey").unique()
 
     return (
@@ -72,14 +55,11 @@ def q4_v2_pandas_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Pre-filter orders
     filtered_orders = orders[(orders["o_orderdate"] >= start_date) & (orders["o_orderdate"] < end_date)]
 
-    # Pre-filter lineitem
     late_lineitems = lineitem[lineitem["l_commitdate"] < lineitem["l_receiptdate"]]
     late_orderkeys = _to_list(late_lineitems["l_orderkey"].unique())
 
-    # Semi-join
     result_df = filtered_orders[filtered_orders["o_orderkey"].isin(late_orderkeys)]
 
     return (
@@ -87,11 +67,6 @@ def q4_v2_pandas_impl(ctx: DataFrameContext) -> Any:
         .agg(order_count=("o_orderkey", "count"))
         .sort_values("o_orderpriority")
     )
-
-
-# ---------------------------------------------------------------------------
-# v3: column prune - select only needed columns before semi-join
-# ---------------------------------------------------------------------------
 
 
 def q4_v3_expression_impl(ctx: DataFrameContext) -> Any:
@@ -131,7 +106,6 @@ def q4_v3_pandas_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Pruned columns
     orders_pruned = orders[["o_orderkey", "o_orderdate", "o_orderpriority"]]
     li_pruned = lineitem[["l_orderkey", "l_commitdate", "l_receiptdate"]]
 
@@ -150,11 +124,6 @@ def q4_v3_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
-# v4: intermediate vars - explicit named steps
-# ---------------------------------------------------------------------------
-
-
 def q4_v4_expression_impl(ctx: DataFrameContext) -> Any:
     orders = ctx.get_table("orders")
     lineitem = ctx.get_table("lineitem")
@@ -165,16 +134,11 @@ def q4_v4_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Step 1: find late lineitems
     late_lineitems = lineitem.filter(col("l_commitdate") < col("l_receiptdate"))
     late_keys = late_lineitems.select("l_orderkey").unique()
-    # Step 2: filter orders by date
     period_orders = orders.filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
-    # Step 3: semi-join
     orders_with_late = period_orders.join(late_keys, left_on="o_orderkey", right_on="l_orderkey", how="semi")
-    # Step 4: aggregate
     aggregated = orders_with_late.group_by("o_orderpriority").agg(col("o_orderkey").count().alias("order_count"))
-    # Step 5: sort
     return aggregated.sort("o_orderpriority")
 
 
@@ -199,11 +163,6 @@ def q4_v4_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
-# v5: pre-compute derived - compute late flag before filtering
-# ---------------------------------------------------------------------------
-
-
 def q4_v5_expression_impl(ctx: DataFrameContext) -> Any:
     orders = ctx.get_table("orders")
     lineitem = ctx.get_table("lineitem")
@@ -214,7 +173,6 @@ def q4_v5_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Pre-compute late flag
     lineitem_with_flag = lineitem.with_columns((col("l_commitdate") < col("l_receiptdate")).alias("is_late"))
     late_orders = lineitem_with_flag.filter(col("is_late")).select("l_orderkey").unique()
 
@@ -237,7 +195,6 @@ def q4_v5_pandas_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Pre-compute late flag column
     lineitem_copy = lineitem.copy()
     lineitem_copy["is_late"] = lineitem_copy["l_commitdate"] < lineitem_copy["l_receiptdate"]
     late_orderkeys = _to_list(lineitem_copy[lineitem_copy["is_late"]]["l_orderkey"].unique())
@@ -250,11 +207,6 @@ def q4_v5_pandas_impl(ctx: DataFrameContext) -> Any:
         .agg(order_count=("o_orderkey", "count"))
         .sort_values("o_orderpriority")
     )
-
-
-# ---------------------------------------------------------------------------
-# v6: chained style
-# ---------------------------------------------------------------------------
 
 
 def q4_v6_expression_impl(ctx: DataFrameContext) -> Any:
@@ -278,11 +230,6 @@ def q4_v6_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q4_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
-# v7: join reorder - use inner join instead of semi-join, then deduplicate
-# ---------------------------------------------------------------------------
-
-
 def q4_v7_expression_impl(ctx: DataFrameContext) -> Any:
     orders = ctx.get_table("orders")
     lineitem = ctx.get_table("lineitem")
@@ -293,7 +240,6 @@ def q4_v7_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Use inner join + unique instead of semi-join (equivalent result)
     late_orders = lineitem.filter(col("l_commitdate") < col("l_receiptdate")).select("l_orderkey").unique()
 
     return (
@@ -326,11 +272,6 @@ def q4_v7_pandas_impl(ctx: DataFrameContext) -> Any:
         .agg(order_count=("o_orderkey", "count"))
         .sort_values("o_orderpriority")
     )
-
-
-# ---------------------------------------------------------------------------
-# v8: filter combination - combine date range as a tuple predicate
-# ---------------------------------------------------------------------------
 
 
 def q4_v8_expression_impl(ctx: DataFrameContext) -> Any:
@@ -376,11 +317,6 @@ def q4_v8_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
-# v9: explicit sort
-# ---------------------------------------------------------------------------
-
-
 def q4_v9_expression_impl(ctx: DataFrameContext) -> Any:
     orders = ctx.get_table("orders")
     lineitem = ctx.get_table("lineitem")
@@ -423,11 +359,6 @@ def q4_v9_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
-# v10: alternative formula - count using len instead of count aggregation
-# ---------------------------------------------------------------------------
-
-
 def q4_v10_expression_impl(ctx: DataFrameContext) -> Any:
     return _q4_expr_base(ctx)
 
@@ -446,7 +377,6 @@ def q4_v10_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered = orders[(orders["o_orderdate"] >= start_date) & (orders["o_orderdate"] < end_date)]
     result_df = filtered[filtered["o_orderkey"].isin(late_orderkeys)]
 
-    # Alternative: use size() instead of count()
     return (
         result_df.groupby("o_orderpriority", as_index=False)
         .size()
@@ -454,9 +384,5 @@ def q4_v10_pandas_impl(ctx: DataFrameContext) -> Any:
         .sort_values("o_orderpriority")
     )
 
-
-# ---------------------------------------------------------------------------
-# Registry
-# ---------------------------------------------------------------------------
 
 Q4_VARIANTS = build_yaml_variants(__file__, globals(), 4, JOIN_AGG_SUBQUERY)

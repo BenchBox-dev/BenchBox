@@ -19,33 +19,24 @@ join-order planning behavior across many-table SQL queries.
 `imdb_pg11` archive, DOI `10.7910/DVN/2QYZBT`, restored into PostgreSQL and
 converted to 21 Parquet tables for repeatable benchmark execution.
 
-The provenance attestation lives at
-`_project/joinorder/provenance-attestation.md`. It records that the
-Dataverse-published MD5 for file id `3590041` matches the cached source pg_dump,
-that the restored source has 21 tables and 74,190,187 rows, and that the
-Postgres-to-Parquet conversion fidelity check passes for row counts,
-null/empty-string preservation, integer ranges, and UTF-8 samples.
+The source pg_dump matches the Dataverse-published MD5, and the restored source
+has 21 tables and 74,190,187 rows. The Postgres-to-Parquet conversion is checked
+for row counts, null/empty-string preservation, integer ranges, and UTF-8
+samples.
 
-BenchBox does not define JoinOrder source recovery as byte-identical
-Parquet/archive reproduction. A 2026-05-12 rebuild check produced different
-archive hashes across two local rebuilds, with byte-hash drift in
-`cast_info.parquet`, while conversion-fidelity checks passed. The rebuild
-contract is therefore logical table-content equivalence: maintainer rebuilds
-export PostgreSQL rows in `id` order, read rebuilt Parquet rows in `id` order,
-and compare versioned typed row-content hashes before packaging. The downloaded
-published archive is still verified by its pinned `archive_sha256` and
-per-table Parquet file hashes.
+Rebuilding the archive from source does not reproduce it byte for byte; rebuilt
+Parquet files can differ in their hashes while holding the same rows. Rebuilds
+are compared by logical table content instead. The downloaded published archive
+is verified by its pinned `archive_sha256` and per-table Parquet file hashes.
 
 Licensing status is separate from integrity status. The Dataverse record
 declares the deposit as `CC0 1.0`, but IMDb's current dataset terms and the JOB
-paper frame the underlying IMDb data as non-commercial. BenchBox records the
-current re-hosted Parquet release asset as an accepted project-owner
-redistribution risk, keeps it as the default fast path, and does not treat it as
-BenchBox-cleared for broad commercial redistribution.
+paper frame the underlying IMDb data as non-commercial. BenchBox keeps the
+re-hosted Parquet archive as the default fast path but does not treat it as
+cleared for broad commercial redistribution.
 
-The benchmark accepts only `--scale 1`. There is currently no public small,
-comparable JOB workload; the decision is recorded in
-`_project/decisions/joinorder-small-workload-2026-05-12.md`. The old
+The benchmark accepts only `--scale 1`. There is no public small,
+comparable JOB workload. The old
 uniformly-random data generator has been renamed to the internal
 `joinorder_synthetic` benchmark for loader and schema smoke tests; it is not a
 substitute for JOB cardinality testing.
@@ -104,18 +95,6 @@ missing, BenchBox falls back to the default hosted archive. If a file is present
 but has the wrong sha256, the run fails before downloading so stale or corrupt
 BYO data is visible.
 
-Maintainers can rebuild the canonical Parquet files directly from Dataverse with
-the project script:
-
-```bash
-uv run -- python _project/scripts/build_joinorder_data.py foundation --work-dir ~/Developer/benchmark_runs/joinorder/build/joinorder-imdb-2013-v1
-```
-
-That path downloads `imdb_pg11` from DOI `10.7910/DVN/2QYZBT`, verifies the
-Dataverse checksum, restores the pg_dump into PostgreSQL, converts the 21 tables
-to Parquet, and runs the canonical manifest and logical-content checks. It is a
-heavy maintainer workflow and is not the silent first-run default.
-
 ## Query Set
 
 `JoinOrderQueryManager` exposes all 113 canonical JOB SQL queries:
@@ -169,12 +148,6 @@ Dataset provenance and redistribution notes live in:
 benchbox/core/joinorder/DATA-LICENSE.md
 ```
 
-Decision record:
-
-```text
-_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md
-```
-
 IMDb attribution:
 
 ```text
@@ -184,9 +157,8 @@ Information courtesy of IMDb (https://www.imdb.com). Used with permission.
 Use this dataset for research, database systems evaluation, and query optimizer
 benchmarking. It is not intended for republication as a general-purpose movie
 database, and BenchBox does not treat the current converted archive as
-BenchBox-cleared for broad commercial redistribution. Optional follow-up work may
-seek explicit permission or add an advanced direct-Dataverse/BYO path, but the
-default user experience remains the verified BenchBox-hosted Parquet archive.
+BenchBox-cleared for broad commercial redistribution. To avoid the re-hosted
+archive, use the [BYO data path](#byo-data-path).
 
 ## References
 

@@ -1,9 +1,6 @@
-"""Tests for Snowflake platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import tempfile
 from pathlib import Path
@@ -24,17 +21,13 @@ pytestmark = [
 
 @pytest.fixture(autouse=True)
 def snowflake_dependencies():
-    """Mock Snowflake dependency check to simulate installed extras."""
 
     with patch("benchbox.platforms.snowflake.check_platform_dependencies", return_value=(True, [])):
         yield
 
 
 class TestSnowflakeAdapter:
-    """Test Snowflake platform adapter functionality."""
-
     def test_initialization_success(self):
-        """Test successful adapter initialization."""
         with patch("benchbox.platforms.snowflake.snowflake"):
             adapter = SnowflakeAdapter(
                 account="test_account",
@@ -52,7 +45,6 @@ class TestSnowflakeAdapter:
             assert adapter.database == "TEST_DB"
 
     def test_initialization_with_defaults(self):
-        """Test initialization with default configuration."""
         with patch("benchbox.platforms.snowflake.snowflake"):
             adapter = SnowflakeAdapter(account="test_account", username="test_user", password="test_pass")
             assert adapter.warehouse == "COMPUTE_WH"
@@ -64,7 +56,6 @@ class TestSnowflakeAdapter:
             assert adapter.auto_resume is True
 
     def test_external_table_capability_declared(self):
-        """Snowflake should explicitly declare external-table support."""
         with patch("benchbox.platforms.snowflake.snowflake"):
             adapter = SnowflakeAdapter(account="test_account", username="test_user", password="test_pass")
             assert adapter.supports_external_tables is True
@@ -91,7 +82,6 @@ class TestSnowflakeAdapter:
                 )
 
     def test_initialization_missing_driver(self):
-        """Test initialization when Snowflake dependencies are missing."""
         with (
             patch("benchbox.platforms.snowflake.snowflake", None),
             patch(
@@ -105,16 +95,14 @@ class TestSnowflakeAdapter:
         assert "Missing dependencies for snowflake platform" in str(excinfo.value)
 
     def test_initialization_missing_required_config(self):
-        """Test initialization with missing required configuration."""
         from benchbox.core.exceptions import ConfigurationError
 
         with patch("benchbox.platforms.snowflake.snowflake"):
             with pytest.raises(ConfigurationError, match="Snowflake configuration is incomplete"):
-                SnowflakeAdapter()  # Missing required fields
+                SnowflakeAdapter()
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_get_connection_params(self, mock_snowflake):
-        """Test connection parameter configuration."""
         adapter = SnowflakeAdapter(
             account="test_account",
             username="test_user",
@@ -132,15 +120,13 @@ class TestSnowflakeAdapter:
         assert params["warehouse"] == "TEST_WH"
         assert params["role"] == "TEST_ROLE"
 
-        # Test with overrides
         override_params = adapter._get_connection_params(account="override_account", username="override_user")
         assert override_params["account"] == "override_account"
         assert override_params["username"] == "override_user"
-        assert override_params["password"] == "test_pass"  # Should keep original
+        assert override_params["password"] == "test_pass"
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_from_config_generates_database_name(self, mock_snowflake):
-        """Test that from_config generates proper database names."""
         config = {
             "benchmark": "tpch",
             "scale_factor": 1.0,
@@ -148,19 +134,17 @@ class TestSnowflakeAdapter:
             "username": "test_user",
             "password": "test_pass",
             "warehouse": "TEST_WH",
-            "tuning_config": None,  # No tuning configuration
+            "tuning_config": None,
         }
 
         adapter = SnowflakeAdapter.from_config(config)
 
-        # Database should be auto-generated with benchmark and scale info
         assert adapter.database == "tpch_sf1_notuning_noconstraints"
         assert adapter.account == "test_account"
         assert adapter.warehouse == "TEST_WH"
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_from_config_respects_explicit_database(self, mock_snowflake):
-        """Test that explicit database name overrides generation."""
         config = {
             "benchmark": "tpch",
             "scale_factor": 1.0,
@@ -173,13 +157,10 @@ class TestSnowflakeAdapter:
 
         adapter = SnowflakeAdapter.from_config(config)
 
-        # Explicit database name should be used
         assert adapter.database == "CUSTOM_DATABASE"
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_from_config_with_scale_factor_formatting(self, mock_snowflake):
-        """Test database name generation with different scale factors."""
-        # Test SF 0.1
         config_01 = {
             "benchmark": "tpcds",
             "scale_factor": 0.1,
@@ -190,7 +171,6 @@ class TestSnowflakeAdapter:
         adapter_01 = SnowflakeAdapter.from_config(config_01)
         assert adapter_01.database == "tpcds_sf01_notuning_noconstraints"
 
-        # Test SF 10
         config_10 = {
             "benchmark": "ssb",
             "scale_factor": 10.0,
@@ -203,7 +183,6 @@ class TestSnowflakeAdapter:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_create_admin_connection(self, mock_snowflake):
-        """Test admin connection creation."""
         mock_connection = Mock()
         mock_snowflake.connector.connect.return_value = mock_connection
 
@@ -228,7 +207,6 @@ class TestSnowflakeAdapter:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_check_server_database_exists_true(self, mock_snowflake):
-        """Test database existence check when database exists."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -254,19 +232,14 @@ class TestSnowflakeAdapter:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_check_server_database_exists_false(self, mock_snowflake):
-        """Test database existence check when database doesn't exist."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        # Return different values for each fetchall() call:
-        # 1. SHOW DATABASES returns only OTHER_DB (not TEST_DB)
-        # 2. SHOW SCHEMAS returns empty (database doesn't exist)
-        # 3. SHOW TABLES returns empty (no tables)
         mock_cursor.fetchall.side_effect = [
-            [["schema", "OTHER_DB", "owner", "comment"]],  # SHOW DATABASES
-            [],  # SHOW SCHEMAS (if database exists but is empty)
-            [],  # SHOW TABLES (if schema exists but is empty)
+            [["schema", "OTHER_DB", "owner", "comment"]],
+            [],
+            [],
         ]
         mock_snowflake.connector.connect.return_value = mock_connection
 
@@ -285,7 +258,6 @@ class TestSnowflakeAdapter:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_check_server_database_exists_connection_error(self, mock_snowflake):
-        """Test database existence check with connection error."""
         mock_snowflake.connector.connect.side_effect = Exception("Connection failed")
 
         adapter = SnowflakeAdapter(
@@ -302,7 +274,6 @@ class TestSnowflakeAdapter:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_drop_database(self, mock_snowflake):
-        """Test database dropping."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -318,13 +289,11 @@ class TestSnowflakeAdapter:
 
         adapter.drop_database()
 
-        # SQL injection fix: identifiers are now quoted
         mock_cursor.execute.assert_called_once_with('DROP DATABASE IF EXISTS "TEST_DB"')
         mock_connection.close.assert_called_once()
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_drop_database_connection_error_preserves_database_name(self, mock_snowflake):
-        """Connection failures should not be masked by an unbound database variable."""
         mock_snowflake.connector.connect.side_effect = RuntimeError("connection failed")
         adapter = SnowflakeAdapter(
             account="test_account",
@@ -339,7 +308,6 @@ class TestSnowflakeAdapter:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_create_connection_success(self, mock_snowflake):
-        """Test successful connection creation."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -353,27 +321,23 @@ class TestSnowflakeAdapter:
             database="TEST_DB",
         )
 
-        # Mock handle_existing_database
         with patch.object(adapter, "handle_existing_database"):
             connection = adapter.create_connection()
 
         assert connection == mock_connection
         mock_snowflake.connector.connect.assert_called_once()
 
-        # Check connection test was performed
         mock_cursor.execute.assert_called_with("SELECT CURRENT_VERSION()")
         mock_cursor.fetchall.assert_called_once()
         mock_cursor.close.assert_called_once()
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_create_connection_with_key_pair_auth(self, mock_snowflake):
-        """Test connection creation with key pair authentication."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
         mock_snowflake.connector.connect.return_value = mock_connection
 
-        # Create a temporary key file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False, encoding="utf-8") as f:
             f.write("""-----BEGIN TEST KEY-----
 benchbox-fixture-key-material
@@ -390,7 +354,6 @@ benchbox-fixture-key-material
                 private_key_path=key_path,
             )
 
-            # Mock cryptography imports by patching the import statements
             mock_serialization = Mock()
             mock_load_key = Mock()
             mock_private_key = Mock()
@@ -416,17 +379,15 @@ benchbox-fixture-key-material
 
             assert connection == mock_connection
 
-            # Should call connect with private_key parameter
             call_kwargs = mock_snowflake.connector.connect.call_args[1]
             assert "private_key" in call_kwargs
-            assert "password" not in call_kwargs  # Should remove password for key auth
+            assert "password" not in call_kwargs
 
         finally:
             Path(key_path).unlink()
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_create_connection_failure(self, mock_snowflake):
-        """Test connection creation failure."""
         mock_snowflake.connector.connect.side_effect = Exception("Connection failed")
 
         adapter = SnowflakeAdapter(
@@ -443,7 +404,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_create_schema(self, mock_snowflake):
-        """Test schema creation."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -463,7 +423,6 @@ benchbox-fixture-key-material
             database="TEST_DB",
         )
 
-        # Mock translate_sql method
         with patch.object(adapter, "translate_sql") as mock_translate:
             mock_translate.return_value = (
                 "CREATE TABLE table1 (id INTEGER, name VARCHAR(100));\nCREATE TABLE table2 (id INTEGER, data TEXT);"
@@ -474,11 +433,9 @@ benchbox-fixture-key-material
         assert isinstance(schema_time, float)
         assert schema_time >= 0
 
-        # Should execute database and schema setup
         setup_calls = list(mock_cursor.execute.call_args_list)
         setup_sqls = [str(call) for call in setup_calls]
 
-        # Should include database creation, schema creation, and table creation
         assert any("CREATE DATABASE" in sql for sql in setup_sqls)
         assert any("CREATE SCHEMA" in sql for sql in setup_sqls)
 
@@ -486,22 +443,18 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_load_data_with_file_upload(self, mock_snowflake):
-        """Test data loading using Snowflake PUT and COPY INTO."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        # Mock COPY INTO results
         mock_cursor.fetchall.side_effect = [
-            [(True, 100, 0, 0, "LOADED", None)],  # Copy results
-            [(100,)],  # Row count
+            [(True, 100, 0, 0, "LOADED", None)],
+            [(100,)],
         ]
-        # The final row-count query reports the loaded rows.
         mock_cursor.fetchone.return_value = (100,)
 
         mock_benchmark = Mock()
 
-        # Create temporary test file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False, encoding="utf-8") as f:
             f.write("1|test1|\n2|test2|\n")
             temp_path = Path(f.name)
@@ -525,7 +478,6 @@ benchbox-fixture-key-material
             assert "TEST_TABLE" in table_stats
             assert table_stats["TEST_TABLE"] == 100
 
-            # Should execute file format creation, PUT, and COPY INTO
             execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
             assert any("CREATE OR REPLACE FILE FORMAT" in call for call in execute_calls)
             assert any("PUT file://" in call for call in execute_calls)
@@ -536,14 +488,13 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_load_data_returns_per_table_timings(self, mock_snowflake):
-        """load_data should report per-table wall-clock timings keyed by table."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
         mock_cursor.fetchall.side_effect = [
-            [(True, 100, 0, 0, "LOADED", None)],  # Copy results
-            [(100,)],  # Row count
+            [(True, 100, 0, 0, "LOADED", None)],
+            [(100,)],
         ]
         mock_cursor.fetchone.return_value = (100,)
 
@@ -573,7 +524,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_load_data_skip_uses_uppercase_keys_with_zero_timings(self, mock_snowflake):
-        """Skipped tables should use the same key casing with a zero timing entry."""
         mock_connection = Mock()
         mock_connection.cursor.return_value = Mock()
 
@@ -595,7 +545,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_validate_external_table_requirements_requires_staging_root(self, mock_snowflake):
-        """External mode should require staging_root for Snowflake."""
         adapter = SnowflakeAdapter(
             account="test_account",
             username="test_user",
@@ -609,7 +558,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_create_external_tables_generates_stage_and_external_table_sql(self, mock_snowflake):
-        """External mode should create external stage and external table DDL."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -647,7 +595,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_create_external_tables_generates_iceberg_sql(self, mock_snowflake):
-        """Iceberg external mode should derive BASE_LOCATION from staging_root."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -682,7 +629,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_create_external_tables_iceberg_requires_external_volume(self, mock_snowflake):
-        """Iceberg external mode should reject runs without external volume config."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -707,7 +653,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_create_external_tables_generates_delta_sql(self, mock_snowflake):
-        """Delta external mode should use TABLE_FORMAT=DELTA."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -738,7 +683,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_create_external_tables_escapes_staging_root_quotes(self, mock_snowflake):
-        """Staging root with single quotes must be escaped in CREATE STAGE SQL."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -765,12 +709,10 @@ benchbox-fixture-key-material
         execute_calls = [str(call.args[0]) for call in mock_cursor.execute.call_args_list]
         stage_sql = [sql for sql in execute_calls if "CREATE STAGE" in sql]
         assert stage_sql, "Expected CREATE STAGE SQL"
-        # The single quote in the path should be escaped as ''
         assert "it''s-a-path" in stage_sql[0]
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_detect_external_table_format(self, mock_snowflake):
-        """External format detection should distinguish delta, iceberg, and parquet paths."""
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             delta_dir = tmp_path / "delta_table"
@@ -787,7 +729,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_create_load_file_formats_uses_configured_compression(self, mock_snowflake):
-        """Configured compression should be embedded in both Snowflake load file formats."""
         mock_cursor = Mock()
         adapter = SnowflakeAdapter(
             account="test_account",
@@ -809,7 +750,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_get_file_format_for_table_uses_tbl_format_for_tpch_chunks(self, mock_snowflake):
-        """Chunked .tbl inputs should use the TBL file format object."""
         adapter = SnowflakeAdapter(
             account="test_account",
             username="test_user",
@@ -831,7 +771,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_get_file_format_for_table_manifest_csv_with_tpc_dialect_picks_tbl_format(self, mock_snowflake):
-        """Manifest-declared TPC dialect on a .csv path must select BENCHBOX_TBL_FORMAT."""
         from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
 
         adapter = SnowflakeAdapter(
@@ -851,7 +790,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_get_file_format_for_table_manifest_csv_without_null_marker_picks_csv_format(self, mock_snowflake):
-        """Manifest-declared CSV dialect without null_marker must select BENCHBOX_CSV_FORMAT."""
         from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
 
         adapter = SnowflakeAdapter(
@@ -869,7 +807,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_get_file_format_for_table_manifest_csv_with_empty_null_marker_picks_csv_format(self, mock_snowflake):
-        """Manifest comma dialect with empty (not null) marker must select BENCHBOX_CSV_FORMAT."""
         from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
 
         adapter = SnowflakeAdapter(
@@ -887,7 +824,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_ensure_preserve_file_format_returns_none_without_sentinel(self, mock_snowflake):
-        """Falsy null markers keep the static CSV/TBL format choice (no new format)."""
         from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
 
         adapter = SnowflakeAdapter(
@@ -907,7 +843,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_ensure_preserve_file_format_creates_per_dialect_format_for_sentinel(self, mock_snowflake):
-        """A truthy null-marker sentinel gets a format preserving empty strings."""
         from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
 
         adapter = SnowflakeAdapter(
@@ -933,7 +868,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_ensure_preserve_file_format_creates_header_aware_format_without_sentinel(self, mock_snowflake):
-        """Header CSVs get SKIP_HEADER even when empty fields retain default NULL handling."""
         from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
 
         adapter = SnowflakeAdapter(
@@ -962,11 +896,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_ensure_preserve_file_format_header_with_none_null_marker_skips(self, mock_snowflake):
-        """A headered CSV declaring csv_null_marker=None must not raise on .replace().
-
-        TSBS DevOps declares csv_has_header=True with csv_null_marker=None: the
-        format still needs SKIP_HEADER but keeps default NULL handling.
-        """
         from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
 
         adapter = SnowflakeAdapter(
@@ -995,7 +924,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_parse_copy_results_logs_failed_and_unparseable_rows(self, mock_snowflake, caplog):
-        """COPY INTO parsing should warn on failed files and malformed row counts."""
         adapter = SnowflakeAdapter(
             account="test_account",
             username="test_user",
@@ -1017,7 +945,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_load_table_from_stage_uploads_files_and_executes_copy_into(self, mock_snowflake):
-        """Stage loading should PUT each file, execute COPY INTO, and return the counted rows."""
         mock_cursor = Mock()
         mock_cursor.fetchall.return_value = [["lineitem.tbl.1", "LOADED", None, 2, None, None]]
         mock_cursor.fetchone.return_value = (5,)
@@ -1056,12 +983,10 @@ benchbox-fixture-key-material
         assert execute_calls[-1] == "SELECT COUNT(*) FROM LINEITEM"
 
     def test_load_table_from_stage_fallback_to_quoted_stage_when_not_authorized(self):
-        """Fallback to lowercase quoted stage and table name when uppercase stage reports does not exist."""
         mock_cursor = Mock()
         mock_cursor.fetchall.return_value = [["lineitem.tbl.1", "LOADED", None, 2, None, None]]
         mock_cursor.fetchone.return_value = (10,)
 
-        # First PUT on @%LINEITEM raises, subsequent calls succeed
         def mock_execute(sql):
             if "@%LINEITEM" in sql:
                 raise Exception("Stage '@%LINEITEM' does not exist or not authorized")
@@ -1088,14 +1013,12 @@ benchbox-fixture-key-material
 
         assert row_count == 10
         execute_calls = [str(call.args[0]) for call in mock_cursor.execute.call_args_list]
-        # Should have tried @%LINEITEM first, then fallback to @"lineitem"
         assert any(f"PUT file://{path.absolute()} @%LINEITEM" in sql for sql in execute_calls)
         assert any(f'PUT file://{path.absolute()} @%"lineitem"' in sql for sql in execute_calls)
         assert any('COPY INTO "lineitem"' in sql for sql in execute_calls)
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_configure_for_benchmark_olap(self, mock_snowflake):
-        """Test OLAP benchmark configuration."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -1106,24 +1029,21 @@ benchbox-fixture-key-material
             password="test_pass",
             warehouse="TEST_WH",
             database="TEST_DB",
-            strict_validation=False,  # Disable validation in unit tests
+            strict_validation=False,
         )
 
         adapter.configure_for_benchmark(mock_connection, "olap")
 
-        # Should execute OLAP-specific optimizations
         execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
         assert any("QUERY_ACCELERATION_MAX_SCALE_FACTOR" in call for call in execute_calls)
         assert any("USE_CACHED_RESULT" in call for call in execute_calls)
         assert any("STATEMENT_TIMEOUT_IN_SECONDS" in call for call in execute_calls)
         assert any("USE WAREHOUSE" in call for call in execute_calls)
 
-        # cursor.close() called twice: once for configure, once for validation
         assert mock_cursor.close.call_count == 2
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_configure_for_benchmark_with_multi_cluster(self, mock_snowflake):
-        """Test benchmark configuration with multi-cluster warehouse."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -1135,13 +1055,12 @@ benchbox-fixture-key-material
             warehouse="TEST_WH",
             database="TEST_DB",
             multi_cluster_warehouse=True,
-            modify_warehouse_settings=True,  # Explicitly enable warehouse modifications
-            strict_validation=False,  # Disable validation in unit tests
+            modify_warehouse_settings=True,
+            strict_validation=False,
         )
 
         adapter.configure_for_benchmark(mock_connection, "tpch")
 
-        # Should execute multi-cluster warehouse configuration
         execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
         assert any("MIN_CLUSTER_COUNT" in call for call in execute_calls)
         assert any("MAX_CLUSTER_COUNT" in call for call in execute_calls)
@@ -1149,7 +1068,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_configure_for_benchmark_with_single_cluster_warehouse_settings(self, mock_snowflake):
-        """Single-cluster mode should apply warehouse size and suspend/resume settings."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -1178,7 +1096,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_execute_query_success(self, mock_snowflake):
-        """Test successful query execution."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -1192,7 +1109,6 @@ benchbox-fixture-key-material
             database="TEST_DB",
         )
 
-        # Mock query statistics
         with patch.object(adapter, "_get_query_statistics") as mock_stats:
             mock_stats.return_value = {"snowflake_query_id": "test_query_id"}
 
@@ -1204,8 +1120,6 @@ benchbox-fixture-key-material
         assert result["first_row"] == (1, "test")
         assert isinstance(result["execution_time_seconds"], float)
         assert result["query_statistics"] == {"snowflake_query_id": "test_query_id"}
-        # resource_usage carries the wall time for warehouse-credit estimation
-        # even when query history is delayed or unavailable.
         assert result["resource_usage"]["execution_time_seconds"] == result["execution_time_seconds"]
 
         mock_cursor.execute.assert_any_call("ALTER SESSION SET QUERY_TAG = 'BenchBox_q1'")
@@ -1214,7 +1128,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_execute_query_accepts_stream_cursor(self, mock_snowflake):
-        """TPC power harness passes a per-stream cursor without cursor()."""
         mock_cursor = Mock(spec=["execute", "fetchall", "fetchone", "close"])
         mock_cursor.fetchall.return_value = [(1,)]
 
@@ -1236,14 +1149,13 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_execute_query_failure(self, mock_snowflake):
-        """Test query execution failure."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
         mock_cursor.execute.side_effect = [
             None,
             Exception("Query failed"),
-        ]  # Query tag succeeds, query fails
+        ]
 
         adapter = SnowflakeAdapter(
             account="test_account",
@@ -1266,12 +1178,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_execute_query_splits_multi_statement_batch(self, mock_snowflake):
-        """Multi-statement operation SQL runs statement-by-statement.
-
-        The driver rejects multi-statement strings, so operation batches
-        (DELETE+INSERT pairs, the 3-statement SCD2 stage batch) must be
-        split; the last statement's rows are reported.
-        """
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -1308,7 +1214,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_multi_statement_dml_failure_rolls_back_and_leaves_data_unchanged(self, mock_snowflake):
-        """Second-statement failure in multi-statement DML rolls back earlier statements."""
         table_data = {"rows": [{"id": 1, "is_current": True}]}
 
         class FakeCursor:
@@ -1371,12 +1276,10 @@ benchbox-fixture-key-material
             "INSERT INTO dim_customer (id, is_current) VALUES (2, TRUE)",
             "ROLLBACK",
         ]
-        # CRITICAL: data remains unchanged because ROLLBACK discarded the uncommitted update
         assert table_data["rows"] == [{"id": 1, "is_current": True}]
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_multi_statement_ddl_skips_explicit_transaction(self, mock_snowflake):
-        """Multi-statement DDL batches do not execute BEGIN/COMMIT (DDL commits implicitly)."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -1402,7 +1305,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_execute_query_single_statement_executes_once(self, mock_snowflake):
-        """A single statement keeps the exact single-execute path."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -1427,7 +1329,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_get_query_statistics(self, mock_snowflake):
-        """Test query statistics retrieval."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -1460,8 +1361,6 @@ benchbox-fixture-key-material
         assert stats["bytes_scanned"] == 1024000
         assert stats["rows_produced"] == 10
         assert stats["warehouse_size"] == "MEDIUM"
-        # QUERY_HISTORY exposes cloud-services credits only; reporting them
-        # as warehouse credits_used once priced warehouse compute near $0.
         assert stats["credits_used_cloud_services"] == 5.5
         assert "credits_used" not in stats
 
@@ -1469,7 +1368,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_edition_flows_to_platform_info_for_cost_model(self, mock_snowflake):
-        """The edition is operator-supplied and must reach platform_info."""
         adapter = SnowflakeAdapter(
             account="test_account",
             username="test_user",
@@ -1491,14 +1389,12 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_get_platform_metadata(self, mock_snowflake):
-        """Test platform metadata collection."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        # Mock query responses
         mock_cursor.fetchone.side_effect = [
-            ["6.21.0"],  # Snowflake version
+            ["6.21.0"],
             [
                 "test_user",
                 "test_role",
@@ -1507,10 +1403,9 @@ benchbox-fixture-key-material
                 "PUBLIC",
                 "us-east-1",
                 "test_account",
-            ],  # Session info
+            ],
         ]
 
-        # Import datetime for proper mock objects
         from datetime import datetime
 
         mock_datetime = datetime(2024, 1, 1, 12, 0, 0)
@@ -1545,10 +1440,8 @@ benchbox-fixture-key-material
                     None,
                     "STANDARD",
                 ]
-            ],  # Warehouse info
-            [
-                ["TABLE1", 1000, 1024000, 7, mock_datetime, mock_datetime, None]
-            ],  # Table info with proper datetime objects
+            ],
+            [["TABLE1", 1000, 1024000, 7, mock_datetime, mock_datetime, None]],
         ]
 
         adapter = SnowflakeAdapter(
@@ -1573,7 +1466,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_analyze_table(self, mock_snowflake):
-        """Test table analysis (reclustering)."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -1593,7 +1485,6 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_close_connection(self, mock_snowflake):
-        """Test connection closing."""
         mock_connection = Mock()
 
         adapter = SnowflakeAdapter(
@@ -1609,7 +1500,6 @@ benchbox-fixture-key-material
         mock_connection.close.assert_called_once()
 
     def test_supports_tuning_type(self):
-        """Test tuning type support checking."""
         with patch("benchbox.platforms.snowflake.snowflake"):
             adapter = SnowflakeAdapter(
                 account="test_account",
@@ -1619,7 +1509,6 @@ benchbox-fixture-key-material
                 database="TEST_DB",
             )
 
-            # Mock TuningType from the correct import path
             with patch("benchbox.core.tuning.interface.TuningType") as mock_tuning_type:
                 mock_tuning_type.CLUSTERING = "clustering"
                 mock_tuning_type.PARTITIONING = "partitioning"
@@ -1630,7 +1519,6 @@ benchbox-fixture-key-material
                 assert adapter.supports_tuning_type(mock_tuning_type.SORTING) is False
 
     def test_generate_tuning_clause_with_clustering(self):
-        """Test tuning clause generation with clustering."""
         with patch("benchbox.platforms.snowflake.snowflake"):
             adapter = SnowflakeAdapter(
                 account="test_account",
@@ -1640,11 +1528,9 @@ benchbox-fixture-key-material
                 database="TEST_DB",
             )
 
-            # Mock table tuning with clustering
             mock_tuning = Mock()
             mock_tuning.has_any_tuning.return_value = True
 
-            # Mock clustering column
             mock_column = Mock()
             mock_column.name = "cluster_key"
             mock_column.order = 1
@@ -1665,7 +1551,6 @@ benchbox-fixture-key-material
                 assert "CLUSTER BY (cluster_key)" in clause
 
     def test_generate_tuning_clause_none(self):
-        """Test tuning clause generation with None input."""
         with patch("benchbox.platforms.snowflake.snowflake"):
             adapter = SnowflakeAdapter(
                 account="test_account",
@@ -1680,13 +1565,11 @@ benchbox-fixture-key-material
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_apply_table_tunings_with_clustering(self, mock_snowflake):
-        """Test applying table tunings with clustering."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        # Mock clustering key query response
-        mock_cursor.fetchone.return_value = [None]  # No existing clustering
+        mock_cursor.fetchone.return_value = [None]
 
         adapter = SnowflakeAdapter(
             account="test_account",
@@ -1696,12 +1579,10 @@ benchbox-fixture-key-material
             database="TEST_DB",
         )
 
-        # Mock table tuning
         mock_tuning = Mock()
         mock_tuning.table_name = "test_table"
         mock_tuning.has_any_tuning.return_value = True
 
-        # Mock clustering column
         mock_column = Mock()
         mock_column.name = "cluster_key"
         mock_column.order = 1
@@ -1721,7 +1602,6 @@ benchbox-fixture-key-material
 
             adapter.apply_table_tunings(mock_tuning, mock_connection)
 
-            # Should execute clustering setup
             execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
             assert any("ALTER TABLE TEST_TABLE CLUSTER BY" in call for call in execute_calls)
             assert not any("RESUME RECLUSTER" in call for call in execute_calls)
@@ -1735,7 +1615,6 @@ benchbox-fixture-key-material
         mock_cursor.close.assert_called()
 
     def test_apply_unified_tuning(self):
-        """Test unified tuning configuration application."""
         with patch("benchbox.platforms.snowflake.snowflake"):
             adapter = SnowflakeAdapter(
                 account="test_account",
@@ -1752,13 +1631,11 @@ benchbox-fixture-key-material
             mock_unified_config.platform_optimizations = Mock()
             mock_unified_config.table_tunings = {}
 
-            # Should not raise exception
             with patch.object(adapter, "apply_constraint_configuration"):
                 with patch.object(adapter, "apply_platform_optimizations"):
                     adapter.apply_unified_tuning(mock_unified_config, mock_connection)
 
     def test_file_format_detection_for_chunked_files(self):
-        """Test that chunked .tbl files (.tbl.1, .tbl.2) are correctly detected as TBL format."""
         with patch("benchbox.platforms.snowflake.snowflake"):
             from pathlib import Path
 
@@ -1770,7 +1647,6 @@ benchbox-fixture-key-material
                 database="TEST_DB",
             )
 
-            # Test various TPC-H file naming patterns
             test_cases = [
                 (Path("customer.tbl"), True, "Simple .tbl file"),
                 (Path("customer.tbl.1"), True, "Chunked .tbl file"),
@@ -1788,7 +1664,6 @@ benchbox-fixture-key-material
                 assert is_tbl == should_be_tbl, f"Failed for {description}: {file_path.name}"
 
     def test_apply_constraint_configuration(self):
-        """Test constraint configuration application."""
         with patch("benchbox.platforms.snowflake.snowflake"):
             adapter = SnowflakeAdapter(
                 account="test_account",
@@ -1804,23 +1679,18 @@ benchbox-fixture-key-material
             mock_foreign_key_config = Mock()
             mock_foreign_key_config.enabled = True
 
-            # Should not raise exception - constraints are informational in Snowflake
             adapter.apply_constraint_configuration(mock_primary_key_config, mock_foreign_key_config, mock_connection)
 
 
 class TestSnowflakeOptimizeTableDefinition:
-    """Test _optimize_table_definition SQL generation."""
-
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_create_table_becomes_create_or_replace(self, mock_snowflake):
-        """CREATE TABLE should be rewritten to CREATE OR REPLACE TABLE."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
         result = adapter._optimize_table_definition("CREATE TABLE orders (id INT)")
         assert result == "CREATE OR REPLACE TABLE orders (id INT)"
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_already_has_or_replace_is_unchanged(self, mock_snowflake):
-        """Statement that already has OR REPLACE should not be modified."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
         stmt = "CREATE OR REPLACE TABLE orders (id INT)"
         result = adapter._optimize_table_definition(stmt)
@@ -1828,7 +1698,6 @@ class TestSnowflakeOptimizeTableDefinition:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_non_create_table_statement_is_passthrough(self, mock_snowflake):
-        """Non-CREATE TABLE statements should be returned unchanged."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
         stmt = "ALTER TABLE orders ADD COLUMN name VARCHAR(100)"
         result = adapter._optimize_table_definition(stmt)
@@ -1836,7 +1705,6 @@ class TestSnowflakeOptimizeTableDefinition:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_comment_prefixed_create_still_gets_or_replace(self, mock_snowflake):
-        """Schema chunks with "--" headers must still get OR REPLACE."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
         chunk = "-- Generated staging load tables\nCREATE TABLE orders_stage (id INT)"
         result = adapter._optimize_table_definition(chunk)
@@ -1845,21 +1713,13 @@ class TestSnowflakeOptimizeTableDefinition:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_lowercase_create_table_is_not_modified(self, mock_snowflake):
-        """Lowercase 'create table' should not be modified (case-sensitive check)."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
         stmt = "create table orders (id INT)"
         result = adapter._optimize_table_definition(stmt)
-        # The method checks upper() for the starts-with, but replaces literal "CREATE TABLE"
         assert result == stmt
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_quoted_identifiers_uppercased_single_quotes_untouched(self, mock_snowflake):
-        """Quoted source-case names must fold to the uppercase convention.
-
-        DDL translation quotes identifiers, so without normalization a table
-        would be created as quoted lowercase while loads and validation
-        address the folded uppercase name.
-        """
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
         result = adapter._optimize_table_definition(
             'CREATE TABLE "hits" ("WatchID" BIGINT NOT NULL, "note" VARCHAR DEFAULT \'keep "me" lower\')'
@@ -1870,11 +1730,8 @@ class TestSnowflakeOptimizeTableDefinition:
 
 
 class TestSnowflakeBuildCtasSortSql:
-    """Test _build_ctas_sort_sql CTAS generation."""
-
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_ctas_sort_generates_correct_sql(self, mock_snowflake):
-        """CTAS sort should produce CREATE OR REPLACE TABLE ... ORDER BY."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
 
         mock_col1 = Mock()
@@ -1889,7 +1746,6 @@ class TestSnowflakeBuildCtasSortSql:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_ctas_sort_returns_none_when_off(self, mock_snowflake):
-        """When sorted ingestion is off, should return None."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
 
         with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("off", "auto")):
@@ -1899,7 +1755,6 @@ class TestSnowflakeBuildCtasSortSql:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_ctas_sort_rejects_non_ctas_method(self, mock_snowflake):
-        """Method other than 'ctas' should raise ValueError."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
 
         with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("on", "presort")):
@@ -1908,23 +1763,19 @@ class TestSnowflakeBuildCtasSortSql:
 
 
 class TestSnowflakeShouldSkipSchemaCreation:
-    """Test _should_skip_schema_creation logic."""
-
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_skips_when_all_tables_exist_with_data(self, mock_snowflake):
-        """Should return True when all expected tables exist and have rows."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
 
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        # fetchone returns a row for SHOW TABLES LIKE, then count > 0
         mock_cursor.fetchone.side_effect = [
-            ("LINEITEM",),  # SHOW TABLES LIKE 'LINEITEM' => exists
-            (1000,),  # SELECT COUNT(*) FROM LINEITEM => 1000 rows
-            ("ORDERS",),  # SHOW TABLES LIKE 'ORDERS' => exists
-            (500,),  # SELECT COUNT(*) FROM ORDERS => 500 rows
+            ("LINEITEM",),
+            (1000,),
+            ("ORDERS",),
+            (500,),
         ]
 
         with patch.object(adapter, "_get_expected_tables", return_value=["LINEITEM", "ORDERS"]):
@@ -1934,14 +1785,12 @@ class TestSnowflakeShouldSkipSchemaCreation:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_does_not_skip_when_table_is_missing(self, mock_snowflake):
-        """Should return False when a table does not exist."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
 
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        # SHOW TABLES LIKE returns None => table doesn't exist
         mock_cursor.fetchone.return_value = None
 
         with patch.object(adapter, "_get_expected_tables", return_value=["LINEITEM"]):
@@ -1951,7 +1800,6 @@ class TestSnowflakeShouldSkipSchemaCreation:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_does_not_skip_when_table_is_empty(self, mock_snowflake):
-        """Should return False when a table exists but has no rows."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
 
         mock_connection = Mock()
@@ -1959,8 +1807,8 @@ class TestSnowflakeShouldSkipSchemaCreation:
         mock_connection.cursor.return_value = mock_cursor
 
         mock_cursor.fetchone.side_effect = [
-            ("LINEITEM",),  # table exists
-            (0,),  # 0 rows
+            ("LINEITEM",),
+            (0,),
         ]
 
         with patch.object(adapter, "_get_expected_tables", return_value=["LINEITEM"]):
@@ -1970,7 +1818,6 @@ class TestSnowflakeShouldSkipSchemaCreation:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_does_not_skip_when_no_expected_tables(self, mock_snowflake):
-        """Should return False when expected tables list is empty."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
 
         mock_connection = Mock()
@@ -1981,7 +1828,6 @@ class TestSnowflakeShouldSkipSchemaCreation:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_returns_false_on_exception(self, mock_snowflake):
-        """Should return False when a database error occurs (fail-safe)."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
 
         mock_connection = Mock()
@@ -1994,11 +1840,8 @@ class TestSnowflakeShouldSkipSchemaCreation:
 
 
 class TestSnowflakeGetExistingTables:
-    """Test _get_existing_tables method."""
-
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_returns_lowercase_table_names(self, mock_snowflake):
-        """SHOW TABLES results should be normalized to lowercase."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
 
         mock_connection = Mock()
@@ -2017,7 +1860,6 @@ class TestSnowflakeGetExistingTables:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_returns_empty_list_on_failure(self, mock_snowflake):
-        """Should return empty list when SHOW TABLES fails."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
 
         mock_connection = Mock()
@@ -2029,17 +1871,13 @@ class TestSnowflakeGetExistingTables:
 
 
 class TestSnowflakeValidateDataIntegrity:
-    """Test _validate_data_integrity SQL generation."""
-
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_passed_when_all_tables_accessible(self, mock_snowflake):
-        """Should return PASSED when all tables are accessible via SELECT."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
 
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
-        # SHOW TABLES reports uppercase names; each fetchone succeeds
         mock_cursor.fetchall.return_value = [
             ("2024-01-01", "LINEITEM", "DB", "PUBLIC"),
             ("2024-01-01", "ORDERS", "DB", "PUBLIC"),
@@ -2053,14 +1891,12 @@ class TestSnowflakeValidateDataIntegrity:
         assert "ORDERS" in details["accessible_tables"]
         assert details["constraints_enabled"] is True
 
-        # Verify the SQL used (quoted stored names first)
         execute_calls = [str(call.args[0]) for call in mock_cursor.execute.call_args_list]
         assert 'SELECT 1 FROM "lineitem" LIMIT 1' in execute_calls
         assert 'SELECT 1 FROM "orders" LIMIT 1' in execute_calls
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_quoted_lowercase_tables_accessible(self, mock_snowflake):
-        """Quoted lowercase TPC-DS tables probe by stored name, not folded uppercase."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
 
         mock_connection = Mock()
@@ -2078,14 +1914,12 @@ class TestSnowflakeValidateDataIntegrity:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_failed_when_table_inaccessible(self, mock_snowflake):
-        """Should return FAILED when a table is not accessible."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
 
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
         mock_cursor.fetchall.return_value = []
-        # Every probe fails
         mock_cursor.execute.side_effect = Exception("Table not found")
         mock_cursor.fetchone.return_value = (1,)
 
@@ -2097,11 +1931,8 @@ class TestSnowflakeValidateDataIntegrity:
 
 
 class TestSnowflakeValidateSessionCacheControl:
-    """Test validate_session_cache_control delegation."""
-
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_calls_shared_validate_with_correct_params(self, mock_snowflake):
-        """Should delegate to cloud_shared with Snowflake-specific parameters."""
         adapter = SnowflakeAdapter(
             account="a",
             username="u",
@@ -2137,11 +1968,8 @@ class TestSnowflakeValidateSessionCacheControl:
 
 
 class TestSnowflakeGetPlatformInfo:
-    """Test get_platform_info SQL generation and response structure."""
-
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_platform_info_without_connection(self, mock_snowflake):
-        """Without a connection, should return basic config info."""
         adapter = SnowflakeAdapter(
             account="test_account",
             username="u",
@@ -2162,12 +1990,11 @@ class TestSnowflakeGetPlatformInfo:
         assert result["configuration"]["database"] == "TEST_DB"
         assert result["configuration"]["schema"] == "PUBLIC"
         assert result["configuration"]["role"] == "SYSADMIN"
-        assert result["configuration"]["result_cache_enabled"] is False  # disable_result_cache default=True
+        assert result["configuration"]["result_cache_enabled"] is False
         assert result["platform_version"] is None
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_platform_info_with_connection_queries_version(self, mock_snowflake):
-        """With a connection, should query current_version() and set engine_version."""
         adapter = SnowflakeAdapter(
             account="a",
             username="u",
@@ -2180,17 +2007,11 @@ class TestSnowflakeGetPlatformInfo:
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        # First call: SELECT current_version()
-        # Second call: SELECT CURRENT_REGION() (single column; the cloud
-        # prefix is embedded, e.g. AWS_US_EAST_1). There is no
-        # CURRENT_CLOUD() function, so no query may reference it.
-        # Third call: SHOW WAREHOUSES (raise to skip)
-        # Fourth call: SELECT current_account_name() (raise to skip)
         mock_cursor.execute.return_value = mock_cursor
         mock_cursor.fetchone.side_effect = [
-            ("8.12.3",),  # current_version()
-            ("AWS_US_EAST_1",),  # CURRENT_REGION()
-            Exception("skip"),  # will be caught
+            ("8.12.3",),
+            ("AWS_US_EAST_1",),
+            Exception("skip"),
         ]
 
         call_count = [0]
@@ -2219,11 +2040,8 @@ class TestSnowflakeGetPlatformInfo:
 
 
 class TestSnowflakeConfigValidation:
-    """Test config validation edge cases and error messages."""
-
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_missing_account_error_message(self, mock_snowflake):
-        """Missing account should produce a specific error message."""
         from benchbox.core.exceptions import ConfigurationError
 
         with pytest.raises(ConfigurationError, match="account"):
@@ -2236,7 +2054,6 @@ class TestSnowflakeConfigValidation:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_missing_username_error_message(self, mock_snowflake):
-        """Missing username should produce a specific error message."""
         from benchbox.core.exceptions import ConfigurationError
 
         with pytest.raises(ConfigurationError, match="username"):
@@ -2249,7 +2066,6 @@ class TestSnowflakeConfigValidation:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_missing_password_error_message(self, mock_snowflake):
-        """Missing password should produce a specific error message."""
         from benchbox.core.exceptions import ConfigurationError
 
         with pytest.raises(ConfigurationError, match="password"):
@@ -2262,7 +2078,6 @@ class TestSnowflakeConfigValidation:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_missing_multiple_fields_error_message(self, mock_snowflake):
-        """Missing multiple fields should list all of them in the error."""
         from benchbox.core.exceptions import ConfigurationError
 
         with pytest.raises(ConfigurationError) as exc_info:
@@ -2275,13 +2090,11 @@ class TestSnowflakeConfigValidation:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_authenticator_default(self, mock_snowflake):
-        """Default authenticator should be 'snowflake'."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
         assert adapter.authenticator == "snowflake"
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_authenticator_override(self, mock_snowflake):
-        """Authenticator should accept custom values like 'oauth'."""
         adapter = SnowflakeAdapter(
             account="a",
             username="u",
@@ -2294,7 +2107,6 @@ class TestSnowflakeConfigValidation:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_private_key_path_is_stored(self, mock_snowflake):
-        """Private key path should be stored for key pair auth."""
         adapter = SnowflakeAdapter(
             account="a",
             username="u",
@@ -2309,13 +2121,11 @@ class TestSnowflakeConfigValidation:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_disable_result_cache_default_true(self, mock_snowflake):
-        """Result cache should be disabled by default for accurate benchmarking."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
         assert adapter.disable_result_cache is True
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_disable_result_cache_explicit_false(self, mock_snowflake):
-        """Result cache can be explicitly enabled."""
         adapter = SnowflakeAdapter(
             account="a",
             username="u",
@@ -2328,19 +2138,16 @@ class TestSnowflakeConfigValidation:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_modify_warehouse_settings_default_false(self, mock_snowflake):
-        """Warehouse modification should be off by default."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
         assert adapter.modify_warehouse_settings is False
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_suppress_nondeterministic_errors_default_false(self, mock_snowflake):
-        """Nondeterministic error suppression should be off by default."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
         assert adapter.suppress_nondeterministic_errors is False
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_auto_suspend_zero_is_preserved(self, mock_snowflake):
-        """auto_suspend=0 should not fall through to default 300."""
         adapter = SnowflakeAdapter(
             account="a", username="u", password="p", warehouse="WH", database="DB", auto_suspend=0
         )
@@ -2348,7 +2155,6 @@ class TestSnowflakeConfigValidation:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_auto_resume_false_is_preserved(self, mock_snowflake):
-        """auto_resume=False should not fall through to default True."""
         adapter = SnowflakeAdapter(
             account="a", username="u", password="p", warehouse="WH", database="DB", auto_resume=False
         )
@@ -2356,41 +2162,33 @@ class TestSnowflakeConfigValidation:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_multi_cluster_warehouse_false_by_default(self, mock_snowflake):
-        """Multi-cluster should be off by default."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
         assert adapter.multi_cluster_warehouse is False
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_file_format_default_csv(self, mock_snowflake):
-        """Default file format should be CSV."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
         assert adapter.file_format == "CSV"
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_compression_default_auto(self, mock_snowflake):
-        """Default compression should be AUTO."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
         assert adapter.compression == "AUTO"
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_query_tag_default(self, mock_snowflake):
-        """Default query tag should be BenchBox."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
         assert adapter.query_tag == "BenchBox"
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_timezone_default_utc(self, mock_snowflake):
-        """Default timezone should be UTC."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
         assert adapter.timezone == "UTC"
 
 
 class TestSnowflakeConfigureForBenchmarkEdgeCases:
-    """Test configure_for_benchmark SQL generation for edge cases."""
-
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_suppress_nondeterministic_errors_generates_sql(self, mock_snowflake):
-        """When suppress_nondeterministic_errors=True, should emit session ALTER statements."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -2413,7 +2211,6 @@ class TestSnowflakeConfigureForBenchmarkEdgeCases:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_modify_warehouse_settings_false_skips_alter_warehouse(self, mock_snowflake):
-        """When modify_warehouse_settings=False, no ALTER WAREHOUSE should be emitted."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -2435,7 +2232,6 @@ class TestSnowflakeConfigureForBenchmarkEdgeCases:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_result_cache_enabled_generates_true(self, mock_snowflake):
-        """When disable_result_cache=False, USE_CACHED_RESULT should be TRUE."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -2457,7 +2253,6 @@ class TestSnowflakeConfigureForBenchmarkEdgeCases:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_multi_cluster_warehouse_generates_scaling_sql(self, mock_snowflake):
-        """Multi-cluster warehouse config should emit MIN/MAX_CLUSTER_COUNT and SCALING_POLICY."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -2488,7 +2283,6 @@ class TestSnowflakeConfigureForBenchmarkEdgeCases:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_non_olap_benchmark_type_skips_olap_settings(self, mock_snowflake):
-        """Non-OLAP benchmark types should not emit QUERY_ACCELERATION or warehouse settings."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -2511,7 +2305,6 @@ class TestSnowflakeConfigureForBenchmarkEdgeCases:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_session_base_settings_always_applied(self, mock_snowflake):
-        """Base session settings (TIMEZONE, AUTOCOMMIT) should always be applied."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -2534,10 +2327,7 @@ class TestSnowflakeConfigureForBenchmarkEdgeCases:
 
 
 class TestSnowflakeNormalizeExistingFiles:
-    """Test _normalize_existing_files static method."""
-
     def test_filters_nonexistent_files(self, tmp_path):
-        """Non-existent files should be filtered out."""
         existing = tmp_path / "exists.tbl"
         existing.write_text("data")
 
@@ -2546,7 +2336,6 @@ class TestSnowflakeNormalizeExistingFiles:
         assert result == [existing]
 
     def test_filters_empty_files(self, tmp_path):
-        """Empty files (0 bytes) should be filtered out."""
         empty = tmp_path / "empty.tbl"
         empty.write_text("")
         nonempty = tmp_path / "data.tbl"
@@ -2557,7 +2346,6 @@ class TestSnowflakeNormalizeExistingFiles:
         assert result == [nonempty]
 
     def test_accepts_single_path_not_list(self, tmp_path):
-        """Should handle a single Path instead of a list."""
         single = tmp_path / "single.tbl"
         single.write_text("1|data|\n")
 
@@ -2566,7 +2354,6 @@ class TestSnowflakeNormalizeExistingFiles:
         assert result == [single]
 
     def test_converts_strings_to_paths(self, tmp_path):
-        """Should handle string paths."""
         f = tmp_path / "file.csv"
         f.write_text("data")
 
@@ -2576,11 +2363,8 @@ class TestSnowflakeNormalizeExistingFiles:
 
 
 class TestSnowflakeBuildSnowflakeConfig:
-    """Test _build_snowflake_config function."""
-
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_merges_saved_creds_and_options(self, mock_snowflake):
-        """CLI options should override saved credentials."""
         from benchbox.platforms.snowflake import _build_snowflake_config
 
         mock_info = Mock()
@@ -2601,16 +2385,13 @@ class TestSnowflakeBuildSnowflakeConfig:
                 info=mock_info,
             )
 
-        # override > option > saved
         assert config.account == "override_acct"
         assert config.warehouse == "CLI_WH"
-        # saved creds preserved when no override
         assert config.username == "saved_user"
         assert config.password == "saved_pass"
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_database_override_is_included(self, mock_snowflake):
-        """Explicit database override should be included in config."""
         from benchbox.platforms.snowflake import _build_snowflake_config
 
         mock_info = Mock()
@@ -2635,7 +2416,6 @@ class TestSnowflakeBuildSnowflakeConfig:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_no_database_override_omits_database(self, mock_snowflake):
-        """Without explicit database override, database should not be set in config."""
         from benchbox.platforms.snowflake import _build_snowflake_config
 
         mock_info = Mock()
@@ -2656,16 +2436,12 @@ class TestSnowflakeBuildSnowflakeConfig:
                 info=mock_info,
             )
 
-        # database should not be in the config (or be None)
         assert not hasattr(config, "database") or config.database is None
 
 
 class TestSnowflakeFromConfigEdgeCases:
-    """Test from_config edge cases."""
-
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_from_config_passes_behavior_options(self, mock_snowflake):
-        """Behavior control options should be passed through from_config."""
         config = {
             "benchmark": "tpch",
             "scale_factor": 1.0,
@@ -2688,7 +2464,6 @@ class TestSnowflakeFromConfigEdgeCases:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_from_config_passes_file_format_and_compression(self, mock_snowflake):
-        """File format and compression should be passed through from_config."""
         config = {
             "benchmark": "tpch",
             "scale_factor": 1.0,
@@ -2706,7 +2481,6 @@ class TestSnowflakeFromConfigEdgeCases:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_from_config_passes_warehouse_settings(self, mock_snowflake):
-        """Warehouse settings should be passed through from_config."""
         config = {
             "benchmark": "tpch",
             "scale_factor": 1.0,
@@ -2728,11 +2502,8 @@ class TestSnowflakeFromConfigEdgeCases:
 
 
 class TestSnowflakeCreateLoadFileFormats:
-    """Test _create_load_file_formats SQL generation."""
-
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_default_compression_auto(self, mock_snowflake):
-        """Default compression=AUTO should be embedded in file format SQL."""
         mock_cursor = Mock()
         adapter = SnowflakeAdapter(
             account="a", username="u", password="p", warehouse="WH", database="DB", schema="MY_SCHEMA"
@@ -2743,7 +2514,6 @@ class TestSnowflakeCreateLoadFileFormats:
         execute_calls = [str(call.args[0]) for call in mock_cursor.execute.call_args_list]
         assert len(execute_calls) == 2
 
-        # Check CSV format
         csv_sql = execute_calls[0]
         assert "MY_SCHEMA.BENCHBOX_CSV_FORMAT" in csv_sql
         assert "FIELD_DELIMITER = ','" in csv_sql
@@ -2752,7 +2522,6 @@ class TestSnowflakeCreateLoadFileFormats:
         assert "REPLACE_INVALID_CHARACTERS = TRUE" in csv_sql
         assert "EMPTY_FIELD_AS_NULL = TRUE" in csv_sql
 
-        # Check TBL format
         tbl_sql = execute_calls[1]
         assert "MY_SCHEMA.BENCHBOX_TBL_FORMAT" in tbl_sql
         assert "FIELD_DELIMITER = '|'" in tbl_sql
@@ -2760,21 +2529,15 @@ class TestSnowflakeCreateLoadFileFormats:
 
 
 class TestSnowflakeDriverIsolation:
-    """Test driver isolation capability declaration."""
-
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_driver_isolation_is_feasible_client_only(self, mock_snowflake):
-        """Snowflake adapter should declare FEASIBLE_CLIENT_ONLY driver isolation."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
         assert adapter.driver_isolation_capability == DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
 
 
 class TestSnowflakeGenerateTuningClauseEdgeCases:
-    """Test generate_tuning_clause edge cases."""
-
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_partition_columns_used_as_clustering_when_no_explicit_clustering(self, mock_snowflake):
-        """Partition columns should become clustering keys when no explicit clustering."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
 
         mock_tuning = Mock()
@@ -2801,7 +2564,6 @@ class TestSnowflakeGenerateTuningClauseEdgeCases:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_multiple_clustering_columns_ordered(self, mock_snowflake):
-        """Multiple clustering columns should be ordered by their order attribute."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
 
         mock_tuning = Mock()
@@ -2820,7 +2582,7 @@ class TestSnowflakeGenerateTuningClauseEdgeCases:
 
             def mock_get_columns_by_type(tuning_type):
                 if tuning_type == mock_tuning_type.CLUSTERING:
-                    return [col2, col1]  # reverse order
+                    return [col2, col1]
                 return []
 
             mock_tuning.get_columns_by_type.side_effect = mock_get_columns_by_type
@@ -2831,7 +2593,6 @@ class TestSnowflakeGenerateTuningClauseEdgeCases:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_no_tuning_returns_empty_string(self, mock_snowflake):
-        """No tuning returns empty string."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
 
         mock_tuning = Mock()
@@ -2842,11 +2603,8 @@ class TestSnowflakeGenerateTuningClauseEdgeCases:
 
 
 class TestSnowflakeCreateSchemaSQL:
-    """Test create_schema SQL generation."""
-
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_create_schema_executes_database_and_schema_ddl(self, mock_snowflake):
-        """create_schema should emit CREATE DATABASE, USE DATABASE, CREATE SCHEMA, USE SCHEMA."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -2880,7 +2638,6 @@ class TestSnowflakeCreateSchemaSQL:
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_create_schema_skips_when_tables_exist(self, mock_snowflake):
-        """create_schema should skip table creation when schema already exists with data."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -2899,25 +2656,18 @@ class TestSnowflakeCreateSchemaSQL:
 
         assert isinstance(elapsed, float)
         execute_calls = [str(call.args[0]) for call in mock_cursor.execute.call_args_list]
-        # Should still create database/schema
         assert "CREATE DATABASE IF NOT EXISTS MY_DB" in execute_calls
-        # But should NOT have query tag or table creation
         assert not any("QUERY_TAG" in sql for sql in execute_calls)
 
 
 class TestSnowflakeParseResultsEdgeCases:
-    """Test _parse_copy_results edge cases."""
-
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_skips_rows_with_3_or_fewer_columns(self, mock_snowflake):
-        """Rows with <= 3 columns should be silently skipped."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
-        # Should not raise
         adapter._parse_copy_results([["a"], ["a", "b"], ["a", "b", "c"]])
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_loaded_status_is_silently_skipped(self, mock_snowflake):
-        """LOADED status rows should not produce warnings."""
         import logging
 
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
@@ -2928,15 +2678,6 @@ class TestSnowflakeParseResultsEdgeCases:
 
 
 class _StatefulSnowflakeCursor:
-    """Minimal stateful fake of a Snowflake cursor for reload tests.
-
-    Models table rows, staged files, and COPY load history across statements:
-    REMOVE clears the stage, PUT stages files (same names replace, modelling
-    OVERWRITE), TRUNCATE clears the target, COPY appends staged rows only when
-    FORCE is set or the files are unseen (then purges the stage and records
-    history), SELECT COUNT returns the live row count.
-    """
-
     ROWS_PER_FILE = 2
 
     def __init__(self, existing_rows=25):
@@ -2991,8 +2732,6 @@ class _StatefulSnowflakeCursor:
 
 
 class TestSnowflakeIdempotentLoad:
-    """Snowflake loads must be idempotent full refreshes (no append duplicates)."""
-
     def _adapter(self, **kwargs):
         from benchbox.platforms.snowflake import SnowflakeAdapter
 
@@ -3016,7 +2755,6 @@ class TestSnowflakeIdempotentLoad:
         return paths
 
     def test_double_load_stable_count_with_truncate_before_copy(self, tmp_path):
-        """With force_recreate, a second load must not change the row count."""
         adapter = self._adapter(force_recreate=True)
         cursor = _StatefulSnowflakeCursor(existing_rows=25)
         files = self._tbl_files(tmp_path)
@@ -3030,14 +2768,13 @@ class TestSnowflakeIdempotentLoad:
         assert first == 2 * len(files)
         assert second == first
         truncates = [s for s in cursor.statements if s.strip().upper().startswith("TRUNCATE TABLE")]
-        assert len(truncates) == 2  # once per table load, not once per chunk file
+        assert len(truncates) == 2
         first_truncate = cursor.statements.index(truncates[0])
         first_copy = next(i for i, s in enumerate(cursor.statements) if "COPY INTO" in s.upper())
         assert first_truncate < first_copy
         assert "TRUNCATE TABLE LINEITEM" in truncates[0]
 
     def test_default_load_is_full_refresh_not_append(self, tmp_path):
-        """Default loads are full refreshes: reruns report 1x with no flag."""
         adapter = self._adapter()
         assert adapter.force_recreate is False
         cursor = _StatefulSnowflakeCursor(existing_rows=25)
@@ -3058,7 +2795,6 @@ class TestSnowflakeIdempotentLoad:
         assert sum(s.startswith("TRUNCATE TABLE") for s in uppers) == 2
 
     def test_truncate_uses_quoted_fallback_target(self, tmp_path):
-        """TRUNCATE must target the PUT-fallback-resolved (quoted) table."""
         adapter = self._adapter(force_recreate=True)
         cursor = _StatefulSnowflakeCursor(existing_rows=0)
 
@@ -3067,7 +2803,7 @@ class TestSnowflakeIdempotentLoad:
                 raise Exception("Stage '@%LINEITEM' does not exist or not authorized")
             _StatefulSnowflakeCursor.execute(cursor, sql)
 
-        cursor.execute = _execute  # type: ignore[method-assign]
+        cursor.execute = _execute
 
         path = tmp_path / "lineitem.tbl"
         path.write_bytes(b"1|one|\n")
@@ -3082,7 +2818,6 @@ class TestSnowflakeIdempotentLoad:
         assert truncate_idx < copy_idx
 
     def test_should_skip_schema_creation_returns_false_when_forced(self):
-        """Forced runs must not skip DDL even when tables exist with data."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -3094,7 +2829,6 @@ class TestSnowflakeIdempotentLoad:
         mock_cursor.execute.assert_not_called()
 
     def test_should_skip_schema_creation_unchanged_when_not_forced(self):
-        """Default runs still skip DDL when tables exist with data."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -3105,7 +2839,6 @@ class TestSnowflakeIdempotentLoad:
             assert adapter._should_skip_schema_creation(Mock(), mock_connection) is True
 
     def test_from_config_forwards_force_recreate(self):
-        """Production construction via from_config must preserve the flag."""
         from benchbox.platforms.snowflake import SnowflakeAdapter
 
         base = {
@@ -3124,7 +2857,6 @@ class TestSnowflakeIdempotentLoad:
             assert SnowflakeAdapter.from_config(dict(base)).force_recreate is False
 
     def test_dirty_stage_leftovers_not_reloaded(self, tmp_path):
-        """Files left in the stage by an interrupted run are not re-ingested."""
         adapter = self._adapter()
         cursor = _StatefulSnowflakeCursor(existing_rows=25)
         cursor.staged = {"stale.tbl": [1] * 99}
@@ -3139,7 +2871,6 @@ class TestSnowflakeIdempotentLoad:
         assert "stale.tbl" not in cursor.staged
 
     def test_load_history_skips_seen_files_without_force(self):
-        """Prove the trap FORCE closes: unseen-history COPY of seen files loads 0."""
         cursor = _StatefulSnowflakeCursor(existing_rows=0)
         cursor.staged = {"lineitem.tbl.1": [1, 1]}
         cursor.load_history = {"lineitem.tbl.1"}
@@ -3158,7 +2889,6 @@ class TestSnowflakeIdempotentLoad:
         assert cursor.fetchone() == (2,)
 
     def test_failed_put_leaves_previous_data_and_raises(self, tmp_path):
-        """A failed upload aborts before TRUNCATE, leaving previous rows intact."""
         adapter = self._adapter()
         cursor = _StatefulSnowflakeCursor(existing_rows=25)
 
@@ -3169,7 +2899,7 @@ class TestSnowflakeIdempotentLoad:
                 raise RuntimeError("network down")
             real_execute(sql)
 
-        cursor.execute = _execute  # type: ignore[method-assign]
+        cursor.execute = _execute
         path = tmp_path / "lineitem.tbl"
         path.write_bytes(b"1|one|\n")
         try:
@@ -3182,7 +2912,6 @@ class TestSnowflakeIdempotentLoad:
         assert not any(s.strip().upper().startswith("TRUNCATE TABLE") for s in cursor.statements)
 
     def test_failed_copy_raises(self, tmp_path):
-        """A failed COPY aborts the load instead of reporting a wiped table."""
         adapter = self._adapter()
         cursor = _StatefulSnowflakeCursor(existing_rows=25)
 
@@ -3193,7 +2922,7 @@ class TestSnowflakeIdempotentLoad:
                 raise RuntimeError("warehouse suspended")
             real_execute(sql)
 
-        cursor.execute = _execute  # type: ignore[method-assign]
+        cursor.execute = _execute
         path = tmp_path / "lineitem.tbl"
         path.write_bytes(b"1|one|\n")
         try:
@@ -3203,7 +2932,6 @@ class TestSnowflakeIdempotentLoad:
             path.unlink()
 
     def test_truncate_missing_table_tolerated(self, tmp_path):
-        """TRUNCATE on a fresh schema (no table yet) does not fail the load."""
         adapter = self._adapter()
         cursor = _StatefulSnowflakeCursor(existing_rows=0)
         del cursor.tables["LINEITEM"]
@@ -3215,7 +2943,7 @@ class TestSnowflakeIdempotentLoad:
                 raise Exception("Table 'LINEITEM' does not exist or not authorized")
             real_execute(sql)
 
-        cursor.execute = _execute  # type: ignore[method-assign]
+        cursor.execute = _execute
         path = tmp_path / "lineitem.tbl"
         path.write_bytes(b"1|one|\n")
         try:
@@ -3226,7 +2954,6 @@ class TestSnowflakeIdempotentLoad:
         assert count == 2
 
     def test_load_data_fails_fast_on_table_error(self, tmp_path):
-        """load_data must raise instead of recording 0 rows for a wiped table."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor

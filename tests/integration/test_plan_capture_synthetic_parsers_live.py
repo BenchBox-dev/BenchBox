@@ -1,15 +1,6 @@
 # Copyright 2026 Joe Harris / BenchBox Project
-#
 # Licensed under the MIT License. See LICENSE file in the project root for details.
 
-"""Live plan-capture hooks for the synthetic-fixture parsers (Presto/Trino, ClickHouse, Spark).
-
-Part of query-plan-capture-parser-live-validation (w2): each class runs a real
-EXPLAIN over a live instance and asserts the parser yields a non-None
-QueryPlanDAG with a stable fingerprint. Every class is gated on its own env
-var and skips cleanly when the engine is absent, so this module is a no-op in
-default CI. See tests/fixtures/query_plans/PROVENANCE.md for validation status.
-"""
 
 import os
 
@@ -22,9 +13,6 @@ pytestmark = [
 
 
 def _assert_live_plan(adapter, connection, query="SELECT 1"):
-    # Two EXPLAINs of a trivial query by design (get + capture); keep the
-    # query trivial — these modules cover provisioned engines only, never
-    # per-byte-billed ones.
     raw = adapter.get_query_plan(connection, query)
     assert raw is not None and raw.strip(), "get_query_plan returned empty plan text"
     plan, _ = adapter.capture_query_plan(connection, query, "live-validation")

@@ -1,6 +1,3 @@
-# Dask DataFrame Tuning - Memory Constrained
-# For low-memory environments processing large datasets
-
 parallelism:
   worker_count: 2
   threads_per_worker: 1

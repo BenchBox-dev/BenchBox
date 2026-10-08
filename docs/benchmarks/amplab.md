@@ -23,6 +23,8 @@ The benchmark is particularly valuable for testing distributed computing framewo
 - **Realistic data distributions** - Web crawl and user behavior patterns
 - **Performance-oriented** - Emphasizes throughput and latency optimization
 
+BenchBox generates synthetic data with the AMPLab benchmark data characteristics for testing big data processing systems.
+
 ## Schema Description
 
 The AMPLab benchmark uses a simple three-table schema that models web analytics data:
@@ -216,17 +218,13 @@ LIMIT 100;
 ```python
 from benchbox import AMPLab
 
-# Initialize AMPLab benchmark
 amplab = AMPLab(scale_factor=1.0, output_dir="amplab_data")
 
-# Generate web analytics data
 data_files = amplab.generate_data()
 
-# Get all benchmark queries
 queries = amplab.get_queries()
 print(f"Generated {len(queries)} AMPLab queries")
 
-# Get specific query with parameters
 scan_query = amplab.get_query("1", params={
     'pagerank_threshold': 1000
 })
@@ -236,16 +234,16 @@ print(scan_query)
 ### Data Generation at Scale
 
 ```python
-# Generate large-scale web analytics data for big data testing
 amplab_large = AMPLab(scale_factor=10.0, output_dir="amplab_large")
 data_files = amplab_large.generate_data()
 
-# Check generated data sizes
 for table_name in amplab_large.get_available_tables():
     table_file = amplab_large.output_dir / f"{table_name}.csv"
     size_mb = table_file.stat().st_size / (1024 * 1024)
     print(f"{table_name}: {size_mb:.1f} MB")
 ```
+
+This generates large-scale web analytics data for big data testing, then prints the size of each generated table file.
 
 ### DuckDB Integration Example
 
@@ -253,16 +251,13 @@ for table_name in amplab_large.get_available_tables():
 import duckdb
 from benchbox import AMPLab
 
-# Initialize and generate data
 amplab = AMPLab(scale_factor=0.1, output_dir="amplab_small")
 data_files = amplab.generate_data()
 
-# Create DuckDB connection and schema
 conn = duckdb.connect("amplab.duckdb")
 schema_sql = amplab.get_create_tables_sql()
 conn.execute(schema_sql)
 
-# Load AMPLab tables
 table_mappings = {
     'rankings': 'rankings.csv',
     'uservisits': 'uservisits.csv',
@@ -280,7 +275,6 @@ for table_name, file_name in table_mappings.items():
         """)
         print(f"Loaded {table_name}")
 
-# Run AMPLab benchmark queries
 query_params = {
     'pagerank_threshold': 1000,
     'start_date': '1980-01-01',
@@ -290,21 +284,20 @@ query_params = {
     'min_visits': 10
 }
 
-# Query 1: Scan performance
 scan_query = amplab.get_query("1", params=query_params)
 scan_result = conn.execute(scan_query).fetchall()
 print(f"Scan Query: {len(scan_result)} pages with high rankings")
 
-# Query 2: Join performance
 join_query = amplab.get_query("2", params=query_params)
 join_result = conn.execute(join_query).fetchall()
 print(f"Join Query: {len(join_result)} user revenue summaries")
 
-# Query 3: Analytics performance
 analytics_query = amplab.get_query("3", params=query_params)
 analytics_result = conn.execute(analytics_query).fetchall()
 print(f"Analytics Query: {len(analytics_result)} user behavior patterns")
 ```
+
+The three queries test scan, join and analytics performance in turn.
 
 ### Apache Spark Integration
 
@@ -312,27 +305,24 @@ print(f"Analytics Query: {len(analytics_result)} user behavior patterns")
 from pyspark.sql import SparkSession
 from benchbox import AMPLab
 
-# Initialize Spark for big data processing
 spark = SparkSession.builder \
     .appName("AMPLab-Benchmark") \
     .config("spark.sql.adaptive.enabled", "true") \
     .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
     .getOrCreate()
 
-# Generate large-scale data
 amplab = AMPLab(scale_factor=100, output_dir="/data/amplab_sf100")
 data_files = amplab.generate_data()
 
-# Load data into Spark DataFrames with optimizations
 rankings_df = spark.read.csv("/data/amplab_sf100/rankings.csv",
                             header=True, inferSchema=True)
-rankings_df = rankings_df.repartition(200, "pageRank")  # Partition by pageRank
+rankings_df = rankings_df.repartition(200, "pageRank")
 rankings_df.cache()
 rankings_df.createOrReplaceTempView("rankings")
 
 uservisits_df = spark.read.csv("/data/amplab_sf100/uservisits.csv",
                               header=True, inferSchema=True)
-uservisits_df = uservisits_df.repartition(400, "visitDate")  # Partition by date
+uservisits_df = uservisits_df.repartition(400, "visitDate")
 uservisits_df.cache()
 uservisits_df.createOrReplaceTempView("uservisits")
 
@@ -340,7 +330,6 @@ documents_df = spark.read.csv("/data/amplab_sf100/documents.csv",
                              header=True, inferSchema=True)
 documents_df.createOrReplaceTempView("documents")
 
-# Run benchmark queries with Spark SQL
 query_params = {
     'pagerank_threshold': 1000,
     'start_date': '1980-01-01',
@@ -350,22 +339,19 @@ query_params = {
     'min_visits': 10
 }
 
-# Scan Query - Test columnar scanning
 print("Running Scan Query...")
 scan_sql = amplab.get_query("1a", params=query_params)
 scan_df = spark.sql(scan_sql)
-scan_df.explain(True)  # Show execution plan
+scan_df.explain(True)
 scan_result = scan_df.collect()
 print(f"Scan results: {scan_result}")
 
-# Join Query - Test distributed joins
 print("Running Join Query...")
 join_sql = amplab.get_query("2", params=query_params)
 join_df = spark.sql(join_sql)
-join_df.explain(True)  # Show execution plan
+join_df.explain(True)
 join_df.show(20)
 
-# Analytics Query - Test complex processing
 print("Running Analytics Query...")
 analytics_sql = amplab.get_query("3", params=query_params)
 analytics_df = spark.sql(analytics_sql)
@@ -373,6 +359,8 @@ analytics_df.show(20)
 
 spark.stop()
 ```
+
+The example partitions the rankings table by ``pageRank`` and the uservisits table by ``visitDate``, then caches both. The scan query tests columnar scanning, the join query tests distributed joins, and the analytics query tests complex processing. ``explain(True)`` shows the execution plan for the scan and join queries.
 
 ### Performance Benchmarking Framework
 
@@ -387,7 +375,6 @@ class AMPLabPerformanceTester:
         self.connection = connection
 
     def benchmark_query_type(self, query_type: str, iterations: int = 3) -> Dict:
-        """Benchmark specific AMPLab query type."""
         query_mappings = {
             'scan': ['1', '1a'],
             'join': ['2', '2a'],
@@ -400,7 +387,6 @@ class AMPLabPerformanceTester:
         query_ids = query_mappings[query_type]
         results = {}
 
-        # Standard parameters for reproducible testing
         params = {
             'pagerank_threshold': 1000,
             'start_date': '1980-01-01',
@@ -437,16 +423,13 @@ class AMPLabPerformanceTester:
         return results
 
     def run_complete_benchmark(self) -> Dict:
-        """Run all AMPLab query types and return systematic results."""
         complete_results = {}
 
-        # Test each query type
         for query_type in ['scan', 'join', 'analytics']:
             print(f"\\nRunning {query_type.upper()} queries...")
             type_results = self.benchmark_query_type(query_type)
             complete_results[query_type] = type_results
 
-        # Calculate summary statistics
         all_times = []
         for type_data in complete_results.values():
             for query_data in type_data.values():
@@ -463,32 +446,24 @@ class AMPLabPerformanceTester:
         return complete_results
 
     def analyze_scalability(self, scale_factors: List[float]) -> Dict:
-        """Test query performance across different scale factors."""
         scalability_results = {}
 
         for scale_factor in scale_factors:
             print(f"\\nTesting scale factor {scale_factor}...")
 
-            # Generate data at this scale
             test_amplab = AMPLab(
                 scale_factor=scale_factor,
                 output_dir=f"amplab_sf{scale_factor}"
             )
             test_amplab.generate_data()
 
-            # Load data (simplified - would need actual loading logic)
-            # ... data loading code ...
-
-            # Run benchmark
             results = self.run_complete_benchmark()
             scalability_results[scale_factor] = results
 
         return scalability_results
 
-# Usage
 performance_tester = AMPLabPerformanceTester(amplab, conn)
 
-# Test individual query types
 scan_results = performance_tester.benchmark_query_type('scan')
 join_results = performance_tester.benchmark_query_type('join')
 analytics_results = performance_tester.benchmark_query_type('analytics')
@@ -498,10 +473,11 @@ print(f"Scan Queries: {scan_results}")
 print(f"Join Queries: {join_results}")
 print(f"Analytics Queries: {analytics_results}")
 
-# Run complete benchmark
 complete_results = performance_tester.run_complete_benchmark()
 print(f"\\nComplete Benchmark Summary: {complete_results['summary']}")
 ```
+
+The framework runs each query type with standard parameters so results are reproducible. ``analyze_scalability`` is simplified: it generates data at each scale factor but omits the data loading step, which you must add before it runs the benchmark.
 
 ## Performance Characteristics
 
@@ -552,16 +528,26 @@ print(f"\\nComplete Benchmark Summary: {complete_results['summary']}")
 amplab = AMPLab(
     scale_factor=1.0,
     output_dir="amplab_data",
-    # Data generation options
-    date_range_days=90,      # Range of visit dates
-    pagerank_max=1000,       # Maximum page rank value
-    generate_documents=True,  # Include document content
-    text_length_avg=2000,    # Average document length
-    # Performance options
-    partition_by_date=True,  # Partition uservisits by date
-    compress_output=True     # Compress generated files
+    date_range_days=90,
+    pagerank_max=1000,
+    generate_documents=True,
+    text_length_avg=2000,
+    partition_by_date=True,
+    compress_output=True
 )
 ```
+
+The data generation options are:
+
+- ``date_range_days``: range of visit dates.
+- ``pagerank_max``: maximum page rank value.
+- ``generate_documents``: include document content.
+- ``text_length_avg``: average document length.
+
+The performance options are:
+
+- ``partition_by_date``: partition the uservisits table by date.
+- ``compress_output``: compress the generated files.
 
 ## Integration Examples
 
@@ -571,16 +557,12 @@ amplab = AMPLab(
 import clickhouse_connect
 from benchbox import AMPLab
 
-# Initialize ClickHouse for analytics workloads
 client = clickhouse_connect.get_client(host='localhost', port=8123)
 amplab = AMPLab(scale_factor=1.0, output_dir="amplab_data")
 
-# Generate data
 data_files = amplab.generate_data()
 
-# Create ClickHouse tables configured for analytics
 create_tables_sql = """
--- Rankings table with proper data types
 CREATE TABLE rankings (
     pageURL String,
     pageRank UInt32,
@@ -588,7 +570,6 @@ CREATE TABLE rankings (
 ) ENGINE = MergeTree()
 ORDER BY pageRank;
 
--- UserVisits table partitioned by date
 CREATE TABLE uservisits (
     sourceIP String,
     destURL String,
@@ -603,7 +584,6 @@ CREATE TABLE uservisits (
 PARTITION BY toYYYYMM(visitDate)
 ORDER BY (visitDate, sourceIP);
 
--- Documents table for text analysis
 CREATE TABLE documents (
     url String,
     contents String
@@ -613,14 +593,12 @@ ORDER BY url;
 
 client.execute(create_tables_sql)
 
-# Load data using ClickHouse CSV import
 for table_name in ['rankings', 'uservisits', 'documents']:
     file_path = amplab.output_dir / f"{table_name}.csv"
 
     with open(file_path, 'rb') as f:
         client.insert_file(table_name, f, fmt='CSV')
 
-# Run configured AMPLab queries
 query_params = {
     'pagerank_threshold': 1000,
     'start_date': '1980-01-01',
@@ -630,7 +608,6 @@ query_params = {
     'min_visits': 10
 }
 
-# Scan query with ClickHouse optimizations
 scan_configured = """
 SELECT pageURL, pageRank
 FROM rankings
@@ -642,7 +619,6 @@ LIMIT 1000;
 scan_result = client.query(scan_configured)
 print(f"Optimized scan: {len(scan_result.result_rows)} results")
 
-# Join query with ClickHouse optimizations
 join_configured = """
 SELECT
     sourceIP,
@@ -661,16 +637,16 @@ join_result = client.query(join_configured)
 print(f"Optimized join: {len(join_result.result_rows)} results")
 ```
 
+The tables use data types chosen for ClickHouse. The uservisits table is partitioned by date (``toYYYYMM(visitDate)``). The scan and join queries are rewritten with ClickHouse optimizations, such as ``GLOBAL JOIN`` in the join query.
+
 ### Hadoop/Hive Integration
 
 ```python
 from benchbox import AMPLab
 
-# Generate data for Hadoop ecosystem
 amplab = AMPLab(scale_factor=10.0, output_dir="/hdfs/amplab_sf10")
 data_files = amplab.generate_data()
 
-# Create Hive external tables
 hive_ddl = """
 -- Create Hive database
 CREATE DATABASE IF NOT EXISTS amplab_benchmark;
@@ -713,10 +689,8 @@ STORED AS TEXTFILE
 LOCATION '/hdfs/amplab_sf10/documents/';
 """
 
-# Execute Hive DDL (would need actual Hive connection)
 print("Hive DDL for AMPLab tables created")
 
-# Generate MapReduce/Spark jobs for AMPLab queries
 scan_job = """
 -- Hive query for scan workload
 SELECT pageURL, pageRank
@@ -740,6 +714,8 @@ ORDER BY totalRevenue DESC
 LIMIT 100;
 """
 ```
+
+The Python code only prepares the Hive DDL and queries as strings and does not execute them. Executing the DDL requires a Hive connection. The two queries are the Hive versions of the scan and join workloads.
 
 ## Best Practices
 
@@ -766,16 +742,17 @@ LIMIT 100;
 ### Performance Issues
 
 **Issue: Slow scan queries on large datasets**
+
+Use columnar storage and predicate pushdown. The table below uses Delta; Parquet also works. A derived ``pageRank_bucket`` column provides better partitioning.
+
 ```sql
--- Solution: Use columnar storage and predicate pushdown
 CREATE TABLE rankings_configured (
     pageURL STRING,
     pageRank INT,
     avgDuration INT
-) USING DELTA  -- Or Parquet
+) USING DELTA
 PARTITIONED BY (pageRank_bucket);
 
--- Create derived column for better partitioning
 ALTER TABLE rankings_configured
 ADD COLUMN pageRank_bucket AS (CASE
     WHEN pageRank < 100 THEN 'low'
@@ -785,8 +762,10 @@ END);
 ```
 
 **Issue: Inefficient joins between large tables**
+
+Optimize the join order and use broadcast joins where appropriate.
+
 ```sql
--- Solution: Optimize join order and use broadcast joins where appropriate
 SELECT /*+ BROADCAST(r) */
     uv.sourceIP,
     SUM(uv.adRevenue) as totalRevenue,
@@ -800,19 +779,23 @@ GROUP BY uv.sourceIP;
 ### Data Loading Issues
 
 **Issue: Out of memory during data generation**
+
+Use streaming generation for large scale factors. With the settings below, the generator works in chunks of 10 million rows.
+
 ```python
-# Solution: Use streaming generation for large scale factors
 amplab = AMPLab(
     scale_factor=100.0,
     output_dir="/data/amplab_large",
-    streaming_generation=True,  # Generate in chunks
-    chunk_size=10000000         # 10M rows per chunk
+    streaming_generation=True,
+    chunk_size=10000000
 )
 ```
 
 **Issue: Slow text processing in analytics queries**
+
+Use database-specific text processing functions.
+
 ```sql
--- Solution: Use database-specific text processing functions
 SELECT
     url,
     LENGTH(contents) as content_length,

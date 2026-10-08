@@ -1,5 +1,3 @@
-"""Targeted cross-dialect rewrites for TPC-Havoc query variants."""
-
 from __future__ import annotations
 
 import sqlglot
@@ -20,7 +18,6 @@ _POSTGRES_DIALECTS = frozenset({"postgres", "postgresql"})
 
 
 def rewrite_dialect_variant(query_id: str, query: str, target_dialect: str) -> str:
-    """Preserve variant semantics where a target dialect rejects the translated shape."""
     target = target_dialect.lower()
     if target in _CLOUD_DIALECTS:
         return rewrite_cloud_variant(query_id, query, target)
@@ -39,7 +36,6 @@ def rewrite_dialect_variant(query_id: str, query: str, target_dialect: str) -> s
 
 
 def _inline_postgres_select_aliases(query: str) -> str:
-    """Replace PostgreSQL-illegal HAVING/WHERE select aliases with their expressions."""
     tree = sqlglot.parse_one(query, read="postgres")
     for select in tree.find_all(exp.Select):
         aliases = {
@@ -62,7 +58,6 @@ def _inline_postgres_select_aliases(query: str) -> str:
 
 
 def _qualify_postgres_columns(query: str, columns: dict[str, str]) -> str:
-    """Qualify variant columns whose unqualified names collide after translation."""
     tree = sqlglot.parse_one(query, read="postgres")
     for column in tree.find_all(exp.Column):
         if not column.table and (table := columns.get(column.name)):
@@ -71,7 +66,6 @@ def _qualify_postgres_columns(query: str, columns: dict[str, str]) -> str:
 
 
 def _rewrite_postgres_dual(query: str) -> str:
-    """Replace the generated one-row SELECT source with an explicit VALUES relation."""
     tree = sqlglot.parse_one(query, read="postgres")
     replacement = sqlglot.parse_one("SELECT * FROM (VALUES (1)) AS dual(dual_col)", read="postgres").args["from_"].this
     for subquery in tree.find_all(exp.Subquery):
@@ -85,7 +79,6 @@ def _rewrite_postgres_dual(query: str) -> str:
 
 
 def _rewrite_clickhouse_filters(query: str) -> str:
-    """Replace aggregate FILTER clauses with ClickHouse aggregate combinators."""
     tree = sqlglot.parse_one(query, read="clickhouse")
     return tree.transform(_clickhouse_filter_node).sql(dialect="clickhouse")
 
@@ -107,7 +100,6 @@ def _clickhouse_filter_node(node: exp.Expression) -> exp.Expression:
 
 
 def _drop_empty_grouping(query: str) -> str:
-    """Drop GROUP BY () while retaining global aggregate and HAVING semantics."""
     tree = sqlglot.parse_one(query, read="postgres")
     for select in tree.find_all(exp.Select):
         group = select.args.get("group")

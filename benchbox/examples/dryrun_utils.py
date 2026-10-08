@@ -1,5 +1,3 @@
-"""Shared dry-run utilities for packaged BenchBox examples."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -11,7 +9,6 @@ from benchbox.core.system import SystemProfiler
 
 
 def ensure_output_directory(path: Path) -> Path:
-    """Ensure the provided path exists as a directory, creating parents as needed."""
 
     resolved = Path(path).expanduser().resolve()
     if resolved.exists() and not resolved.is_dir():
@@ -27,7 +24,6 @@ def execute_example_dry_run(
     output_dir: Path,
     filename_prefix: str,
 ) -> tuple[DryRunResult, dict[str, Path]]:
-    """Run the shared dry run workflow and emit a rich summary."""
 
     destination = ensure_output_directory(output_dir)
 
@@ -73,7 +69,6 @@ def execute_example_dry_run(
 
 
 def _load_fallback_queries(benchmark_config: BenchmarkConfig) -> dict[str, str] | None:
-    """Load queries directly from the benchmark when the dry run cannot extract them."""
 
     name = benchmark_config.name.lower()
     try:

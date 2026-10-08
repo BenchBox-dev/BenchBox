@@ -1,5 +1,3 @@
-"""Unit tests for JoinOrder benchmark configuration handling."""
-
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -20,7 +18,6 @@ pytestmark = [
 
 
 def _make_system_profile() -> SystemProfile:
-    """Create a minimal system profile for loader tests."""
 
     return SystemProfile(
         os_name="TestOS",
@@ -38,7 +35,6 @@ def _make_system_profile() -> SystemProfile:
 
 
 def test_joinorder_benchmark_propagates_compression(tmp_path) -> None:
-    """JoinOrderBenchmark should respect compression kwargs and pass them to the generator."""
 
     benchmark = JoinOrderSyntheticBenchmark(
         scale_factor=0.1,
@@ -51,7 +47,6 @@ def test_joinorder_benchmark_propagates_compression(tmp_path) -> None:
 
     generator = benchmark._generator
 
-    # Compression settings are stored in the generator, not the benchmark
     assert benchmark.parallel == 2
     assert generator.compress_data is True
     assert generator.compression_type == "zstd"
@@ -59,7 +54,6 @@ def test_joinorder_benchmark_propagates_compression(tmp_path) -> None:
 
 
 def test_joinorder_benchmark_propagates_compression_gzip(tmp_path) -> None:
-    """JoinOrderBenchmark should respect gzip compression settings."""
 
     benchmark = JoinOrderSyntheticBenchmark(
         scale_factor=0.1,
@@ -72,7 +66,6 @@ def test_joinorder_benchmark_propagates_compression_gzip(tmp_path) -> None:
 
     generator = benchmark._generator
 
-    # Compression settings are stored in the generator, not the benchmark
     assert benchmark.parallel == 2
     assert generator.compress_data is True
     assert generator.compression_type == "gzip"
@@ -80,7 +73,6 @@ def test_joinorder_benchmark_propagates_compression_gzip(tmp_path) -> None:
 
 
 def test_get_benchmark_instance_handles_joinorder_compression() -> None:
-    """Loader should instantiate the synthetic benchmark with compression options."""
 
     config = BenchmarkConfig(
         name="joinorder_synthetic",
@@ -100,7 +92,7 @@ def test_get_benchmark_instance_handles_joinorder_compression() -> None:
 
     assert isinstance(instance, JoinOrderSyntheticBenchmark)
     assert instance.parallel == profile.cpu_cores_logical
-    # Compression settings are stored in the generator, not the benchmark
+
     assert instance.force_regenerate is True
     assert generator.compress_data is True
     assert generator.compression_type == "zstd"
@@ -180,7 +172,6 @@ def test_joinorder_get_query_rejects_params(tmp_path: Path) -> None:
 
 
 def test_canonical_joinorder_schema_omits_foreign_keys_by_default() -> None:
-    """Canonical IMDb data has dangling references; FK constraints are opt-in."""
     schema = JoinOrderSchema()
 
     sql = schema.get_create_tables_sql("postgres")

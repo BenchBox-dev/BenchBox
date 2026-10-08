@@ -1,11 +1,3 @@
-"""Tests for ``DSQGenBinary.generate_with_parameters``: rendering a query with explicit values.
-
-Values are keyed by the names dsqgen's ``-LOG`` writes (``YEAR.01``). The round-trip test renders
-a seed for every one of the 99 queries and every variant template, reads its ``-LOG`` values, renders again from those values
-with a different seed, and requires the same SQL, so it pins that the explicit values fully determine
-the substitutions.
-"""
-
 import pytest
 
 pytestmark = [
@@ -35,7 +27,7 @@ def test_explicit_values_win_over_the_seed(dsqgen):
 
         assert "d_year =2001" in sql
         assert "inv1.d_moy=1" in sql
-        assert "inv2.d_moy=1+1" in sql  # the template's [MONTH]+1 keeps its expression
+        assert "inv2.d_moy=1+1" in sql
 
 
 def test_text_values_and_dependent_defines(dsqgen):
@@ -84,13 +76,11 @@ def test_malformed_names_are_rejected(dsqgen, name):
 
 @pytest.mark.parametrize("name", ["NOPE.01", "year.01"])
 def test_a_name_the_template_does_not_define_is_rejected(dsqgen, name):
-    # Names are case-sensitive.
     with pytest.raises(ValueError, match=f"no substitution for parameter '{name}'"):
         dsqgen.generate_with_parameters(39, {name: 1})
 
 
 def test_a_defined_value_the_template_does_not_use_is_accepted(dsqgen):
-    # Q10 defines ten COUNTY values (and dsqgen -LOG reports ten) but its SQL uses only five.
     used = _squash(dsqgen.generate_with_parameters(10, {"COUNTY.01": "Aa County"}))
     with_unused = _squash(dsqgen.generate_with_parameters(10, {"COUNTY.01": "Aa County", "COUNTY.10": "Zz County"}))
 

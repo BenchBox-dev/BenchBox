@@ -1,34 +1,11 @@
-"""Analysis module for benchmark comparison.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides comprehensive tools for comparing benchmark results
-across multiple database platforms with:
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
-- Statistical significance testing (Welch's t-test, Mann-Whitney U)
-- Cost vs performance analysis
-- Head-to-head platform comparisons
-
-Example:
-    >>> from benchbox.core.analysis import PlatformComparison
-    >>>
-    >>> # Compare results from multiple platforms
-    >>> comparison = PlatformComparison.from_directory("benchmark_runs/tpch/sf10/")
-    >>> report = comparison.compare()
-    >>>
-    >>> # Get the winner
-    >>> emit(f"Winner: {report.winner}")
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
-
-# Comparison engine
 from benchbox.core.analysis.comparison import (
     ComparisonConfig,
     PlatformComparison,
 )
-
-# Data models
 from benchbox.core.analysis.models import (
     ComparisonOutcome,
     ComparisonReport,
@@ -44,8 +21,6 @@ from benchbox.core.analysis.models import (
     ValidationResult,
     WinLossRecord,
 )
-
-# Statistical utilities
 from benchbox.core.analysis.statistics import (
     apply_bonferroni_correction,
     calculate_coefficient_of_variation,
@@ -66,7 +41,6 @@ from benchbox.core.analysis.statistics import (
 )
 
 __all__ = [
-    # Models
     "ComparisonOutcome",
     "ComparisonReport",
     "ConfidenceInterval",
@@ -80,10 +54,8 @@ __all__ = [
     "StatisticalTest",
     "ValidationResult",
     "WinLossRecord",
-    # Comparison
     "ComparisonConfig",
     "PlatformComparison",
-    # Statistics
     "apply_bonferroni_correction",
     "calculate_coefficient_of_variation",
     "calculate_cohens_d",

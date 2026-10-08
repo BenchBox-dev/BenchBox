@@ -1,5 +1,3 @@
-"""Migration errors for platform selectors removed from BenchBox."""
-
 import pytest
 
 from benchbox.platforms.adapter_factory import get_adapter, reject_removed_platform

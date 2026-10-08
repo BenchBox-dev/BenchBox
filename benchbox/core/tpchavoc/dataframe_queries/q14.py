@@ -1,13 +1,6 @@
-"""TPC-Havoc DataFrame variants for Q14.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Implements 10 structurally diverse variants of TPC-H Q14 (Promotion Effect).
-Q14 joins lineitem and part, filters by date, and computes the percentage of
-revenue from promotional parts using CASE WHEN / conditional sum logic.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -22,10 +15,6 @@ from benchbox.core.tpch.dataframe_queries import (
 from benchbox.core.tpchavoc.dataframe_queries._delegating_variants import make_variant_delegate
 from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_FILTER, build_yaml_variants
 
-# ---------------------------------------------------------------------------
-# v1: baseline - delegate directly to TPC-H base implementation
-# ---------------------------------------------------------------------------
-
 
 def q14_v1_expression_impl(ctx: DataFrameContext) -> Any:
     return _q14_expr_base(ctx)
@@ -33,11 +22,6 @@ def q14_v1_expression_impl(ctx: DataFrameContext) -> Any:
 
 def q14_v1_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q14_pandas_base(ctx)
-
-
-# ---------------------------------------------------------------------------
-# v2: pre-filter - filter lineitem before joining part
-# ---------------------------------------------------------------------------
 
 
 def q14_v2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -50,7 +34,6 @@ def q14_v2_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Pre-filter lineitem before joining
     filtered = lineitem.filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") < lit(end_date)))
 
     return filtered.join(part, left_on="l_partkey", right_on="p_partkey").select(
@@ -74,7 +57,6 @@ def q14_v2_pandas_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Explicit pre-filter step
     filtered = lineitem[(lineitem["l_shipdate"] >= start_date) & (lineitem["l_shipdate"] < end_date)]
     joined = filtered.merge(part, left_on="l_partkey", right_on="p_partkey").copy()
     joined["revenue"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
@@ -87,11 +69,6 @@ def q14_v2_pandas_impl(ctx: DataFrameContext) -> Any:
     promo_percent = 100.0 * promo_val / total_val if total_val > 0 else 0
 
     return pd.DataFrame({"promo_revenue": [promo_percent]})
-
-
-# ---------------------------------------------------------------------------
-# v3: column prune - select only needed columns before joining
-# ---------------------------------------------------------------------------
 
 
 def q14_v3_expression_impl(ctx: DataFrameContext) -> Any:
@@ -147,11 +124,6 @@ def q14_v3_pandas_impl(ctx: DataFrameContext) -> Any:
     return pd.DataFrame({"promo_revenue": [promo_percent]})
 
 
-# ---------------------------------------------------------------------------
-# v4: intermediate vars - explicit DataFrames for each step
-# ---------------------------------------------------------------------------
-
-
 def q14_v4_expression_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
     part = ctx.get_table("part")
@@ -162,11 +134,8 @@ def q14_v4_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Step 1: filter lineitem
     step1 = lineitem.filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") < lit(end_date)))
-    # Step 2: join with part
     step2 = step1.join(part, left_on="l_partkey", right_on="p_partkey")
-    # Step 3: calculate promo revenue
     return step2.select(
         (
             lit(100.0)
@@ -179,11 +148,6 @@ def q14_v4_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 q14_v4_pandas_impl = make_variant_delegate(q14_v2_pandas_impl, name="q14_v4_pandas_impl", module=__name__)
-
-
-# ---------------------------------------------------------------------------
-# v5: pre-compute derived - compute revenue column before selecting
-# ---------------------------------------------------------------------------
 
 
 def q14_v5_expression_impl(ctx: DataFrameContext) -> Any:
@@ -222,7 +186,6 @@ def q14_v5_pandas_impl(ctx: DataFrameContext) -> Any:
 
     filtered = lineitem[(lineitem["l_shipdate"] >= start_date) & (lineitem["l_shipdate"] < end_date)]
     joined = filtered.merge(part, left_on="l_partkey", right_on="p_partkey").copy()
-    # Pre-compute revenue column before the promo calculation
     joined["revenue"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
     joined["is_promo"] = joined["p_type"].str.startswith("PROMO").astype(float)
     joined["promo_revenue"] = joined["revenue"] * joined["is_promo"]
@@ -234,11 +197,6 @@ def q14_v5_pandas_impl(ctx: DataFrameContext) -> Any:
     promo_percent = 100.0 * promo_val / total_val if total_val > 0 else 0
 
     return pd.DataFrame({"promo_revenue": [promo_percent]})
-
-
-# ---------------------------------------------------------------------------
-# v6: chained style - maximum method chaining
-# ---------------------------------------------------------------------------
 
 
 def q14_v6_expression_impl(ctx: DataFrameContext) -> Any:
@@ -268,7 +226,6 @@ def q14_v6_pandas_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Chained style - single expression chain mirroring the expression impl
     joined = (
         ctx.get_table("lineitem")
         .loc[lambda df: (df["l_shipdate"] >= start_date) & (df["l_shipdate"] < end_date)]
@@ -285,11 +242,6 @@ def q14_v6_pandas_impl(ctx: DataFrameContext) -> Any:
     return pd.DataFrame({"promo_revenue": [promo_percent]})
 
 
-# ---------------------------------------------------------------------------
-# v7: join reorder - start from part, join lineitem
-# ---------------------------------------------------------------------------
-
-
 def q14_v7_expression_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
     part = ctx.get_table("part")
@@ -300,7 +252,6 @@ def q14_v7_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Join from part → lineitem (reversed)
     return (
         part.join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") < lit(end_date)))
@@ -326,7 +277,6 @@ def q14_v7_pandas_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Join from part → lineitem (reversed)
     joined = part.merge(lineitem, left_on="p_partkey", right_on="l_partkey")
     filtered = joined[(joined["l_shipdate"] >= start_date) & (joined["l_shipdate"] < end_date)].copy()
     filtered["revenue"] = filtered["l_extendedprice"] * (1 - filtered["l_discount"])
@@ -341,11 +291,6 @@ def q14_v7_pandas_impl(ctx: DataFrameContext) -> Any:
     return pd.DataFrame({"promo_revenue": [promo_percent]})
 
 
-# ---------------------------------------------------------------------------
-# v8: filter combination - filter part for PROMO prefix before joining
-# ---------------------------------------------------------------------------
-
-
 def q14_v8_expression_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
     part = ctx.get_table("part")
@@ -356,11 +301,9 @@ def q14_v8_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Separate into promo and non-promo parts for dual join approach
     promo_parts = part.filter(col("p_type").str.starts_with("PROMO"))
     all_lineitem = lineitem.filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") < lit(end_date)))
 
-    # Join all lineitem with part to get totals; join filtered lineitem with promo_parts for promo total
     total_rev = (
         all_lineitem.join(part, left_on="l_partkey", right_on="p_partkey")
         .select((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("rev"))
@@ -372,8 +315,6 @@ def q14_v8_expression_impl(ctx: DataFrameContext) -> Any:
         .select(col("rev").sum().alias("promo"))
     )
 
-    # Combine single-row aggregates natively via cross join; return as
-    # expression-family frame (no ctx.scalar(), no pandas dependency)
     return total_rev.join(promo_rev, how="cross").select(
         (lit(100.0) * col("promo") / col("total")).alias("promo_revenue")
     )
@@ -391,7 +332,6 @@ def q14_v8_pandas_impl(ctx: DataFrameContext) -> Any:
 
     filtered = lineitem[(lineitem["l_shipdate"] >= start_date) & (lineitem["l_shipdate"] < end_date)]
 
-    # Join with all parts first for total, then filter to promo only for promo total
     joined_all = filtered.merge(part, left_on="l_partkey", right_on="p_partkey").copy()
     joined_all["revenue"] = joined_all["l_extendedprice"] * (1 - joined_all["l_discount"])
 
@@ -406,11 +346,6 @@ def q14_v8_pandas_impl(ctx: DataFrameContext) -> Any:
     return pd.DataFrame({"promo_revenue": [promo_percent]})
 
 
-# ---------------------------------------------------------------------------
-# v9: explicit sort - no sort needed for scalar; use different date check order
-# ---------------------------------------------------------------------------
-
-
 def q14_v9_expression_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
     part = ctx.get_table("part")
@@ -421,7 +356,6 @@ def q14_v9_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Check end_date condition first (different predicate ordering)
     return (
         lineitem.filter((col("l_shipdate") < lit(end_date)) & (col("l_shipdate") >= lit(start_date)))
         .join(part, left_on="l_partkey", right_on="p_partkey")
@@ -447,7 +381,6 @@ def q14_v9_pandas_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Check end_date condition first (different predicate ordering)
     filtered = lineitem[(lineitem["l_shipdate"] < end_date) & (lineitem["l_shipdate"] >= start_date)]
     joined = filtered.merge(part, left_on="l_partkey", right_on="p_partkey").copy()
     joined["revenue"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
@@ -462,11 +395,6 @@ def q14_v9_pandas_impl(ctx: DataFrameContext) -> Any:
     return pd.DataFrame({"promo_revenue": [promo_percent]})
 
 
-# ---------------------------------------------------------------------------
-# v10: alternative formula - price - price*disc instead of price*(1-disc)
-# ---------------------------------------------------------------------------
-
-
 def q14_v10_expression_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
     part = ctx.get_table("part")
@@ -477,7 +405,6 @@ def q14_v10_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Alternative: price - price*disc instead of price*(1-disc)
     rev_alt = col("l_extendedprice") - col("l_extendedprice") * col("l_discount")
 
     return (
@@ -503,7 +430,6 @@ def q14_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 
     filtered = lineitem[(lineitem["l_shipdate"] >= start_date) & (lineitem["l_shipdate"] < end_date)]
     joined = filtered.merge(part, left_on="l_partkey", right_on="p_partkey").copy()
-    # Alternative formula: price - price*disc
     joined["revenue"] = joined["l_extendedprice"] - joined["l_extendedprice"] * joined["l_discount"]
     joined["promo_revenue"] = joined["revenue"] * joined["p_type"].str.startswith("PROMO").astype(float)
 
@@ -515,9 +441,5 @@ def q14_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 
     return pd.DataFrame({"promo_revenue": [promo_percent]})
 
-
-# ---------------------------------------------------------------------------
-# Registry
-# ---------------------------------------------------------------------------
 
 Q14_VARIANTS = build_yaml_variants(__file__, globals(), 14, JOIN_AGG_FILTER)

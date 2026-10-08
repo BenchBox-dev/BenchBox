@@ -1,34 +1,6 @@
-"""Cloud Spark staging infrastructure for unified cloud storage uploads.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides a unified API for uploading benchmark data to cloud storage
-across all major cloud providers:
-- AWS S3 (s3://)
-- Google Cloud Storage (gs://)
-- Azure Blob Storage (abfss://, wasbs://)
-- Databricks Unity Catalog Volumes (dbfs:/Volumes/)
-- Local filesystem (file://) for testing
-
-Usage:
-    from benchbox.platforms.base.cloud_spark import CloudSparkStaging
-
-    # Auto-detect provider from URI scheme
-    staging = CloudSparkStaging.from_uri("s3://my-bucket/benchbox/data")
-
-    # Upload all TPC-H tables
-    staging.upload_tables(
-        tables=["lineitem", "orders", "customer", ...],
-        source_dir=Path("./generated_data"),
-        format="parquet",
-    )
-
-    # Check if data already exists
-    if staging.tables_exist(tables):
-        emit("Data already staged, skipping upload")
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -50,8 +22,6 @@ logger = logging.getLogger(__name__)
 
 
 class CloudProvider(Enum):
-    """Supported cloud storage providers."""
-
     AWS_S3 = "s3"
     GCS = "gs"
     AZURE_BLOB = "azure"
@@ -62,8 +32,6 @@ class CloudProvider(Enum):
 
 @dataclass
 class UploadProgress:
-    """Progress information for file uploads."""
-
     table_name: str
     file_name: str
     bytes_uploaded: int
@@ -73,7 +41,6 @@ class UploadProgress:
 
     @property
     def percent_complete(self) -> float:
-        """Calculate percentage complete."""
         if self.total_bytes == 0:
             return 100.0
         return (self.bytes_uploaded / self.total_bytes) * 100
@@ -81,32 +48,19 @@ class UploadProgress:
 
 @dataclass
 class StagingConfig:
-    """Configuration for cloud staging."""
-
     uri: str
     provider: CloudProvider
     bucket: str
     prefix: str
     region: str | None = None
     credentials: dict[str, Any] | None = None
-    compression: str | None = None  # zstd, gzip, none
+    compression: str | None = None
     parallel_uploads: int = 4
-    chunk_size: int = 8 * 1024 * 1024  # 8MB default
+    chunk_size: int = 8 * 1024 * 1024
 
 
 class CloudSparkStaging(ABC):
-    """Abstract base class for cloud storage staging.
-
-    Provides a unified API for uploading benchmark data to any cloud
-    storage provider. Subclasses implement provider-specific upload logic.
-    """
-
     def __init__(self, config: StagingConfig) -> None:
-        """Initialize staging with configuration.
-
-        Args:
-            config: Staging configuration including URI and credentials
-        """
         self.config = config
         self._logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
@@ -117,28 +71,9 @@ class CloudSparkStaging(ABC):
         credentials: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> CloudSparkStaging:
-        """Create staging instance from URI with auto-detected provider.
-
-        Args:
-            uri: Cloud storage URI (s3://, gs://, abfss://, dbfs://)
-            credentials: Optional credentials dict
-            **kwargs: Additional configuration options
-
-        Returns:
-            CloudSparkStaging instance for the detected provider
-
-        Raises:
-            ValueError: If URI scheme is not supported
-
-        Examples:
-            >>> staging = CloudSparkStaging.from_uri("s3://my-bucket/data")
-            >>> staging = CloudSparkStaging.from_uri("gs://my-bucket/data")
-            >>> staging = CloudSparkStaging.from_uri("abfss://container@account.dfs.core.windows.net/data")
-        """
         parsed = urlparse(uri)
         scheme = parsed.scheme.lower()
 
-        # Detect provider from scheme
         provider_map = {
             "s3": CloudProvider.AWS_S3,
             "s3a": CloudProvider.AWS_S3,
@@ -149,7 +84,7 @@ class CloudSparkStaging(ABC):
             "az": CloudProvider.AZURE_BLOB,
             "dbfs": CloudProvider.DBFS,
             "file": CloudProvider.LOCAL,
-            "": CloudProvider.LOCAL,  # No scheme = local path
+            "": CloudProvider.LOCAL,
         }
 
         if scheme not in provider_map:
@@ -157,7 +92,6 @@ class CloudSparkStaging(ABC):
 
         provider = provider_map[scheme]
 
-        # Parse bucket and prefix
         bucket, prefix = cls._parse_uri(uri, provider)
 
         config = StagingConfig(
@@ -169,36 +103,22 @@ class CloudSparkStaging(ABC):
             **kwargs,
         )
 
-        # Return provider-specific implementation
         return cls._create_for_provider(config)
 
     @staticmethod
     def _parse_uri(uri: str, provider: CloudProvider) -> tuple[str, str]:
-        """Parse URI into bucket and prefix components.
-
-        Args:
-            uri: Cloud storage URI
-            provider: Detected cloud provider
-
-        Returns:
-            Tuple of (bucket, prefix)
-        """
         parsed = urlparse(uri)
 
         if provider == CloudProvider.LOCAL:
             return "", parsed.path
 
         if provider == CloudProvider.AZURE_ADLS:
-            # abfss://container@account.dfs.core.windows.net/path
-            # netloc = container@account.dfs.core.windows.net
-            bucket = parsed.netloc  # Full container@account string
+            bucket = parsed.netloc
             prefix = parsed.path.lstrip("/")
         elif provider == CloudProvider.DBFS:
-            # dbfs:/Volumes/catalog/schema/volume/path
-            bucket = ""  # DBFS doesn't have traditional buckets
+            bucket = ""
             prefix = parsed.path.lstrip("/")
         else:
-            # s3://bucket/prefix or gs://bucket/prefix
             bucket = parsed.netloc
             prefix = parsed.path.lstrip("/")
 
@@ -206,14 +126,6 @@ class CloudSparkStaging(ABC):
 
     @classmethod
     def _create_for_provider(cls, config: StagingConfig) -> CloudSparkStaging:
-        """Create provider-specific staging implementation.
-
-        Args:
-            config: Staging configuration
-
-        Returns:
-            Provider-specific CloudSparkStaging instance
-        """
         provider_classes: dict[CloudProvider, type[CloudSparkStaging]] = {
             CloudProvider.AWS_S3: S3Staging,
             CloudProvider.GCS: GCSStaging,
@@ -236,58 +148,24 @@ class CloudSparkStaging(ABC):
         remote_path: str,
         progress_callback: Callable[[UploadProgress], None] | None = None,
     ) -> str:
-        """Upload a single file to cloud storage.
-
-        Args:
-            local_path: Local file path
-            remote_path: Remote path (relative to staging prefix)
-            progress_callback: Optional callback for progress updates
-
-        Returns:
-            Full URI of uploaded file
-        """
+        pass
 
     @abstractmethod
     def file_exists(self, remote_path: str) -> bool:
-        """Check if a remote file exists.
-
-        Args:
-            remote_path: Remote path (relative to staging prefix)
-
-        Returns:
-            True if file exists
-        """
+        pass
 
     @abstractmethod
     def list_files(self, remote_prefix: str) -> list[str]:
-        """List files under a remote prefix.
-
-        Args:
-            remote_prefix: Remote prefix to list (relative to staging prefix)
-
-        Returns:
-            List of file paths
-        """
+        pass
 
     @abstractmethod
     def delete_path(self, remote_path: str, recursive: bool = False) -> None:
-        """Delete a remote file or directory.
-
-        Args:
-            remote_path: Remote path to delete
-            recursive: If True, delete directory contents recursively
-        """
+        pass
 
     @staticmethod
     def _normalize_data_files(
         data_files: Mapping[str, str | Path | Sequence[str | Path] | None],
     ) -> dict[str, list[Path]]:
-        """Normalize per-table file mappings to concrete local paths.
-
-        Raises TypeError if any table's value is None - callers should filter
-        placeholder metadata (e.g. via ``_has_explicit_data_files``) before
-        invoking this method.
-        """
         normalized: dict[str, list[Path]] = {}
         for table_name, table_files in data_files.items():
             if table_files is None:
@@ -304,7 +182,6 @@ class CloudSparkStaging(ABC):
 
     @staticmethod
     def _expand_explicit_table_files(table_name: str, table_files: list[Path]) -> list[tuple[Path, str]]:
-        """Expand explicit files/directories to upload entries with stable relative paths."""
         standalone_files: list[Path] = []
         expanded: list[tuple[Path, str]] = []
 
@@ -341,11 +218,6 @@ class CloudSparkStaging(ABC):
         data_files: Mapping[str, str | Path | Sequence[str | Path]],
         progress_callback: Callable[[UploadProgress], None] | None = None,
     ) -> dict[str, str]:
-        """Upload explicit per-table file mappings to cloud storage.
-
-        Callers that already know the exact data files should use this API
-        instead of relying on table-name globbing via ``upload_tables()``.
-        """
         normalized = self._normalize_data_files(data_files)
         uploaded: dict[str, str] = {}
         upload_entries = {
@@ -384,11 +256,9 @@ class CloudSparkStaging(ABC):
 
     @staticmethod
     def dataset_manifest_name(fingerprint: str) -> str:
-        """Return the per-table reuse-manifest file name for a dataset fingerprint."""
         return f"_benchbox_manifest_{fingerprint}.json"
 
     def _write_dataset_manifests(self, tables: list[str], fingerprint: str) -> None:
-        """Record the staged dataset identity beside each uploaded table."""
         payload = json.dumps({"dataset_fingerprint": fingerprint}).encode("utf-8")
         fd, tmp_name = tempfile.mkstemp(prefix="benchbox-manifest-", suffix=".json")
         try:
@@ -407,29 +277,13 @@ class CloudSparkStaging(ABC):
         progress_callback: Callable[[UploadProgress], None] | None = None,
         fingerprint: str | None = None,
     ) -> dict[str, str]:
-        """Upload multiple tables to cloud storage.
-
-        Args:
-            tables: List of table names to upload
-            source_dir: Local directory containing table data
-            file_format: File format (parquet, csv, etc.)
-            progress_callback: Optional callback for progress updates
-            fingerprint: Optional dataset identity recorded beside each
-                uploaded table so reuse can verify the staged dataset
-                instead of trusting table names alone.
-
-        Returns:
-            Dict mapping table names to their remote URIs
-        """
         data_files: dict[str, list[Path]] = {}
 
         for table_name in tables:
-            # Find table files
             pattern = f"{table_name}*.{file_format}"
             table_files = list(source_dir.glob(pattern))
 
             if not table_files:
-                # Try without extension for formats like .tbl
                 pattern = f"{table_name}*"
                 table_files = list(source_dir.glob(pattern))
 
@@ -450,18 +304,6 @@ class CloudSparkStaging(ABC):
         file_format: str = "parquet",
         fingerprint: str | None = None,
     ) -> bool:
-        """Check if all tables already exist in staging.
-
-        Args:
-            tables: List of table names to check
-            file_format: Expected file format
-            fingerprint: Optional dataset identity; when given, each table
-                must also carry its reuse manifest, otherwise staged files
-                from a different dataset must not be reused.
-
-        Returns:
-            True if all tables have at least one file
-        """
         for table_name in tables:
             files = self.list_files(f"{table_name}/")
             if not files:
@@ -473,40 +315,20 @@ class CloudSparkStaging(ABC):
         return True
 
     def table_has_fingerprint(self, table_name: str, fingerprint: str) -> bool:
-        """Return whether the staged table dir carries a dataset fingerprint.
-
-        Args:
-            table_name: Name of the table.
-            fingerprint: Dataset identity whose reuse manifest must be present.
-
-        Returns:
-            True if the staged table directory carries the manifest.
-        """
         files = self.list_files(f"{table_name}/")
         wanted = self.dataset_manifest_name(fingerprint)
         return wanted in {entry.rsplit("/", 1)[-1] for entry in files}
 
     def get_table_uri(self, table_name: str) -> str:
-        """Get the full URI for a table's data.
-
-        Args:
-            table_name: Name of the table
-
-        Returns:
-            Full URI to table data directory
-        """
         return f"{self.config.uri.rstrip('/')}/{table_name}/"
 
 
 class S3Staging(CloudSparkStaging):
-    """AWS S3 staging implementation."""
-
     def __init__(self, config: StagingConfig) -> None:
         super().__init__(config)
         self._client: Any = None
 
     def _get_client(self) -> Any:
-        """Get or create S3 client."""
         if self._client is None:
             try:
                 import boto3
@@ -525,7 +347,6 @@ class S3Staging(CloudSparkStaging):
         return self._client
 
     def _full_key(self, remote_path: str) -> str:
-        """Get full S3 key including prefix."""
         if self.config.prefix:
             return f"{self.config.prefix.rstrip('/')}/{remote_path}"
         return remote_path
@@ -536,7 +357,6 @@ class S3Staging(CloudSparkStaging):
         remote_path: str,
         progress_callback: Callable[[UploadProgress], None] | None = None,
     ) -> str:
-        """Upload file to S3."""
         client = self._get_client()
         key = self._full_key(remote_path)
 
@@ -549,7 +369,6 @@ class S3Staging(CloudSparkStaging):
         return f"s3://{self.config.bucket}/{key}"
 
     def file_exists(self, remote_path: str) -> bool:
-        """Check if file exists in S3."""
         client = self._get_client()
         key = self._full_key(remote_path)
 
@@ -560,7 +379,6 @@ class S3Staging(CloudSparkStaging):
             return False
 
     def list_files(self, remote_prefix: str) -> list[str]:
-        """List files in S3 under prefix."""
         client = self._get_client()
         prefix = self._full_key(remote_prefix)
 
@@ -573,7 +391,6 @@ class S3Staging(CloudSparkStaging):
         return files
 
     def delete_path(self, remote_path: str, recursive: bool = False) -> None:
-        """Delete file or directory from S3."""
         client = self._get_client()
 
         if recursive:
@@ -590,14 +407,11 @@ class S3Staging(CloudSparkStaging):
 
 
 class GCSStaging(CloudSparkStaging):
-    """Google Cloud Storage staging implementation."""
-
     def __init__(self, config: StagingConfig) -> None:
         super().__init__(config)
         self._client: Any = None
 
     def _get_client(self) -> Any:
-        """Get or create GCS client."""
         if self._client is None:
             try:
                 from google.cloud import storage
@@ -613,7 +427,6 @@ class GCSStaging(CloudSparkStaging):
         return self._client
 
     def _full_path(self, remote_path: str) -> str:
-        """Get full GCS path including prefix."""
         if self.config.prefix:
             return f"{self.config.prefix.rstrip('/')}/{remote_path}"
         return remote_path
@@ -624,7 +437,6 @@ class GCSStaging(CloudSparkStaging):
         remote_path: str,
         progress_callback: Callable[[UploadProgress], None] | None = None,
     ) -> str:
-        """Upload file to GCS."""
         client = self._get_client()
         bucket = client.bucket(self.config.bucket)
         blob_path = self._full_path(remote_path)
@@ -635,7 +447,6 @@ class GCSStaging(CloudSparkStaging):
         return f"gs://{self.config.bucket}/{blob_path}"
 
     def file_exists(self, remote_path: str) -> bool:
-        """Check if file exists in GCS."""
         client = self._get_client()
         bucket = client.bucket(self.config.bucket)
         blob_path = self._full_path(remote_path)
@@ -644,7 +455,6 @@ class GCSStaging(CloudSparkStaging):
         return blob.exists()
 
     def list_files(self, remote_prefix: str) -> list[str]:
-        """List files in GCS under prefix."""
         client = self._get_client()
         bucket = client.bucket(self.config.bucket)
         prefix = self._full_path(remote_prefix)
@@ -653,7 +463,6 @@ class GCSStaging(CloudSparkStaging):
         return [blob.name for blob in blobs]
 
     def delete_path(self, remote_path: str, recursive: bool = False) -> None:
-        """Delete file or directory from GCS."""
         client = self._get_client()
         bucket = client.bucket(self.config.bucket)
 
@@ -668,14 +477,11 @@ class GCSStaging(CloudSparkStaging):
 
 
 class AzureADLSStaging(CloudSparkStaging):
-    """Azure Data Lake Storage Gen2 staging implementation."""
-
     def __init__(self, config: StagingConfig) -> None:
         super().__init__(config)
         self._client: Any = None
 
     def _get_client(self) -> Any:
-        """Get or create ADLS client."""
         if self._client is None:
             try:
                 from azure.identity import DefaultAzureCredential
@@ -688,7 +494,6 @@ class AzureADLSStaging(CloudSparkStaging):
                     )
                 ) from e
 
-            # Parse account from container@account.dfs.core.windows.net
             netloc = self.config.bucket
             if "@" not in netloc:
                 raise ValueError(f"Invalid ADLS URI format: {self.config.uri}")
@@ -704,7 +509,6 @@ class AzureADLSStaging(CloudSparkStaging):
         return self._client
 
     def _full_path(self, remote_path: str) -> str:
-        """Get full ADLS path including prefix."""
         if self.config.prefix:
             return f"{self.config.prefix.rstrip('/')}/{remote_path}"
         return remote_path
@@ -715,7 +519,6 @@ class AzureADLSStaging(CloudSparkStaging):
         remote_path: str,
         progress_callback: Callable[[UploadProgress], None] | None = None,
     ) -> str:
-        """Upload file to Azure ADLS."""
         client = self._get_client()
         file_path = self._full_path(remote_path)
 
@@ -726,7 +529,6 @@ class AzureADLSStaging(CloudSparkStaging):
         return f"{self.config.uri.rstrip('/')}/{remote_path}"
 
     def file_exists(self, remote_path: str) -> bool:
-        """Check if file exists in ADLS."""
         client = self._get_client()
         file_path = self._full_path(remote_path)
         file_client = client.get_file_client(file_path)
@@ -738,7 +540,6 @@ class AzureADLSStaging(CloudSparkStaging):
             return False
 
     def list_files(self, remote_prefix: str) -> list[str]:
-        """List files in ADLS under prefix."""
         client = self._get_client()
         prefix = self._full_path(remote_prefix)
 
@@ -746,7 +547,6 @@ class AzureADLSStaging(CloudSparkStaging):
         return [path.name for path in paths if not path.is_directory]
 
     def delete_path(self, remote_path: str, recursive: bool = False) -> None:
-        """Delete file or directory from ADLS."""
         client = self._get_client()
         file_path = self._full_path(remote_path)
 
@@ -759,14 +559,11 @@ class AzureADLSStaging(CloudSparkStaging):
 
 
 class AzureBlobStaging(CloudSparkStaging):
-    """Azure Blob Storage staging implementation."""
-
     def __init__(self, config: StagingConfig) -> None:
         super().__init__(config)
         self._client: Any = None
 
     def _get_client(self) -> Any:
-        """Get or create Blob client."""
         if self._client is None:
             try:
                 from azure.identity import DefaultAzureCredential
@@ -780,7 +577,6 @@ class AzureBlobStaging(CloudSparkStaging):
                 ) from e
 
             credential = DefaultAzureCredential()
-            # Parse container URL from config
             self._client = ContainerClient(
                 account_url=f"https://{self.config.bucket.split('@')[1] if '@' in self.config.bucket else self.config.bucket}",
                 container_name=self.config.bucket.split("@")[0] if "@" in self.config.bucket else self.config.bucket,
@@ -790,7 +586,6 @@ class AzureBlobStaging(CloudSparkStaging):
         return self._client
 
     def _full_path(self, remote_path: str) -> str:
-        """Get full blob path including prefix."""
         if self.config.prefix:
             return f"{self.config.prefix.rstrip('/')}/{remote_path}"
         return remote_path
@@ -801,7 +596,6 @@ class AzureBlobStaging(CloudSparkStaging):
         remote_path: str,
         progress_callback: Callable[[UploadProgress], None] | None = None,
     ) -> str:
-        """Upload file to Azure Blob."""
         client = self._get_client()
         blob_path = self._full_path(remote_path)
 
@@ -812,7 +606,6 @@ class AzureBlobStaging(CloudSparkStaging):
         return f"{self.config.uri.rstrip('/')}/{remote_path}"
 
     def file_exists(self, remote_path: str) -> bool:
-        """Check if file exists in Azure Blob."""
         client = self._get_client()
         blob_path = self._full_path(remote_path)
         blob_client = client.get_blob_client(blob_path)
@@ -820,7 +613,6 @@ class AzureBlobStaging(CloudSparkStaging):
         return blob_client.exists()
 
     def list_files(self, remote_prefix: str) -> list[str]:
-        """List files in Azure Blob under prefix."""
         client = self._get_client()
         prefix = self._full_path(remote_prefix)
 
@@ -828,7 +620,6 @@ class AzureBlobStaging(CloudSparkStaging):
         return [blob.name for blob in blobs]
 
     def delete_path(self, remote_path: str, recursive: bool = False) -> None:
-        """Delete file or directory from Azure Blob."""
         client = self._get_client()
 
         if recursive:
@@ -841,14 +632,11 @@ class AzureBlobStaging(CloudSparkStaging):
 
 
 class DBFSStaging(CloudSparkStaging):
-    """Databricks DBFS/Unity Catalog Volumes staging implementation."""
-
     def __init__(self, config: StagingConfig) -> None:
         super().__init__(config)
         self._client: Any = None
 
     def _get_client(self) -> Any:
-        """Get or create DBFS client via Databricks SDK."""
         if self._client is None:
             try:
                 from databricks.sdk import WorkspaceClient
@@ -862,7 +650,6 @@ class DBFSStaging(CloudSparkStaging):
         return self._client
 
     def _full_path(self, remote_path: str) -> str:
-        """Get full DBFS path including prefix."""
         if self.config.prefix:
             return f"/{self.config.prefix.strip('/')}/{remote_path}"
         return f"/{remote_path}"
@@ -873,7 +660,6 @@ class DBFSStaging(CloudSparkStaging):
         remote_path: str,
         progress_callback: Callable[[UploadProgress], None] | None = None,
     ) -> str:
-        """Upload file to DBFS."""
         client = self._get_client()
         dbfs_path = self._full_path(remote_path)
 
@@ -883,7 +669,6 @@ class DBFSStaging(CloudSparkStaging):
         return f"dbfs:{dbfs_path}"
 
     def file_exists(self, remote_path: str) -> bool:
-        """Check if file exists in DBFS."""
         client = self._get_client()
         dbfs_path = self._full_path(remote_path)
 
@@ -894,7 +679,6 @@ class DBFSStaging(CloudSparkStaging):
             return False
 
     def list_files(self, remote_prefix: str) -> list[str]:
-        """List files in DBFS under prefix."""
         client = self._get_client()
         dbfs_path = self._full_path(remote_prefix)
 
@@ -905,15 +689,12 @@ class DBFSStaging(CloudSparkStaging):
             return []
 
     def delete_path(self, remote_path: str, recursive: bool = False) -> None:
-        """Delete file or directory from DBFS."""
         client = self._get_client()
         dbfs_path = self._full_path(remote_path)
         client.dbfs.delete(dbfs_path, recursive=recursive)
 
 
 class LocalStaging(CloudSparkStaging):
-    """Local filesystem staging for testing."""
-
     def __init__(self, config: StagingConfig) -> None:
         super().__init__(config)
         self._base_path = Path(config.prefix or config.uri.replace("file://", ""))
@@ -924,7 +705,6 @@ class LocalStaging(CloudSparkStaging):
         remote_path: str,
         progress_callback: Callable[[UploadProgress], None] | None = None,
     ) -> str:
-        """Copy file to local staging directory."""
         import shutil
 
         dest = self._base_path / remote_path
@@ -934,18 +714,15 @@ class LocalStaging(CloudSparkStaging):
         return f"file://{dest}"
 
     def file_exists(self, remote_path: str) -> bool:
-        """Check if file exists locally."""
         return (self._base_path / remote_path).exists()
 
     def list_files(self, remote_prefix: str) -> list[str]:
-        """List files under local prefix."""
         prefix_path = self._base_path / remote_prefix
         if not prefix_path.exists():
             return []
         return [str(p.relative_to(self._base_path)) for p in prefix_path.rglob("*") if p.is_file()]
 
     def delete_path(self, remote_path: str, recursive: bool = False) -> None:
-        """Delete local file or directory."""
         import shutil
 
         path = self._base_path / remote_path

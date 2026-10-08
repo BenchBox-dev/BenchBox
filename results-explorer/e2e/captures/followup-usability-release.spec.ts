@@ -1,36 +1,3 @@
-/**
- * Release-gate browser-drive for
- * `results-explorer-followup-usability-release-gate` w3 + w4.
- *
- * Asserts the user-visible outcome of every PR shipped under the
- * `2026-05-08 Results Explorer follow-up usability` effort:
- *
- *   - PR #299 (TODO #1 w4): Query Workbench facet groups are
- *     collapsible; secondary groups default-collapsed.
- *   - PR #300 (TODO #2 w1+w2): Chart panel header band is single-row;
- *     Per-query > Heatmap subtab does not duplicate the matrix.
- *   - PR #303 (TODO #3 w2/w3/w4): Benchmark/Platform sibling switchers
- *     and Home ranking selector renders above the matrix.
- *   - PR #304 (TODO #4 w2+w3): Heatmap sticky-left offsets dynamic;
- *     header row is vertically sticky.
- *   - PR #305 (TODO #4 w5): Platform detail filter strip surfaces with
- *     a Reset button when the cohort has 25+ rows.
- *   - PR #307 (TODO #5 w4/w5/w6): Query compare tray, Home compare
- *     entrypoint, Platform cohort lock.
- *   - PR #309 (TODO #6 w3/w4/w6): Cohort-aware run identity labels
- *     across distribution, overview, and trend charts.
- *   - PR #310 (TODO #4 w4): Heatmap Platform cell is identity-only;
- *     Receipt link sits in the Trust column.
- *   - PR #311 (TODO #7 w6+w7): Compare normalized-speedup chart
- *     defaults to comparable-only with a toggle.
- *
- * Default mode (no env var): assertions only — runs in CI as a
- * regression gate. Set `FOLLOWUP_USABILITY_CAPTURE=1` to also
- * write before-release screenshots into
- * `_project/audits/results-explorer-followup-usability-release-2026-05-08-screenshots/`
- * for the audit doc.
- */
-
 import { mkdirSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -77,8 +44,6 @@ async function clickFirstEnabledUnchecked(locator: Locator, startAt = 0): Promis
 }
 
 async function launchFirstBuilderComparison(page: Page): Promise<void> {
-  // rx-19: Compare builder candidate table retired; launch comparison directly via fixtureIds.
-  // Simple reliable launch: go to BenchmarkIndex, pick 2, follow tray link (proves picking still works)
   await page.goto("/results/tpch/");
   await waitForShell(page);
   await waitForDataLoaded(page, /TPC-H Results/);
@@ -94,7 +59,6 @@ async function launchFirstBuilderComparison(page: Page): Promise<void> {
       return;
     }
   }
-  // Fallback: direct URL with known fixture
   await page.goto("/results/compare?ids=" + `${fixtureIds.shortIds.duckdb},${fixtureIds.shortIds.datafusion}`);
   await waitForShell(page);
   await waitForDataLoaded(page, /Comparison/i);
@@ -130,7 +94,6 @@ test.describe("@followup-usability release-gate route walk", () => {
     await expect(benchmarkToggle).toHaveAttribute("aria-expanded", "true");
     await expect(desktopFilters.getByPlaceholder("Search benchmark")).toBeVisible();
 
-    // Secondary groups default-collapsed (Trust, Cost status, etc.).
     const trustToggle = desktopFilters.getByRole("button", { name: /^Trust/ });
     await expect(trustToggle).toHaveAttribute("aria-expanded", "false");
 
@@ -200,8 +163,6 @@ test.describe("@followup-usability release-gate route walk", () => {
 
     const firstHeatmapRow = heatmap.locator("tbody tr[data-testid]").first();
     await expect(firstHeatmapRow).toBeVisible();
-    // The platform name is the receipt link, so matrix reachability needs no
-    // disclosure and costs the row no extra height.
     await expect(firstHeatmapRow.locator("summary")).toHaveCount(0);
     await expect(firstHeatmapRow.getByRole("link", { name: /^Open receipt for / }).first()).toBeVisible();
 
@@ -226,8 +187,6 @@ test.describe("@followup-usability release-gate route walk", () => {
     await enabledCompareCheckboxes.first().uncheck();
     expect(await countDisabled(compareCheckboxes)).toBe(baselineDisabledCount);
 
-    // The cohort filter panel stays mounted at every cohort size now (it
-    // used to hide below a 25-row threshold).
     const filters = page.getByTestId("platform-detail-filters");
     await expect(filters).toBeVisible();
     await expect(filters.getByTestId("platform-filter-benchmark")).toBeVisible();
@@ -273,14 +232,12 @@ test.describe("@followup-usability release-gate route walk", () => {
   test("Compare normalized-speedup chart uses builder-launched IDs and asserts comparable-only control when partials exist", async ({ page }) => {
     await launchFirstBuilderComparison(page);
 
-    // Comparison may take extra time to load via WASM; allow longer, skip if not available in small fixture.
     const comparisonLoaded = await page.getByRole("heading", { name: /Comparison/i }).isVisible().catch(() => false);
     if (!comparisonLoaded) {
       await page.waitForTimeout(5000);
     }
     const hasComparison = await page.getByRole("heading", { name: /Comparison/i }).isVisible().catch(() => false);
     if (!hasComparison) {
-      // Small fixture may not have comparable pair for this chart walk; skip chart assertion but keep capture.
       await expect(page.getByRole("main")).toBeVisible();
       await maybeCapture(page, "compare-normalized-speedup");
       return;
@@ -296,7 +253,6 @@ test.describe("@followup-usability release-gate route walk", () => {
     const chartPanel = page.getByRole("tabpanel", { name: /chart/i }).first();
     const hasPanel = await chartPanel.isVisible().catch(() => false);
     if (!hasPanel) {
-      // Chart may not render for this fixture pair (e.g., loading); verify page is not broken.
       await expect(page.getByRole("main")).toBeVisible();
       await maybeCapture(page, "compare-normalized-speedup");
       return;
@@ -323,10 +279,6 @@ test.describe("@followup-usability release-gate route walk", () => {
   test("Result Detail renders without claiming missing receipt fields", async ({ page }) => {
     await openFirstSparseResultDetail(page);
 
-    // The disclosure-based "Show missing fields" toggle was shipped in
-    // PR #295 (TODO results-explorer-result-detail-metadata-density) and
-    // is part of the broader follow-up effort the audit covers. Assert it
-    // is present so a regression that re-adds inline empties surfaces.
     await expect(page.getByText(/Show missing/i)).toBeVisible();
 
     await maybeCapture(page, "result-detail-sparse-metadata");

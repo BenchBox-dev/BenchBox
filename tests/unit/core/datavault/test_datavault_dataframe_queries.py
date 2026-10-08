@@ -1,7 +1,4 @@
-"""Unit tests for Data Vault DataFrame query implementations.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -19,8 +16,6 @@ ALL_QUERY_IDS = [f"Q{i}" for i in range(1, 23)]
 
 
 class TestDataVaultQueryRegistry:
-    """Tests for Data Vault DataFrame query registry."""
-
     def test_registry_imports_successfully(self):
         from benchbox.core.datavault.dataframe_queries import DATAVAULT_DATAFRAME_QUERIES
 
@@ -89,8 +84,6 @@ class TestDataVaultQueryRegistry:
 
 
 class TestDataVaultQueryCategories:
-    """Tests for Data Vault query category assignments."""
-
     def test_simple_queries_have_aggregate(self):
         from benchbox.core.datavault.dataframe_queries import get_datavault_query
 
@@ -120,8 +113,6 @@ class TestDataVaultQueryCategories:
 
 
 class TestDataVaultParameters:
-    """Tests for Data Vault query parameters."""
-
     def test_all_queries_have_parameters(self):
         from benchbox.core.datavault.dataframe_queries.parameters import DATAVAULT_DEFAULT_PARAMS
 
@@ -161,8 +152,6 @@ class TestDataVaultParameters:
 
 
 class TestDataVaultBenchmarkRegistry:
-    """Tests for Data Vault DataFrame support in benchmark registry."""
-
     def test_datavault_supports_dataframe(self):
         from benchbox.core.benchmark_registry import get_benchmark_metadata
 
@@ -172,14 +161,6 @@ class TestDataVaultBenchmarkRegistry:
 
 
 def _schema_faithful_tables(n_rows: int = 4):
-    """Build schema-faithful synthetic tables for every Data Vault table.
-
-    Every frame carries the real schema columns, including the housekeeping
-    columns (load_dts/record_source everywhere; load_end_dts/hashdiff on
-    satellites) that used to collide during chained joins. Hash keys are
-    consistent per key domain so joins match; string columns carry values
-    that pass the queries' default filters.
-    """
     import datetime
 
     import pandas as pd
@@ -234,7 +215,6 @@ def _schema_faithful_tables(n_rows: int = 4):
 
 
 def _register_contexts(tables):
-    """Register pandas frames in both backend contexts."""
     import polars as pl
 
     from benchbox.platforms.dataframe.pandas_df import PandasDataFrameAdapter
@@ -249,7 +229,6 @@ def _register_contexts(tables):
 
 
 def _materialize(result):
-    """Collect any backend result to (columns, rows) with plain scalars."""
     import pandas as pd
 
     native = getattr(result, "native", result)
@@ -262,8 +241,6 @@ def _materialize(result):
 
 
 class TestHousekeepingColumnStripping:
-    """Unit tests for the join-duplicate guards."""
-
     def test_expression_strips_all_housekeeping_columns(self):
         import polars as pl
 
@@ -324,8 +301,6 @@ class TestHousekeepingColumnStripping:
 
 
 class TestAllQueriesExecuteOnSchemaFaithfulData:
-    """Every query x backend executes over full-schema data without join errors."""
-
     @pytest.mark.parametrize("query_id", ALL_QUERY_IDS)
     @pytest.mark.parametrize("family", ["expression", "pandas"])
     def test_query_executes(self, query_id, family):
@@ -337,14 +312,11 @@ class TestAllQueriesExecuteOnSchemaFaithfulData:
         impl = query.expression_impl if family == "expression" else query.pandas_impl
         columns, _rows = _materialize(impl(ctx))
         assert columns, f"{query_id}/{family} returned no columns"
-        # No join-suffixed duplicate columns may leak into results.
         dups = [c for c in columns if c.endswith(("_right", "_x", "_y"))]
         assert not dups, f"{query_id}/{family} leaked duplicate columns: {dups}"
 
 
 class TestQ17NullSemantics:
-    """Q17 preserves SQL NULL (not 0.0) when the filtered set is empty."""
-
     def _tables(self, brand, container):
         import pandas as pd
 
@@ -385,8 +357,6 @@ class TestQ17NullSemantics:
         from benchbox.core.datavault.dataframe_queries import get_datavault_query
 
         tables = self._tables("Brand#23", "MED BOX")
-        # Three rows for one part: quantities 10, 10, 1 -> avg 7, cutoff 1.4:
-        # only the qty-1 row qualifies.
         import pandas as pd
 
         tables["link_lineitem"] = pd.DataFrame(
@@ -415,8 +385,6 @@ class TestQ17NullSemantics:
 
 
 class TestQ11ProjectsPartKey:
-    """Q11 projects the p_partkey business key like the SQL surface."""
-
     @pytest.mark.parametrize("family", ["expression", "pandas"])
     def test_partkey_projection_and_values(self, family):
         import pandas as pd
@@ -451,8 +419,6 @@ class TestQ11ProjectsPartKey:
 
 
 class TestQ3Q10ColumnOrder:
-    """Q3/Q10 emit columns in SQL-surface order (key columns first, revenue placed)."""
-
     def test_q3_column_order(self):
         import datetime
 
@@ -553,8 +519,6 @@ class TestQ3Q10ColumnOrder:
 
 
 class TestQ15MaxSupplier:
-    """Q15 returns the max-revenue supplier deterministically (float-wobble stable)."""
-
     def _tables(self, revenues):
         import datetime
 
@@ -616,12 +580,6 @@ class TestQ15MaxSupplier:
 
     @pytest.mark.parametrize("family", ["expression", "pandas"])
     def test_sub_cent_difference_selects_true_max(self, family):
-        """A 1e-4 revenue gap is invisible at cent precision but decisive: it
-        pins the tolerance to the data's own granularity.
-
-        Cent rounding would return both suppliers; SQL exact-max semantics
-        return only the true max.
-        """
         from benchbox.core.datavault.dataframe_queries import get_datavault_query
 
         expr_ctx, pandas_ctx = _register_contexts(self._tables([100.0, 100.0001]))
@@ -641,7 +599,6 @@ class TestQ15MaxSupplier:
         from benchbox.core.datavault.dataframe_queries import get_datavault_query
 
         tables = self._tables([100.0])
-        # Move the only lineitem out of the Q15 date window.
         tables["sat_lineitem"]["l_shipdate"] = pd.Series([datetime.date(1990, 1, 1)])
         expr_ctx, pandas_ctx = _register_contexts(tables)
         ctx = expr_ctx if family == "expression" else pandas_ctx

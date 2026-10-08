@@ -1,11 +1,3 @@
-"""Q51, Q53 and Q63 reproduce what their templates say, not an approximation of it.
-
-Q53 and Q63 name item brands such as ``scholaramalgamalg #14``; in an unquoted YAML scalar ``#`` starts a
-comment, so the specs once held ``scholaramalgamalg`` and the implementations matched no item whenever the
-SQL did. Q51's day sums are NULL when every price that day is NULL, and its running total carries the
-previous total across such a day.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path

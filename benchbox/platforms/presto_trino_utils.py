@@ -1,5 +1,3 @@
-"""Shared helpers for Presto-family adapters."""
-
 from __future__ import annotations
 
 import re
@@ -14,17 +12,10 @@ _DATE_LITERAL_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def is_date_value(value: str) -> bool:
-    """Return True for strings that match the TPC-H YYYY-MM-DD date format.
-
-    Presto and Trino memory catalogs require ``DATE 'YYYY-MM-DD'`` literal
-    syntax rather than string auto-casting, so INSERT VALUES rendering needs
-    to detect the date shape explicitly.
-    """
     return bool(_DATE_LITERAL_RE.match(value))
 
 
 def escape_insert_value(value: str) -> str:
-    """Format a CSV field as a Presto/Trino literal for INSERT VALUES."""
     if value == "" or value.lower() == "null":
         return "NULL"
     if is_date_value(value):
@@ -37,13 +28,6 @@ def escape_insert_value(value: str) -> str:
 
 
 def load_file_batches(cursor: Any, file_path: Path, qualified_table: str, *, delimiter: str | None = None) -> int:
-    """Load one file into a Presto/Trino table using batched INSERT VALUES.
-
-    ``delimiter`` carries the resolver-derived dialect when the caller has
-    DataSource context (manifest metadata, then benchmark attributes); when
-    absent, the historical file-extension heuristic applies so standalone
-    callers keep working.
-    """
     from benchbox.platforms.base.data_loading import FileFormatRegistry
     from benchbox.utils.file_format import get_delimiter_for_file
 
@@ -79,7 +63,6 @@ def load_file_batches(cursor: Any, file_path: Path, qualified_table: str, *, del
 
 
 def normalize_existing_files(file_paths: Any) -> list[Path]:
-    """Normalize file inputs to existing, non-empty local paths."""
     normalized_paths = file_paths if isinstance(file_paths, list) else [file_paths]
     valid_files: list[Path] = []
     for file_path in normalized_paths:
@@ -90,7 +73,6 @@ def normalize_existing_files(file_paths: Any) -> list[Path]:
 
 
 def show_tables_lower(connection: Any) -> list[str]:
-    """Return lower-cased table names from a cursor-based SHOW TABLES result."""
     cursor = connection.cursor()
     try:
         cursor.execute("SHOW TABLES")
@@ -109,7 +91,6 @@ def validate_catalog_exists(
     get_available_catalogs: Callable[[], list[str]],
     logger: Logger,
 ) -> tuple[str, bool]:
-    """Validate a requested catalog or auto-select one for Presto-family adapters."""
     auto_selected = False
 
     if not catalog:
@@ -160,19 +141,6 @@ def execute_schema_statements(
     extract_table_name: Callable[[str], str | None],
     log_notice: Callable[[str], None],
 ) -> None:
-    """Execute schema DDL statements with drop-and-recreate error recovery.
-
-    Shared implementation for Presto and Trino create_schema methods.
-
-    Args:
-        schema_sql: Semicolon-delimited DDL statements.
-        connection: DBAPI connection.
-        logger: Logger instance.
-        normalize_table_name_in_sql: Callable to normalize table names.
-        optimize_table_definition: Callable to apply platform-specific DDL tweaks.
-        extract_table_name: Callable to extract table name from a DDL statement.
-        log_notice: Default-visible logging wrapper that respects quiet mode.
-    """
     cursor = connection.cursor()
 
     try:

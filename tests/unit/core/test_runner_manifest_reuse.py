@@ -1,5 +1,3 @@
-"""Tests for manifest-based data reuse in the core runner."""
-
 from __future__ import annotations
 
 import json
@@ -100,7 +98,6 @@ def test_manifest_reuse_populates_tables_and_logs(
 
 
 def test_manifest_reuse_preserves_directory_format_preference(tmp_path: Path, benchmark_config: BenchmarkConfig):
-    """Manifest reuse should preserve preferred directory formats for platform-specific adapters."""
     delta_dir = tmp_path / "lineitem"
     (delta_dir / "_delta_log").mkdir(parents=True)
     (delta_dir / "_delta_log" / "00000000000000000000.json").write_text("{}")
@@ -233,14 +230,13 @@ def test_force_regenerate_ignores_manifest(tmp_path: Path, benchmark_config: Ben
 
 
 def test_force_regenerate_overrides_populated_tables(tmp_path: Path, benchmark_config: BenchmarkConfig):
-    """force_regenerate should regenerate even when benchmark.tables is already populated."""
     _write_manifest(tmp_path, table_names=["customer"])
     benchmark_config.options = {"force_regenerate": True}
 
     class DummyBenchmark:
         def __init__(self) -> None:
             self.output_dir = tmp_path
-            self.tables = {"customer": ["customer.dat"]}  # Pre-populated
+            self.tables = {"customer": ["customer.dat"]}
             self.generate_data = Mock()
 
     dummy = DummyBenchmark()
@@ -252,7 +248,6 @@ def test_force_regenerate_overrides_populated_tables(tmp_path: Path, benchmark_c
 
 
 def test_populated_missing_tables_trigger_regeneration(tmp_path: Path, benchmark_config: BenchmarkConfig):
-    """A populated mapping with missing files must not bypass generation."""
 
     class DummyBenchmark:
         def __init__(self) -> None:
@@ -269,7 +264,6 @@ def test_populated_missing_tables_trigger_regeneration(tmp_path: Path, benchmark
 
 
 def test_populated_tables_must_match_manifest_before_reuse(tmp_path: Path, benchmark_config: BenchmarkConfig):
-    """Existing but stale table mappings must not be reused."""
     _write_manifest(tmp_path, table_names=["customer"])
     stale_path = tmp_path / "orders.dat"
     stale_path.write_text("stale\n")
@@ -289,7 +283,6 @@ def test_populated_tables_must_match_manifest_before_reuse(tmp_path: Path, bench
 
 
 def test_external_populated_tables_without_manifest_are_reused(tmp_path: Path, benchmark_config: BenchmarkConfig):
-    """External caller-provided tables must not require a local datagen manifest."""
     benchmark_config.options["table_mode"] = "external"
 
     class DummyBenchmark:
@@ -308,7 +301,7 @@ def test_external_populated_tables_without_manifest_are_reused(tmp_path: Path, b
 
 def test_invalid_manifest_regenerates(tmp_path: Path, benchmark_config: BenchmarkConfig):
     manifest = _write_manifest(tmp_path, table_names=["orders"])
-    # Corrupt manifest by altering file size expectation
+
     manifest["tables"]["orders"]["formats"]["dat"][0]["size_bytes"] += 100
     with (tmp_path / "_datagen_manifest.json").open("w") as fh:
         json.dump(manifest, fh)
@@ -353,7 +346,6 @@ def test_no_regenerate_with_invalid_manifest_raises(tmp_path: Path, benchmark_co
 
 
 def _write_directory_manifest(tmp_path: Path, *, table_name: str = "lineitem") -> dict:
-    """Create a manifest with a directory entry (like Delta/Iceberg)."""
     table_dir = tmp_path / table_name
     table_dir.mkdir()
     (table_dir / "part-0.parquet").write_bytes(b"x" * 100)
@@ -398,7 +390,6 @@ def _write_directory_manifest(tmp_path: Path, *, table_name: str = "lineitem") -
 def test_directory_entry_validates_successfully(
     tmp_path: Path, benchmark_config: BenchmarkConfig, capsys: pytest.CaptureFixture[str]
 ):
-    """Directory-based manifest entries (Delta/Iceberg) should validate via recursive size."""
     _write_directory_manifest(tmp_path)
 
     class DummyBenchmark:
@@ -417,10 +408,8 @@ def test_directory_entry_validates_successfully(
 
 
 def test_directory_entry_size_mismatch_detected(tmp_path: Path, benchmark_config: BenchmarkConfig):
-    """Directory-based manifest entries should detect size changes (added/removed files)."""
     _write_directory_manifest(tmp_path)
 
-    # Add an extra file to change the recursive sum
     (tmp_path / "lineitem" / "extra.parquet").write_bytes(b"w" * 999)
 
     class DummyBenchmark:
@@ -437,10 +426,8 @@ def test_directory_entry_size_mismatch_detected(tmp_path: Path, benchmark_config
 
 
 def test_table_name_directory_collision_invalidates_manifest(tmp_path: Path, benchmark_config: BenchmarkConfig):
-    """Untracked directory sharing a table name should invalidate manifest and trigger regen."""
     _write_manifest(tmp_path, table_names=["customer", "orders"])
 
-    # Create a stale Iceberg-style directory that collides with a table name
     stale_dir = tmp_path / "customer"
     stale_dir.mkdir()
     (stale_dir / "data").mkdir()
@@ -461,7 +448,6 @@ def test_table_name_directory_collision_invalidates_manifest(tmp_path: Path, ben
 
 
 def test_cloud_staging_path_checks_local_directory_collisions(tmp_path: Path, benchmark_config: BenchmarkConfig):
-    """Cloud staging keeps the local collision guard while carrying its remote target."""
     _write_manifest(tmp_path, table_names=["customer"])
     stale_dir = tmp_path / "customer"
     stale_dir.mkdir()
@@ -483,7 +469,6 @@ def test_cloud_staging_path_checks_local_directory_collisions(tmp_path: Path, be
 def test_tracked_directory_entry_still_validates(
     tmp_path: Path, benchmark_config: BenchmarkConfig, capsys: pytest.CaptureFixture[str]
 ):
-    """Delta/Iceberg directory IN manifest (with matching path) should NOT be invalidated."""
     _write_directory_manifest(tmp_path, table_name="lineitem")
 
     class DummyBenchmark:
@@ -502,8 +487,7 @@ def test_tracked_directory_entry_still_validates(
 
 
 def test_file_entry_resolving_to_directory_invalidates(tmp_path: Path, benchmark_config: BenchmarkConfig):
-    """Manifest entry without is_directory pointing at a dir should invalidate manifest."""
-    # Write a V2 manifest that records "orders.dat" as a file entry
+
     file_path = tmp_path / "orders.dat"
     file_path.write_text("1|sample\n")
     size = file_path.stat().st_size
@@ -522,7 +506,6 @@ def test_file_entry_resolving_to_directory_invalidates(tmp_path: Path, benchmark
     with (tmp_path / "_datagen_manifest.json").open("w") as fh:
         json.dump(manifest, fh)
 
-    # Now replace the file with a directory of the same name
     file_path.unlink()
     file_path.mkdir()
     (file_path / "data.parquet").write_bytes(b"x" * size)
@@ -543,13 +526,11 @@ def test_file_entry_resolving_to_directory_invalidates(tmp_path: Path, benchmark
 def test_multi_format_tracked_directory_not_flagged_as_collision(
     tmp_path: Path, benchmark_config: BenchmarkConfig, capsys: pytest.CaptureFixture[str]
 ):
-    """Directory tracked in a non-default format should NOT trigger collision invalidation."""
-    # Create a manifest with both tbl (preferred) and delta formats for lineitem
+
     tbl_file = tmp_path / "lineitem.tbl"
     tbl_file.write_text("1|data\n")
     tbl_size = tbl_file.stat().st_size
 
-    # Create the delta directory (tracked in manifest under delta format)
     delta_dir = tmp_path / "lineitem"
     delta_dir.mkdir()
     (delta_dir / "part-0.parquet").write_bytes(b"x" * 100)
@@ -605,7 +586,6 @@ def test_multi_format_tracked_directory_not_flagged_as_collision(
 def test_shards_inside_table_named_directory_not_flagged_as_collision(
     tmp_path: Path, benchmark_config: BenchmarkConfig, capsys: pytest.CaptureFixture[str]
 ):
-    """A table directory is recorded when manifest entries live beneath it."""
     shard_dir = tmp_path / "lineitem"
     shard_dir.mkdir()
     shard = shard_dir / "part-0001.csv"
@@ -654,7 +634,6 @@ def test_shards_inside_table_named_directory_not_flagged_as_collision(
 
 
 def test_populated_tables_matching_current_manifest_reuse_manifest(tmp_path: Path, benchmark_config: BenchmarkConfig):
-    """Caller tables identical to the validated manifest keep its provenance."""
     _write_manifest(tmp_path, table_names=["customer", "orders"])
 
     class DummyBenchmark:

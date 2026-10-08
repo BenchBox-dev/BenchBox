@@ -1,5 +1,3 @@
-"""Benchmark API contract and core-boundary guards."""
-
 from __future__ import annotations
 
 import ast
@@ -41,7 +39,6 @@ pytestmark = [
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 PUBLIC_CONTRACTS_DOC = PROJECT_ROOT / "docs/reference/public-contracts.md"
 SUPPORT_STATUS_CRITERIA_DOC = PROJECT_ROOT / "docs/benchmarks/support-status.md"
-# Matches a criteria-matrix table row whose first cells are `id`, `status`, and rationale.
 _CRITERIA_MATRIX_ROW = re.compile(
     r"^\|\s*`(?P<bid>[a-z0-9_]+)`\s*\|\s*`(?P<status>[a-z_]+)`\s*\|\s*(?P<rationale>.*?)\s*\|"
 )
@@ -115,7 +112,6 @@ def _collect_criteria_matrix_rows(
 
 
 def test_benchmark_api_surface_markers_match_contract_map() -> None:
-    """Runtime modules should expose the API tiers documented for users and contributors."""
 
     contract_doc = PUBLIC_CONTRACTS_DOC.read_text()
 
@@ -137,7 +133,6 @@ def test_benchmark_api_surface_markers_match_contract_map() -> None:
 
 
 def test_deprecated_core_base_usage_is_pinned_to_current_migration_exceptions() -> None:
-    """The deprecated base must not attract new benchmark consumers."""
 
     deprecated_consumers = {
         benchmark_id
@@ -149,7 +144,6 @@ def test_deprecated_core_base_usage_is_pinned_to_current_migration_exceptions() 
 
 
 def test_benchmark_registry_wrapper_and_loader_counts_match_contract_map() -> None:
-    """Keep public facade, internal loader, and registry counts from drifting silently."""
 
     top_level_benchmark_exports = set(BENCHMARK_CLASS_NAMES.values()) & set(benchbox.__all__)
     lazy_benchmark_exports = set(benchbox._BENCHMARK_REGISTRY)
@@ -174,7 +168,6 @@ def test_benchmark_registry_wrapper_and_loader_counts_match_contract_map() -> No
 
 
 def test_benchmark_class_reverse_lookup_matches_registry_maps() -> None:
-    """Public and core benchmark class names should map back to one canonical ID."""
 
     for benchmark_id, class_name in BENCHMARK_CLASS_NAMES.items():
         assert get_benchmark_id_for_class_name(class_name) == benchmark_id
@@ -184,7 +177,6 @@ def test_benchmark_class_reverse_lookup_matches_registry_maps() -> None:
 
 
 def test_simple_benchmark_mixin_rejects_missing_contract_members() -> None:
-    """SimpleBenchmarkMixin consumers should fail at class definition, not deep runtime."""
 
     with pytest.raises(TypeError, match="missing required contract members"):
 
@@ -193,7 +185,6 @@ def test_simple_benchmark_mixin_rejects_missing_contract_members() -> None:
 
 
 def test_simple_benchmark_mixin_rejects_inherited_abstract_contract_members() -> None:
-    """Inherited abstract base methods should not satisfy the concrete mixin contract."""
 
     with pytest.raises(TypeError, match="get_query"):
 
@@ -212,13 +203,11 @@ def test_simple_benchmark_mixin_rejects_inherited_abstract_contract_members() ->
 
 
 def test_public_benchmark_class_lookup_name_returns_public_wrapper() -> None:
-    """The registry's intent-revealing class lookup should return the public wrapper surface."""
 
     assert get_public_benchmark_class("tpch").__name__ == "TPCH"
 
 
 def test_benchmark_support_status_metadata_matches_contract_map() -> None:
-    """Every benchmark has one product-support status distinct from visibility and capability."""
 
     valid = set(BENCHMARK_SUPPORT_STATUS_VALUES)
     for benchmark_id, meta in BENCHMARK_METADATA.items():
@@ -238,7 +227,7 @@ def test_benchmark_support_status_metadata_matches_contract_map() -> None:
     assert "joinorder_synthetic" not in list_public_benchmark_ids()
 
     with pytest.raises(ValueError, match="Unknown benchmark support_status"):
-        get_benchmarks_by_support_status("unknown")  # type: ignore[arg-type]
+        get_benchmarks_by_support_status("unknown")
 
     contract_doc = PUBLIC_CONTRACTS_DOC.read_text()
     assert "Benchmark support status: **6** stable, **11** beta, **5** experimental" in contract_doc
@@ -246,7 +235,6 @@ def test_benchmark_support_status_metadata_matches_contract_map() -> None:
 
 
 def test_external_dataset_stable_promotion_requires_complete_content_pins(tmp_path: Path) -> None:
-    """A status-only edit cannot promote an external corpus without byte pins."""
     from benchbox.core.flightdata.downloader import PINNED_SOURCE_SHA256, FlightDataDownloader
     from benchbox.core.nyctaxi.downloader import PINNED_SOURCE_SHA256 as NYC_SHA256, NYCTaxiDataDownloader
 
@@ -264,11 +252,6 @@ def test_external_dataset_stable_promotion_requires_complete_content_pins(tmp_pa
 
 
 def test_benchmark_support_status_criteria_matrix_covers_every_benchmark() -> None:
-    """The criteria matrix must carry one row per benchmark whose status matches the registry.
-
-    This is the drift guard: adding, removing, or re-classifying a benchmark in the
-    registry fails here until ``docs/benchmarks/support-status.md`` records the change.
-    """
 
     registry_status = {bid: meta["support_status"] for bid, meta in BENCHMARK_METADATA.items()}
     doc_text = SUPPORT_STATUS_CRITERIA_DOC.read_text()
@@ -321,7 +304,6 @@ def test_benchmark_support_status_criteria_matrix_covers_every_benchmark() -> No
 
 
 def test_benchmark_support_status_criteria_matrix_rejects_stale_benchmark_rows() -> None:
-    """A removed benchmark must not remain silently documented in the criteria matrix."""
 
     doc_text = """
 ## Acceptance Criteria by Status
@@ -353,7 +335,6 @@ def test_benchmark_support_status_criteria_matrix_rejects_stale_benchmark_rows()
 
 
 def test_registry_derived_claim_matcher_requires_numeric_boundaries() -> None:
-    """Exact count claims must not pass by matching inside larger numbers."""
 
     assert _contains_registry_derived_claim(
         "Explore 22 benchmarks (TPC-H, TPC-DS, and more)",
@@ -378,12 +359,6 @@ def test_registry_derived_claim_matcher_requires_numeric_boundaries() -> None:
 
 
 def test_public_benchmark_count_claims_are_registry_derived() -> None:
-    """Durable public surfaces must carry the registry-derived benchmark counts.
-
-    Drift gate: if the public benchmark count or integrity-spec coverage changes,
-    these hand-written exact-count claims go stale and this test names the files to
-    fix. The registry stays the source of truth; the docs are checked against it.
-    """
     from benchbox.core.results.benchmark_specs import BENCHMARK_SPECS
 
     public_ids = set(list_public_benchmark_ids())
@@ -417,7 +392,6 @@ def test_public_benchmark_count_claims_are_registry_derived() -> None:
 
 
 def test_benchmark_data_source_metadata_matches_runtime_declarations() -> None:
-    """Every registry entry has a static data_source key matching runtime declarations."""
 
     assert all("data_source" in meta for meta in BENCHMARK_METADATA.values())
     assert BENCHMARK_DATA_SOURCE_PROBE_IDS == (
@@ -443,7 +417,6 @@ def test_benchmark_data_source_metadata_matches_runtime_declarations() -> None:
 
 
 def test_benchmark_estimate_metadata_is_complete() -> None:
-    """Registry metadata should own CLI memory and time estimates for every benchmark."""
 
     for benchmark_id, meta in BENCHMARK_METADATA.items():
         assert "estimated_time_range" in meta, benchmark_id
@@ -455,7 +428,6 @@ def test_benchmark_estimate_metadata_is_complete() -> None:
 
 
 def test_benchmark_api_import_boundary_excludes_platform_adapter_imports() -> None:
-    """Core benchmark API files must not import concrete platform adapter modules."""
 
     targets = [
         PROJECT_ROOT / "benchbox/base.py",

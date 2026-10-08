@@ -1,5 +1,3 @@
-"""Databricks cache enforcement across session setup, measurement and bundles."""
-
 import json
 from datetime import datetime
 from unittest.mock import Mock, patch
@@ -144,7 +142,7 @@ def test_zero_warmup_power_factory_initializes_before_harness_execution(adapter,
     session = Session()
     wrapper = getattr(adapter, factory)(session, "tpch", 1.0)
     assert session.commands == ["SET use_cached_result = false", "SET use_cached_result"]
-    # The harness has not started. Its first query must not do session setup.
+
     session.commands.clear()
     wrapper.execute("SELECT 1")
     assert session.commands == ["SELECT 1"]

@@ -1,9 +1,6 @@
-"""Tests for platform_info functionality across all platform adapters.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from typing import Any
 from unittest.mock import MagicMock, Mock, patch
@@ -18,26 +15,20 @@ pytestmark = [
 
 
 class TestPlatformInfoBase:
-    """Base test class for platform_info functionality."""
-
     def validate_platform_info_schema(self, platform_info: dict[str, Any], platform_type: str):
-        """Validate that platform_info follows the expected schema."""
-        # Required fields
+
         assert "platform_type" in platform_info
         assert "platform_name" in platform_info
         assert "connection_mode" in platform_info
         assert "configuration" in platform_info
 
-        # Validate types
         assert isinstance(platform_info["platform_type"], str)
         assert isinstance(platform_info["platform_name"], str)
         assert isinstance(platform_info["connection_mode"], str)
         assert isinstance(platform_info["configuration"], dict)
 
-        # Validate platform_type matches expected
         assert platform_info["platform_type"] == platform_type
 
-        # Optional fields that may be present
         optional_fields = [
             "platform_version",
             "host",
@@ -48,15 +39,12 @@ class TestPlatformInfoBase:
 
         for field in optional_fields:
             if field in platform_info:
-                # If present, should be string, int, or None
                 assert platform_info[field] is None or isinstance(platform_info[field], (str, int))
 
 
 class TestDuckDBPlatformInfo(TestPlatformInfoBase):
-    """Test DuckDB platform_info functionality."""
-
     def test_duckdb_platform_info_memory_mode(self):
-        """Test DuckDB platform_info for memory mode."""
+
         from benchbox.platforms.duckdb import DuckDBAdapter
 
         adapter = DuckDBAdapter(database_path=":memory:", memory_limit="4GB")
@@ -70,7 +58,7 @@ class TestDuckDBPlatformInfo(TestPlatformInfoBase):
         assert platform_info["configuration"]["memory_limit"] == "4GB"
 
     def test_duckdb_platform_info_file_mode(self):
-        """Test DuckDB platform_info for file mode."""
+
         from benchbox.platforms.duckdb import DuckDBAdapter
 
         adapter = DuckDBAdapter(database_path="test.db", thread_limit=4)
@@ -84,10 +72,8 @@ class TestDuckDBPlatformInfo(TestPlatformInfoBase):
 
 
 class TestClickHousePlatformInfo(TestPlatformInfoBase):
-    """Test ClickHouse platform_info functionality."""
-
     def test_clickhouse_platform_info_server_mode(self):
-        """Test ClickHouse platform_info for server mode."""
+
         from benchbox.platforms.clickhouse import ClickHouseAdapter
 
         with (
@@ -106,7 +92,7 @@ class TestClickHousePlatformInfo(TestPlatformInfoBase):
             assert platform_info["configuration"]["database"] == "test"
 
     def test_clickhouse_platform_info_embedded_mode(self):
-        """Test ClickHouse platform_info for embedded mode with chDB mocked."""
+
         import importlib.machinery
         import types
 
@@ -115,7 +101,7 @@ class TestClickHousePlatformInfo(TestPlatformInfoBase):
         fake_chdb = types.ModuleType("chdb")
         fake_chdb.chdb_version = (1, 2, 3)
         fake_chdb.__version__ = "1.2.3"
-        # Add a fake __spec__ so importlib.util.find_spec works
+
         fake_chdb.__spec__ = importlib.machinery.ModuleSpec("chdb", None)
         with patch.dict("sys.modules", {"chdb": fake_chdb}):
             adapter = ClickHouseAdapter(deployment_mode="local", data_path="/tmp/chdb")
@@ -125,15 +111,13 @@ class TestClickHousePlatformInfo(TestPlatformInfoBase):
             assert platform_info["platform_name"] == "ClickHouse (Local)"
             assert platform_info["connection_mode"] == "local"
             assert platform_info["configuration"]["data_path"] == "/tmp/chdb"
-            # Client library version should be derived from chdb.__version__
+
             assert platform_info["client_library_version"] is not None
 
 
 class TestSQLitePlatformInfo(TestPlatformInfoBase):
-    """Test SQLite platform_info functionality."""
-
     def test_sqlite_platform_info_memory_mode(self):
-        """Test SQLite platform_info for memory mode."""
+
         from benchbox.platforms.sqlite import SQLiteAdapter
 
         adapter = SQLiteAdapter(database_path=":memory:")
@@ -146,7 +130,7 @@ class TestSQLitePlatformInfo(TestPlatformInfoBase):
         assert platform_info["configuration"]["database_path"] == ":memory:"
 
     def test_sqlite_platform_info_file_mode(self):
-        """Test SQLite platform_info for file mode."""
+
         from benchbox.platforms.sqlite import SQLiteAdapter
 
         adapter = SQLiteAdapter(database_path="test.db", timeout=60.0)
@@ -160,10 +144,8 @@ class TestSQLitePlatformInfo(TestPlatformInfoBase):
 
 
 class TestCloudPlatformInfo(TestPlatformInfoBase):
-    """Test cloud platform adapters platform_info functionality."""
-
     def test_bigquery_platform_info(self):
-        """Test BigQuery platform_info."""
+
         from benchbox.platforms.bigquery import BigQueryAdapter
 
         with (
@@ -187,7 +169,7 @@ class TestCloudPlatformInfo(TestPlatformInfoBase):
             assert platform_info["configuration"]["location"] == "US"
 
     def test_snowflake_platform_info(self):
-        """Test Snowflake platform_info."""
+
         from benchbox.platforms.snowflake import SnowflakeAdapter
 
         with (
@@ -213,12 +195,11 @@ class TestCloudPlatformInfo(TestPlatformInfoBase):
             assert platform_info["configuration"]["database"] == "TEST_DB"
 
     def test_redshift_platform_info(self):
-        """Test Redshift platform_info."""
+
         import types
 
         from benchbox.platforms.redshift import RedshiftAdapter
 
-        # Mock redshift_connector at import level
         fake_redshift_connector = types.ModuleType("redshift_connector")
         with (
             patch.dict("sys.modules", {"redshift_connector": fake_redshift_connector}),
@@ -244,12 +225,11 @@ class TestCloudPlatformInfo(TestPlatformInfoBase):
             assert platform_info["configuration"]["s3_bucket"] == "test-bucket"
 
     def test_databricks_platform_info(self):
-        """Test Databricks platform_info."""
+
         import types
 
         from benchbox.platforms.databricks import DatabricksAdapter
 
-        # Mock databricks.sql at import level
         fake_databricks = types.ModuleType("databricks")
         fake_databricks_sql = types.ModuleType("databricks.sql")
         fake_databricks.sql = fake_databricks_sql
@@ -283,10 +263,8 @@ class TestCloudPlatformInfo(TestPlatformInfoBase):
 
 
 class TestPlatformInfoIntegration:
-    """Test platform_info integration with BenchmarkResults."""
-
     def test_benchmark_results_includes_platform_info(self):
-        """Test that BenchmarkResults includes platform_info."""
+
         from datetime import datetime
 
         from benchbox.platforms.base import BenchmarkResults
@@ -325,7 +303,7 @@ class TestPlatformInfoIntegration:
         assert results.platform_info["connection_mode"] == "memory"
 
     def test_platform_info_collection_with_connection(self):
-        """Test that platform_info is collected with connection information."""
+
         from benchbox.platforms.duckdb import DuckDBAdapter
 
         adapter = DuckDBAdapter(memory_limit="2GB")
@@ -333,19 +311,16 @@ class TestPlatformInfoIntegration:
 
         platform_info = adapter.get_platform_info(mock_connection)
 
-        # Should work the same with or without connection for DuckDB
         assert platform_info["platform_type"] == "duckdb"
         assert platform_info["configuration"]["memory_limit"] == "2GB"
 
     def test_platform_info_error_handling(self):
-        """Test platform_info handles missing dependencies gracefully."""
+
         from benchbox.platforms.duckdb import DuckDBAdapter
 
-        # Even if duckdb import fails internally, should return safe defaults
         adapter = DuckDBAdapter()
         platform_info = adapter.get_platform_info()
 
-        # Should always have basic structure
         assert "platform_type" in platform_info
         assert "platform_name" in platform_info
         assert "connection_mode" in platform_info

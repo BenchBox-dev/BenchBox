@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import email
 import hashlib
 import io
 import json
@@ -9,11 +10,109 @@ import re
 import subprocess
 import sys
 import tokenize
+import tomllib
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 POLICY_PATH = "quality/comment-cleanup-scope.json"
+
+COMMENT_POLICY_ENFORCEMENT_MODES = {"advisory", "blocking"}
+
+
+COMMENT_POLICY_DIRECTIVES = (
+    r"# noqa: [A-Z]+[0-9]+(?:, ?[A-Z]+[0-9]+)*",
+    r"# type: ignore\[[a-z0-9_-]+(?:, ?[a-z0-9_-]+)*\]",
+    r"# pragma: no (?:cover|branch)",
+    r"# fmt: (?:off|on|skip)",
+    r"# (?:ruff|flake8): noqa: [A-Z]+[0-9]+(?:, ?[A-Z]+[0-9]+)*",
+    r"# shellcheck (?:disable=SC[0-9]+(?:,SC[0-9]+)*|shell=(?:bash|sh|dash|ksh))",
+    r"/// <reference (?:types|path)=\"[^\"\n]+\" ?/>",
+    r"// @ts-(?:expect-error|ignore|check|nocheck)",
+    r"/\*\* @vitest-environment (?:jsdom|node|happy-dom) \*/",
+    r"// @vitest-environment (?:jsdom|node|happy-dom)",
+    r"/\*\+ [A-Z_]+\([A-Za-z0-9_., ]+\) \*/",
+)
+
+
+def validate_comment_policy_path(path: str) -> None:
+    if not path or PurePosixPath(path).is_absolute() or ".." in PurePosixPath(path).parts or "\\" in path:
+        raise ValueError(f"invalid policy path: {path!r}")
+    if any(char in path for char in "*?[]"):
+        raise ValueError("policy paths must be exact files or directory prefixes")
+
+
+def comment_policy_matches(path: str, scope: str) -> bool:
+    return path.startswith(scope) if scope.endswith("/") else path == scope
+
+
+def load_comment_policy(raw: bytes) -> dict:
+    policy = json.loads(raw)
+    if set(policy) - {"enforcement"} != {"version", "external", "completed", "exceptions"} or policy["version"] != 1:
+        raise ValueError("invalid comment-policy schema")
+    enforcement = policy.get("enforcement", "blocking")
+    if not isinstance(enforcement, str) or enforcement not in COMMENT_POLICY_ENFORCEMENT_MODES:
+        raise ValueError("enforcement must be advisory or blocking")
+    for key in ("external", "completed", "exceptions"):
+        if not isinstance(policy[key], list):
+            raise ValueError(f"{key} must be a list")
+    for entry in policy["external"]:
+        if set(entry) != {"path", "owner", "provenance"} or not all(
+            isinstance(v, str) and v.strip() for v in entry.values()
+        ):
+            raise ValueError("external scope requires path, owner and provenance")
+        validate_comment_policy_path(entry["path"])
+    for path in policy["completed"]:
+        validate_comment_policy_path(path)
+        if any(
+            comment_policy_matches(path, entry["path"]) or comment_policy_matches(entry["path"], path)
+            for entry in policy["external"]
+        ):
+            raise ValueError("completed and external scopes cannot overlap")
+    identities = set()
+    for entry in policy["exceptions"]:
+        required = {"path", "symbol", "text", "kind", "consumer", "necessity", "alternative", "owner", "removal"}
+        fixture_fields = {"payload", "finding_kind"} if entry.get("kind") == "fixture" else set()
+        required |= fixture_fields
+        if (
+            set(entry) - {"expires", "count"} != required
+            or not all(isinstance(v, str) for k, v in entry.items() if k != "count")
+            or type(entry.get("count", 1)) is not int
+            or entry.get("count", 1) < 1
+        ):
+            raise ValueError(
+                "exception requires an exact identity, consumer, necessity, alternative, owner and removal"
+            )
+        if any(not entry[key].strip() for key in required - {"symbol"}):
+            raise ValueError("exception evidence must not be empty")
+        validate_comment_policy_path(entry["path"])
+        validate_comment_policy_path(entry["consumer"])
+        if entry["kind"] not in {"directive", "notice", "fixture"}:
+            raise ValueError("explanatory comment and docstring exceptions are prohibited")
+        if entry["kind"] == "fixture" and entry["finding_kind"] not in {"comment", "payload-error"}:
+            raise ValueError("fixture must identify an actual comment or malformed parser input")
+        if entry["kind"] == "directive":
+            if not any(re.fullmatch(pattern, entry["text"]) for pattern in COMMENT_POLICY_DIRECTIVES):
+                raise ValueError("directive must match an exact registered grammar without explanatory suffixes")
+            suppression = re.search(
+                r"noqa|type: ignore|pragma: no|fmt: (?:off|skip)|disable=|@ts-(?:expect-error|ignore|nocheck)",
+                entry["text"],
+            )
+            if suppression and "expires" not in entry:
+                raise ValueError("directive exception needs an unexpired review date")
+        identity = (
+            entry["path"],
+            entry["symbol"],
+            entry["text"],
+            entry["kind"],
+            entry.get("payload", ""),
+            entry.get("finding_kind", "comment"),
+        )
+        if identity in identities:
+            raise ValueError("duplicate exception identity")
+        identities.add(identity)
+    return policy
 
 
 @dataclass(frozen=True)
@@ -103,7 +202,13 @@ def check_owner(value: Any, label: str, task_ids: set[str] | None = None) -> str
 
 
 def load_policy(path: Path) -> dict[str, Any]:
-    policy = json.loads(path.read_text(encoding="utf-8"))
+    return load_policy_bytes(path.read_bytes())
+
+
+def load_policy_bytes(raw: bytes) -> dict[str, Any]:
+    policy = json.loads(raw)
+    if not isinstance(policy, dict):
+        raise PolicyError("policy must be an object")
     require_fields(
         policy,
         {
@@ -928,6 +1033,143 @@ def owned_paths(
     return results, findings
 
 
+def immutable_dependency_artifacts(
+    root: Path,
+    base: str,
+    resolved: list[dict[str, Any]],
+    rules: list[dict[str, Any]],
+    legacy_external: list[dict[str, str]],
+    staged: bool = False,
+) -> set[str]:
+    by_path = {record["path"]: record for record in resolved}
+    by_rule = {rule["id"]: rule for rule in rules}
+    excluded = set()
+    for entry in legacy_external:
+        path = entry["path"]
+        record = by_path.get(path)
+        rule = by_rule.get(record["rule"]) if record and isinstance(record["rule"], str) else None
+        external_record = record and record["rule"] == "external" and record["state"] == "excluded"
+        if (
+            not path.endswith(".whl")
+            or not external_record
+            and (not rule or any("path" in selector for selector in rule["selectors"]))
+        ):
+            continue
+        project_path = entry["provenance"]
+        if not project_path.endswith("/pyproject.toml"):
+            continue
+        lock_path = str(PurePosixPath(project_path).with_name("uv.lock"))
+        try:
+            project = tomllib.loads(base_blob(root, base, project_path).decode())
+            locked = tomllib.loads(base_blob(root, base, lock_path).decode())
+        except (subprocess.CalledProcessError, UnicodeError, tomllib.TOMLDecodeError):
+            continue
+        source_path = str(PurePosixPath(path).relative_to(PurePosixPath(project_path).parent))
+        name = entry["owner"]
+        binding = project.get("tool", {}).get("uv", {}).get("sources", {}).get(name)
+        packages = [package for package in locked.get("package", []) if package.get("name") == name]
+        dependencies = [
+            value
+            for value in project.get("project", {}).get("dependencies", [])
+            if value == name or value.startswith(name + "[")
+        ]
+        if binding != {"path": source_path} or len(packages) != 1 or not dependencies:
+            continue
+        package = packages[0]
+        raw = base_blob(root, base, path)
+        digest = "sha256:" + hashlib.sha256(raw).hexdigest()
+        if package.get("source") != binding or package.get("wheels") != [
+            {"filename": PurePosixPath(path).name, "hash": digest}
+        ]:
+            continue
+        try:
+            with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+                metadata_paths = [value for value in archive.namelist() if value.endswith(".dist-info/METADATA")]
+                if len(metadata_paths) != 1:
+                    continue
+                metadata = email.message_from_bytes(archive.read(metadata_paths[0]))
+        except (zipfile.BadZipFile, KeyError):
+            continue
+        if metadata.get("Name") != name or metadata.get("Version") != package.get("version"):
+            continue
+
+        def candidate_bytes(candidate_path: str) -> bytes:
+            return git(root, "show", ":" + candidate_path) if staged else (root / candidate_path).read_bytes()
+
+        if candidate_bytes(path) != raw:
+            raise PolicyError(f"immutable dependency artifact changed: {path}")
+        current_project = tomllib.loads(candidate_bytes(project_path).decode())
+        current_lock = tomllib.loads(candidate_bytes(lock_path).decode())
+        current_binding = current_project.get("tool", {}).get("uv", {}).get("sources", {}).get(name)
+        current_dependencies = [
+            value
+            for value in current_project.get("project", {}).get("dependencies", [])
+            if value == name or value.startswith(name + "[")
+        ]
+        current_packages = [value for value in current_lock.get("package", []) if value.get("name") == name]
+        if current_binding != binding or current_dependencies != dependencies or current_packages != packages:
+            raise PolicyError(f"immutable dependency binding changed: {path}")
+        record.update(
+            owner="comment-cleanup-external-ownership",
+            state="excluded",
+            rule="immutable-dependency",
+            blocking_disposition=f"Unchanged upstream dependency pinned by {project_path} and {lock_path} at {base}.",
+        )
+        excluded.add(path)
+    return excluded
+
+
+def immutable_external_ownership(
+    root: Path, base: str, legacy_external: list[dict[str, str]], staged: bool = False
+) -> tuple[set[str], list[dict[str, Any]]] | None:
+    paths = tracked_paths(root, base)
+    if POLICY_PATH not in paths:
+        return None
+    policy = load_policy_bytes(base_blob(root, base, POLICY_PATH))
+    roots = validate_roots(policy)
+    rules = validate_rules(policy)
+    derived = validate_derived_rules(policy)
+    validate_rule_priorities(rules, derived)
+    external = validate_external_entries(policy, set(paths))
+    validate_evidence(policy, root, base, set(paths))
+    priorities: dict[str, int] = {}
+    resolved, _ = owned_paths(paths, roots, rules, priorities)
+    apply_derived_rules(resolved, derived, root, base, priorities)
+    notice_findings = apply_notice_owners(resolved, policy["notices"])
+    apply_external_entries(resolved, external)
+    if notice_findings or any(isinstance(record["rule"], list) for record in resolved):
+        raise PolicyError("immutable ownership contains conflicting owners")
+    excluded = {record["path"] for record in resolved if record["state"] == "excluded" and record["rule"] == "external"}
+    legacy_eligible = {
+        record["path"]
+        for record in resolved
+        if record["owner"] is None
+        and record["rule"] is None
+        or record["owner"] == "comment-cleanup-external-ownership"
+        and record["rule"] == "external-ownership-mirrors"
+    }
+    excluded.update(
+        path
+        for path in legacy_eligible
+        if not any(matches(path, entry["selector"]) for entry in external)
+        and any(
+            matches(path, {"prefix": entry["path"]}) if entry["path"].endswith("/") else path == entry["path"]
+            for entry in legacy_external
+        )
+    )
+    excluded.update(immutable_dependency_artifacts(root, base, resolved, rules, legacy_external, staged))
+    notices = [
+        {
+            **notice,
+            "whole_file": notice["byte_start"] == 0
+            and notice["byte_end"] == len(base_blob(root, base, notice["path"])),
+        }
+        for notice in policy["notices"]
+        if any(matches(notice["path"], entry["selector"]) for entry in external)
+    ]
+    return excluded, notices
+
+
 def dependency_findings(policy: dict[str, Any], resolved: list[dict[str, Any]]) -> list[Finding]:
     states = {record["path"]: record["state"] for record in resolved}
     states.update({payload["id"]: payload["state"] for payload in policy["payloads"]})
@@ -985,6 +1227,23 @@ def main(argv: list[str] | None = None) -> int:
         apply_derived_rules(resolved, derived, root, args.base, priorities)
         notice_findings = apply_notice_owners(resolved, policy["notices"])
         apply_external_entries(resolved, external)
+        if "quality/comment-policy.json" in path_set:
+            try:
+                trusted_legacy = load_comment_policy(base_blob(root, args.base, "quality/comment-policy.json"))[
+                    "external"
+                ]
+            except (ValueError, TypeError, KeyError, AttributeError) as error:
+                raise PolicyError(f"invalid trusted comment-policy: {error}") from error
+            snapshot = immutable_external_ownership(root, args.base, trusted_legacy)
+            if snapshot is not None:
+                frozen_excluded, _ = snapshot
+                immutable_dependency_artifacts(
+                    root,
+                    args.base,
+                    resolved,
+                    rules,
+                    [entry for entry in trusted_legacy if entry["path"] in frozen_excluded],
+                )
         apply_format_classes(resolved, format_classes, root, args.base)
         owned = {record["path"] for record in resolved if record["owner"]}
         findings = [finding for finding in findings if finding.subject not in owned]

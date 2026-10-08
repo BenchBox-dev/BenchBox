@@ -1,10 +1,3 @@
-"""Regression coverage for the sales and net columns Q66 reads on both DataFrame families.
-
-The Q66 template draws the sales column and the net column of each channel at random (SALESONE,
-SALESTWO, NETONE, NETTWO), and the multiplied column differs from seed to seed. The DataFrame
-implementations used to hard-code one choice, so they matched the SQL only when the seed drew it.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -12,7 +5,7 @@ import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 FAMILIES = ["expression", "pandas"]
-MAR_SALES, MAR_NET = 10, 34  # positions in the output row
+MAR_SALES, MAR_NET = 10, 34
 
 
 def _context(family, tables):
@@ -35,7 +28,6 @@ def _context(family, tables):
 
 
 def _tables():
-    """One March sale per channel; every candidate column holds a different value."""
     return {
         "warehouse": {
             "w_warehouse_sk": [1],

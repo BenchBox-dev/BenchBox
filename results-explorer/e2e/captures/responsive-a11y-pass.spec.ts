@@ -1,13 +1,3 @@
-/**
- * Cross-route responsive/a11y capture for
- * `results-explorer-retheme-responsive-accessibility` w7.
- *
- * Records 390/768/1280/1600 screenshots for every primary route on top
- * of the rethemed Explorer. Skipped by default; opt in with
- * `RETHEME_CAPTURE=1` to refresh artifacts under
- * `_project/audits/screenshots/results-retheme-responsive-a11y-<date>/`.
- */
-
 import { mkdirSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";

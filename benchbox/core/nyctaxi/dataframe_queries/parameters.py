@@ -1,12 +1,6 @@
-"""NYC Taxi DataFrame query parameters.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Default parameter values for NYC Taxi queries. Uses static defaults
-for DataFrame execution (date ranges and zone IDs).
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -56,25 +50,14 @@ for _query_id, _start, _end, _extra in reader(_PARAM_ROWS.splitlines(), delimite
 
 @dataclass
 class NYCTaxiParameters:
-    """Parameter container for a NYC Taxi query."""
-
     query_id: str
     params: dict[str, Any]
 
     def get(self, key: str, default: Any = None) -> Any:
-        """Get a parameter value with optional default."""
         return self.params.get(key, default)
 
 
 def get_parameters(query_id: str) -> NYCTaxiParameters:
-    """Get parameters for a NYC Taxi query.
-
-    Args:
-        query_id: Query identifier (e.g., "Q1", "Q25")
-
-    Returns:
-        NYCTaxiParameters with default values for the query.
-    """
     params = NYCTAXI_DEFAULT_PARAMS.get(query_id, {}).copy()
     if _parameter_overrides is not None and query_id in _parameter_overrides:
         params.update(_parameter_overrides[query_id])
@@ -85,11 +68,5 @@ _parameter_overrides: dict[str, dict[str, Any]] | None = None
 
 
 def set_parameter_overrides(overrides: dict[str, dict[str, Any]] | None) -> None:
-    """Inject seed-derived parameters for a gate run.
-
-    Called by the cross-surface builder before query execution so the DataFrame
-    surface reads the same windows the SQL surface rendered. Pass None to clear
-    and revert to static defaults.
-    """
     global _parameter_overrides
     _parameter_overrides = overrides

@@ -1,14 +1,4 @@
-"""Unit tests for DataFrame protocol definitions.
-
-Tests for:
-- JoinType enum
-- AggregateFunction enum
-- SortOrder enum
-- DataFrameOps protocol compliance
-- DataFrameGroupBy protocol compliance
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -32,43 +22,39 @@ pytestmark = [
 
 
 class TestJoinType:
-    """Tests for JoinType enum."""
-
     def test_all_join_types_exist(self):
-        """Test that all expected join types are defined."""
+
         expected = {"inner", "left", "right", "outer", "cross", "semi", "anti"}
         actual = {jt.value for jt in JoinType}
         assert actual == expected
 
     def test_str_returns_value(self):
-        """Test that str() returns the value."""
+
         assert str(JoinType.INNER) == "inner"
         assert str(JoinType.LEFT) == "left"
         assert str(JoinType.SEMI) == "semi"
 
     def test_from_string_valid(self):
-        """Test from_string with valid inputs."""
+
         assert JoinType.from_string("inner") == JoinType.INNER
         assert JoinType.from_string("LEFT") == JoinType.LEFT
         assert JoinType.from_string("OUTER") == JoinType.OUTER
 
     def test_from_string_invalid(self):
-        """Test from_string with invalid input raises ValueError."""
+
         with pytest.raises(ValueError, match="Invalid join type"):
             JoinType.from_string("invalid")
 
     def test_from_string_case_insensitive(self):
-        """Test that from_string is case-insensitive."""
+
         assert JoinType.from_string("INNER") == JoinType.INNER
         assert JoinType.from_string("Inner") == JoinType.INNER
         assert JoinType.from_string("inner") == JoinType.INNER
 
 
 class TestAggregateFunction:
-    """Tests for AggregateFunction enum."""
-
     def test_all_aggregate_functions_exist(self):
-        """Test that all expected aggregate functions are defined."""
+
         expected = {
             "sum",
             "mean",
@@ -87,61 +73,54 @@ class TestAggregateFunction:
         assert actual == expected
 
     def test_str_returns_value(self):
-        """Test that str() returns the value."""
+
         assert str(AggregateFunction.SUM) == "sum"
         assert str(AggregateFunction.COUNT) == "count"
         assert str(AggregateFunction.COUNT_DISTINCT) == "count_distinct"
 
     def test_from_string_valid(self):
-        """Test from_string with valid inputs."""
+
         assert AggregateFunction.from_string("sum") == AggregateFunction.SUM
         assert AggregateFunction.from_string("COUNT") == AggregateFunction.COUNT
         assert AggregateFunction.from_string("count_distinct") == AggregateFunction.COUNT_DISTINCT
 
     def test_from_string_invalid(self):
-        """Test from_string with invalid input raises ValueError."""
+
         with pytest.raises(ValueError, match="Invalid aggregate function"):
             AggregateFunction.from_string("invalid")
 
     def test_avg_alias(self):
-        """Test that AVG exists as an alias for MEAN."""
+
         assert AggregateFunction.AVG is not None
         assert AggregateFunction.AVG.value == "avg"
 
 
 class TestSortOrder:
-    """Tests for SortOrder enum."""
-
     def test_all_sort_orders_exist(self):
-        """Test that all expected sort orders are defined."""
+
         expected = {"asc", "desc"}
         actual = {so.value for so in SortOrder}
         assert actual == expected
 
     def test_str_returns_value(self):
-        """Test that str() returns the value."""
+
         assert str(SortOrder.ASC) == "asc"
         assert str(SortOrder.DESC) == "desc"
 
     def test_ascending_property(self):
-        """Test the ascending property."""
+
         assert SortOrder.ASC.ascending is True
         assert SortOrder.DESC.ascending is False
 
 
 class TestDataFrameOpsProtocol:
-    """Tests for DataFrameOps protocol compliance."""
-
     def test_protocol_is_runtime_checkable(self):
-        """Test that DataFrameOps is runtime checkable via isinstance()."""
+
         assert isinstance(DataFrameOps, type), "DataFrameOps should be a type (protocol class)"
 
     def test_mock_implementation_satisfies_protocol(self):  # noqa: C901
-        """Test that a mock implementation satisfies the protocol."""
 
         class MockDataFrame:
-            """Mock DataFrame implementation for testing protocol compliance."""
-
             def select(self, *columns: str) -> MockDataFrame:
                 return self
 
@@ -192,8 +171,6 @@ class TestDataFrameOpsProtocol:
                 return (0, 0)
 
         class MockGroupBy:
-            """Mock GroupBy implementation."""
-
             def agg(self, *aggregations: Any, **named_aggregations: Any) -> MockDataFrame:
                 return MockDataFrame()
 
@@ -217,7 +194,6 @@ class TestDataFrameOpsProtocol:
 
         mock_df = MockDataFrame()
 
-        # Test that operations return correct types
         assert isinstance(mock_df.select("a", "b"), MockDataFrame)
         assert isinstance(mock_df.filter(True), MockDataFrame)
         assert isinstance(mock_df.group_by("a"), MockGroupBy)
@@ -229,14 +205,11 @@ class TestDataFrameOpsProtocol:
 
 
 class TestDataFrameGroupByProtocol:
-    """Tests for DataFrameGroupBy protocol compliance."""
-
     def test_protocol_is_runtime_checkable(self):
-        """Test that DataFrameGroupBy is runtime checkable via isinstance()."""
+
         assert isinstance(DataFrameGroupBy, type), "DataFrameGroupBy should be a type (protocol class)"
 
     def test_mock_groupby_satisfies_protocol(self):
-        """Test that a mock GroupBy implementation satisfies the protocol."""
 
         class MockResult:
             pass
@@ -265,7 +238,6 @@ class TestDataFrameGroupByProtocol:
 
         mock_gb = MockGroupBy()
 
-        # Test all methods exist and are callable
         assert isinstance(mock_gb.agg(), MockResult)
         assert isinstance(mock_gb.sum("col"), MockResult)
         assert isinstance(mock_gb.mean("col"), MockResult)
@@ -276,10 +248,7 @@ class TestDataFrameGroupByProtocol:
 
 
 class TestProtocolMethodChaining:
-    """Tests for method chaining compatibility."""
-
     def test_operations_return_chainable_type(self):
-        """Test that operations can be chained."""
 
         class ChainableDF:
             def select(self, *columns: str) -> ChainableDF:
@@ -299,12 +268,10 @@ class TestProtocolMethodChaining:
 
         df = ChainableDF()
 
-        # Test chaining
         result = df.select("a").filter(True).sort("a").limit(10).distinct()
         assert isinstance(result, ChainableDF)
 
     def test_groupby_agg_returns_dataframe(self):
-        """Test that groupby aggregation returns something suitable for further operations."""
 
         class ChainableDF:
             def group_by(self, *columns: str) -> ChainableGB:
@@ -319,6 +286,5 @@ class TestProtocolMethodChaining:
 
         df = ChainableDF()
 
-        # Test groupby -> agg -> further operations
         result = df.group_by("category").agg().select("category")
         assert isinstance(result, ChainableDF)

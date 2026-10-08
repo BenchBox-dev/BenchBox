@@ -1,36 +1,19 @@
 #!/usr/bin/env python3
-"""TPC-DS Debug Utility
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This utility provides comprehensive debugging and validation capabilities for TPC-DS
-query generation, particularly testing the DSQGen binary integration and TPCDSQueryManager.
+# TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-DS specification.
 
-Usage:
-    python tests/utilities/tpcds_debug_utility.py
-
-Features:
-- Tests DSQGen binary functionality directly
-- Validates query ID parsing and variations
-- Tests query generation with different seeds and parameters
-- Comprehensive error reporting and debugging
-- Performance testing for query generation
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DS specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import sys
 from pathlib import Path
 
-# Include the project root to Python path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from benchbox.core.tpcds.c_tools import DSQGenBinary  # noqa: E402
-from benchbox.core.tpcds.queries import TPCDSQueryManager  # noqa: E402
+from benchbox.core.tpcds.c_tools import DSQGenBinary
+from benchbox.core.tpcds.queries import TPCDSQueryManager
 
 
 def test_dsqgen_binary():
@@ -40,13 +23,11 @@ def test_dsqgen_binary():
 
     dsqgen = DSQGenBinary()
 
-    # Test basic functionality
     print(f"Templates dir: {dsqgen.templates_dir}")
     print(f"Tools dir: {dsqgen.tools_dir}")
     print(f"DSQGen path: {dsqgen.dsqgen_path}")
     print()
 
-    # Test query ID parsing
     print("Query ID parsing:")
     test_cases = [1, "14a", "23b", "99", "15a"]
     for case in test_cases:
@@ -57,14 +38,12 @@ def test_dsqgen_binary():
             print(f"  {case} -> ERROR: {e}")
     print()
 
-    # Test query variations
     print("Query variations:")
     for query_id in [1, 14, 23, 24, 39, 50]:
         variations = dsqgen.get_query_variations(query_id)
         print(f"  Query {query_id}: {variations}")
     print()
 
-    # Test validation
     print("Query validation:")
     test_ids = [1, "14a", "15a", 99, 100, "invalid"]
     for test_id in test_ids:
@@ -72,7 +51,6 @@ def test_dsqgen_binary():
         print(f"  {test_id}: {valid}")
     print()
 
-    # Test actual query generation
     print("Query generation:")
     try:
         sql1 = dsqgen.generate(1, seed=42)
@@ -83,7 +61,6 @@ def test_dsqgen_binary():
         print(f"  Query 1 (seed 100): {len(sql2)} chars")
         print(f"  Queries different: {sql1 != sql2}")
 
-        # Test variant query
         sql_14a = dsqgen.generate("14a", seed=42)
         print(f"  Query 14a (seed 42): {len(sql_14a)} chars")
 
@@ -100,12 +77,10 @@ def test_query_manager():
     manager = TPCDSQueryManager()
     print("TPCDSQueryManager initialized successfully")
 
-    # Test basic query retrieval
     try:
         sql = manager.get_query(1, seed=42)
         print(f"Query 1: {len(sql)} characters")
 
-        # Test different parameters
         sql_sf2 = manager.get_query(1, seed=42, scale_factor=2.0)
         print(f"Query 1 (SF=2): {len(sql_sf2)} characters")
 
@@ -115,7 +90,6 @@ def test_query_manager():
     except Exception as e:
         print(f"ERROR in basic query retrieval: {e}")
 
-    # Test query variations
     try:
         variations = manager.get_query_variations(14)
         print(f"Query 14 variations: {variations}")
@@ -127,7 +101,6 @@ def test_query_manager():
     except Exception as e:
         print(f"ERROR in variations: {e}")
 
-    # Test parameter generation
     try:
         params = {"year": 2001, "state": "CA", "category": "Electronics"}
         sql_params = manager.generate_with_parameters(1, params)

@@ -1,24 +1,6 @@
-"""Result-equivalence regression test for the AMPLab cross-surface gate.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This is the fast, default-lane companion to the full AMPLab cross-surface
-equivalence gate in ``benchbox/core/equivalence/cross_surface.py`` (run via
-``make amplab-cross-surface-equivalence-report``, wired into the
-``correctness-gate`` CI job), exactly as
-``tests/integration/test_ssb_cross_surface_equivalence.py`` is for SSB. It
-executes every AMPLab query's DataFrame surface (both backends) against its OWN
-SQL surface on a bounded SF=0.1 DuckDB cell and asserts they agree - SQL is the
-trusted reference for its own DataFrame surface, so no hand-curated answer key is
-needed.
-
-AMPLab's date-typed ``visitDate`` column is the reason this gate has teeth: the
-DataFrame impls originally compared it to ISO-string literals, which the
-production loader's date32 dtype rejects; the gate proves the date-typed params
-now agree value-for-value with the SQL surface.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -44,14 +26,8 @@ pytestmark = [
 ]
 
 
-# Runs to completion but far exceeds the medium lane's 60s cap: timed out
-# on a clean GitHub runner (develop-post-merge run 28706929881, medium-test
-# job) and measured ~52s in a 4-core container (2026-07-05). The marker
-# overrides the CLI --timeout=60 (pytest-timeout marker precedence) so the
-# test keeps running in the medium lane instead of being killed mid-work.
 @pytest.mark.timeout(300)
 def test_amplab_dataframe_surface_equivalent_to_sql(tmp_path):
-    """Every AMPLab DataFrame query (both backends) must match its own SQL surface."""
     gate = GATES["amplab"]
     data = gate.build(EQUIVALENCE_SCALE, tmp_path)
     connection = data.connection
@@ -70,13 +46,9 @@ def test_amplab_dataframe_surface_equivalent_to_sql(tmp_path):
     finally:
         connection.close()
 
-    # Both gated backends must actually compare something - a fully-unimplemented
-    # backend would make the gate silently green by comparing nothing.
     missing = sorted(backend for backend, count in coverage.items() if count == 0)
     assert not missing, f"gated AMPLab backend(s) implement no queries: {missing}"
 
-    # The baseline is empty; tolerate only entries explicitly classified there,
-    # never an unclassified regression.
     unexpected = {d.key for d in divergences} - set(gate.known_divergences)
     assert not unexpected, "AMPLab DataFrame surface diverges from SQL: " + ", ".join(
         f"{d.key} ({d.detail})" for d in divergences if d.key in unexpected

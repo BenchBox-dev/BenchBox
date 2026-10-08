@@ -1,5 +1,3 @@
-"""Prove HOME isolation covers collection without bypassing the shared lock."""
-
 from __future__ import annotations
 
 import os
@@ -33,7 +31,7 @@ def test_cli_invocation_owns_quiet_and_provider_state() -> None:
     @click.command()
     def command():
         printing.set_quiet(True)
-        ci._config_provider = installed  # type: ignore[assignment]
+        ci._config_provider = installed
         assert printing.is_quiet()
         assert ci._config_provider is installed
         raise click.ClickException("intentional failure")
@@ -146,7 +144,6 @@ def _run_session_probe(
     extra_env: dict[str, str] | None = None,
     lock_held: bool = False,
 ) -> subprocess.CompletedProcess[str]:
-    """Run a probe module under the early plugin, optionally while this process holds the shared lock."""
     caller_home = tmp_path / "caller-home"
     caller_home.mkdir()
     (tmp_path / "pytest.ini").write_text("[pytest]\nmarkers =\n    live_integration: live\n", encoding="utf-8")
@@ -170,7 +167,7 @@ def _run_session_probe(
         "BENCHBOX_SKIP_TEST_LOCK",
         *[k for k in env if k.startswith("PYTEST_XDIST_")],
     ):
-        env.pop(inherited, None)  # the probe is a fresh controller, not a worker of this run
+        env.pop(inherited, None)
     env.update(extra_env or {})
     try:
         return subprocess.run(
@@ -268,7 +265,6 @@ class _EarlyConfig:
 def test_only_a_parallel_controller_takes_the_lock(
     monkeypatch: pytest.MonkeyPatch, worker: str | None, args: list[str], expected_lock: bool
 ) -> None:
-    """A worker is covered by its controller's lock; on Windows it cannot verify that hold, so it must not try."""
     import _benchbox_pytest_xdist_safety as plugin
 
     calls: list[bool] = []

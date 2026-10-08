@@ -1,10 +1,3 @@
-"""Compatibility facade for the core-owned platform manifest.
-
-The import-safe authority lives below the platform layer so core registry code
-does not depend upward on ``benchbox.platforms``. New internal consumers should
-import ``benchbox.core.platform_manifest`` directly.
-"""
-
 from benchbox.core.platform_manifest import (
     PLATFORM_MANIFEST,
     PLATFORM_MANIFEST_BY_KEY,

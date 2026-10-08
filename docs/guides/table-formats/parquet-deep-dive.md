@@ -27,14 +27,14 @@ Before diving into Parquet specifics, let's understand why columnar storage help
 Analytical queries typically read few columns but many rows:
 
 ```sql
--- Only needs 'revenue' column, but all 6M rows
 SELECT SUM(l_extendedprice) FROM lineitem;
 
--- Only needs 4 columns out of 16
 SELECT l_returnflag, l_linestatus, SUM(l_quantity)
 FROM lineitem
 GROUP BY l_returnflag, l_linestatus;
 ```
+
+The first query needs only the `l_extendedprice` column but reads all 6M rows. The second needs only 4 of the 16 columns.
 
 With row storage, the query reads entire rows, including columns it doesn't need. With columnar storage, it reads only the columns requested.
 
@@ -120,10 +120,12 @@ BenchBox enables dictionary encoding by default (`use_dictionary=True`). For fin
 
 ```python
 DataFrameWriteConfiguration(
-    dictionary_columns=["l_returnflag", "l_shipmode"],    # Force dictionary
-    skip_dictionary_columns=["l_comment", "l_orderkey"],  # Skip dictionary
+    dictionary_columns=["l_returnflag", "l_shipmode"],
+    skip_dictionary_columns=["l_comment", "l_orderkey"],
 )
 ```
+
+`dictionary_columns` forces dictionary encoding on the listed columns, and `skip_dictionary_columns` skips it.
 
 #### Other Parquet Encodings
 
@@ -151,9 +153,10 @@ Parquet stores statistics in the file footer:
 **How statistics affect benchmarks:**
 
 ```sql
--- Query with range filter
 SELECT * FROM lineitem WHERE l_shipdate > '1998-01-01';
 ```
+
+This is a query with a range filter.
 
 If a row group's max l_shipdate is '1997-12-31', the query engine skips that entire row group. This predicate pushdown happens automatically based on statistics.
 
@@ -194,18 +197,21 @@ For most benchmarks, the default Zstd:3 works well. Higher compression levels (Z
 ### When to Adjust Compression
 
 ```bash
-# Default (Zstd level 3)
 benchbox run --platform duckdb --benchmark tpch --scale 1
 
-# Higher compression (smaller files, slower write)
 benchbox run --platform duckdb --benchmark tpch --compression zstd:9
 
-# Faster compression (larger files, faster write)
 benchbox run --platform duckdb --benchmark tpch --compression snappy
 
-# No compression (debugging, baseline)
 benchbox run --platform duckdb --benchmark tpch --compression none
 ```
+
+The commands use, in order:
+
+- The default (Zstd level 3).
+- Higher compression, which gives smaller files and slower writes.
+- Faster compression, which gives larger files and faster writes.
+- No compression, for debugging and as a baseline.
 
 ## Row Group Tuning
 
@@ -255,10 +261,11 @@ Data page v2 allows query engines to inspect definition levels (null tracking) a
 BenchBox defaults to file format version 2.6 and data page version 1.0, which prioritize broad compatibility for cross-platform benchmark reproducibility. To enable data page v2, set `data_page_version` in a tuning YAML file:
 
 ```yaml
-# tuning-v2.yaml
 write:
   data_page_version: "2.0"
 ```
+
+Save this as `tuning-v2.yaml`.
 
 ```bash
 benchbox run --platform duckdb --benchmark tpch --scale 1 --tuning ./tuning-v2.yaml
@@ -271,15 +278,14 @@ For standard TPC-H and TPC-DS benchmarks with flat schemas, the defaults work we
 ### Recommended Settings
 
 ```bash
-# Standard benchmark (reproducible, efficient)
 benchbox run --platform duckdb --benchmark tpch --scale 10 --compression zstd:3
 
-# Storage-focused comparison
 benchbox run --platform duckdb --benchmark tpch --scale 10 --compression zstd:9
 
-# Performance baseline (measure decompression impact)
 benchbox run --platform duckdb --benchmark tpch --scale 10 --compression none
 ```
+
+The commands are, in order, a standard benchmark (reproducible and efficient), a storage-focused comparison, and a performance baseline that measures the decompression impact.
 
 ### Common Mistakes to Avoid
 

@@ -1,12 +1,6 @@
-"""Tests for ``scripts/generate_query_docs.py``.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Uses benchmarks whose query text is plain in-repo strings (clickbench,
-read_primitives, datavault) so the suite never shells out to qgen/dsqgen.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -20,8 +14,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCRIPT = _REPO_ROOT / "scripts" / "generate_query_docs.py"
-# clickbench (43 queries, category groups) + datavault (22, TPC-derived, flat)
-# together exercise every rendering branch without shelling out to qgen/dsqgen.
 _FAST_BENCHMARKS = frozenset({"clickbench", "datavault"})
 
 
@@ -64,11 +56,9 @@ class TestSlugsAndLabels:
     def test_prettify_sql_reformats_and_falls_back(self):
         pretty = gqd._prettify_sql("SELECT a, b FROM t WHERE a = 1", "datafusion")
         assert "\n" in pretty and "SELECT" in pretty
-        # Unparseable input is returned unchanged, never dropped.
         assert gqd._prettify_sql("-- not sql at all", "default") == "-- not sql at all"
 
     def test_overview_link_depth_reaches_docs_benchmarks(self):
-        # docs/benchmarks/queries/<bm>/<page>.md -> docs/benchmarks/<slug>.md
         assert gqd._overview_link("clickbench") == "../../clickbench.md"
         assert gqd._overview_link("tpch") == "../../tpc-h.md"
 
@@ -102,13 +92,11 @@ class TestRenderAll:
         assert any(p.startswith("clickbench/") for p in out)
 
     def test_large_benchmark_gets_group_pages(self, rendered):
-        # clickbench has 43 queries and a category scheme -> group pages.
         cb = {p for p in rendered if p.startswith("clickbench/")}
         assert any(p.startswith("clickbench/group-") for p in cb)
         assert "clickbench/index.md" in cb
 
     def test_small_benchmark_has_a_flat_index(self, rendered):
-        # datavault has 22 queries -> a single catalog page, no group pages.
         assert not any(p.startswith("datavault/group-") for p in rendered)
 
     def test_tpc_derived_pages_carry_the_trademark_notice(self, rendered):

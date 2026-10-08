@@ -1,13 +1,3 @@
-/**
- * Custom CSS for BenchBox documentation
- * Enhances Furo theme with Cobalt2-styled code blocks
- */
-
-/* ============================================================================
-   Code Block Styling (Cobalt2 Theme)
-   ============================================================================ */
-
-/* Main code blocks */
 div.highlight pre,
 div.highlight-python pre,
 div.highlight-bash pre,
@@ -26,7 +16,6 @@ pre.literal-block {
     box-shadow: var(--card-shadow) !important;
 }
 
-/* Code block container */
 div.highlight {
     background-color: transparent !important;
     border-radius: 6px !important;
@@ -34,7 +23,6 @@ div.highlight {
     padding: 0 !important;
 }
 
-/* Inline code */
 code.literal,
 code.docutils.literal {
     background-color: var(--code-bg) !important;
@@ -46,7 +34,6 @@ code.docutils.literal {
     border: 1px solid var(--code-border) !important;
 }
 
-/* Code in headings */
 h1 code.literal,
 h2 code.literal,
 h3 code.literal,
@@ -58,7 +45,6 @@ h6 code.literal {
     font-size: 0.85em !important;
 }
 
-/* Line numbers in code blocks */
 .linenos {
     background-color: var(--code-bg) !important;
     color: var(--code-line-number) !important;
@@ -68,7 +54,6 @@ h6 code.literal {
     user-select: none !important;
 }
 
-/* Copy button for code blocks (if enabled) */
 button.copybtn {
     background-color: var(--accent-primary) !important;
     color: var(--bb-site-header-cta-text) !important;
@@ -85,42 +70,28 @@ button.copybtn:hover {
     opacity: 1 !important;
 }
 
-/* ============================================================================
-   Admonitions and Callouts
-   ============================================================================ */
-
-/* Enhance Furo's admonitions with Cobalt2 accent colors */
-/* Note admonitions */
 .admonition.note,
 .admonition.seealso {
     border-left: 4px solid var(--info-color);
 }
 
-/* Warning admonitions */
 .admonition.warning,
 .admonition.attention,
 .admonition.caution {
     border-left: 4px solid var(--warning-color);
 }
 
-/* Important/Danger admonitions */
 .admonition.danger,
 .admonition.error {
     border-left: 4px solid var(--danger-color);
 }
 
-/* Tip admonitions */
 .admonition.tip,
 .admonition.hint,
 .admonition.important {
     border-left: 4px solid var(--success-color);
 }
 
-/* ============================================================================
-   Code Examples and Documentation
-   ============================================================================ */
-
-/* Example blocks */
 .example {
     background-color: var(--bg-tertiary) !important;
     border-left: 4px solid var(--warning-color) !important;
@@ -129,7 +100,6 @@ button.copybtn:hover {
     border-radius: 4px !important;
 }
 
-/* Method signatures */
 dt.sig {
     background-color: var(--bg-tertiary) !important;
     border-left: 3px solid var(--info-color) !important;
@@ -137,11 +107,6 @@ dt.sig {
     font-family: 'Monaco', 'Consolas', 'Menlo', 'DejaVu Sans Mono', 'Courier New', monospace !important;
 }
 
-/* ============================================================================
-   Collapsible Sidebar Section Captions
-   ============================================================================ */
-
-/* Make toctree captions collapsible */
 .sidebar-tree .caption {
     cursor: pointer;
     user-select: none;
@@ -152,7 +117,6 @@ dt.sig {
     margin-bottom: 0.5rem;
 }
 
-/* Add collapse/expand icon before caption */
 .sidebar-tree .caption::before {
     content: "▼";
     position: absolute;
@@ -161,27 +125,18 @@ dt.sig {
     transition: transform 0.2s ease;
 }
 
-/* Rotate icon when collapsed */
 .sidebar-tree .caption.collapsed::before {
     transform: rotate(-90deg);
 }
 
-/* Hide items under collapsed captions */
 .sidebar-tree .caption.collapsed + ul {
     display: none !important;
 }
 
-/* Smooth transition for collapsing */
 .sidebar-tree .caption + ul {
     transition: all 0.2s ease;
 }
 
-/* ============================================================================
-   Links and Navigation
-   ============================================================================ */
-
-/* Furo theme compatibility: Use CSS variables where possible */
-/* Primary links with Cobalt2 accent colors - let Furo handle most styling */
 .content a:not(.reference.external):not([class*="headerlink"]) code.literal {
     color: var(--color-brand-content);
 }
@@ -190,7 +145,6 @@ dt.sig {
     color: var(--code-accent);
 }
 
-/* Preserve Cobalt2 styling for external links */
 a.reference.external {
     color: var(--color-brand-content);
 }
@@ -199,11 +153,6 @@ a.reference.external:hover {
     color: var(--code-accent);
 }
 
-/* ============================================================================
-   Tables
-   ============================================================================ */
-
-/* Table styling - Light mode */
 table.docutils {
     border-collapse: collapse !important;
     border: 1px solid var(--border-primary) !important;
@@ -229,7 +178,6 @@ table.docutils tr:nth-child(even) {
     background-color: var(--table-row-alt-bg) !important;
 }
 
-/* Table styling - Dark mode (explicit) */
 [data-theme="dark"] table.docutils {
     border: 1px solid var(--border-primary) !important;
 }
@@ -249,7 +197,6 @@ table.docutils tr:nth-child(even) {
     color: var(--text-primary) !important;
 }
 
-/* Alternating row colors - Dark Mode: apply to both tr and td for full coverage */
 [data-theme="dark"] table.docutils tbody tr:nth-child(even),
 [data-theme="dark"] table.docutils tbody tr:nth-child(even) td {
     background-color: var(--table-row-alt-bg) !important;
@@ -260,7 +207,6 @@ table.docutils tr:nth-child(even) {
     background-color: var(--bg-primary) !important;
 }
 
-/* Table styling - Dark mode (auto via prefers-color-scheme) */
 @media (prefers-color-scheme: dark) {
     body:not([data-theme="light"]) table.docutils {
         border: 1px solid var(--border-primary) !important;
@@ -292,26 +238,16 @@ table.docutils tr:nth-child(even) {
     }
 }
 
-/* Code in tables */
 table.docutils code.literal {
     white-space: nowrap !important;
 }
 
-/* ============================================================================
-   Search Highlighting
-   ============================================================================ */
-
-/* Search result highlighting */
 .highlighted {
     background-color: var(--highlight-bg) !important;
     color: var(--highlight-fg) !important;
     padding: 2px 4px !important;
     border-radius: 2px !important;
 }
-
-/* ============================================================================
-   Responsive Design
-   ============================================================================ */
 
 @media screen and (max-width: 768px) {
     div.highlight pre,
@@ -330,10 +266,6 @@ table.docutils code.literal {
     }
 }
 
-/* ============================================================================
-   Print Styles
-   ============================================================================ */
-
 @media print {
     div.highlight pre,
     div.highlight-python pre,
@@ -350,11 +282,6 @@ table.docutils code.literal {
     }
 }
 
-/* ============================================================================
-   ABlog / Blog Styles
-   ============================================================================ */
-
-/* Blog post navigation */
 .ablog-postnavy {
     display: flex;
     justify-content: space-between;
@@ -374,14 +301,12 @@ table.docutils code.literal {
     margin-left: auto;
 }
 
-/* Blog post metadata (legacy class) */
 .ablog-post-meta {
     color: var(--color-foreground-muted);
     font-size: 0.9em;
     margin-bottom: 1rem;
 }
 
-/* Blog post metadata - below title */
 .post-meta {
     color: var(--color-foreground-muted);
     font-size: 0.9rem;
@@ -435,12 +360,10 @@ table.docutils code.literal {
     color: var(--bb-site-header-cta-text);
 }
 
-/* One BenchBox theme control owns the visible state on docs/blog. */
 .theme-toggle-container {
     display: none !important;
 }
 
-/* Dark mode adjustments for post metadata */
 [data-theme="dark"] .post-tag {
     background-color: var(--color-background-secondary);
 }
@@ -449,7 +372,6 @@ table.docutils code.literal {
     background-color: var(--color-brand-primary);
 }
 
-/* Blog collection/archive pages */
 .ablog__collection h1 {
     margin-bottom: 1.5rem;
 }
@@ -489,17 +411,11 @@ table.docutils code.literal {
     margin-right: 1rem;
 }
 
-/* ============================================================================
-   ABlog Sidebar Styling (Match Furo Navigation)
-   ============================================================================ */
-
-/* Container for all ABlog sidebar widgets */
 .ablog-sidebar-item {
     margin-bottom: 1.5rem;
     font-size: var(--sidebar-item-font-size);
 }
 
-/* Sidebar headings - match Furo's caption style */
 .ablog-sidebar-item h2,
 .ablog-sidebar-item h3 {
     font-size: var(--sidebar-caption-font-size, 0.75rem);
@@ -511,7 +427,6 @@ table.docutils code.literal {
     padding: 0;
 }
 
-/* Remove default link styling from headings */
 .ablog-sidebar-item h2 a,
 .ablog-sidebar-item h3 a {
     color: inherit;
@@ -523,7 +438,6 @@ table.docutils code.literal {
     color: var(--color-sidebar-link-text--top-level);
 }
 
-/* Lists in sidebar - match Furo navigation style */
 .ablog-sidebar-item ul {
     list-style: none;
     padding: 0;
@@ -536,7 +450,6 @@ table.docutils code.literal {
     line-height: 1.3;
 }
 
-/* Links in sidebar - match Furo navigation links */
 .ablog-sidebar-item a {
     color: var(--color-sidebar-link-text);
     text-decoration: none;
@@ -550,7 +463,6 @@ table.docutils code.literal {
     color: var(--color-sidebar-link-text--top-level);
 }
 
-/* Post card specific styling */
 .ablog__postcard {
     padding-bottom: 1rem;
     border-bottom: 1px solid var(--color-sidebar-background-border);
@@ -583,7 +495,6 @@ table.docutils code.literal {
     color: var(--color-foreground-muted);
 }
 
-/* Tag cloud styling - make it cleaner */
 .ablog__tagcloud ul.ablog-cloud {
     display: flex;
     flex-wrap: wrap;
@@ -594,19 +505,16 @@ table.docutils code.literal {
     padding: 0;
 }
 
-/* Normalize tag cloud sizes to be more subtle */
 .ablog-cloud-1 a { font-size: 0.8rem; }
 .ablog-cloud-2 a { font-size: 0.85rem; }
 .ablog-cloud-3 a { font-size: 0.9rem; }
 .ablog-cloud-4 a { font-size: 0.95rem; }
 .ablog-cloud-5 a { font-size: 1rem; }
 
-/* Hide the tagcloud CSS link since we're providing custom styles */
 .ablog__tagcloud link {
     display: none;
 }
 
-/* Archives styling */
 .ablog__archives ul {
     padding-left: 0;
 }
@@ -615,7 +523,6 @@ table.docutils code.literal {
     padding: 0.25rem 0;
 }
 
-/* Recent posts styling */
 .ablog__recentposts li {
     padding: 0.35rem 0;
     border-bottom: 1px solid var(--color-sidebar-background-border);
@@ -625,7 +532,6 @@ table.docutils code.literal {
     border-bottom: none;
 }
 
-/* Blog sidebar brand header */
 .blog-sidebar-brand {
     display: flex;
     flex-direction: column;
@@ -641,7 +547,6 @@ table.docutils code.literal {
     color: var(--color-sidebar-brand-text);
 }
 
-/* Dark mode adjustments for ABlog sidebar */
 [data-theme="dark"] .ablog-sidebar-item h2,
 [data-theme="dark"] .ablog-sidebar-item h3 {
     color: var(--color-sidebar-caption-text);
@@ -655,9 +560,6 @@ table.docutils code.literal {
     color: var(--color-sidebar-link-text--top-level);
 }
 
-/* Furo's footer is a column flex container, which otherwise stretches the
-   shared theme radiogroup (appended by docs/_templates/page.html) to the
-   full content width. Center it as its own row instead. */
 footer > .benchbox-site-footer-theme {
     align-self: center;
     margin-bottom: 1rem;

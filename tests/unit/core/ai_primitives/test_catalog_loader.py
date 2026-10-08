@@ -1,9 +1,6 @@
-"""Tests for AI Primitives catalog loader.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -20,10 +17,8 @@ pytestmark = [
 
 
 class TestAIQuery:
-    """Tests for AIQuery dataclass."""
-
     def test_query_creation(self):
-        """Test creating an AIQuery instance."""
+
         query = AIQuery(
             id="test_query",
             category="generative",
@@ -45,7 +40,7 @@ class TestAIQuery:
         assert query.cost_per_1k_tokens == 0.0003
 
     def test_query_defaults(self):
-        """Test AIQuery default values."""
+
         query = AIQuery(
             id="minimal",
             category="nlp",
@@ -61,7 +56,7 @@ class TestAIQuery:
         assert query.cost_per_1k_tokens == 0.001
 
     def test_query_with_variants(self):
-        """Test AIQuery with platform variants."""
+
         query = AIQuery(
             id="variant_query",
             category="generative",
@@ -77,7 +72,7 @@ class TestAIQuery:
         assert "bigquery" in query.variants
 
     def test_query_with_skip_on(self):
-        """Test AIQuery with skip_on list."""
+
         query = AIQuery(
             id="skip_query",
             category="embedding",
@@ -92,10 +87,8 @@ class TestAIQuery:
 
 
 class TestLoadAICatalog:
-    """Tests for catalog loading functionality."""
-
     def test_load_catalog_success(self):
-        """Test successful catalog loading."""
+
         catalog = load_ai_catalog()
 
         assert isinstance(catalog, AICatalog)
@@ -103,10 +96,9 @@ class TestLoadAICatalog:
         assert len(catalog.queries) > 0
 
     def test_catalog_has_expected_queries(self):
-        """Test catalog contains expected queries."""
+
         catalog = load_ai_catalog()
 
-        # Check for expected query IDs
         expected_queries = [
             "generative_complete_simple",
             "nlp_sentiment_single",
@@ -118,7 +110,6 @@ class TestLoadAICatalog:
             assert query_id in catalog.queries, f"Expected query '{query_id}' not found"
 
     def test_catalog_queries_have_required_fields(self):
-        """Test all queries have required fields."""
         catalog = load_ai_catalog()
 
         for query_id, query in catalog.queries.items():
@@ -130,7 +121,7 @@ class TestLoadAICatalog:
             assert query.cost_per_1k_tokens >= 0, f"Query {query_id} has invalid cost_per_1k_tokens"
 
     def test_catalog_categories(self):
-        """Test catalog has expected categories."""
+
         catalog = load_ai_catalog()
 
         categories = {q.category for q in catalog.queries.values()}
@@ -139,24 +130,20 @@ class TestLoadAICatalog:
         assert expected_categories.issubset(categories)
 
     def test_catalog_skip_on_includes_unsupported(self):
-        """Test queries skip unsupported platforms."""
         catalog = load_ai_catalog()
 
         unsupported = {"duckdb", "sqlite", "postgresql"}
 
         for query_id, query in catalog.queries.items():
             if query.skip_on:
-                # Check that common unsupported platforms are in skip_on
                 for platform in unsupported:
                     if platform in query.skip_on:
                         break
                 else:
-                    # At least one unsupported platform should be in skip_on
-                    # unless it's a special query
                     pass
 
     def test_catalog_variants_format(self):
-        """Test query variants have correct format."""
+
         catalog = load_ai_catalog()
 
         for query_id, query in catalog.queries.items():
@@ -169,10 +156,8 @@ class TestLoadAICatalog:
 
 
 class TestCatalogValidation:
-    """Tests for catalog validation logic."""
-
     def test_catalog_no_duplicates(self):
-        """Test catalog has no duplicate query IDs."""
+
         catalog = load_ai_catalog()
 
         query_ids = list(catalog.queries.keys())
@@ -181,21 +166,21 @@ class TestCatalogValidation:
         assert len(query_ids) == len(unique_ids), "Duplicate query IDs found"
 
     def test_catalog_version_is_integer(self):
-        """Test catalog version is an integer."""
+
         catalog = load_ai_catalog()
 
         assert isinstance(catalog.version, int)
         assert catalog.version >= 1
 
     def test_query_categories_are_lowercase(self):
-        """Test all categories are lowercase."""
+
         catalog = load_ai_catalog()
 
         for query in catalog.queries.values():
             assert query.category == query.category.lower()
 
     def test_skip_on_dialects_are_lowercase(self):
-        """Test skip_on dialects are lowercase."""
+
         catalog = load_ai_catalog()
 
         for query in catalog.queries.values():
@@ -204,7 +189,7 @@ class TestCatalogValidation:
                     assert dialect == dialect.lower()
 
     def test_variant_dialects_are_lowercase(self):
-        """Test variant dialects are lowercase."""
+
         catalog = load_ai_catalog()
 
         for query in catalog.queries.values():

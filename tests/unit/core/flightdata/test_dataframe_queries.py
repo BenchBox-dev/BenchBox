@@ -1,9 +1,6 @@
-"""Tests for FlightData DataFrame queries.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -20,8 +17,6 @@ pytestmark = [
 
 
 class TestQueryRegistration:
-    """Tests for query registration and metadata."""
-
     def test_all_20_queries_registered(self):
         from benchbox.core.flightdata.dataframe_queries import get_dataframe_queries
 
@@ -105,8 +100,6 @@ class TestQueryRegistration:
 
 
 class TestParameterOverrides:
-    """Tests for parameter override mechanism."""
-
     def test_default_parameters(self):
         from benchbox.core.flightdata.dataframe_queries import (
             FLIGHTDATA_DEFAULT_PARAMS,
@@ -114,7 +107,7 @@ class TestParameterOverrides:
             set_parameter_overrides,
         )
 
-        set_parameter_overrides(None)  # ensure no prior test left overrides in place
+        set_parameter_overrides(None)
         params = get_flightdata_parameters()
         assert params["start_date"] == FLIGHTDATA_DEFAULT_PARAMS["start_date"]
         assert params["end_date"] == FLIGHTDATA_DEFAULT_PARAMS["end_date"]
@@ -134,7 +127,6 @@ class TestParameterOverrides:
         assert params["start_date"] == custom_start
         assert params["end_date"] == custom_end
 
-        # Restore defaults
         set_parameter_overrides(None)
         params = get_flightdata_parameters()
         assert params["start_date"] == FLIGHTDATA_DEFAULT_PARAMS["start_date"]
@@ -154,16 +146,9 @@ class TestParameterOverrides:
 
 @pytest.fixture
 def pandas_ctx():
-    """Minimal pandas DataFrameContext with synthetic flight data.
-
-    Module-level so it is accessible to all test classes in this file.
-    """
     pytest.importorskip("pandas")
     import pandas as pd
 
-    # Align synthetic dates with FLIGHTDATA_DEFAULT_PARAMS (2024-12-01/2025-01-01)
-    # so DataFrame queries with default window return rows. Previously 2018
-    # matched the old hardcoded default and now would be filtered out.
     flights = pd.DataFrame(
         {
             "flight_id": range(1, 11),
@@ -248,7 +233,6 @@ def pandas_ctx():
 
 @pytest.fixture
 def polars_ctx():
-    """Minimal Polars expression-family context with synthetic flight data."""
     pl = pytest.importorskip("polars")
 
     from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
@@ -281,8 +265,6 @@ def polars_ctx():
 
 
 class TestPandasImplExecute:
-    """Tests that pandas_impl functions run on synthetic data."""
-
     def test_ontime_by_carrier(self, pandas_ctx):
         from benchbox.core.flightdata.dataframe_queries import ontime_by_carrier_pandas_impl
 
@@ -364,20 +346,18 @@ class TestPandasImplExecute:
         assert "total_flights" in result.columns
 
     def test_date_range_filtering(self, pandas_ctx):
-        """Verify date range filter is applied."""
+
         from benchbox.core.flightdata.dataframe_queries import (
             improvement_trend_pandas_impl,
             set_parameter_overrides,
         )
 
-        # Set a date range that excludes all rows
         set_parameter_overrides({"start_date": date(2099, 1, 1), "end_date": date(2100, 1, 1)})
         result = improvement_trend_pandas_impl(pandas_ctx)
         assert len(result) == 0
         set_parameter_overrides(None)
 
     def test_distance_bucket_labels_consistent(self, pandas_ctx):
-        """Pandas distance_delay labels must match expression_impl labels."""
         from benchbox.core.flightdata.dataframe_queries import distance_delay_pandas_impl
 
         expected = {
@@ -392,7 +372,6 @@ class TestPandasImplExecute:
         assert actual.issubset(expected), f"Unexpected distance labels: {actual - expected}"
 
     def test_holiday_labels_consistent(self, pandas_ctx):
-        """Pandas holiday_impact labels must match expression_impl labels."""
         from benchbox.core.flightdata.dataframe_queries import holiday_impact_pandas_impl
 
         expected = {
@@ -420,8 +399,6 @@ class TestPandasImplExecute:
 
 
 class TestExpressionImplParity:
-    """Tests that expression implementations preserve the SQL result schema."""
-
     def test_day_of_week_expression_includes_day_name(self, polars_ctx):
         from benchbox.core.flightdata.dataframe_queries import day_of_week_expression_impl
 
@@ -481,8 +458,6 @@ class TestExpressionImplParity:
 
 
 class TestBenchmarkDateSync:
-    """Tests that FlightData DataFrame parameters match the SQL benchmark window."""
-
     def test_benchmark_syncs_sql_date_window_to_dataframe_queries(self):
         from benchbox.core.flightdata.benchmark import FlightDataBenchmark
         from benchbox.core.flightdata.dataframe_queries import (

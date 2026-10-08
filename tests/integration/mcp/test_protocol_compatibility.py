@@ -1,5 +1,3 @@
-"""Production protocol-version compatibility policy."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -39,7 +37,6 @@ def test_supported_protocol_is_sessionless(tmp_path: Path, mode: str, expected_v
 
 @pytest.mark.parametrize("mode", ["auto", "legacy"])
 def test_conformance_baseline_assumptions_are_guarded(tmp_path: Path, mode: str) -> None:
-    """Keep the pinned fixture gaps separate from BenchBox's supported surface."""
 
     async def exercise() -> None:
         async with http_client(tmp_path, mode=mode, request_headers=[], response_headers=[]) as client:

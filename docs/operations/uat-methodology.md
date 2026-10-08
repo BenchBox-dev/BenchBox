@@ -1,7 +1,7 @@
 # UAT methodology helpers
 
 Operational notes for authors of sweep-shape UATs (those that produce a
-multi-bundle corpus, e.g. the 2026-05-02 multi-platform sweep).
+multi-bundle corpus, such as a multi-platform sweep).
 
 ## Validator-clean rate roll-up
 
@@ -22,14 +22,14 @@ fresh per-platform / per-benchmark numbers.
 ### Invocation
 
 ```bash
-# Roll up an entire sweep results directory:
-make uat-validate RESULTS_DIR=~/Developer/benchmark_runs/results OUTPUT_TSV=uat-rollup.tsv
+make uat-validate RESULTS_DIR=<checkout-parent>/benchmark_runs/results OUTPUT_TSV=uat-rollup.tsv
 
-# Direct module form, useful inside scripts:
 uv run -- python -m tests.uat._cli validate \
-    --results-dir ~/Developer/benchmark_runs/results \
+    --results-dir <checkout-parent>/benchmark_runs/results \
     --output-tsv uat-rollup.tsv
 ```
+
+The `make` target rolls up an entire sweep results directory. The direct module form is useful inside scripts.
 
 ### TSV columns
 
@@ -70,7 +70,5 @@ A typical headline read of the footer:
 # benchmark=tpcds: total=84 submittable=72 clean=22 validator_clean_rate=30.6%
 ```
 
-A platform or benchmark cluster below 50% is the trigger to file a
-defect TODO, per the success-metrics convention in the UAT methodology
-remediation spec
-(`_project/specs/uat-methodology-blind-spot-remediation.md` §2 Finding 2).
+Treat any platform or benchmark with a validator-clean rate below 50% as a
+defect to investigate and report.

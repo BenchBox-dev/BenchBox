@@ -1,21 +1,4 @@
 #!/usr/bin/env node
-/**
- * Deterministic fixture-corpus generator for the browser-functional
- * test suite.
- *
- * Copies source bundles from `test-fixtures/source/bundles/` into
- * `test-fixtures/.generated/source/bundles/`, applies controlled
- * metadata variants (trust labels, compare-invalid cohorts), and then
- * runs `uv run -- python _project/scripts/explorer_publish.py build` to
- * produce the per-run read model at `test-fixtures/.generated/data/`.
- *
- * Never touches:
- *   - results-explorer/public/data/
- *   - results-data/bundles/
- *
- * See docs/development/browser-test-architecture.md for the decision
- * record this generator implements.
- */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -49,9 +32,6 @@ const LARGE_CORPUS_RUN_ID_PREFIX = "8a57a5a8-large-corpus-";
 const PANDAS_SOURCE_BUNDLE = "tpch-pandas-sf0.01-20260826-8bde2222.json";
 const PANDAS_STANDARD_FIXTURE_RUN_ID = "8bde2222-fixture-standard";
 
-// The Pandas source is an immutable copy of a real power run. The browser
-// compare cohort needs a standard-phase Pandas row, so it is emitted only as a
-// plainly synthetic fixture variant below, never normalized in place.
 const SOURCE_BINDINGS = [
   {
     fixtureBundle: PANDAS_SOURCE_BUNDLE,
@@ -78,11 +58,6 @@ const SOURCE_BINDINGS = [
     manifest: "tpch-cedardb-sf0.01-20260825-cf0d9e4d.source.manifest.json",
   },
 ];
-// Manifest verification (SOURCE_BINDINGS) is decoupled from copy exclusion:
-// every verbatim power-cohort source is hash-checked AND copied, while the
-// Pandas power source stays excluded because the corpus carries only its
-// synthetic standard-phase derivative (a verbatim copy would add a sixth
-// power-cohort platform and break hardcoded e2e counts).
 const SYNTHETIC_CANONICAL_SOURCES = new Set([PANDAS_SOURCE_BUNDLE]);
 
 if (!new Set(["default", "large"]).has(FIXTURE_PROFILE)) {
@@ -124,35 +99,14 @@ const asSyntheticStandardPandasFixture = (bundle) => {
   return mutated;
 };
 
-/**
- * Metadata variants applied to the generator output. Each entry takes a
- * source bundle filename and produces one or more derived bundles plus
- * optional sidecars. Variants are purely additive - the original bundle
- * is always copied verbatim so tests can rely on the known-good shape
- * for happy-path assertions.
- */
 const VARIANTS = [
   {
-    // The source is a real power run. This separate, explicitly named synthetic
-    // row supplies the standard-phase Pandas comparison fixture without
-    // relabelling the contributed evidence itself.
     source: PANDAS_SOURCE_BUNDLE,
     subdir: "synthetic",
     derived: "tpch-fixture-pandas-standard-sf0.01-20260826.json",
     mutate: asSyntheticStandardPandasFixture,
   },
   {
-    // Community-submission variant: derived from the TPC-H DuckDB bundle.
-    // The explorer pipeline promotes every bundle that lives next to a
-    // `submission-manifest.json` sidecar to `trust_label=community-submission`,
-    // so the derived file must land in its own subdirectory to avoid
-    // tainting the adjacent maintainer-run bundles.
-    //
-    // This is also the corpus's only funding-disclosing bundle
-    // (`provenance.funding`), which is what gives the funding-chip e2e a row to
-    // assert on. Community + employer-funded is a deliberate pairing: it proves
-    // the two axes are independent, since every other fixture leaves funding at
-    // the `unspecified` producer default and therefore renders no chip.
     source: "tpch-duckdb-sf0.01-20260826-8a57a5a8.json",
     subdir: "community",
     derived: "tpch-duckdb-sf0.01-20260826-community.json",
@@ -168,25 +122,15 @@ const VARIANTS = [
       },
     },
     mutate: (bundle) => {
-      // Give the derived record a distinct run id so it does not collide
-      // with its maintainer-run ancestor.
       const mutated = structuredClone(bundle);
       if (mutated.run) {
         mutated.run.id = `${mutated.run.id ?? "run"}-community`;
       }
-      // Declare a funding source so the read model carries a non-default
-      // `funding` value. See transformer.py::_funding.
       mutated.provenance = { ...(mutated.provenance ?? {}), funding: "employer" };
       return mutated;
     },
   },
   {
-    // Tuned variant: derived from the TPC-H DuckDB bundle with
-    // `config.tuning_mode="tuned"` and a sibling `.tuning.json` sidecar
-    // so the pipeline sets `has_tuning=true`. The failure-injection suite
-    // uses this to exercise the sidecar fetch-error path on ResultDetail.
-    // A per-variant subdirectory keeps the tuning sidecar scoped to this
-    // one bundle.
     source: "tpch-duckdb-sf0.01-20260826-8a57a5a8.json",
     subdir: "tuned",
     derived: "tpch-duckdb-sf0.01-20260826-tuned.json",
@@ -210,10 +154,6 @@ const VARIANTS = [
     },
   },
   {
-    // Vendor-supplied variant: derived from the TPC-H Pandas source. Bundles
-    // under the top-level `vendor/` subtree receive `trust_label=vendor-supplied`
-    // from the explorer pipeline. Keep this subtree free of community
-    // submission-manifest sidecars so the label stays unambiguous.
     source: PANDAS_SOURCE_BUNDLE,
     subdir: "vendor",
     derived: "tpch-pandas-sf0.01-20260826-vendor.json",
@@ -224,9 +164,6 @@ const VARIANTS = [
     },
   },
   {
-    // Second tuned/notuned pair: Pandas mirror of the DuckDB tuned variant.
-    // Gives the honesty controls a ≥2-platform tuned cohort without adding
-    // extra DuckDB or Polars rows (those platforms have hard-coded e2e counts).
     source: PANDAS_SOURCE_BUNDLE,
     subdir: "tuned-pandas",
     derived: "tpch-pandas-sf0.01-20260826-tuned.json",
@@ -248,11 +185,6 @@ const VARIANTS = [
     },
   },
   {
-    // Power-phase tuned sibling for the genuine Polars source: the
-    // verifier needs >=2 tuned pairs in the >=4-platform power cohort
-    // (DuckDB plus one more), and every tuned row must derive from a
-    // real run with a synthetic-only tuning sidecar, never from a
-    // byte-cloned baseline wearing a tuned label.
     source: "tpch-polars-sf0.01-20260824-51ccc406.json",
     subdir: "tuned-polars",
     derived: "tpch-polars-sf0.01-20260824-tuned.json",
@@ -276,9 +208,6 @@ const VARIANTS = [
     },
   },
   {
-    // Scale-factor variant: same TPC-H DuckDB bundle rewritten to SF 0.1.
-    // The compare-scale-mismatch failure test pairs this with an SF 0.01
-    // bundle to exercise the hard-block path that jsdom cannot reach.
     source: "tpch-duckdb-sf0.01-20260826-8a57a5a8.json",
     subdir: "sf01",
     derived: "tpch-duckdb-sf0.1-20260826-scale.json",
@@ -294,11 +223,6 @@ const VARIANTS = [
     },
   },
   {
-    // Partial query-coverage variant: derived from the TPC-H DataFusion
-    // bundle with Q22 omitted. The follow-up usability release gate uses
-    // this to exercise Compare's normalized-speedup "Comparable only"
-    // default with a real browser corpus row that has at least one hidden
-    // partial query.
     source: "tpch-datafusion-sf0.01-20260826-e8a7d048.json",
     subdir: "partial-query",
     derived: "tpch-datafusion-partial-sf0.01-20260826-query-gap.json",
@@ -315,10 +239,6 @@ const VARIANTS = [
     },
   },
   {
-    // Synthetic zero-timing result for ResultDetail's empty-state contract.
-    // This additive browser-only variant never changes the checked-in source
-    // corpus or public results. A distinct platform name keeps it out of
-    // exact-row-count assertions for the canonical DuckDB platform.
     source: "tpch-duckdb-sf0.01-20260826-8a57a5a8.json",
     subdir: "zero-timing",
     derived: "tpch-fixture-zero-timing-sf0.01-20260826.json",
@@ -355,9 +275,6 @@ const VARIANTS = [
     },
   },
   {
-    // Synthetic AWS managed-cloud variant: fixture-only coverage for the
-    // environment facets flattened into the browser snapshot. This never
-    // touches the public corpus.
     source: "tpch-duckdb-sf0.01-20260826-8a57a5a8.json",
     subdir: "environment/aws-cloud",
     derived: "tpch-fixture-aws-sf0.01-20260826-environment.json",
@@ -403,8 +320,6 @@ const VARIANTS = [
       }),
   },
   {
-    // Synthetic GCP serverless variant: exercises a second cloud provider,
-    // region, and compute-shape source path.
     source: "tpch-duckdb-sf0.01-20260826-8a57a5a8.json",
     subdir: "environment/gcp-serverless",
     derived: "tpch-fixture-gcp-sf0.01-20260826-environment.json",
@@ -450,9 +365,6 @@ const VARIANTS = [
       }),
   },
   {
-    // Synthetic provisioned-local/container-source variant: this remains
-    // `deployment_class=local` under the current flattened contract while
-    // carrying normalized runtime metadata for future runtime facets.
     source: "tpch-duckdb-sf0.01-20260826-8a57a5a8.json",
     subdir: "environment/container-local",
     derived: "tpch-fixture-container-sf0.01-20260826-environment.json",
@@ -741,22 +653,6 @@ const runPipeline = (contract) => {
   }
 };
 
-/**
- * Every fixture role a browser spec can address, keyed by the `run.id` that
- * identifies it.
- *
- * `run.id` is authored in the source bundles and in the VARIANTS above; it is
- * the only stable handle on a fixture. `result_id` is content-addressed - it
- * ends in a SHA prefix of the published bundle bytes - so it moves whenever
- * fixture content or anonymization output changes, and `short_id` is derived
- * from `result_id`, so it moves too.
- *
- * Filename prefix cannot stand in for this. Three fixtures share the
- * `tpch-duckdb-sf0.01-` prefix (canonical, tuned, community) and they are not
- * interchangeable: `funding-disclosure.spec.ts` asserts that the community
- * fixture is the ONLY one declaring `provenance.funding`, so handing it the
- * canonical id does not weaken the test, it inverts it.
- */
 const FIXTURE_ROLES = {
   "8a57a5a8": "duckdb",
   "8a57a5a8-tuned": "duckdbTuned",
@@ -778,16 +674,6 @@ const FIXTURE_ROLES = {
   "51ccc406-tuned": "polarsTuned",
 };
 
-/**
- * Read the pipeline's own short-id table out of the built read model.
- *
- * An earlier revision of this file recomputed the algorithm in JavaScript from
- * a comment describing `_build_short_ids`. That trades one drift class for
- * another: nothing enforced that the two implementations agreed, and the JS
- * copy silently assumed its input set (bundle filenames) matched the
- * pipeline's (`all_result_ids`). The pipeline already persists the mapping in
- * `short_ids`, so read it instead of reproducing it.
- */
 const readShortIds = () => {
   const script = [
     "import duckdb, json, sys",
@@ -802,28 +688,13 @@ const readShortIds = () => {
   return JSON.parse(result.stdout);
 };
 
-/**
- * Emit `fixture-ids.json` next to the read model.
- *
- * Specs used to hardcode these ids and they drifted: the literals checked in
- * matched neither the pre- nor the post-#1512 build, so the browser suite
- * failed on every run. Emitting one entry per role keeps every spec pinned to
- * whatever this build actually produced.
- */
 const writeFixtureIds = () => {
   const rows = readdirSync(join(genDataDir, "bundles"))
-    // Companion tuning sidecars are deliberately published beside their
-    // primary result bundle, but they are not browser fixtures and have no
-    // `run.id`. Keep them available for detail-page sidecar requests while
-    // excluding them from role discovery.
     .filter((name) => name.endsWith(".json") && !name.endsWith(".tuning.json"))
     .map((name) => name.slice(0, -".json".length));
   const runIdOf = (rid) => JSON.parse(readFileSync(join(genDataDir, "bundles", `${rid}.json`), "utf8"))?.run?.id;
   const shortIds = readShortIds();
 
-  // Fail loudly on an unclaimed or missing fixture. A spec that silently loses
-  // its role is the failure mode this whole file exists to remove, so a new or
-  // renamed fixture must break the generator, not the suite.
   const byRole = {};
   const unclaimed = [];
   for (const resultId of rows) {
@@ -874,7 +745,6 @@ const main = () => {
   writeLargeCorpusVariants();
   runPipeline(contract);
 
-  // Sanity: pipeline must have produced at least the DuckDB snapshot.
   const duckdbPath = join(genDataDir, "results.duckdb");
   if (!existsSync(duckdbPath)) {
     throw new Error(`pipeline did not produce ${duckdbPath}`);

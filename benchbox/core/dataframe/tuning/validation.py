@@ -1,12 +1,6 @@
-"""DataFrame tuning validation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides validation functions for DataFrame tuning configurations,
-including platform compatibility checking and configuration-specific validations.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -19,31 +13,19 @@ if TYPE_CHECKING:
 
 
 class ValidationLevel(Enum):
-    """Severity level for validation issues."""
-
-    ERROR = "error"  # Configuration is invalid, will cause failures
-    WARNING = "warning"  # Configuration may cause unexpected behavior
-    INFO = "info"  # Informational, may affect performance
+    ERROR = "error"
+    WARNING = "warning"
+    INFO = "info"
 
 
 @dataclass
 class ValidationIssue:
-    """Represents a validation issue found in a configuration.
-
-    Attributes:
-        level: Severity of the issue
-        message: Description of the issue
-        setting: The setting that caused the issue (if applicable)
-        suggestion: Recommended action to fix the issue
-    """
-
     level: ValidationLevel
     message: str
     setting: str | None = None
     suggestion: str | None = None
 
     def __str__(self) -> str:
-        """Return string representation of the issue."""
         prefix = f"[{self.level.value.upper()}]"
         if self.setting:
             prefix = f"{prefix} {self.setting}:"
@@ -54,8 +36,6 @@ class ValidationIssue:
 
 
 class TuningValidationError(Exception):
-    """Raised when tuning validation fails with ERROR level issues."""
-
     def __init__(self, message: str, issues: list[ValidationIssue] | None = None):
         super().__init__(message)
         self.issues = issues or []
@@ -65,28 +45,12 @@ def validate_dataframe_tuning(
     config: DataFrameTuningConfiguration,
     platform: str,
 ) -> list[ValidationIssue]:
-    """Validate a DataFrame tuning configuration for a platform.
-
-    This function performs comprehensive validation including:
-    - Platform compatibility checking for all enabled settings
-    - Value range validation
-    - Platform-specific semantic validation
-
-    Args:
-        config: The configuration to validate
-        platform: The target DataFrame platform
-
-    Returns:
-        List of ValidationIssue objects (empty if valid)
-    """
     issues: list[ValidationIssue] = []
 
-    # Normalize platform name
     platform_lower = platform.lower()
     if platform_lower.endswith("-df"):
         platform_lower = platform_lower[:-3]
 
-    # Check platform compatibility for all enabled settings
     enabled = config.get_enabled_settings()
     for setting in enabled:
         if not setting.is_compatible_with_platform(platform_lower):
@@ -99,7 +63,6 @@ def validate_dataframe_tuning(
                 )
             )
 
-    # Platform-specific validations
     if platform_lower == "polars":
         issues.extend(_validate_polars(config))
     elif platform_lower == "pandas":
@@ -113,10 +76,8 @@ def validate_dataframe_tuning(
 
 
 def _validate_polars(config: DataFrameTuningConfiguration) -> list[ValidationIssue]:
-    """Validate Polars-specific configuration."""
     issues: list[ValidationIssue] = []
 
-    # Warn if streaming_mode=True but chunk_size not set
     if config.execution.streaming_mode and config.memory.chunk_size is None:
         issues.append(
             ValidationIssue(
@@ -127,7 +88,6 @@ def _validate_polars(config: DataFrameTuningConfiguration) -> list[ValidationIss
             )
         )
 
-    # Validate engine_affinity values
     valid_engines = {"streaming", "in-memory", None}
     if config.execution.engine_affinity is not None and config.execution.engine_affinity not in valid_engines:
         issues.append(
@@ -139,7 +99,6 @@ def _validate_polars(config: DataFrameTuningConfiguration) -> list[ValidationIss
             )
         )
 
-    # Warn about conflicting streaming settings
     if config.execution.streaming_mode and config.execution.engine_affinity == "in-memory":
         issues.append(
             ValidationIssue(
@@ -154,10 +113,8 @@ def _validate_polars(config: DataFrameTuningConfiguration) -> list[ValidationIss
 
 
 def _validate_pandas(config: DataFrameTuningConfiguration) -> list[ValidationIssue]:
-    """Validate Pandas-specific configuration."""
     issues: list[ValidationIssue] = []
 
-    # Warn about auto_categorize with pyarrow backend
     if config.data_types.auto_categorize_strings and config.data_types.dtype_backend == "pyarrow":
         issues.append(
             ValidationIssue(
@@ -168,7 +125,6 @@ def _validate_pandas(config: DataFrameTuningConfiguration) -> list[ValidationIss
             )
         )
 
-    # Warn about categorical_threshold at extremes
     if config.data_types.auto_categorize_strings:
         if config.data_types.categorical_threshold < 0.1:
             issues.append(
@@ -193,13 +149,8 @@ def _validate_pandas(config: DataFrameTuningConfiguration) -> list[ValidationIss
 
 
 def _validate_dask(config: DataFrameTuningConfiguration) -> list[ValidationIssue]:
-    """Validate Dask-specific configuration."""
     issues: list[ValidationIssue] = []
 
-    # Validate memory_limit format is already done in dataclass
-    # Add semantic validations
-
-    # Warn about high thread count per worker
     if config.parallelism.threads_per_worker is not None and config.parallelism.threads_per_worker > 8:
         issues.append(
             ValidationIssue(
@@ -210,7 +161,6 @@ def _validate_dask(config: DataFrameTuningConfiguration) -> list[ValidationIssue
             )
         )
 
-    # Warn if spill_to_disk without memory_limit
     if config.memory.spill_to_disk and config.memory.memory_limit is None:
         issues.append(
             ValidationIssue(
@@ -221,7 +171,6 @@ def _validate_dask(config: DataFrameTuningConfiguration) -> list[ValidationIssue
             )
         )
 
-    # Warn about very low worker count
     if config.parallelism.worker_count is not None and config.parallelism.worker_count < 2:
         issues.append(
             ValidationIssue(
@@ -236,10 +185,8 @@ def _validate_dask(config: DataFrameTuningConfiguration) -> list[ValidationIssue
 
 
 def _validate_cudf(config: DataFrameTuningConfiguration) -> list[ValidationIssue]:
-    """Validate cuDF-specific configuration."""
     issues: list[ValidationIssue] = []
 
-    # GPU must be enabled for cuDF
     if not config.gpu.enabled:
         issues.append(
             ValidationIssue(
@@ -250,7 +197,6 @@ def _validate_cudf(config: DataFrameTuningConfiguration) -> list[ValidationIssue
             )
         )
 
-    # Validate pool_type
     valid_pools = {"default", "managed", "pool", "cuda"}
     if config.gpu.pool_type not in valid_pools:
         issues.append(
@@ -262,7 +208,6 @@ def _validate_cudf(config: DataFrameTuningConfiguration) -> list[ValidationIssue
             )
         )
 
-    # Warn about disabling spill_to_host
     if not config.gpu.spill_to_host:
         issues.append(
             ValidationIssue(
@@ -277,39 +222,14 @@ def _validate_cudf(config: DataFrameTuningConfiguration) -> list[ValidationIssue
 
 
 def has_errors(issues: list[ValidationIssue]) -> bool:
-    """Check if any validation issues are errors.
-
-    Args:
-        issues: List of validation issues
-
-    Returns:
-        True if any issue has ERROR level
-    """
     return any(issue.level == ValidationLevel.ERROR for issue in issues)
 
 
 def has_warnings(issues: list[ValidationIssue]) -> bool:
-    """Check if any validation issues are warnings.
-
-    Args:
-        issues: List of validation issues
-
-    Returns:
-        True if any issue has WARNING level
-    """
     return any(issue.level == ValidationLevel.WARNING for issue in issues)
 
 
 def format_issues(issues: list[ValidationIssue], include_info: bool = True) -> str:
-    """Format validation issues as a human-readable string.
-
-    Args:
-        issues: List of validation issues
-        include_info: Whether to include INFO level issues
-
-    Returns:
-        Formatted string with all issues
-    """
     if not issues:
         return "No validation issues found."
 

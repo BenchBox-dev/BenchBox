@@ -1,31 +1,6 @@
-"""Permanent credential-egress sentinel sweep across all export chokepoints.
-
-This is intentionally an integration-shaped unit test: it constructs each
-registered adapter without opening a connection, carries configured options
-through the public payload / private JSON export / results.db boundaries, and
-rejects any credential or identifier sentinel that survives.
-
-Coverage layers (R8 permanent invariant + expansion):
-
-* 49-adapter platform_config / raw_config construct-and-export sweep with
-  explicit optional-dependency skip accounting: a platform may only skip when
-  benchbox.utils.dependencies (dependencies.yaml) recognizes it as carrying
-  an optional SDK/driver dependency; the pass/skip split otherwise tracks
-  whichever extras the CI ``uv sync --group dev`` closure happens to install.
-* raw_metadata + normalized deployment/cloud/compute/storage blocks.
-* URI query/fragment credentials through platform-options sanitization and
-  result export chokepoints.
-* MCP error scrubbing for assignment-form secrets.
-* Nested tuning identifiers (list-of-dicts FK tables) through the public
-  anonymizer and the anonymized bundle's platform.tuning block.
-
-Do not reduce this to a key-name grep: construct adapters/results and inspect
-serialized outputs. Do not introduce SecretStr or a four-layer architecture.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for
-details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for
+# details.
 
 from __future__ import annotations
 
@@ -49,29 +24,10 @@ from benchbox.utils.dependencies import DEPENDENCY_GROUPS, PLATFORM_TO_EXTRA
 
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
-# Reviewed adapter corpus size. Drift means a platform was added/removed without
-# updating the permanent egress invariant.
 EXPECTED_REGISTERED_PLATFORM_COUNT = 49
 
 
 def _catalog_required_packages(platform_name: str) -> tuple[str, ...] | None:
-    """Return the catalog-declared optional-dependency packages for a platform.
-
-    ``benchbox.utils.dependencies`` (backed by ``dependencies.yaml``) is the
-    project's own source of truth for which registered platforms carry an
-    optional SDK/driver dependency versus which are always constructible in
-    the CI ``uv sync --group dev`` environment (DuckDB, SQLite, DataFusion,
-    Polars, PySpark, ...). A platform with no catalog entry has no recognized
-    reason to skip -- its adapter must always construct. This replaces a
-    prior hardcoded ODBC-only allowlist that only recognized pyodbc-backed
-    adapters (fabric-lakehouse, synapse) and misclassified every other
-    optional-SDK platform's missing-dependency skip as unexpected.
-
-    Returns the pip package names (e.g. ``pyodbc``, ``boto3``,
-    ``google-cloud-dataproc``) that legitimately explain a missing-dependency
-    skip for ``platform_name``, or ``None`` if the platform has no catalog
-    entry.
-    """
     extra_name = PLATFORM_TO_EXTRA.get(platform_name, platform_name)
     dep_info = DEPENDENCY_GROUPS.get(extra_name)
     if dep_info is None:
@@ -87,13 +43,10 @@ _CREDENTIAL_SENTINELS = (
     "EGRESS_SECRET_KEY_SENTINEL",
     "EGRESS_ACCESS_TOKEN_SENTINEL",
     "EGRESS_DSN_PASSWORD_SENTINEL",
-    # Injected via access_key_id / secret_access_key; must be in the asserted set
-    # so a partial filter cannot silently drop only the short aliases.
     "EGRESS_ACCESS_KEY_ID_SENTINEL",
     "EGRESS_SECRET_ACCESS_KEY_SENTINEL",
 )
 
-# Cross-layer expansion gates (distinct so a partial fix cannot silence all).
 _SWEEP_URI_GATE = "SWEEP_URI_GATE"
 _SWEEP_MCP_GATE = "SWEEP_MCP_GATE"
 _SWEEP_TABLE_GATE = "SWEEP_TABLE_GATE"
@@ -101,7 +54,6 @@ _SWEEP_COLUMN_GATE = "SWEEP_COLUMN_GATE"
 
 
 def _sentinel_config(tmp_path: Path) -> dict[str, object]:
-    """Return a connection-free config broad enough for the adapter family."""
     return {
         "database_path": ":memory:",
         "database": "benchbox",
@@ -191,15 +143,6 @@ def _prepare_config_for_platform(platform_name: str, tmp_path: Path) -> dict[str
 
 
 def _construct_adapter_or_skip_reason(platform_name: str, tmp_path: Path) -> Any | str:
-    """Return a constructed adapter, or a skip-reason string (never empty).
-
-    Only platforms with a catalog-recognized optional dependency
-    (``_catalog_required_packages``) may skip. Any other missing-dependency
-    failure is an unexpected skip and must fail the invariant. Adapters are
-    inconsistent about which exception carries a missing optional dependency:
-    most raise ImportError, but the Spark-family adapters raise
-    ConfigurationError with the same get_dependency_error_message() text.
-    """
     config = _prepare_config_for_platform(platform_name, tmp_path)
     adapter_class = PlatformRegistry.get_adapter_class(platform_name)
     try:
@@ -236,7 +179,6 @@ def _assert_no_sentinels_in_bytes(data: bytes, sentinels: tuple[str, ...] | list
 
 
 def _export_chokepoints(result: BenchmarkResults, tmp_path: Path) -> tuple[str, str, bytes]:
-    """Drive public payload, private JSON export, and results.db bytes."""
     public = json.dumps(build_result_payload(result, sanitize_platform_secrets=False), default=str, sort_keys=True)
     private = (
         ResultExporter(output_dir=tmp_path / "export", anonymize=False)
@@ -249,7 +191,6 @@ def _export_chokepoints(result: BenchmarkResults, tmp_path: Path) -> tuple[str, 
 
 
 def test_registered_platform_count_is_forty_nine() -> None:
-    """Registry size is an explicit invariant of the permanent sweep corpus."""
     PlatformRegistry.clear_cache()
     platforms = PlatformRegistry.get_available_platforms()
     assert len(platforms) == EXPECTED_REGISTERED_PLATFORM_COUNT, (
@@ -258,20 +199,6 @@ def test_registered_platform_count_is_forty_nine() -> None:
 
 
 def test_adapter_construct_coverage_accounting(tmp_path: Path) -> None:
-    """Every registered adapter must construct or record an explicit catalog skip.
-
-    Only platforms with a ``benchbox.utils.dependencies`` catalog entry
-    (``_catalog_required_packages``) may skip -- e.g. cloud SDK/ODBC-backed
-    adapters absent from the CI ``uv sync --group dev`` closure. Platforms
-    with no catalog entry (DuckDB, SQLite, DataFusion, Polars, PySpark, ...)
-    must always construct; any other missing-dependency outcome fails inside
-    ``_construct_adapter_or_skip_reason``. The exact pass/skip split is
-    environment-dependent (it tracks whichever optional extras happen to be
-    installed), so this asserts the accounting invariant rather than a fixed
-    count -- a fixed count previously coupled the test to one specific
-    dependency closure (ODBC-only) and made every other legitimate
-    optional-dependency skip look like a regression.
-    """
     names = _registered_platform_names()
     assert len(names) == EXPECTED_REGISTERED_PLATFORM_COUNT
 
@@ -288,9 +215,6 @@ def test_adapter_construct_coverage_accounting(tmp_path: Path) -> None:
             continue
         constructed.append(platform_name)
 
-    # Coverage cannot go vacuous: every skip must be individually justified by
-    # the dependency catalog, constructed/skipped must partition the full
-    # registered corpus, and each skip must cite its own catalog package(s).
     assert len(constructed) + len(skipped) == EXPECTED_REGISTERED_PLATFORM_COUNT
     assert not (set(constructed) & set(skipped))
 
@@ -307,8 +231,6 @@ def test_adapter_construct_coverage_accounting(tmp_path: Path) -> None:
 def test_registered_adapter_result_payload_redacts_credential_sentinels(platform_name: str, tmp_path: Path) -> None:
     outcome = _construct_adapter_or_skip_reason(platform_name, tmp_path)
     if isinstance(outcome, str):
-        # Only catalog-recognized optional-dependency platforms reach here;
-        # anything else fails inside _construct_adapter_or_skip_reason.
         assert _catalog_required_packages(platform_name) is not None
         pytest.skip(outcome.removeprefix("skip:optional-dependency:").split(":", 1)[-1])
 
@@ -334,10 +256,6 @@ def test_registered_adapter_result_payload_redacts_credential_sentinels(platform
 
 
 def test_platform_metadata_blocks_never_egress_distinct_sentinels(tmp_path: Path) -> None:
-    """raw_config, raw_metadata, and normalized mapping blocks share one boundary.
-
-    Distinct sentinels per source ensure a partial fix cannot silence the gate.
-    """
     gates = {
         "raw_config": "RAW_CONFIG_GATE",
         "raw_metadata": "RAW_METADATA_GATE",
@@ -366,7 +284,6 @@ def test_platform_metadata_blocks_never_egress_distinct_sentinels(tmp_path: Path
     )
 
     public, private, database_bytes = _export_chokepoints(result, tmp_path)
-    # Public path always sanitizes; re-check the sanitized public payload too.
     public_sanitized = json.dumps(build_result_payload(result), default=str)
 
     for source, sentinel in gates.items():
@@ -375,18 +292,12 @@ def test_platform_metadata_blocks_never_egress_distinct_sentinels(tmp_path: Path
         assert sentinel not in private, f"private export leaked {source}={sentinel}"
         assert sentinel.encode() not in database_bytes, f"results.db leaked {source}={sentinel}"
 
-    # Non-secret tuning must still be available to analysis consumers.
     assert "o_orderkey" in public
     assert "BENCH_WH" in private
     assert b"bench-bucket" in database_bytes
 
 
 def test_uri_query_credentials_never_egress_through_options_or_result_chokepoints(tmp_path: Path) -> None:
-    """URI query/fragment credential params must not survive sanitize or export.
-
-    Option keys need not themselves be secret-named: the credential lives only
-    in the URI component (export URLs, sslpassword, OAuth-style fragments).
-    """
     values = {
         "url": f"https://example.invalid/x?password={_SWEEP_URI_GATE}",
         "endpoint": f"https://example.invalid/export?access_token={_SWEEP_URI_GATE}&x=1",
@@ -430,7 +341,6 @@ def test_uri_query_credentials_never_egress_through_options_or_result_chokepoint
 
 
 def test_mcp_error_scrub_never_egress_credential_sentinels() -> None:
-    """MCP error responses must scrub assignment-form credential material."""
     cases = (
         f"dsn={_SWEEP_MCP_GATE}",
         f"password={_SWEEP_MCP_GATE}",
@@ -444,8 +354,6 @@ def test_mcp_error_scrub_never_egress_credential_sentinels() -> None:
     for text in cases:
         result = make_execution_error(text, exception=Exception(text))
         blob = json.dumps(result)
-        # Failure messages name the assignment form only — never re-embed the
-        # full serialized response (which would re-materialize secrets in CI logs).
         case_label = text.split("=", 1)[0]
         assert _SWEEP_MCP_GATE not in blob, f"MCP error leaked sentinel for assignment form {case_label!r}"
         assert _SWEEP_MCP_GATE not in result["message"], f"MCP message leaked sentinel for {case_label!r}"
@@ -454,22 +362,12 @@ def test_mcp_error_scrub_never_egress_credential_sentinels() -> None:
         )
         assert "****" in result["message"]
 
-    # Benign diagnostic prose must remain readable (prose-precision contract).
     benign = "password field is missing; token expired while connecting"
     clean = make_execution_error(benign, exception=Exception(benign))
     assert clean["details"]["exception_message"] == benign
 
 
 def test_nested_tuning_identifiers_never_egress(tmp_path: Path) -> None:
-    """List-of-dicts FK tuning shapes must not leak table/column identifiers.
-
-    ``build_tuning_payload`` promotes top-level keys on ``tunings_applied``
-    (``foreign_keys``, ``primary_keys``, …) into ``requested.constraints``.
-    Nesting those under a ``constraints`` bag is ignored and would make the
-    export half of this gate vacuous — use the real shape and prove presence
-    both before and after anonymization.
-    """
-    # Shape matching UnifiedTuningConfiguration.to_dict() / build_tuning_payload.
     foreign_keys_block = {
         "enabled": True,
         "tables": [
@@ -514,7 +412,6 @@ def test_nested_tuning_identifiers_never_egress(tmp_path: Path) -> None:
     assert pk_key.startswith("table_")
     assert pk_tables[pk_key][0].startswith("column_")
 
-    # Real export path: top-level constraint keys on tunings_applied.
     tunings_applied = {
         "foreign_keys": foreign_keys_block,
         "primary_keys": primary_keys_block,
@@ -534,10 +431,6 @@ def test_nested_tuning_identifiers_never_egress(tmp_path: Path) -> None:
         tuning_source_file="examples/tunings/custom.yaml:0123456789abcdef",
     )
 
-    # Positive presence: the private (unanonymized) bundle retains the gates so
-    # the anonymized half cannot pass by emitting an empty/missing structure.
-    # The requested tuning rides in the bundle's `platform.tuning.requested`
-    # block; it used to be a `.tuning.json` companion, which is no longer written.
     private_export = ResultExporter(output_dir=tmp_path / "private", anonymize=False).export_result(
         result, formats=["json"]
     )
@@ -548,12 +441,10 @@ def test_nested_tuning_identifiers_never_egress(tmp_path: Path) -> None:
     assert _SWEEP_TABLE_GATE in private_raw
     assert _SWEEP_COLUMN_GATE in private_raw
 
-    # Public export path: the anonymized bundle.
     exported = ResultExporter(output_dir=tmp_path / "export", anonymize=True).export_result(result, formats=["json"])
     primary_raw = exported["json"].read_text(encoding="utf-8")
     for gate in (_SWEEP_TABLE_GATE, _SWEEP_COLUMN_GATE):
         assert gate not in primary_raw, f"anonymized primary JSON leaked {gate}"
-    # The retired companions must not reappear alongside it.
     for retired in (".tuning.json", ".applied.json"):
         assert not (tmp_path / "export" / f"{exported['json'].stem}{retired}").exists()
 
@@ -569,11 +460,6 @@ def test_nested_tuning_identifiers_never_egress(tmp_path: Path) -> None:
 
 
 def test_cross_layer_sentinel_gate_is_green() -> None:
-    """Compact multi-layer gate matching the tracker verification command.
-
-    URI options, MCP errors, and nested tuning companions must all redact the
-    distinct sweep sentinels in a single assertion surface.
-    """
     uri = json.dumps(sanitize_platform_options({"url": f"https://example.invalid/x?password={_SWEEP_URI_GATE}"}))
     mcp = json.dumps(make_execution_error(f"dsn={_SWEEP_MCP_GATE}", exception=Exception(f"dsn={_SWEEP_MCP_GATE}")))
     payload = {
