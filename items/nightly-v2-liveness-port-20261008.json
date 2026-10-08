@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "nightly-v2 has a liveness domain using the hardened lookup, or a written reason it is not needed",
+    "dlv2-70 lists this item as a condition for deleting nightly.yml"
+  ],
+  "description": "nightly-v2.yml has no equivalent of the scheduled-workflow-liveness job. dlv2-70 deletes nightly.yml, which would remove the only check that a scheduled workflow has stopped firing. Port the hardened check into nightly-v2 as its own domain (with its own issue label, as the other domains have), or record why it is no longer needed. Do not copy the current per_page=1 query across.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/issues/2570"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-08T23:55:51Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "b2571f1583b7493e9b98dc21afe6d6cf",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    }
+  ]
+}

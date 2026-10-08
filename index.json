@@ -13585,6 +13585,15 @@
       "status": "done",
       "title": "Operator: confirm nightly throughput-uat green with gating (workflow_dispatch)"
     },
+    "nightly-v2-liveness-port-20261008": {
+      "claim": null,
+      "needs": [
+        "nightly-liveness-diagnose-harden-20261008"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Port the scheduled-workflow-liveness check to nightly-v2 before nightly.yml is retired"
+    },
     "nightly-windows-mcp-durable-fsync-followup": {
       "claim": null,
       "needs": [],
