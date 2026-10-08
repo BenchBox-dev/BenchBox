@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Q10 peak memory per configuration is recorded in context, with the command and container memory.",
+    "Either Q10 passes at the 5.25 GiB rung in notuning and tuned (bundle paths recorded), or the UAT memory-rung docs state the measured floor for TPC-DS SF1 on ClickHouse server.",
+    "The ADR-3 TPC-DS row is updated to match the outcome."
+  ],
+  "context": "Source: tuning-evidence plan (2026-10-08), plan step 7. Covers muse F2 (failure triage). Bundles: ~/Developer/benchmark_runs/results/tpcds_sf1_clickhouse_server_sql_20261007_{181214_a6fec358,181902_eda9dc78,182532_732d1669}.json. The branch origin/docs/tpcds-sf1-query-memory-floor mentioned during the review does not exist on origin (checked 2026-10-08). Related: clickhouse-local-tpcds-query-35-fails-at-sf1.",
+  "description": "## Problem\nOn ClickHouse server at SF1 in a 5.25 GiB container, TPC-DS Q10 fails in every cell: `notuning`, tuned, and tuned with `optimize_after_load`. It fails in all three measured iterations and the warm-up with \"Code: 241 ... memory limit exceeded ... maximum: 4.67 GiB\". A query that always fails drops out of the geometric mean, so the TPC-DS keep decision silently excludes it. The ADR-3 addendum miscounts this as \"three queries\".\n\n## Change\n- Measure Q10's peak memory in each configuration (`system.query_log`).\n- Decide whether the cause is the query transform or plan (for example, how the correlated `EXISTS` subqueries are rewritten) or a true memory floor at SF1.\n- Outcome: either fix the transform so Q10 passes at the 5.25 GiB rung, or document a measured memory floor for TPC-DS SF1 on ClickHouse in the UAT memory-rung docs.\n\n## Decision gate\n- If the fix is a statement-level setting, check the owner's decision on per-query settings (`tuning-evidence-tuned-mode-promise-20261008`, D1) first. A fix needed for `notuning` to pass is a harness requirement, applied and recorded in all modes, not tuning.\n\n## Guardrails (must preserve)\n- Do not hide the failure: no skip lists, and no dropping Q10 from reports.\n- The query text must stay within TPC-DS rules: only implementation-level changes, nothing for performance.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`. Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- Re-read every file:line anchor before editing. Anchors are from develop 5ca12e6ca.",
+  "links": [
+    "benchbox/platforms/clickhouse/workload.py",
+    "docs/operations/uat-framework.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T23:31:05Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "6b6d6383ce304972932bed3d43c37610",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
+    }
+  ]
+}
