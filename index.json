@@ -7708,15 +7708,10 @@
       "title": "Standardize benchmark and platform naming across documentation"
     },
     "docs-licensing-compliance-wording": {
-      "claim": {
-        "expires_at": "2026-10-09T23:43:36Z",
-        "generation": "e94b3c8447e441acb63f7daa6d545825",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:a9f51c620a99fea6b166f0af"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Settle TPC compliance and IMDb permission wording on published pages"
     },
     "docs-linkcheck-fails-on-external-site-timeouts": {
