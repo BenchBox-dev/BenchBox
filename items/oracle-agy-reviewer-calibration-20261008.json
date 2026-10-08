@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "agy is given a read-only permission rule that lets it read files without --dangerously-skip-permissions, or it is documented as unable to review",
+    "If enabled: a captured successful envelope is a parse_output test, and quota and auth messages are calibrated"
+  ],
+  "description": "A schema check on 2026-10-08 showed that `agy --mode plan --json-schema` without `--output-format json` exits 0 with an error and no output (now fixed in commands.py). In headless plan mode agy denies its own read commands (\"a tool required the command permission that headless mode cannot prompt for\"), so it returns an empty response. agy stays disabled with reads_files: false. The response-envelope parsing added for agy has not been checked against a successful CI run.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-08T23:31:17Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "ea8d8f9258e948028e8ed78f46aed5d4",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}
