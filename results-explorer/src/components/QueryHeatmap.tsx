@@ -6,7 +6,7 @@ import { FundingChip } from "@/components/FundingChip";
 import { parseOverrideRules } from "@/lib/displayLabels";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import { fmtMs as formatDurationMs, fmtGeomean } from "@/utils";
-import { formatLatencyMs, formatPowerScore, formatSpeedup } from "@/lib/metricFormatters";
+import { formatLatencyMs, formatScoreMetric, formatSpeedup } from "@/lib/metricFormatters";
 import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
 import { compareSelectionLabel } from "@/lib/compareCohort";
 import { MAX_COMPARE_SELECTIONS, resultIdentityAriaLabel, resultReceiptHref } from "@/lib/resultLinks";
@@ -21,7 +21,9 @@ import {
   formatTimingExclusion,
   isComparable,
   isRankable,
+  normalizePrimaryMetric,
   platformTimingValue,
+  primaryMetricLabel,
   validPrimaryMetricValue,
 } from "@/lib/displayEligibility";
 
@@ -136,7 +138,7 @@ export function QueryHeatmap({
     return mins;
   }, [platforms, sortedQueryIds]);
 
-  const primaryMetric = ranking?.primary_metric === "power_score" ? "power_score" : "display_geomean_ms";
+  const primaryMetric = normalizePrimaryMetric(ranking?.primary_metric);
   const higherIsBetter = ranking?.primary_order === "desc";
   const defaultPrimaryDirection: SortDirection = higherIsBetter ? "desc" : "asc";
   type MatrixSortKey = "platform" | "primary" | "geomean" | `query:${string}`;
@@ -150,7 +152,7 @@ export function QueryHeatmap({
 
   function fmtPrimary(val: number | null): string {
     if (val === null) return "-";
-    return primaryMetric === "power_score" ? formatPowerScore(val).valueText : fmtGeomean(val);
+    return primaryMetric === "display_geomean_ms" ? fmtGeomean(val) : formatScoreMetric(primaryMetric, val);
   }
 
   function compareNullableNumber(a: number | null, b: number | null, direction: SortDirection): number {
@@ -308,8 +310,8 @@ export function QueryHeatmap({
 
   const suppressHeat = sorted.length < 2;
 
-  const primaryLabel = primaryMetric === "power_score" ? "Power score" : "Geomean";
-  const primaryDirectionLabel = primaryMetric === "power_score" ? "higher is better" : "lower is better";
+  const primaryLabel = primaryMetric === "display_geomean_ms" ? "Geomean" : primaryMetricLabel(primaryMetric);
+  const primaryDirectionLabel = primaryMetric === "display_geomean_ms" ? "lower is better" : "higher is better";
   const heatmapMeaning = suppressHeat
     ? "Heat color is unavailable because fewer than two platforms can be compared in this ranking."
     : "Heat color compares each query column with the fastest published timing; darker cells are slower.";

@@ -46,6 +46,7 @@ interface CoverageFormatOptions {
 
 export type MetricFormatInput =
   | ({ type: "power_score" } & ScalarMetricInput & PowerScoreOptions)
+  | ({ type: "throughput_score" } & ScalarMetricInput & PowerScoreOptions)
   | ({ type: "latency_ms" } & ScalarMetricInput & LatencyOptions)
   | ({ type: "duration_s" } & ScalarMetricInput)
   | ({ type: "speedup" } & ScalarMetricInput & SpeedupOptions)
@@ -59,6 +60,8 @@ export function formatMetricValue(input: MetricFormatInput): MetricFormatResult 
   switch (input.type) {
     case "power_score":
       return formatPowerScore(input.value, input);
+    case "throughput_score":
+      return formatThroughputScore(input.value, input);
     case "latency_ms":
       return formatLatencyMs(input.value, input);
     case "duration_s":
@@ -84,6 +87,23 @@ export function formatPowerScore(value: number | null | undefined, options: Powe
 
   const text = options.exact ? formatNumber(numeric, { maximumFractionDigits: 12 }) : compactScore(numeric);
   return result(text, null, numeric, options.exact ? `exact power score ${text}` : `power score ${text}`);
+}
+
+export function formatThroughputScore(value: number | null | undefined, options: PowerScoreOptions = {}): MetricFormatResult {
+  const numeric = finiteNumber(value);
+  if (numeric === null) return missing(options.missingText ?? "-", "throughput score");
+
+  const text = options.exact ? formatNumber(numeric, { maximumFractionDigits: 12 }) : compactScore(numeric);
+  return result(
+    text,
+    null,
+    numeric,
+    options.exact ? `exact throughput at size ${text}` : `throughput at size ${text}`,
+  );
+}
+
+export function formatScoreMetric(metric: string, value: number | null | undefined): string {
+  return (metric === "throughput_at_size" ? formatThroughputScore(value) : formatPowerScore(value)).valueText;
 }
 
 export function formatPowerScoreExact(value: number | null | undefined, missingText = "-"): MetricFormatResult {

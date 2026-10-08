@@ -943,9 +943,9 @@ class UnifiedExpr(_DataFusionDeferredOperations):
 
             return UnifiedExpr(self._expr.cast(pa.date32()))
 
-        import polars as pl
+        from benchbox.platforms.dataframe.polars_df import polars_cast_date
 
-        return UnifiedExpr(self._expr.cast(pl.Date))
+        return UnifiedExpr(polars_cast_date(self._expr))
 
     def cast_int32(self) -> UnifiedExpr:
         return self._apply_cast("int32")

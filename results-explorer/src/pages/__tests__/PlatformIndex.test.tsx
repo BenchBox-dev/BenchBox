@@ -786,6 +786,40 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(ssb.querySelector('[data-result-id="r-tpch-a"]')).toBeNull();
   });
 
+  it("keeps throughput runs with different stream counts on separate trend lines", async () => {
+    const throughputRow = (resultId: string, streams: number, runDate: string, score: number) =>
+      makeRow({
+        result_id: resultId,
+        benchmark: "tpch",
+        scale_factor: 1,
+        phase: "throughput",
+        stream_count: streams,
+        run_date: runDate,
+        power_score: null,
+        throughput_at_size: score,
+        primary_metric: "throughput_at_size",
+      });
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      throughputRow("r-t3-a", 3, "2026-04-01", 1000),
+      throughputRow("r-t3-b", 3, "2026-04-02", 1100),
+      throughputRow("r-t3-c", 3, "2026-04-03", 1050),
+      throughputRow("r-t2-a", 2, "2026-04-01", 900),
+      throughputRow("r-t2-b", 2, "2026-04-02", 950),
+      throughputRow("r-t2-c", 2, "2026-04-03", 930),
+    ]);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+    openTrendsCard();
+
+    const three = screen.getByTestId("trend-cohort-tpch-sf1-throughput-3streams-throughput_at_size");
+    const two = screen.getByTestId("trend-cohort-tpch-sf1-throughput-2streams-throughput_at_size");
+    expect(three.querySelector('[data-result-id="r-t3-a"]')).toBeTruthy();
+    expect(three.querySelector('[data-result-id="r-t2-a"]')).toBeNull();
+    expect(two.querySelector('[data-result-id="r-t2-b"]')).toBeTruthy();
+    expect(three.textContent).toContain("throughput (3 streams)");
+  });
+
   it("shows public-ID receipt links and validation status for each platform result", async () => {
     render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());

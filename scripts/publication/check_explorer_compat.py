@@ -61,8 +61,8 @@ try:
     CURRENT_SCHEMA_VERSION: int = _READ_MODEL_VERSION
     CONTRACT_VERSION: str = _CONTRACT_VERSION
 except ImportError:
-    SUPPORTED_SCHEMA_VERSIONS: tuple[int, ...] = (13,)
-    CURRENT_SCHEMA_VERSION: int = 13
+    SUPPORTED_SCHEMA_VERSIONS: tuple[int, ...] = (14,)
+    CURRENT_SCHEMA_VERSION: int = 14
     CONTRACT_VERSION: str = "6"
 
 _TYPE_ALIASES: dict[str, str] = {
@@ -322,12 +322,35 @@ TABLE_COLUMNS_V13: dict[str, dict[str, str]] = {
     },
 }
 
+TABLE_COLUMNS_V14: dict[str, dict[str, str]] = {
+    **TABLE_COLUMNS_V13,
+    "results": {
+        **TABLE_COLUMNS_V13["results"],
+        "throughput_at_size": "DOUBLE",
+        "stream_count": "INTEGER",
+    },
+    "benchmark_matrix_cells": {
+        **TABLE_COLUMNS_V13["benchmark_matrix_cells"],
+        "stream_count": "INTEGER",
+    },
+    "benchmark_rankings": {
+        **TABLE_COLUMNS_V13["benchmark_rankings"],
+        "throughput_at_size": "DOUBLE",
+        "stream_count": "INTEGER",
+    },
+    "cohort_metadata": {
+        **TABLE_COLUMNS_V13["cohort_metadata"],
+        "stream_count": "INTEGER",
+    },
+}
+
 SCHEMA_REGISTRY: dict[int, dict[str, dict[str, str]]] = {
     9: TABLE_COLUMNS_V9,
     10: TABLE_COLUMNS_V10,
     11: TABLE_COLUMNS_V11,
     12: TABLE_COLUMNS_V12,
     13: TABLE_COLUMNS_V13,
+    14: TABLE_COLUMNS_V14,
 }
 
 REQUIRED_INDEXES_V9: list[tuple[str, str, list[str]]] = [
@@ -368,6 +391,14 @@ REQUIRED_VIEW_COLUMNS_V13: dict[str, list[str]] = {
     "result_detail_metrics": [
         *REQUIRED_VIEW_COLUMNS_V11["result_detail_metrics"],
         "benchmark_support_status",
+    ],
+}
+
+REQUIRED_VIEW_COLUMNS_V14: dict[str, list[str]] = {
+    "result_detail_metrics": [
+        *REQUIRED_VIEW_COLUMNS_V13["result_detail_metrics"],
+        "throughput_at_size",
+        "stream_count",
     ],
 }
 
@@ -471,7 +502,8 @@ CORE_EXPLORER_QUERIES: list[tuple[str, str]] = [
         "total_duration_s, geomean_ms, display_geomean_ms, query_count, logical_query_count, "
         "has_display_timing, valid_query_count, missing_query_count, zero_timing_count, "
         "display_exclusion_reason, comparison_exclusion_reason, ranking_exclusion_reason, "
-        "trust_label, visibility, funding, validation_status, cost_usd, benchmark_support_status "
+        "trust_label, visibility, funding, validation_status, cost_usd, benchmark_support_status, "
+        "throughput_at_size, stream_count "
         "FROM results ORDER BY run_date DESC LIMIT 24",
     ),
     (
@@ -482,17 +514,19 @@ CORE_EXPLORER_QUERIES: list[tuple[str, str]] = [
     (
         "Result detail metrics view",
         "SELECT result_id, benchmark, scale_factor, platform, validation_status, override_rules, "
-        "override_evidence, override_approver, override_expires FROM result_detail_metrics LIMIT 10",
+        "override_evidence, override_approver, override_expires, throughput_at_size, stream_count "
+        "FROM result_detail_metrics LIMIT 10",
     ),
     (
         "Benchmark matrix cells scan",
         "SELECT benchmark, scale_factor, phase, result_id, platform_id, query_id, display_ms, "
-        "is_valid_display_timing, timing_exclusion_reason FROM benchmark_matrix_cells LIMIT 100",
+        "is_valid_display_timing, timing_exclusion_reason, stream_count FROM benchmark_matrix_cells LIMIT 100",
     ),
     (
         "Benchmark rankings query",
         "SELECT benchmark, scale_factor, phase, result_id, platform_id, platform, short_id, "
-        "trust_label, funding, is_ranking_eligible, has_display_timing, power_score, display_geomean_ms, "
+        "trust_label, funding, is_ranking_eligible, has_display_timing, power_score, throughput_at_size, "
+        "stream_count, display_geomean_ms, "
         "primary_metric, primary_order, rank, total_in_cohort, cohort_ranked_count, "
         "speedup_vs_best, speedup_vs_slowest_in_cohort FROM benchmark_rankings LIMIT 50",
     ),
@@ -500,7 +534,8 @@ CORE_EXPLORER_QUERIES: list[tuple[str, str]] = [
         "Cohort metadata query",
         "SELECT cohort_key, benchmark, scale_factor, phase, cohort_label, cohort_href, "
         "platform_count, cohort_ranked_count, primary_metric, primary_order, platform_id, "
-        "platform, result_id, short_id, rank, metric_value, speedup_vs_best FROM cohort_metadata LIMIT 50",
+        "platform, result_id, short_id, rank, metric_value, speedup_vs_best, stream_count "
+        "FROM cohort_metadata LIMIT 50",
     ),
     (
         "Meta leaderboard summary",
@@ -586,7 +621,9 @@ def validate_database_schema(con: Any, expected_version: int | None = None) -> l
     if missing_views:
         errors.append(f"missing required views for v{version_to_check}: {', '.join(missing_views)}")
 
-    if version_to_check >= 13:
+    if version_to_check >= 14:
+        view_column_requirements = REQUIRED_VIEW_COLUMNS_V14
+    elif version_to_check >= 13:
         view_column_requirements = REQUIRED_VIEW_COLUMNS_V13
     elif version_to_check >= 12:
         view_column_requirements = REQUIRED_VIEW_COLUMNS_V12

@@ -11,6 +11,7 @@ from benchbox.utils.cloud_storage import get_cloud_path_info, is_cloud_path
 from benchbox.utils.printing import emit
 from benchbox.utils.sql_parsing import find_matching_parenthesis
 
+from .merge_settle import wait_for_merges_to_settle
 from .query_transformer import ClickHouseQueryTransformer
 
 if TYPE_CHECKING:
@@ -661,7 +662,26 @@ class ClickHouseWorkloadMixin:
             tuning_config=self.unified_tuning_configuration if self.tuning_enabled else None,
         )
         table_stats, loading_time = loader.load()
+        if self.deployment_mode == "server" and self.tuning_enabled:
+            self._settle_background_merges(connection)
         return table_stats, loading_time, None
+
+    def _settle_background_merges(self, connection: Any) -> None:
+        try:
+            result = wait_for_merges_to_settle(connection)
+        except Exception as exc:
+            logger.warning("Could not check ClickHouse background merges after load: %s", exc)
+            return
+        if not result.settled:
+            logger.warning(
+                "ClickHouse background merges had not settled after %.0fs (%d active parts); "
+                "query timings may include merge activity",
+                result.waited_seconds,
+                result.active_parts,
+            )
+            return
+        if result.waited_seconds >= 1.0:
+            emit(f"  Background merges settled after {result.waited_seconds:.1f}s ({result.active_parts} active parts)")
 
     def _get_existing_tables(self, connection) -> list[str]:
         try:
@@ -795,6 +815,13 @@ class ClickHouseWorkloadMixin:
                     ("join_algorithm", "grace_hash"),
                     ("grace_hash_join_initial_buckets", 8),
                 )
+            elif (
+                self.deployment_mode == "server"
+                and getattr(self, "tuning_enabled", False)
+                and (benchmark_type or "").lower() == "tpch"
+                and str(query_id).lower().removeprefix("q") == "21"
+            ):
+                additional_settings = (("join_algorithm", "hash"),)
             transformed_query = transformer.add_query_settings(transformed_query, additional_settings)
 
             if transformer.get_transformations_applied() and self.verbose_enabled:

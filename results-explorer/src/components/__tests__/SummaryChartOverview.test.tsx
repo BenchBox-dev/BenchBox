@@ -131,6 +131,39 @@ describe("SummaryChartOverview section chrome", () => {
     );
   });
 
+  it("shows Throughput@Size beside the geomean for a throughput cohort", () => {
+    const summary = makeSummary({
+      phase: "throughput",
+      stream_count: 3,
+      ranking: { primary_metric: "throughput_at_size", secondary_metric: "display_geomean_ms", primary_order: "desc" },
+      platforms: [
+        makePlatform({ result_id: "r1", platform: "Spark", power_score: null, throughput_at_size: 3741 }),
+        makePlatform({
+          result_id: "r2",
+          platform_id: "duckdb",
+          platform: "DuckDB",
+          power_score: null,
+          throughput_at_size: 1500,
+        }),
+      ],
+    });
+    const { container } = renderOverview(summary);
+    const table = container.querySelector("table.summary-metric-table") as HTMLElement;
+
+    expect(within(table).getByText("Throughput@Size")).not.toBeNull();
+    expect(within(table).queryByText("Power@Size")).toBeNull();
+    expect(within(table).getByText("3,741")).not.toBeNull();
+    expect(within(table).getByText("1,500")).not.toBeNull();
+  });
+
+  it("keeps Power@Size for a power cohort", () => {
+    const { container } = renderOverview();
+    const table = container.querySelector("table.summary-metric-table") as HTMLElement;
+
+    expect(within(table).getByText("Power@Size")).not.toBeNull();
+    expect(within(table).queryByText("Throughput@Size")).toBeNull();
+  });
+
   it("states the distribution boundary once and does not link exclusions to the provenance legend", () => {
     renderOverview();
     expect(screen.queryByText(/whiskers min\/max/)).toBeNull();

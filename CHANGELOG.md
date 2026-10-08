@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Before you upgrade
 
+- **ClickHouse tuned runs are faster, and their results are not comparable with earlier ones.**
+  The tuned session settings no longer switch the join algorithm to
+  `grace_hash`, which made joins about 2× slower on SF1 TPC-H. The ClickHouse
+  TPC-H tuned template no longer partitions `LINEITEM` and `ORDERS` by month;
+  the date sort keys stay, and they give the same date-range pruning, so the
+  recorded tuning configuration of that template changes. TPC-H Q21 on tuned
+  server runs now sets `join_algorithm = 'hash'` for that statement so it fits
+  the 5.25 GiB memory envelope. A tuned server-mode load
+  now waits, up to 10 minutes, for background merges to finish before the first
+  query, and the wait is not counted as load time. Don't compare tuned
+  ClickHouse timings recorded before this change with results after it.
 - CLI help, MCP descriptions and benchmark descriptions use explicit metadata.
   Python API references retain public contracts independently of source docstrings.
   Generated query implementations and regional price resolvers no longer assign

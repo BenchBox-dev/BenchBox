@@ -4,7 +4,7 @@ import math
 from dataclasses import dataclass
 
 from _project.scripts.explorer_pipeline.compare_math import speedup_vs_best, speedup_vs_slowest
-from _project.scripts.explorer_pipeline.models import BenchmarkSummary, PlatformRow
+from _project.scripts.explorer_pipeline.models import BenchmarkSummary, PlatformRow, primary_metric_value
 
 
 @dataclass(frozen=True)
@@ -37,7 +37,7 @@ def rank_platforms(summary: BenchmarkSummary) -> RankedCohort:
     higher_is_better = primary_order == "desc"
 
     def metric_value(row: PlatformRow) -> float | None:
-        return row.power_score if primary_metric == "power_score" else row.display_geomean_ms
+        return primary_metric_value(row, primary_metric)
 
     def ranking_exclusion_reason(row: PlatformRow, value: float | None) -> str | None:
         if not row.is_ranking_eligible:

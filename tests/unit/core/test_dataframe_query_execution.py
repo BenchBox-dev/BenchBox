@@ -84,6 +84,26 @@ class TestAMPLabDataFrameQueriesExecution:
         result = q2_expression_impl(ctx)
         assert result.columns == ["sourceIP", "totalRevenue", "avgPageRank"]
 
+    @pytest.mark.parametrize("visit_dtype", ["date", "string"])
+    def test_q2_expression_filters_visit_dates_of_either_dtype(self, visit_dtype):
+        from benchbox.core.amplab.dataframe_queries.queries import q2_expression_impl
+
+        visits = pl.DataFrame(
+            {
+                "sourceIP": ["1.1.1.1", "2.2.2.2", "3.3.3.3"],
+                "destURL": ["u1", "u2", "u1"],
+                "visitDate": [date(2000, 1, 2), date(2000, 1, 2), date(2000, 2, 1)],
+                "adRevenue": [1.5, 2.5, 9.0],
+            }
+        )
+        if visit_dtype == "string":
+            visits = visits.with_columns(pl.col("visitDate").cast(pl.String))
+        rankings = pl.DataFrame({"pageURL": ["u1", "u2"], "pageRank": [10, 20]})
+
+        result = q2_expression_impl(_make_ctx({"uservisits": visits, "rankings": rankings}))
+
+        assert sorted(result.collect()["sourceIP"].to_list()) == ["1.1.1.1", "2.2.2.2"]
+
     def test_q2a_expression(self, ctx):
         from benchbox.core.amplab.dataframe_queries.queries import q2a_expression_impl
 

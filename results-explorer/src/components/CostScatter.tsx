@@ -3,7 +3,8 @@ import { useElementSize } from "@/lib/useElementSize";
 import { axisLabelAnchor, chartFrame } from "@/lib/chartFrame";
 import { paletteColor } from "@/lib/chartTheme";
 import { costModelDisclosure, normalizedCostValue } from "@/lib/costDisplay";
-import { formatLatencyMs, formatPowerScore, formatUsd } from "@/lib/metricFormatters";
+import { normalizePrimaryMetric, primaryMetricHigherIsBetter, primaryMetricLabel, primaryMetricValue } from "@/lib/displayEligibility";
+import { formatLatencyMs, formatScoreMetric, formatUsd } from "@/lib/metricFormatters";
 
 const AXIS_W = 54;
 const AXIS_H = 32;
@@ -32,8 +33,8 @@ export function CostScatter({ summary }: Props) {
   const frame = chartFrame(containerWidth);
   const w = frame.width;
 
-  const metric = summary.ranking?.primary_metric ?? "display_geomean_ms";
-  const higherIsBetter = metric === "power_score";
+  const metric = normalizePrimaryMetric(summary.ranking?.primary_metric);
+  const higherIsBetter = primaryMetricHigherIsBetter(metric);
 
   const pts: ScatterPoint[] = summary.platforms
     .map((p, i) => {
@@ -42,7 +43,7 @@ export function CostScatter({ summary }: Props) {
         result_id: p.result_id,
         platform: p.platform,
         cost,
-        perf: metric === "power_score" ? p.power_score : p.display_geomean_ms,
+        perf: primaryMetricValue(p, metric),
         modelVersion: p.cost_model_version,
         scope: p.cost_scope,
         provider: p.cloud_provider,
@@ -90,8 +91,9 @@ export function CostScatter({ summary }: Props) {
     return PADDING_TOP + CHART_H * (1 - pos);
   }
 
-  const metricLabel =
-    metric === "power_score" ? "Power score (higher is better)" : "Geomean latency (lower is better)";
+  const metricLabel = higherIsBetter
+    ? `${primaryMetricLabel(metric)} (higher is better)`
+    : "Geomean latency (lower is better)";
   const modelDisclosure = costModelDisclosure(summary.platforms);
 
   return (
@@ -107,10 +109,9 @@ export function CostScatter({ summary }: Props) {
         {[0, 0.25, 0.5, 0.75, 1].map((f) => {
           const y = PADDING_TOP + f * CHART_H;
           const val = higherIsBetter ? yMax - f * yRange : yMin + f * yRange;
-          const label =
-            metric === "power_score"
-              ? formatPowerScore(val).valueText
-              : formatLatencyMs(val, { subMillisecond: "compact" }).valueText;
+          const label = higherIsBetter
+            ? formatScoreMetric(metric, val)
+            : formatLatencyMs(val, { subMillisecond: "compact" }).valueText;
           return (
             <g key={f}>
               <line
@@ -143,7 +144,7 @@ export function CostScatter({ summary }: Props) {
               <circle cx={cx} cy={cy} r={7} fill={p.color} fill-opacity={0.85}>
                 <title>
                   {`${p.platform}: normalized ${formatUsd(p.cost).valueText} / ${
-                    metric === "power_score" ? formatPowerScore(p.perf).valueText : formatLatencyMs(p.perf).valueText
+                    higherIsBetter ? formatScoreMetric(metric, p.perf) : formatLatencyMs(p.perf).valueText
                   } (${p.modelVersion ?? "model unknown"}${regionLabel ? `, ${regionLabel}` : ""})`}
                 </title>
               </circle>

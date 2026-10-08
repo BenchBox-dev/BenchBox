@@ -100,7 +100,9 @@ CREATE TABLE IF NOT EXISTS results (
     bundle_download_url  VARCHAR  NOT NULL,
     physical_mechanisms   VARCHAR,
     physical_rendering_id VARCHAR,
-    benchmark_support_status VARCHAR
+    benchmark_support_status VARCHAR,
+    throughput_at_size   DOUBLE,
+    stream_count         INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS query_display_timings (
@@ -192,6 +194,8 @@ SELECT
     r.physical_mechanisms,
     r.physical_rendering_id,
     r.benchmark_support_status,
+    r.throughput_at_size,
+    r.stream_count,
     e.os,
     e.arch,
     e.cpu_count,
@@ -218,6 +222,7 @@ CREATE TABLE IF NOT EXISTS benchmark_matrix_cells (
     display_ms   DOUBLE,
     is_valid_display_timing BOOLEAN NOT NULL,
     timing_exclusion_reason VARCHAR,
+    stream_count INTEGER,
     PRIMARY KEY (benchmark, scale_factor, phase, result_id, query_id)
 );
 
@@ -264,6 +269,8 @@ CREATE TABLE IF NOT EXISTS benchmark_rankings (
     percentile_p99     DOUBLE,
     speedup_vs_best              DOUBLE,
     speedup_vs_slowest_in_cohort DOUBLE,
+    throughput_at_size           DOUBLE,
+    stream_count                 INTEGER,
     PRIMARY KEY (benchmark, scale_factor, phase, result_id)
 );
 
@@ -346,6 +353,7 @@ CREATE TABLE IF NOT EXISTS cohort_metadata (
     rank           INTEGER,
     metric_value   DOUBLE,
     speedup_vs_best DOUBLE,
+    stream_count   INTEGER,
     PRIMARY KEY (cohort_key, result_id)
 );
 
