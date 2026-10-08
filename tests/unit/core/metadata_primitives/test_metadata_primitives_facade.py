@@ -1,12 +1,6 @@
-"""Unit tests for the MetadataPrimitives top-level facade class.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests benchbox/metadata_primitives.py - the public-facing facade that
-delegates to the internal MetadataPrimitivesBenchmark implementation.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -19,8 +13,6 @@ pytestmark = [
 
 
 class TestMetadataPrimitivesFacadeInstantiation:
-    """Tests for MetadataPrimitives facade instantiation."""
-
     def test_import_and_create_default(self):
         from benchbox.metadata_primitives import MetadataPrimitives
 
@@ -47,8 +39,6 @@ class TestMetadataPrimitivesFacadeInstantiation:
 
 
 class TestMetadataPrimitivesFacadeSchema:
-    """Tests for schema delegation methods."""
-
     def test_get_schema_returns_dict(self):
         from benchbox.metadata_primitives import MetadataPrimitives
 
@@ -81,8 +71,6 @@ class TestMetadataPrimitivesFacadeSchema:
 
 
 class TestMetadataPrimitivesFacadeDataGeneration:
-    """Tests for data generation delegation."""
-
     def test_generate_data_returns_dict(self):
         from benchbox.metadata_primitives import MetadataPrimitives
 
@@ -99,8 +87,6 @@ class TestMetadataPrimitivesFacadeDataGeneration:
 
 
 class TestMetadataPrimitivesFacadeBenchmarkInfo:
-    """Tests for get_benchmark_info."""
-
     def test_get_benchmark_info_returns_dict(self):
         from benchbox.metadata_primitives import MetadataPrimitives
 
@@ -149,8 +135,6 @@ class TestMetadataPrimitivesFacadeBenchmarkInfo:
 
 
 class TestMetadataPrimitivesFacadeComplexity:
-    """Tests for complexity-related delegation methods."""
-
     def test_get_complexity_categories_returns_list(self):
         from benchbox.metadata_primitives import MetadataPrimitives
 

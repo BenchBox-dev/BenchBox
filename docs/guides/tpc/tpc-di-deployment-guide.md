@@ -74,54 +74,45 @@ The TPC-DI (Transaction Processing Performance Council - Data Integration) bench
 #### Using pip (Recommended)
 
 ```bash
-# Install from PyPI
 uv add benchbox
 
-# Verify installation
 python -c "from benchbox import TPCDI; print('TPC-DI installation successful')"
 ```
 
 #### Using conda
 
 ```bash
-# Create conda environment
 conda create -n benchbox python=3.11
 conda activate benchbox
 
-# Install dependencies
 conda install numpy sqlglot pytest
 
-# Install benchbox
 uv add benchbox
 ```
 
 #### From Source
 
 ```bash
-# Clone repository
 git clone https://github.com/your-org/benchbox.git
 cd benchbox
 
-# Create virtual environment
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate
 
-# Install in development mode
 uv pip install -e .
 
-# Run tests to verify installation
 python -m pytest tests/test_tpcdi.py -v
 ```
+
+On Windows, activate the environment with `venv\Scripts\activate` instead of `source venv/bin/activate`.
 
 ### Docker Installation
 
 #### Using Pre-built Image
 
 ```bash
-# Pull official image
 docker pull benchbox/tpcdi:latest
 
-# Run container
 docker run -it --rm \
   -v $(pwd)/data:/app/data \
   benchbox/tpcdi:latest \
@@ -131,33 +122,26 @@ docker run -it --rm \
 #### Building Custom Image
 
 ```dockerfile
-# Dockerfile
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install benchbox
 RUN pip install benchbox
 
-# Copy application code
 COPY . .
 
-# Set environment variables
 ENV PYTHONPATH=/app
 ENV TPCDI_DATA_DIR=/app/data
 ENV TPCDI_SCALE_FACTOR=1.0
 
-# Create data directory
 RUN mkdir -p /app/data
 
 EXPOSE 8080
@@ -166,10 +150,8 @@ CMD ["python", "-m", "benchbox.tpcdi.server"]
 ```
 
 ```bash
-# Build image
 docker build -t my-tpcdi-benchmark .
 
-# Run with custom configuration
 docker run -it --rm \
   -e TPCDI_SCALE_FACTOR=0.1 \
   -v $(pwd)/data:/app/data \
@@ -179,7 +161,6 @@ docker run -it --rm \
 ### Kubernetes Deployment
 
 ```yaml
-# tpcdi-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -241,23 +222,19 @@ spec:
 ### Environment Variables
 
 ```bash
-# Basic configuration
 export TPCDI_SCALE_FACTOR=1.0
 export TPCDI_OUTPUT_DIR=/path/to/data
 export TPCDI_PARALLEL_WORKERS=4
 
-# Database configuration
 export DATABASE_URL="postgresql://user:pass@localhost:5432/tpcdi"
 export DATABASE_POOL_SIZE=10
 export DATABASE_TIMEOUT=30
 
-# Performance tuning
 export TPCDI_BATCH_SIZE=10000
 export TPCDI_MEMORY_LIMIT_MB=8192
 export TPCDI_ENABLE_PARALLEL_ETL=true
 export TPCDI_ENABLE_PARALLEL_QUERIES=true
 
-# Logging configuration
 export TPCDI_LOG_LEVEL=INFO
 export TPCDI_LOG_FILE=/var/log/tpcdi.log
 export TPCDI_ENABLE_METRICS=true
@@ -265,71 +242,42 @@ export TPCDI_ENABLE_METRICS=true
 
 ### Configuration File
 
-Create a `tpcdi_config.yaml` file:
+Create a `tpcdi_config.yaml` file with supported ``TPCDIConfig`` fields:
 
 ```yaml
-# TPC-DI Configuration
-benchmark:
-  scale_factor: 1.0
-  output_directory: "/data/tpcdi"
-
-database:
-  url: "duckdb:///data/tpcdi.duckdb"
-  pool_size: 10
-  timeout: 30
-
+scale_factor: 1.0
+output_dir: "/data/tpcdi"
 enable_parallel: true
 max_workers: 4
 chunk_size: 50000
+enable_validation: true
+strict_validation: false
+optimize_memory: true
+log_level: "INFO"
+```
 
-  # Query execution parallelization
-  enable_parallel_queries: true
-  query_batch_size: 5
+Load the mapping with ``TPCDIConfig.from_dict``. It converts a string
+``output_dir`` to a path and filters out unknown keys.
 
-performance:
-  batch_size: 10000
-  memory_limit_mb: 8192
-  timeout_seconds: 3600
-  enable_performance_monitoring: true
-  progress_reporting_interval: 5.0
+```python
+from pathlib import Path
 
-error_handling:
-  enable_error_recovery: true
-  max_retries: 3
-  retry_delay_seconds: 1.0
+import yaml
 
-logging:
-  level: "INFO"
-  file: "/var/log/tpcdi.log"
-  enable_metrics: true
-  metric_collection_interval: 10
+from benchbox.core.tpcdi.config import TPCDIConfig
 
-data_formats:
-  csv:
-    delimiter: "|"
-    quote_char: "\""
-    escape_char: "\\"
-  xml:
-    encoding: "utf-8"
-    validate: true
-  json:
-    pretty_print: false
-    encoding: "utf-8"
-  fixed_width:
-    encoding: "utf-8"
-    strip_whitespace: true
+payload = yaml.safe_load(Path("tpcdi_config.yaml").read_text())
+config = TPCDIConfig.from_dict(payload)
 ```
 
 ### Python Configuration
 
 ```python
-# config.py
 from pathlib import Path
 
 from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
 from benchbox.core.tpcdi.config import TPCDIConfig
 
-# Unified configuration with parallel processing enabled
 config = TPCDIConfig(
     scale_factor=1.0,
     output_dir=Path('/data/tpcdi'),
@@ -337,7 +285,6 @@ config = TPCDIConfig(
     max_workers=4,
 )
 
-# Create benchmark instance
 benchmark = TPCDIBenchmark(config=config)
 ```
 
@@ -346,20 +293,16 @@ benchmark = TPCDIBenchmark(config=config)
 ### Development Environment
 
 ```python
-# dev_setup.py
 import tempfile
 from pathlib import Path
 from benchbox import TPCDI
 
-# Quick development setup
 temp_dir = Path(tempfile.mkdtemp())
 benchmark = TPCDI(scale_factor=0.01, output_dir=temp_dir)
 
-# Generate SF0.01 dataset for testing
 data_paths = benchmark.generate_data()
 print(f"Generated {len(data_paths)} data files in {temp_dir}")
 
-# Test with SQLite in-memory database
 import sqlite3
 with sqlite3.connect(':memory:') as conn:
     benchmark.load_data_to_database(conn)
@@ -370,18 +313,15 @@ with sqlite3.connect(':memory:') as conn:
 ### Testing Environment
 
 ```python
-# test_setup.py
 import os
 from pathlib import Path
 
 from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
 from benchbox.core.tpcdi.config import TPCDIConfig
 
-# Configure for testing environment
 test_dir = Path(os.getenv('TEST_DATA_DIR', '/tmp/tpcdi_test'))
 test_dir.mkdir(exist_ok=True)
 
-# Test configuration with moderate scale
 config = TPCDIConfig(
     scale_factor=0.1,
     output_dir=test_dir,
@@ -391,21 +331,17 @@ config = TPCDIConfig(
 
 benchmark = TPCDIBenchmark(config=config)
 
-# Run systematic test suite
 def run_test_suite():
-    # Test data generation
     print("Testing data generation...")
     data_paths = benchmark.generate_data()
     assert len(data_paths) > 0, "Data generation failed"
 
-    # Test ETL pipeline
     print("Testing ETL pipeline...")
     import duckdb
     with duckdb.connect(':memory:') as conn:
         etl_result = benchmark.run_etl_pipeline(conn, validate_data=True)
         assert etl_result['success'], f"ETL failed: {etl_result.get('error')}"
 
-        # Test query execution
         print("Testing query execution...")
         query_result = benchmark.run_benchmark(conn, iterations=2)
         successful_queries = sum(1 for q in query_result['queries'].values()
@@ -421,7 +357,6 @@ if __name__ == "__main__":
 ### Staging Environment
 
 ```python
-# staging_setup.py
 import logging
 import os
 from pathlib import Path
@@ -429,7 +364,6 @@ from pathlib import Path
 from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
 from benchbox.core.tpcdi.config import TPCDIConfig
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -439,7 +373,6 @@ logging.basicConfig(
     ]
 )
 
-# Staging configuration
 staging_dir = Path(os.getenv('STAGING_DATA_DIR', '/data/staging/tpcdi'))
 staging_dir.mkdir(parents=True, exist_ok=True)
 
@@ -452,7 +385,6 @@ config = TPCDIConfig(
 
 benchmark = TPCDIBenchmark(config=config)
 
-# Database connection (PostgreSQL example)
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
@@ -471,12 +403,10 @@ def run_staging_benchmark():
     logger.info("Starting TPC-DI staging benchmark")
 
     try:
-        # Generate data
         logger.info("Generating data...")
         data_paths = benchmark.generate_data()
         logger.info(f"Generated {len(data_paths)} data files")
 
-        # Run ETL pipeline
         with get_database_connection() as conn:
             logger.info("Running ETL pipeline...")
             etl_result = benchmark.run_etl_pipeline(
@@ -490,7 +420,6 @@ def run_staging_benchmark():
                 logger.error(f"ETL failed: {etl_result.get('error')}")
                 return False
 
-            # Run benchmark queries
             logger.info("Running benchmark queries...")
             query_result = benchmark.run_benchmark(conn, iterations=3)
 
@@ -512,7 +441,6 @@ if __name__ == "__main__":
 ### Production Environment
 
 ```python
-# production_setup.py
 import os
 import sys
 import logging
@@ -523,7 +451,6 @@ from datetime import datetime
 from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
 from benchbox.core.tpcdi.config import TPCDIConfig
 
-# Production logging configuration
 log_dir = Path('/var/log/tpcdi')
 log_dir.mkdir(exist_ok=True)
 
@@ -542,7 +469,6 @@ class ProductionTPCDI:
         self.benchmark = None
         self.shutdown_requested = False
 
-        # Register signal handlers
         signal.signal(signal.SIGTERM, self.signal_handler)
         signal.signal(signal.SIGINT, self.signal_handler)
 
@@ -553,7 +479,6 @@ class ProductionTPCDI:
         self.shutdown_requested = True
 
     def setup_benchmark(self):
-        # Production configuration
         data_dir = Path(os.getenv('TPCDI_DATA_DIR', '/data/tpcdi'))
         data_dir.mkdir(parents=True, exist_ok=True)
 
@@ -571,7 +496,6 @@ class ProductionTPCDI:
         self.logger.info(f"Production TPC-DI benchmark initialized with scale factor {self.benchmark.scale_factor}")
 
     def get_database_connection(self):
-        """Get production database connection with connection pooling."""
         db_url = os.getenv('DATABASE_URL')
         if not db_url:
             raise ValueError("DATABASE_URL environment variable not set")
@@ -580,7 +504,6 @@ class ProductionTPCDI:
             import psycopg2
             from psycopg2 import pool
 
-            # Create connection pool
             connection_pool = psycopg2.pool.ThreadedConnectionPool(
                 minconn=1,
                 maxconn=int(os.getenv('DB_POOL_SIZE', '10')),
@@ -597,7 +520,6 @@ class ProductionTPCDI:
             raise ValueError(f"Unsupported database URL: {db_url}")
 
     def run_production_benchmark(self):
-        """Run production benchmark with full monitoring and error handling."""
         self.logger.info("Starting production TPC-DI benchmark")
 
         results = {
@@ -613,7 +535,6 @@ class ProductionTPCDI:
         }
 
         try:
-            # Phase 1: Data Generation
             if self.shutdown_requested:
                 return results
 
@@ -628,7 +549,6 @@ class ProductionTPCDI:
             }
             self.logger.info(f"Data generation completed in {gen_time:.2f}s")
 
-            # Phase 2: ETL Pipeline
             if self.shutdown_requested:
                 return results
 
@@ -653,7 +573,6 @@ class ProductionTPCDI:
 
                 self.logger.info(f"ETL pipeline completed in {etl_time:.2f}s")
 
-                # Phase 3: Query Benchmark
                 if self.shutdown_requested:
                     return results
 
@@ -674,7 +593,6 @@ class ProductionTPCDI:
 
                 self.logger.info(f"Query benchmark completed in {query_time:.2f}s")
 
-                # Collect final metrics
                 results['metrics'] = self.benchmark.get_enhanced_etl_status()
                 results['success'] = True
                 results['end_time'] = datetime.now().isoformat()
@@ -689,7 +607,6 @@ class ProductionTPCDI:
             results['error'] = str(e)
             results['end_time'] = datetime.now().isoformat()
 
-        # Save results
         results_file = Path('/var/log/tpcdi') / f"benchmark_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         with open(results_file, 'w') as f:
             json.dump(results, f, indent=2)
@@ -717,33 +634,28 @@ if __name__ == "__main__":
 ### Memory Optimization
 
 ```python
-# memory_tuning.py
 import os
 import psutil
 
 def get_appropriate_memory_config():
-    """Calculate appropriate memory configuration based on system resources."""
-    # Get available memory
     memory = psutil.virtual_memory()
     available_gb = memory.available / (1024**3)
 
-    # Reserve 25% for system
     usable_gb = available_gb * 0.75
     usable_mb = int(usable_gb * 1024)
 
-    # Calculate appropriate batch size based on memory
-    if usable_mb >= 16384:  # 16GB+
+    if usable_mb >= 16384:
         batch_size = 50000
-        memory_limit = min(usable_mb, 32768)  # Cap at 32GB
-    elif usable_mb >= 8192:  # 8-16GB
+        memory_limit = min(usable_mb, 32768)
+    elif usable_mb >= 8192:
         batch_size = 25000
         memory_limit = usable_mb
-    elif usable_mb >= 4096:  # 4-8GB
+    elif usable_mb >= 4096:
         batch_size = 10000
         memory_limit = usable_mb
-    else:  # <4GB
+    else:
         batch_size = 5000
-        memory_limit = max(usable_mb, 2048)  # Minimum 2GB
+        memory_limit = max(usable_mb, 2048)
 
     return {
         'memory_limit_mb': memory_limit,
@@ -751,32 +663,35 @@ def get_appropriate_memory_config():
         'recommended_scale_factor': min(10.0, usable_gb / 2)
     }
 
-# Apply memory optimization
 memory_config = get_appropriate_memory_config()
 print(f"Recommended configuration: {memory_config}")
 ```
 
+The function reserves 25% of available memory for the system and sizes the rest in tiers:
+
+- 16 GB or more usable: batch size 50,000, memory limit capped at 32 GB.
+- 8 to 16 GB: batch size 25,000.
+- 4 to 8 GB: batch size 10,000.
+- Under 4 GB: batch size 5,000, memory limit of at least 2 GB.
+
 ### CPU Optimization
 
 ```python
-# cpu_tuning.py
 import multiprocessing
 import os
 
 from benchbox.core.tpcdi.config import TPCDIConfig
 
 def get_appropriate_cpu_config():
-    """Calculate appropriate CPU configuration."""
     cpu_count = multiprocessing.cpu_count()
 
-    # Determine appropriate worker configuration
-    if cpu_count >= 16:  # High-end servers
-        workers = min(12, cpu_count - 4)  # Reserve 4 cores for system
-    elif cpu_count >= 8:  # Mid-range systems
+    if cpu_count >= 16:
+        workers = min(12, cpu_count - 4)
+    elif cpu_count >= 8:
         workers = min(6, cpu_count - 2)
-    elif cpu_count >= 4:  # Standard systems
+    elif cpu_count >= 4:
         workers = min(3, cpu_count - 1)
-    else:  # Low-end systems
+    else:
         workers = 1
 
     return TPCDIConfig(
@@ -784,23 +699,26 @@ def get_appropriate_cpu_config():
         max_workers=workers,
     )
 
-# Apply CPU optimization
 cpu_config = get_appropriate_cpu_config()
 print(f"Recommended parallel config: {cpu_config}")
 ```
 
+The function picks the worker count from the core count:
+
+- 16 or more cores (high-end servers): `min(12, cpu_count - 4)`, which leaves 4 cores for the system.
+- 8 to 15 cores (mid-range): `min(6, cpu_count - 2)`.
+- 4 to 7 cores (standard): `min(3, cpu_count - 1)`.
+- Fewer than 4 cores: 1 worker.
+
 ### Storage Optimization
 
 ```python
-# storage_tuning.py
 import shutil
 import os
 from pathlib import Path
 
 def optimize_storage_layout(base_dir: Path):
-    """Optimize storage layout for TPC-DI workloads."""
 
-    # Create configured directory structure
     directories = {
         'source': base_dir / 'source',
         'staging': base_dir / 'staging',
@@ -813,37 +731,39 @@ def optimize_storage_layout(base_dir: Path):
     for name, path in directories.items():
         path.mkdir(parents=True, exist_ok=True)
 
-        # Set appropriate permissions
         os.chmod(path, 0o755)
 
-        # Check disk space
         disk_usage = shutil.disk_usage(path)
         free_gb = disk_usage.free / (1024**3)
 
         print(f"{name}: {path} ({free_gb:.1f}GB free)")
 
-        if free_gb < 10:  # Less than 10GB free
+        if free_gb < 10:
             print(f"WARNING: Low disk space for {name}")
 
     return directories
 
-# Storage optimization settings
 storage_settings = {
-    'csv_buffer_size': 8192,  # 8KB buffer for CSV operations
-    'xml_buffer_size': 16384,  # 16KB buffer for XML operations
-    'compression': 'gzip',  # Compress intermediate files
-    'temp_cleanup': True,  # Clean up temporary files
-    'batch_write_size': 10000  # Write in batches for better I/O performance
+    'csv_buffer_size': 8192,
+    'xml_buffer_size': 16384,
+    'compression': 'gzip',
+    'temp_cleanup': True,
+    'batch_write_size': 10000
 }
 ```
+
+`optimize_storage_layout` creates each directory with mode 755, reports its free space and warns when less than 10 GB is free. The storage settings mean:
+
+- `csv_buffer_size`: 8 KB buffer for CSV operations.
+- `xml_buffer_size`: 16 KB buffer for XML operations.
+- `compression`: gzip-compress intermediate files.
+- `temp_cleanup`: remove temporary files when done.
+- `batch_write_size`: write in batches of 10,000 for better I/O performance.
 
 ### Database Optimization
 
 ```sql
--- postgresql_optimization.sql
--- PostgreSQL-specific optimizations for TPC-DI
 
--- Connection and memory settings
 SET shared_buffers = '4GB';
 SET effective_cache_size = '12GB';
 SET maintenance_work_mem = '1GB';
@@ -851,33 +771,27 @@ SET work_mem = '256MB';
 SET random_page_cost = 1.1;
 SET effective_io_concurrency = 200;
 
--- Parallel processing settings
 SET max_parallel_workers_per_gather = 4;
 SET max_parallel_workers = 8;
 SET parallel_tuple_cost = 0.1;
 SET parallel_setup_cost = 1000.0;
 
--- WAL and checkpoint settings
 SET wal_buffers = '16MB';
 SET checkpoint_segments = 32;
 SET checkpoint_completion_target = 0.9;
 
--- Optimizer settings
 SET constraint_exclusion = partition;
 SET default_statistics_target = 100;
 
--- Create indexes for TPC-DI tables
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_dimcustomer_sk ON DimCustomer(SK_CustomerID);
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_dimcustomer_id ON DimCustomer(CustomerID);
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_facttrade_customer ON FactTrade(SK_CustomerID);
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_facttrade_security ON FactTrade(SK_SecurityID);
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_facttrade_date ON FactTrade(SK_CreateDateID);
 
--- Table partitioning for large fact tables
 CREATE TABLE FactTrade_2023 PARTITION OF FactTrade
     FOR VALUES FROM ('2023-01-01') TO ('2024-01-01');
 
--- Analyze tables for appropriate query plans
 ANALYZE DimCustomer;
 ANALYZE DimAccount;
 ANALYZE DimSecurity;
@@ -887,12 +801,21 @@ ANALYZE DimDate;
 ANALYZE DimTime;
 ```
 
+The script is `postgresql_optimization.sql`, PostgreSQL-specific tuning for TPC-DI. In order, it sets:
+
+- Connection and memory settings.
+- Parallel processing settings.
+- WAL and checkpoint settings.
+- Optimizer settings.
+- Indexes on the TPC-DI tables.
+- Partitioning for large fact tables.
+- A final `ANALYZE` of the tables so the planner has current statistics.
+
 ## Monitoring and Maintenance
 
 ### System Monitoring
 
 ```python
-# monitoring.py
 import psutil
 import time
 import json
@@ -906,7 +829,6 @@ class TPCDIMonitor:
         self.log_dir = log_dir
         self.log_dir.mkdir(exist_ok=True)
 
-        # Setup logging
         self.logger = logging.getLogger('tpcdi_monitor')
         handler = logging.FileHandler(log_dir / 'monitor.log')
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -915,21 +837,16 @@ class TPCDIMonitor:
         self.logger.setLevel(logging.INFO)
 
     def collect_system_metrics(self) -> Dict[str, Any]:
-        """Collect system-level metrics."""
-        # CPU metrics
         cpu_percent = psutil.cpu_percent(interval=1)
         cpu_count = psutil.cpu_count()
         load_avg = psutil.getloadavg()
 
-        # Memory metrics
         memory = psutil.virtual_memory()
         swap = psutil.swap_memory()
 
-        # Disk metrics
         disk_usage = psutil.disk_usage('/')
         disk_io = psutil.disk_io_counters()
 
-        # Network metrics
         network_io = psutil.net_io_counters()
 
         return {
@@ -959,7 +876,6 @@ class TPCDIMonitor:
         }
 
     def monitor_benchmark(self, benchmark, duration_minutes: int = 60):
-        """Monitor benchmark execution."""
         start_time = time.time()
         end_time = start_time + (duration_minutes * 60)
 
@@ -967,10 +883,8 @@ class TPCDIMonitor:
 
         while time.time() < end_time:
             try:
-                # Collect system metrics
                 system_metrics = self.collect_system_metrics()
 
-                # Collect benchmark metrics
                 benchmark_metrics = benchmark.get_enhanced_etl_status()
                 etl_metrics = benchmark.get_etl_status()
 
@@ -982,16 +896,13 @@ class TPCDIMonitor:
 
                 metrics_log.append(combined_metrics)
 
-                # Check for alerts
                 self.check_alerts(system_metrics)
 
-                # Wait before next collection
                 time.sleep(10)
 
             except Exception as e:
                 self.logger.error(f"Error collecting metrics: {e}")
 
-        # Save metrics to file
         metrics_file = self.log_dir / f"metrics_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         with open(metrics_file, 'w') as f:
             json.dump(metrics_log, f, indent=2)
@@ -999,47 +910,37 @@ class TPCDIMonitor:
         self.logger.info(f"Monitoring completed. Metrics saved to {metrics_file}")
 
     def check_alerts(self, metrics: Dict[str, Any]):
-        """Check for alert conditions."""
-        # CPU alert
         if metrics['cpu']['percent'] > 90:
             self.logger.warning(f"High CPU usage: {metrics['cpu']['percent']:.1f}%")
 
-        # Memory alert
         if metrics['memory']['percent'] > 85:
             self.logger.warning(f"High memory usage: {metrics['memory']['percent']:.1f}%")
 
-        # Disk alert
         if metrics['disk']['percent'] > 80:
             self.logger.warning(f"High disk usage: {metrics['disk']['percent']:.1f}%")
 
-        # Load average alert
         cpu_count = metrics['cpu']['count']
         load_5min = metrics['cpu']['load_avg'][1]
         if load_5min > cpu_count * 2:
             self.logger.warning(f"High load average: {load_5min:.2f} (cores: {cpu_count})")
 
-# Usage example
 if __name__ == "__main__":
     from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
 
     benchmark = TPCDIBenchmark(scale_factor=1.0)
     monitor = TPCDIMonitor()
 
-    # Monitor for 30 minutes
     monitor.monitor_benchmark(benchmark, duration_minutes=30)
 ```
 
 ### Log Management
 
 ```bash
-#!/bin/bash
-# log_management.sh
 
 LOG_DIR="/var/log/tpcdi"
 RETENTION_DAYS=30
 MAX_LOG_SIZE="100M"
 
-# Create logrotate configuration
 cat > /etc/logrotate.d/tpcdi << EOF
 $LOG_DIR/*.log {
     daily
@@ -1057,11 +958,9 @@ $LOG_DIR/*.log {
 }
 EOF
 
-# Clean up old metric files
 find $LOG_DIR -name "metrics_*.json" -mtime +$RETENTION_DAYS -delete
 find $LOG_DIR -name "benchmark_results_*.json" -mtime +$RETENTION_DAYS -delete
 
-# Compress old files
 find $LOG_DIR -name "*.log.*" -mtime +1 ! -name "*.gz" -exec gzip {} \;
 
 echo "Log management tasks completed"
@@ -1070,34 +969,27 @@ echo "Log management tasks completed"
 ### Health Checks
 
 ```python
-# health_check.py
 import time
 import tempfile
 from pathlib import Path
 from benchbox import TPCDI
 
 def health_check() -> bool:
-    """Perform basic health check of TPC-DI installation."""
     try:
-        # Test 1: Import check
         print("✅ Import test passed")
 
-        # Test 2: Basic instantiation
         with tempfile.TemporaryDirectory() as temp_dir:
             benchmark = TPCDI(scale_factor=0.001, output_dir=temp_dir)
             print("✅ Instantiation test passed")
 
-            # Test 3: Schema validation
             schema = benchmark.get_schema()
             assert len(schema) >= 5, "Schema should have at least 5 tables"
             print("✅ Schema validation passed")
 
-            # Test 4: Query validation
             queries = benchmark.get_queries()
             assert len(queries) >= 3, "Should have at least 3 queries"
             print("✅ Query validation passed")
 
-            # Test 5: Data generation
             start_time = time.time()
             data_paths = benchmark.generate_data()
             generation_time = time.time() - start_time
@@ -1106,12 +998,10 @@ def health_check() -> bool:
             assert generation_time < 30, "Data generation should complete quickly"
             print(f"✅ Data generation test passed ({generation_time:.2f}s)")
 
-            # Test 6: Database operations
             import sqlite3
             with sqlite3.connect(':memory:') as conn:
                 benchmark.load_data_to_database(conn)
 
-                # Test a simple query
                 first_query_id = list(queries.keys())[0]
                 result = benchmark.execute_query(first_query_id, conn)
                 assert result is not None, "Query execution should return result"
@@ -1142,19 +1032,19 @@ MemoryError: Unable to allocate array
 
 **Solutions**:
 ```python
-# Reduce scale factor
-benchmark = TPCDIBenchmark(scale_factor=0.1)  # Instead of 1.0
+benchmark = TPCDIBenchmark(scale_factor=0.1)
 
-# Configure memory optimization and reduce workers
 config = TPCDIConfig(
     scale_factor=0.1,
     optimize_memory=True,
     max_workers=2,
     enable_parallel=True,
-    chunk_size=5000,  # Process data in smaller batches
+    chunk_size=5000,
 )
 benchmark = TPCDIBenchmark(config=config)
 ```
+
+Use a scale factor of 0.1 instead of 1.0. Reduce workers and set `chunk_size=5000` so data is processed in smaller batches.
 
 #### 2. Performance Issues
 
@@ -1170,7 +1060,6 @@ import multiprocessing
 from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
 from benchbox.core.tpcdi.config import TPCDIConfig
 
-# Enable parallel processing across available CPU cores
 config = TPCDIConfig(
     enable_parallel=True,
     max_workers=multiprocessing.cpu_count(),
@@ -1187,14 +1076,14 @@ PermissionError: [Errno 13] Permission denied: '/data/tpcdi'
 
 **Solutions**:
 ```bash
-# Fix directory permissions
 sudo mkdir -p /data/tpcdi
 sudo chown -R $USER:$USER /data/tpcdi
 sudo chmod -R 755 /data/tpcdi
 
-# Or use a user-writable directory
 export TPCDI_DATA_DIR=$HOME/tpcdi_data
 ```
+
+Fix the directory permissions as shown, or point `TPCDI_DATA_DIR` at a user-writable directory instead.
 
 #### 4. Database Connection Issues
 
@@ -1205,11 +1094,9 @@ psycopg2.OperationalError: could not connect to server
 
 **Solutions**:
 ```python
-# Verify connection string
 import os
 os.environ['DATABASE_URL'] = 'postgresql://user:pass@localhost:5432/tpcdi'
 
-# Test connection separately
 import psycopg2
 try:
     conn = psycopg2.connect(os.environ['DATABASE_URL'])
@@ -1218,10 +1105,11 @@ try:
 except Exception as e:
     print(f"Connection failed: {e}")
 
-# Use connection pooling for production
 from psycopg2 import pool
 connection_pool = psycopg2.pool.ThreadedConnectionPool(1, 10, os.environ['DATABASE_URL'])
 ```
+
+Verify the connection string, test the connection on its own, and use connection pooling in production (the last statement).
 
 #### 5. Query Execution Errors
 
@@ -1232,40 +1120,36 @@ ProgrammingError: syntax error at or near "LIMIT"
 
 **Solutions**:
 ```python
-# Use correct SQL dialect
 translated_query = benchmark.translate_query(query_id, dialect='postgres')
 
-# Check database-specific syntax
-# Enable query debugging
 import logging
 logging.basicConfig(level=logging.DEBUG)
 ```
 
+Translate the query to the correct SQL dialect, then enable debug logging to check the database-specific syntax.
+
 ### Debug Mode
 
+The debug run uses a small scale factor of 0.01, and setting `TPCDI_DEBUG` and `TPCDI_VERBOSE` enables all debug features.
+
 ```python
-# debug_mode.py
 import logging
 import os
 from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
 
-# Enable debug logging
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
-# Create debug benchmark
 benchmark = TPCDIBenchmark(
-    scale_factor=0.01,  # Small scale for debugging
+    scale_factor=0.01,
     output_dir=Path('/tmp/tpcdi_debug')
 )
 
-# Enable all debug features
 os.environ['TPCDI_DEBUG'] = 'true'
 os.environ['TPCDI_VERBOSE'] = 'true'
 
-# Run with detailed error reporting
 try:
     result = benchmark.run_etl_pipeline(conn, validate_data=True)
     print(f"Debug run completed: {result}")
@@ -1277,22 +1161,18 @@ except Exception as e:
 ### Diagnostic Tools
 
 ```python
-# diagnostics.py
 import sys
 import subprocess
 import importlib
 from pathlib import Path
 
 def run_diagnostics():
-    """Run systematic diagnostics."""
     print("TPC-DI Diagnostic Report")
     print("=" * 50)
 
-    # Python environment
     print(f"Python version: {sys.version}")
     print(f"Python executable: {sys.executable}")
 
-    # Required packages
     packages = ['benchbox', 'numpy', 'sqlglot', 'pytest']
     for package in packages:
         try:
@@ -1302,7 +1182,6 @@ def run_diagnostics():
         except ImportError:
             print(f"❌ {package}: not installed")
 
-    # System resources
     import psutil
     memory = psutil.virtual_memory()
     disk = psutil.disk_usage('/')
@@ -1312,7 +1191,6 @@ def run_diagnostics():
     print(f"Memory: {memory.total / (1024**3):.1f}GB total, {memory.available / (1024**3):.1f}GB available")
     print(f"Disk: {disk.total / (1024**3):.1f}GB total, {disk.free / (1024**3):.1f}GB free")
 
-    # Database connectivity
     print(f"\nDatabase Connectivity:")
     try:
         import sqlite3
@@ -1328,7 +1206,6 @@ def run_diagnostics():
     except Exception as e:
         print(f"❌ DuckDB: {e}")
 
-    # Permission checks
     test_dirs = ['/tmp', '/var/log', '/data']
     print(f"\nDirectory Permissions:")
     for test_dir in test_dirs:
@@ -1350,15 +1227,12 @@ if __name__ == "__main__":
 ### Access Control
 
 ```python
-# security.py
 import os
 import stat
 from pathlib import Path
 
 def secure_directory_setup(base_dir: Path):
-    """Set up secure directory permissions."""
 
-    # Create directories with secure permissions
     directories = {
         'data': base_dir / 'data',
         'logs': base_dir / 'logs',
@@ -1370,28 +1244,20 @@ def secure_directory_setup(base_dir: Path):
         path.mkdir(parents=True, exist_ok=True)
 
         if name == 'config':
-            # Config directory: owner read/write only
-            os.chmod(path, stat.S_IRWXU)  # 700
+            os.chmod(path, stat.S_IRWXU)
         elif name == 'logs':
-            # Log directory: owner read/write, group read
-            os.chmod(path, stat.S_IRWXU | stat.S_IRGRP)  # 740
+            os.chmod(path, stat.S_IRWXU | stat.S_IRGRP)
         else:
-            # Data/temp directories: owner read/write, group read
-            os.chmod(path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP)  # 750
+            os.chmod(path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP)
 
 def validate_database_connection(connection_string: str) -> bool:
-    """Validate database connection security."""
 
-    # Check for secure connection
     if connection_string.startswith('postgresql://'):
-        # Ensure SSL is used in production
         if 'sslmode=require' not in connection_string:
             print("WARNING: PostgreSQL connection should use SSL in production")
             return False
 
-    # Check for embedded credentials
     if '@' in connection_string:
-        # Connection string contains credentials
         parts = connection_string.split('@')
         if len(parts) > 1:
             print("WARNING: Credentials in connection string. Use environment variables.")
@@ -1399,9 +1265,7 @@ def validate_database_connection(connection_string: str) -> bool:
 
     return True
 
-# Environment variable validation
 def validate_environment():
-    """Validate security-related environment variables."""
 
     required_vars = ['DATABASE_URL', 'TPCDI_DATA_DIR']
     optional_vars = ['TPCDI_LOG_LEVEL', 'TPCDI_WORKERS']
@@ -1411,7 +1275,6 @@ def validate_environment():
             print(f"ERROR: Required environment variable {var} not set")
             return False
 
-    # Validate database URL security
     db_url = os.getenv('DATABASE_URL')
     if not validate_database_connection(db_url):
         return False
@@ -1419,10 +1282,17 @@ def validate_environment():
     return True
 ```
 
+The directory modes are:
+
+- `config`: owner read/write/execute only (700).
+- `logs`: owner full access, group read (740).
+- Data and temp directories: owner full access, group read and execute (750).
+
+`validate_database_connection` warns and returns `False` when a PostgreSQL URL lacks `sslmode=require` (SSL is needed in production) or when the connection string embeds credentials (use environment variables instead). `secure_file_write` sets written files to owner read/write only (600).
+
 ### Data Protection
 
 ```python
-# data_protection.py
 import hashlib
 import json
 from pathlib import Path
@@ -1433,14 +1303,11 @@ class DataProtection:
         self.encryption_key = encryption_key
 
     def hash_sensitive_data(self, data: str) -> str:
-        """Hash sensitive data for logging/monitoring."""
         return hashlib.sha256(data.encode()).hexdigest()[:16]
 
     def sanitize_logs(self, log_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Remove sensitive information from logs."""
         sanitized = log_data.copy()
 
-        # Fields to sanitize
         sensitive_fields = [
             'password', 'secret', 'key', 'token', 'credential',
             'DATABASE_URL', 'connection_string'
@@ -1461,16 +1328,13 @@ class DataProtection:
         return sanitized
 
     def secure_file_write(self, file_path: Path, data: Any):
-        """Write files with secure permissions."""
 
-        # Write data
         with open(file_path, 'w') as f:
             if isinstance(data, dict):
                 json.dump(data, f, indent=2)
             else:
                 f.write(str(data))
 
-        # Set secure permissions (owner read/write only)
         os.chmod(file_path, 0o600)
 ```
 

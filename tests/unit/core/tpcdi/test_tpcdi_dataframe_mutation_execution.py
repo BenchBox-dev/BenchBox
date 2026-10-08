@@ -1,13 +1,4 @@
-"""Execution tests for the TPC-DI DataFrame ETL mutation path.
-
-Runs the SCD Type 2 cycle (historical load, expire current versions, insert
-new versions) through ``DataFrameETLBackend`` against real
-``PolarsMaintenanceOperations`` on a tmp table root and asserts the stored
-Parquet state. Companion unit tests pin the dict-condition rendering and the
-table-root resolution contract with lightweight fakes.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -31,10 +22,10 @@ try:
 
     DEPS_AVAILABLE = True
 except ImportError:
-    pd = None  # type: ignore[assignment]
-    pl = None  # type: ignore[assignment]
-    DataFrameETLBackend = None  # type: ignore[assignment]
-    PolarsMaintenanceOperations = None  # type: ignore[assignment]
+    pd = None
+    pl = None
+    DataFrameETLBackend = None
+    PolarsMaintenanceOperations = None
     DEPS_AVAILABLE = False
 
 pytestmark.append(pytest.mark.skipif(not DEPS_AVAILABLE, reason="pandas/polars not installed"))
@@ -67,8 +58,6 @@ def _read_table(root: Path, table_name: str) -> Any:
 
 
 class TestScd2MutationExecution:
-    """SCD2 load/expire/insert cycle against real maintenance operations."""
-
     def test_historical_load_expire_insert_cycle(self, tmp_path: Path) -> None:
         root = tmp_path / "tables"
         backend = DataFrameETLBackend(
@@ -145,8 +134,6 @@ def _recording_ops() -> tuple[SimpleNamespace, dict[str, Any]]:
 
 
 class TestBackendContracts:
-    """Rendering and path-resolution contracts with lightweight fakes."""
-
     def test_dict_condition_and_updates_render_to_sql(self, tmp_path: Path) -> None:
         ops, seen = _recording_ops()
         backend = DataFrameETLBackend(maintenance_ops=ops, platform_name="polars-df", table_root=tmp_path / "tables")

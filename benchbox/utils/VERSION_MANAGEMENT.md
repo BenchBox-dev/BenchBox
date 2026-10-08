@@ -146,7 +146,7 @@ BenchBox follows semantic versioning (SemVer):
 
 ### Version Information in Logs
 
-When debugging is enabled (verbose mode), version information is automatically included:
+When debugging is enabled (verbose mode), `log_debug_info()` automatically includes version information in its output:
 
 ```python
 from benchbox.utils.verbosity import VerbosityMixin
@@ -154,18 +154,16 @@ from benchbox.utils.verbosity import VerbosityMixin
 class MyClass(VerbosityMixin):
     def debug_operation(self):
         self.log_debug_info("Operation Context")
-        # Automatically includes version information
 ```
 
 ### Error Context
 
-All CLI errors automatically include version information for debugging:
+All CLI errors automatically include version information in their error details:
 
 ```python
 from benchbox.cli.exceptions import BenchboxCLIError
 
 raise BenchboxCLIError("Something went wrong")
-# Automatically includes version in error details
 ```
 
 ## Integration Points
@@ -203,9 +201,11 @@ from benchbox.cli.exceptions import ErrorContext, BenchboxCLIError
 context = ErrorContext(
     operation="benchmark_execution",
     stage="data_loading",
-    include_version_info=True  # Automatic version inclusion
+    include_version_info=True
 )
 ```
+
+Setting `include_version_info=True` adds the version information automatically.
 
 ## Best Practices
 
@@ -252,16 +252,13 @@ When imports fail, version information helps identify compatibility issues:
 
 ### Debug Information
 
-For comprehensive debugging:
+For comprehensive debugging, enable debug logging, run with verbose output (`-vv`), and check version consistency:
 
 ```bash
-# Enable debug logging
 export BENCHBOX_LOG_LEVEL=DEBUG
 
-# Run with verbose output
 uv run benchbox run --benchmark tpch --scale 0.01 -vv
 
-# Check version consistency
 uv run -- python -c "from benchbox.utils.version import format_version_report; print(format_version_report())"
 ```
 

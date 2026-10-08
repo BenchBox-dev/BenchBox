@@ -1,12 +1,6 @@
-"""Tests for Redshift SQL generation branches - coverage extension.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Targets: COPY SQL content, DISTSTYLE/DISTKEY/SORTKEY clauses, connection config,
-session cache control, _build_ctas_sort_sql error path.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock, Mock, patch
 
@@ -21,7 +15,7 @@ pytestmark = [
 
 
 def _make_adapter(**kwargs):
-    """Create a RedshiftAdapter with test defaults."""
+
     try:
         from benchbox.platforms.redshift import RedshiftAdapter
     except ImportError:

@@ -22,6 +22,7 @@ def compare(base: str, head: str) -> parity.FileReport:
         ('def f():\n    """doc"""\n    return 1\n', "def f():\n    return 1\n", 0, 1, 0),
         ('"""module"""\nimport os\n', "import os\n", 0, 1, 0),
         ('class A:\n    """doc"""\n    x = 1\n', "class A:\n    x = 1\n", 0, 1, 0),
+        ('"""Module description."""\n', "", 0, 1, 0),
         ('def f():\n    """doc"""\n', "def f():\n    pass\n", 0, 1, 1),
         ('class A:\n    """doc"""\n', "class A:\n    pass\n", 0, 1, 1),
         ('def f():\n    """doc"""\n    pass\n', "def f():\n    pass\n", 0, 1, 0),
@@ -43,6 +44,7 @@ def test_removing_only_comments_and_leading_docstrings_is_parity(
         ("x = 1\n", "x = 2\n"),
         ('query = "SELECT 1"\n', 'query = "SELECT 2"\n'),
         ('def f():\n    """doc"""\n', "def f():\n    ...\n"),
+        ('"""Module description."""\n', "pass\n"),
         ('def f():\n    """doc"""\n    return 1\n', "def f():\n    pass\n    return 1\n"),
         ('def f():\n    x = 1\n    "not a docstring"\n    return x\n', "def f():\n    x = 1\n    return x\n"),
         ("def f(x):  # type: (int) -> int\n    return x\n", "def f(x):\n    return x\n"),
@@ -135,6 +137,51 @@ def test_unparseable_source_is_an_error_not_a_pass(source: str) -> None:
 def test_comparison_does_not_depend_on_line_numbers_or_blank_lines() -> None:
     report = compare('"""m"""\n\n\n\ndef f():\n\n    """d"""\n\n    return 1\n', "def f():\n    return 1\n")
     assert report.status == "ok" and report.docstrings_removed == 2
+
+
+@pytest.mark.parametrize("directive", ["# type: ignore", "# type: ignore[override]"])
+def test_preserved_type_ignore_may_shift_after_docstring_removal(directive: str) -> None:
+    base = f'"""module"""\n\ndef f(x):  {directive}\n    return x\n'
+    head = f"def f(x):  {directive}\n    return x\n"
+    assert compare(base, head).status == "ok"
+
+
+@pytest.mark.parametrize(
+    "directive",
+    [
+        "# type: ignore",
+        "# type: ignore[assignment]",
+        "# ruff: noqa",
+        "# ruff: noqa: E501",
+        "# flake8: noqa",
+        "# flake8: noqa: E501",
+        "# noqa",
+        "# noqa: E501",
+        "# pragma: no cover",
+        "# fmt: off",
+    ],
+)
+def test_registered_directive_removal_is_drift(directive: str) -> None:
+    assert compare(f"x = 1  {directive}\n", "x = 1\n").status == "drift"
+
+
+def test_type_ignore_tag_change_and_reorder_are_drift() -> None:
+    assert compare("x = 1  # type: ignore[assignment]\n", "x = 1  # type: ignore[arg-type]\n").status == "drift"
+    base = "x = 1  # type: ignore[assignment]\ny = 2  # type: ignore[arg-type]\n"
+    head = "x = 1  # type: ignore[arg-type]\ny = 2  # type: ignore[assignment]\n"
+    assert compare(base, head).status == "drift"
+
+
+def test_directive_moves_in_repeated_code_are_drift() -> None:
+    rows = ["x = 1"] * 10
+    for directive, inline in [("# type: ignore", True), ("# type: ignore[assignment]", True), ("# noqa", False)]:
+        if inline:
+            base = "\n".join(rows[:5] + [f"x = 1  {directive}"] + rows[6:]) + "\n"
+            head = "\n".join(rows[:6] + [f"x = 1  {directive}"] + rows[7:]) + "\n"
+        else:
+            base = "\n".join(rows[:5] + [directive] + rows[5:]) + "\n"
+            head = "\n".join(rows[:6] + [directive] + rows[6:]) + "\n"
+        assert compare(base, head).status == "drift"
 
 
 def git(repo: Path, *args: str) -> str:
@@ -250,3 +297,47 @@ def test_cli_rejects_a_file_replaced_by_a_symbolic_link(repo: Path, capsys: pyte
 def test_cli_reports_a_git_failure_with_status_two(repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert parity.main(["--root", str(repo), "--base", "f" * 40]) == 2
     assert "comment-parity:" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "directive",
+    [
+        "# noqa: F401 - retained optional dependency",
+        "# noqa: F401  # retained import side effect",
+        "# noqa: F401, E501 - retained dependency",
+        "#noqa:F401 retained dependency",
+        "# ruff: noqa: F401 - retained dependency",
+        "# flake8: noqa: F401 - retained dependency",
+        "# ruff: noqa retained file exemption",
+        "# noqa retained blanket exemption",
+        "# noqa: F401, - reason",
+        "# noqa: F401,",
+        "# noqa: F401# reason",
+        "# ruff: noqa: F401, - reason",
+        "# flake8: noqa: F401, - reason",
+        "# noqa: F401,reason",
+        "# noqa: F401,,",
+        "# noqa: F401, ; reason",
+    ],
+)
+def test_noqa_reason_stays_bound_to_its_code(directive: str) -> None:
+    base = f'"""module prose"""\nx = 1  {directive}\ny = 2\n'
+    retained = f"x = 1  {directive}\ny = 2\n"
+    assert compare(base, retained).clean
+    assert compare(base, "x = 1\ny = 2\n").status == "drift"
+    assert compare(base, f"x = 1\ny = 2  {directive}\n").status == "drift"
+
+
+@pytest.mark.parametrize(
+    "comment",
+    [
+        "# explain noqa here",
+        "# noqareason",
+        "# noqaish: F401",
+        "# ruff: noqaish: F401",
+        "# noqa: explanation",
+        "# noqa: F401; reason",
+    ],
+)
+def test_noqa_words_in_ordinary_prose_are_not_directives(comment: str) -> None:
+    assert compare(f"x = 1  {comment}\n", "x = 1\n").clean

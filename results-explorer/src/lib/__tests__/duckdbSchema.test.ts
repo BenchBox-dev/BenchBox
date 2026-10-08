@@ -8,8 +8,6 @@ import { queryRows } from "@/db";
 
 const mockedQueryRows = vi.mocked(queryRows);
 
-// The schema probe is module-level cached, so reset the module between tests
-// to force a fresh probe each time.
 beforeEach(() => {
   vi.resetModules();
   mockedQueryRows.mockReset();

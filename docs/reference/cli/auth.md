@@ -30,21 +30,18 @@ uv run -- benchbox auth COMMAND [OPTIONS]
 ## Examples
 
 ```bash
-# Prompt for a token and store it securely
 uv run -- benchbox auth login
 
-# Store a token for a staging service
 uv run -- benchbox auth login --service https://staging.benchbox.dev/v1
 
-# Check whether BenchBox can submit to the default service
 uv run -- benchbox auth status
 
-# Replace a stored token
 uv run -- benchbox auth refresh
 
-# Remove a stored token
 uv run -- benchbox auth logout
 ```
+
+In order, these commands: prompt for a token and store it securely, store a token for a staging service, check whether BenchBox can submit to the default service, replace a stored token, and remove a stored token.
 
 Prefer the prompt or an environment variable for secrets. `benchbox auth login --token ...`
 exists for controlled automation, but command-line token values can be captured

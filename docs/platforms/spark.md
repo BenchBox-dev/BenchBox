@@ -19,28 +19,27 @@ Apache Spark is the most widely deployed distributed computing framework for lar
 ## Installation
 
 ```bash
-# Install PySpark
 pip install pyspark
 
-# Or with specific version
 pip install pyspark==3.5.0
 
-# For Delta Lake support
 pip install delta-spark
 ```
+
+The first command installs PySpark. The second installs a specific version. The third adds Delta Lake support.
 
 ## Configuration
 
 ### Environment Variables
 
 ```bash
-# Spark configuration
 export SPARK_HOME=/path/to/spark
 export PYSPARK_PYTHON=python3
 
-# For distributed mode
 export SPARK_MASTER=spark://master:7077
 ```
+
+The first two variables configure Spark. `SPARK_MASTER` is needed only for distributed mode.
 
 ### CLI Options
 
@@ -70,20 +69,22 @@ benchbox run --platform spark --benchmark tpch --scale 1.0 \
 ### Local Mode
 
 ```bash
-# Run locally with all cores
 benchbox run --platform spark --benchmark tpch --scale 0.1 \
   --platform-option master="local[*]"
 ```
 
+This runs locally with all cores.
+
 ### Cluster Mode
 
 ```bash
-# Run on Spark cluster
 benchbox run --platform spark --benchmark tpch --scale 10.0 \
   --platform-option master=spark://master:7077 \
   --platform-option num_executors=10 \
   --platform-option executor_memory=16g
 ```
+
+This runs on a Spark cluster.
 
 ### Python API
 
@@ -91,26 +92,25 @@ benchbox run --platform spark --benchmark tpch --scale 10.0 \
 from benchbox import TPCH
 from benchbox.platforms.spark import SparkAdapter
 
-# Initialize adapter
 adapter = SparkAdapter(
     master="local[*]",
     driver_memory="4g",
     app_name="TPC-H Benchmark",
 )
 
-# Load and run benchmark
 benchmark = TPCH(scale_factor=1.0)
 benchmark.generate_data()
 adapter.load_benchmark(benchmark)
 results = adapter.run_benchmark(benchmark)
 ```
 
+The example initializes the adapter, then loads and runs the benchmark.
+
 ### Delta Lake Integration
 
 ```python
 from benchbox.platforms.spark import SparkAdapter
 
-# Initialize with Delta Lake
 adapter = SparkAdapter(
     master="local[*]",
     table_format="delta",
@@ -121,6 +121,8 @@ adapter = SparkAdapter(
 )
 ```
 
+This initializes the adapter with Delta Lake.
+
 ## Deployment Modes
 
 ### Local Mode
@@ -129,22 +131,23 @@ Best for development and small datasets:
 
 ```bash
 benchbox run --platform spark --benchmark tpch --scale 0.1 \
-  --platform-option master="local[4]"  # 4 cores
+  --platform-option master="local[4]"
 ```
+
+`local[4]` uses 4 cores.
 
 ### Standalone Cluster
 
 ```bash
-# Start master
 $SPARK_HOME/sbin/start-master.sh
 
-# Start workers
 $SPARK_HOME/sbin/start-worker.sh spark://master:7077
 
-# Run benchmark
 benchbox run --platform spark --benchmark tpch --scale 10.0 \
   --platform-option master=spark://master:7077
 ```
+
+The commands start the master, start a worker, and run the benchmark.
 
 ### Kubernetes
 
@@ -222,9 +225,10 @@ benchbox run --platform spark --benchmark tpch \
 Spark provides detailed physical and logical plans:
 
 ```python
-# Get query plan
 spark.sql("SELECT ...").explain(extended=True)
 ```
+
+This prints the query plan.
 
 ## Limitations
 
@@ -236,8 +240,9 @@ spark.sql("SELECT ...").explain(extended=True)
 
 ### Out of Memory
 
+Increase memory:
+
 ```python
-# Increase memory
 adapter = SparkAdapter(
     driver_memory="8g",
     executor_memory="16g",
@@ -249,8 +254,9 @@ adapter = SparkAdapter(
 
 ### Shuffle Spill
 
+Reduce the shuffle partition size by raising the partition count:
+
 ```python
-# Reduce shuffle partition size
 adapter = SparkAdapter(
     spark_config={
         "spark.sql.shuffle.partitions": "400",
@@ -261,11 +267,10 @@ adapter = SparkAdapter(
 
 ### Connection to Master Failed
 
-```bash
-# Verify master is running
-curl http://master:8080  # Web UI
+Verify that the master is running by requesting its web UI at port 8080, and check firewall rules.
 
-# Check firewall rules
+```bash
+curl http://master:8080
 ```
 
 ## Related Documentation

@@ -29,8 +29,9 @@ Use expression objects for column references and operations.
 
 **Members:** Polars, PySpark, DataFusion
 
+This is expression-style syntax:
+
 ```python
-# Expression-style syntax
 result = (
     df.filter(col('status') == lit('active'))
     .group_by('category')
@@ -50,8 +51,9 @@ Use string-based column access and boolean indexing.
 
 **Members:** Pandas, cuDF, Dask, Vaex
 
+This is Pandas-style syntax:
+
 ```python
-# Pandas-style syntax
 filtered = df[df['status'] == 'active']
 result = filtered.groupby('category').agg({'amount': 'sum'})
 ```
@@ -68,11 +70,10 @@ Create a context class that provides table access and family-specific helpers.
 
 ### Expression Family Context
 
-```python
-# benchbox/core/dataframe/context.py
+Put this class in `benchbox/core/dataframe/context.py`.
 
+```python
 class MyPlatformDataFrameContext(DataFrameContext):
-    """Context for MyPlatform DataFrame operations."""
 
     def __init__(self):
         self._tables: dict[str, Any] = {}
@@ -82,33 +83,30 @@ class MyPlatformDataFrameContext(DataFrameContext):
         return "expression"
 
     def get_table(self, name: str) -> Any:
-        """Get a registered table by name."""
         if name not in self._tables:
             raise KeyError(f"Table '{name}' not registered")
         return self._tables[name]
 
     def register_table(self, name: str, df: Any) -> None:
-        """Register a DataFrame as a named table."""
         self._tables[name] = df
 
     @property
     def col(self):
-        """Column reference function."""
         from myplatform import col
         return col
 
     @property
     def lit(self):
-        """Literal value function."""
         from myplatform import lit
         return lit
 ```
 
 ### Pandas Family Context
 
+`get_table` returns a copy for safety. `col` and `lit` return `None` because the pandas family does not use them.
+
 ```python
 class MyPandasLikeContext(DataFrameContext):
-    """Context for MyPandasLike DataFrame operations."""
 
     def __init__(self):
         self._tables: dict[str, Any] = {}
@@ -120,33 +118,31 @@ class MyPandasLikeContext(DataFrameContext):
     def get_table(self, name: str) -> Any:
         if name not in self._tables:
             raise KeyError(f"Table '{name}' not registered")
-        return self._tables[name].copy()  # Return copy for safety
+        return self._tables[name].copy()
 
     def register_table(self, name: str, df: Any) -> None:
         self._tables[name] = df
 
     @property
     def col(self):
-        return None  # Not used in pandas family
+        return None
 
     @property
     def lit(self):
-        return None  # Not used in pandas family
+        return None
 ```
 
 ## Step 3: Implement Platform Adapter
 
 Create an adapter that handles data loading and query execution.
 
-For **expression family** platforms, inherit from `ExpressionFamilyAdapter`:
+For **expression family** platforms, inherit from `ExpressionFamilyAdapter`. Put the adapter in
+`benchbox/platforms/dataframe/myplatform_df.py`. In `execute_query`, the adapter collects the result if it is lazy.
 
 ```python
-# benchbox/platforms/dataframe/myplatform_df.py
-
 from benchbox.platforms.dataframe.expression_family import ExpressionFamilyAdapter
 
 class MyPlatformAdapter(ExpressionFamilyAdapter[MyDF, MyLazyDF, MyExpr]):
-    """Adapter for MyPlatform DataFrame benchmarking."""
 
     platform_name = "myplatform-df"
 
@@ -155,11 +151,9 @@ class MyPlatformAdapter(ExpressionFamilyAdapter[MyDF, MyLazyDF, MyExpr]):
         self.options = options
 
     def create_context(self) -> MyPlatformDataFrameContext:
-        """Create a new context for query execution."""
         return MyPlatformDataFrameContext()
 
     def load_tables(self, ctx: DataFrameContext, data_dir: str) -> None:
-        """Load benchmark tables into the context."""
         import myplatform as mp
         from pathlib import Path
 
@@ -172,14 +166,12 @@ class MyPlatformAdapter(ExpressionFamilyAdapter[MyDF, MyLazyDF, MyExpr]):
             ctx.register_table(table_name, df)
 
     def execute_query(self, ctx: DataFrameContext, query: DataFrameQuery) -> Any:
-        """Execute a query and return results."""
         impl = query.get_impl_for_family(self.family)
         if impl is None:
             raise ValueError(f"No {self.family} implementation for {query.query_id}")
 
         result = impl(ctx)
 
-        # Collect if lazy
         if hasattr(result, 'collect'):
             result = result.collect()
 
@@ -187,7 +179,6 @@ class MyPlatformAdapter(ExpressionFamilyAdapter[MyDF, MyLazyDF, MyExpr]):
 
     @staticmethod
     def is_available() -> bool:
-        """Check if the platform is installed."""
         try:
             import myplatform
             return True
@@ -196,7 +187,6 @@ class MyPlatformAdapter(ExpressionFamilyAdapter[MyDF, MyLazyDF, MyExpr]):
 
     @staticmethod
     def get_version() -> str | None:
-        """Get platform version string."""
         try:
             import myplatform
             return myplatform.__version__
@@ -207,16 +197,15 @@ class MyPlatformAdapter(ExpressionFamilyAdapter[MyDF, MyLazyDF, MyExpr]):
 ## Step 4: Register the Platform
 
 Add the platform to the DataFrame adapter registry and `PlatformRegistry` metadata. DataFrame-only platforms must set `supports_sql=False`, `supports_dataframe=True`, and exactly one `support_status`.
+The registry lives in `benchbox/platforms/dataframe/__init__.py`. The `myplatform-df` entry is the new platform.
 
 ```python
-# benchbox/platforms/dataframe/__init__.py
-
 from benchbox.platforms.dataframe.myplatform import MyPlatformAdapter
 
 DATAFRAME_ADAPTERS = {
     "polars-df": PolarsDataFrameAdapter,
     "pandas-df": PandasDataFrameAdapter,
-    "myplatform-df": MyPlatformAdapter,  # Add new platform
+    "myplatform-df": MyPlatformAdapter,
 }
 ```
 
@@ -227,18 +216,17 @@ platform scaffold script (`--kind dataframe`).
 
 ### Unit Tests
 
-```python
-# tests/unit/platforms/test_myplatform_adapter.py
+Put the unit tests in `tests/unit/platforms/test_myplatform_adapter.py`. `test_is_available` passes whether or not
+`myplatform` is installed, because the result is `True` only when it is installed. The `family` assertion expects
+`"expression"` for an expression family platform and `"pandas"` for a pandas family platform.
 
+```python
 import pytest
 from benchbox.platforms.dataframe.myplatform import MyPlatformAdapter
 
 class TestMyPlatformAdapter:
-    """Tests for MyPlatform DataFrame adapter."""
 
     def test_is_available(self):
-        """Test availability check."""
-        # Will be True if myplatform is installed
         result = MyPlatformAdapter.is_available()
         assert isinstance(result, bool)
 
@@ -247,17 +235,15 @@ class TestMyPlatformAdapter:
         reason="myplatform not installed"
     )
     def test_create_context(self, tmp_path):
-        """Test context creation."""
         adapter = MyPlatformAdapter(str(tmp_path))
         ctx = adapter.create_context()
-        assert ctx.family == "expression"  # or "pandas"
+        assert ctx.family == "expression"
 
     @pytest.mark.skipif(
         not MyPlatformAdapter.is_available(),
         reason="myplatform not installed"
     )
     def test_query_execution(self, tmp_path, sample_data):
-        """Test query execution with sample data."""
         adapter = MyPlatformAdapter(str(tmp_path))
         ctx = adapter.create_context()
         adapter.load_tables(ctx, sample_data)
@@ -271,9 +257,9 @@ class TestMyPlatformAdapter:
 
 ### Integration Tests
 
-```python
-# tests/integration/test_myplatform_tpch.py
+Put the integration tests in `tests/integration/test_myplatform_tpch.py`.
 
+```python
 import pytest
 from benchbox.platforms.dataframe.myplatform import MyPlatformAdapter
 
@@ -283,10 +269,8 @@ from benchbox.platforms.dataframe.myplatform import MyPlatformAdapter
     reason="myplatform not installed"
 )
 class TestMyPlatformTPCH:
-    """Integration tests for MyPlatform TPC-H execution."""
 
     def test_all_tpch_queries(self, tpch_data_dir):
-        """Test all TPC-H queries execute successfully."""
         from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES
 
         adapter = MyPlatformAdapter(str(tpch_data_dir))

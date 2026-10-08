@@ -1,5 +1,3 @@
-"""Unit tests for benchbox.monitoring performance utilities."""
-
 from __future__ import annotations
 
 import os
@@ -99,26 +97,23 @@ def test_performance_history_detects_regressions(temp_history_path: Path) -> Non
 
 
 def test_performance_tracker_trend_and_anomaly_detection() -> None:
-    # Properly close the file descriptor before using the path
+
     fd, path = tempfile.mkstemp(suffix="_tracker.json")
     os.close(fd)
     temp_file = Path(path)
     try:
         tracker = PerformanceTracker(temp_file)
 
-        # Improving metric
         for value in [1.0, 0.95, 0.9, 0.85, 0.8, 0.78]:
             tracker.record_metric("improving", value)
         trend = tracker.get_trend("improving")
         assert trend["trend"] == "improving"
 
-        # Stable metric with noise
         for value in [1.0, 1.01, 0.99, 1.0, 1.02, 0.98]:
             tracker.record_metric("stable", value)
         trend = tracker.get_trend("stable")
         assert trend["trend"] == "stable"
 
-        # Inject anomalies for detection
         for value in [1.0] * 12:
             tracker.record_metric("anomaly", value)
         tracker.record_metric("anomaly", 3.5)
@@ -130,5 +125,4 @@ def test_performance_tracker_trend_and_anomaly_detection() -> None:
             if temp_file.exists():
                 temp_file.unlink()
         except PermissionError:
-            # On Windows, file may still be held by the tracker
             pass

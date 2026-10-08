@@ -1,5 +1,3 @@
-"""Unit tests for post-benchmark statement overhead probe."""
-
 from __future__ import annotations
 
 import threading
@@ -49,8 +47,6 @@ class _QueryApiJob:
 
 
 class _QueryApiClient:
-    """BigQuery-style client: query() but no cursor()."""
-
     def __init__(self, delay: float = 0.0) -> None:
         self.queries: list[str] = []
         self.delay = delay
@@ -73,7 +69,7 @@ def test_probe_statement_overhead_success() -> None:
     assert overhead["min"] >= 0.0
     assert overhead["median"] >= 0.0
     assert overhead["min"] <= overhead["median"]
-    # 1 warmup + 5 measurement queries = 6 total SELECT 1
+
     assert len(cursor.executed_queries) == 6
     assert all(q == "SELECT 1" for q in cursor.executed_queries)
     assert cursor.closed is True
@@ -88,7 +84,7 @@ def test_probe_statement_overhead_custom_sample_count() -> None:
     assert result["collection_status"] == "available"
     overhead = result["statement_overhead_ms"]
     assert overhead["samples"] == 3
-    # 1 warmup + 3 measurement queries = 4 total
+
     assert len(cursor.executed_queries) == 4
     assert cursor.closed is True
 
@@ -124,7 +120,7 @@ def test_probe_statement_overhead_execution_failure() -> None:
     assert result["collection_status"] == "partial"
     assert result["source"] == "unavailable"
     assert result["collection_error_class"] == "RuntimeError"
-    # Raw error text is never published, only the allowlisted diagnostic.
+
     assert result["collection_error_message"] == "RuntimeError: statement overhead probe failed"
     assert cursor.closed is True
 
@@ -144,7 +140,7 @@ def test_probe_statement_overhead_hung_execute_returns_timeout() -> None:
     assert result["collection_status"] == "partial"
     assert result["collection_error_class"] == "TimeoutError"
     assert result["collection_error_message"] == "TimeoutError: statement overhead probe failed"
-    # The hung execute must not hang the caller: well under the 30s sleep.
+
     assert elapsed < 10.0
 
 

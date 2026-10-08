@@ -1,5 +1,3 @@
-"""Tests for scripts/check_duplicate_code.py delta mode and helpers."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -61,7 +59,7 @@ def _git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProc
 
 
 def _init_repo_with_clone(tmp_path: Path) -> Path:
-    """Create a tiny git repo whose benchbox/ tree has a Type-2 clone pair."""
+
     repo = tmp_path / "repo"
     repo.mkdir()
     _git(repo, "init")
@@ -70,7 +68,7 @@ def _init_repo_with_clone(tmp_path: Path) -> Path:
 
     package = repo / "benchbox"
     package.mkdir()
-    # Two identical-structure functions (>= 10 body lines each) so they form a group.
+
     body = textwrap.dedent(
         """\
         def clone_a(x):
@@ -129,7 +127,7 @@ class TestDeltaCli:
     def test_delta_pass_when_unchanged(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys):
         repo = _init_repo_with_clone(tmp_path)
         monkeypatch.chdir(repo)
-        # Working tree matches HEAD; merge-base with HEAD is HEAD.
+
         code = dup.main(["--delta-vs", "HEAD", "--source-root", "benchbox", "--min-lines", "10"])
         out = capsys.readouterr().out
         assert code == 0
@@ -138,7 +136,7 @@ class TestDeltaCli:
 
     def test_delta_fail_when_new_clone_added(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys):
         repo = _init_repo_with_clone(tmp_path)
-        # Add a third structural clone on the working tree (not committed).
+
         extra = textwrap.dedent(
             """\
 

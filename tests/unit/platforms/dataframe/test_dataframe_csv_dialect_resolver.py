@@ -1,12 +1,3 @@
-"""Regression tests: dataframe adapter load_table() routes trailing-delimiter gate through resolver.
-
-Mirrors test_spark_csv_dialect_resolver.py but covers the pandas-family and expression-family
-base classes, verifying that:
-  - TBL format (format_type=="tbl") sets null_marker="" so trailing-delimiter probing fires.
-  - CSV format (format_type=="csv") sets null_marker=None so probing is skipped.
-  - When a real DataSource with manifest metadata is supplied, resolve_csv_dialect() is used.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -21,14 +12,7 @@ from benchbox.platforms.dataframe.pandas_family import PandasFamilyAdapter, Pand
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
-# ---------------------------------------------------------------------------
-# Minimal pandas-family adapter stub
-# ---------------------------------------------------------------------------
-
-
 class _PandasStub(PandasFamilyAdapter[dict]):
-    """Minimal concrete PandasFamilyAdapter that records read_csv calls."""
-
     platform_name = "StubPandas"
 
     def __init__(self) -> None:
@@ -121,14 +105,7 @@ def _pandas_ctx(adapter: _PandasStub) -> PandasFamilyContext:
     return adapter.create_context()
 
 
-# ---------------------------------------------------------------------------
-# Minimal expression-family adapter stub
-# ---------------------------------------------------------------------------
-
-
 class _ExpressionStub(ExpressionFamilyAdapter[dict, dict, str]):
-    """Minimal concrete ExpressionFamilyAdapter that records read_csv calls."""
-
     platform_name = "StubExpr"
     table_mode = "native"
     config = None
@@ -224,13 +201,8 @@ class _ExpressionStub(ExpressionFamilyAdapter[dict, dict, str]):
         return {}
 
 
-# ---------------------------------------------------------------------------
-# Pandas-family tests
-# ---------------------------------------------------------------------------
-
-
 def test_pandas_load_table_tbl_sets_null_marker(tmp_path: Path) -> None:
-    """format_hint='tbl' (TPC data) must set null_marker='' for trailing-delimiter probing."""
+
     f = tmp_path / "lineitem.tbl"
     f.write_text("1|ok\n")
 
@@ -243,7 +215,7 @@ def test_pandas_load_table_tbl_sets_null_marker(tmp_path: Path) -> None:
 
 
 def test_pandas_load_table_csv_leaves_null_marker_none(tmp_path: Path) -> None:
-    """format_hint='csv' must leave null_marker=None so probing is skipped."""
+
     f = tmp_path / "lineitem.csv"
     f.write_text("id,name\n1,ok\n")
 
@@ -256,11 +228,10 @@ def test_pandas_load_table_csv_leaves_null_marker_none(tmp_path: Path) -> None:
 
 
 def test_pandas_load_table_uses_resolver_null_marker_when_data_source_provided(tmp_path: Path) -> None:
-    """When a DataSource with manifest metadata is supplied, resolve_csv_dialect() drives null_marker."""
+
     f = tmp_path / "lineitem.csv"
     f.write_text("1|ok|\n")
 
-    # Manifest declares TPC-style dialect on a .csv path.
     ds = DataSource(
         source_type="manifest_v2",
         tables={"lineitem": [f]},
@@ -276,7 +247,7 @@ def test_pandas_load_table_uses_resolver_null_marker_when_data_source_provided(t
 
 
 def test_pandas_load_table_null_marker_none_when_no_null_marker_in_manifest(tmp_path: Path) -> None:
-    """Manifest with csv_null_marker=None must produce null_marker=None."""
+
     f = tmp_path / "clickbench.csv"
     f.write_text("1,ok\n")
 
@@ -294,13 +265,8 @@ def test_pandas_load_table_null_marker_none_when_no_null_marker_in_manifest(tmp_
     assert adapter.calls[0]["null_marker"] is None
 
 
-# ---------------------------------------------------------------------------
-# Expression-family tests
-# ---------------------------------------------------------------------------
-
-
 def test_expression_load_table_tbl_sets_null_marker(tmp_path: Path) -> None:
-    """format_hint='tbl' must set null_marker='' for expression-family adapters."""
+
     f = tmp_path / "orders.tbl"
     f.write_text("1|ok\n")
 
@@ -313,7 +279,7 @@ def test_expression_load_table_tbl_sets_null_marker(tmp_path: Path) -> None:
 
 
 def test_expression_load_table_csv_leaves_null_marker_none(tmp_path: Path) -> None:
-    """format_hint='csv' must leave null_marker=None for expression-family adapters."""
+
     f = tmp_path / "orders.csv"
     f.write_text("id,name\n1,ok\n")
 
@@ -326,7 +292,7 @@ def test_expression_load_table_csv_leaves_null_marker_none(tmp_path: Path) -> No
 
 
 def test_expression_load_table_uses_resolver_null_marker_when_data_source_provided(tmp_path: Path) -> None:
-    """When a DataSource with manifest metadata is supplied, resolve_csv_dialect() drives null_marker."""
+
     f = tmp_path / "orders.csv"
     f.write_text("1|ok|\n")
 

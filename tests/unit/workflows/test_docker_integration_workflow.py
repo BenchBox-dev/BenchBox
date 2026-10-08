@@ -1,10 +1,3 @@
-"""Contract tests for the Docker integration pipeline.
-
-The docker-integration.yml workflow owns nightly compose-backed live suites
-for postgres, clickhouse, and trino. These tests pin the schedule,
-per-service jobs, compose stack references, and the no-silent-skip guard.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path

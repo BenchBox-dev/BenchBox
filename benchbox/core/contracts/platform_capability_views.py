@@ -1,5 +1,3 @@
-"""Runtime compatibility views for narrow platform capability protocols."""
-
 from __future__ import annotations
 
 from typing import Any, TypeVar, cast
@@ -30,7 +28,6 @@ def _capability_view(
     required_callables: tuple[str, ...],
     required_data: tuple[str, ...] = (),
 ) -> _CapabilityT:
-    """Return a structural view or fail with actionable member evidence."""
 
     missing = [member for member in (*required_callables, *required_data) if not hasattr(candidate, member)]
     if missing:
@@ -40,8 +37,6 @@ def _capability_view(
     if non_callable:
         detail = f"; not callable: {', '.join(non_callable)}"
         raise CapabilityContractError(f"{type(candidate).__name__} does not provide {capability_name}{detail}")
-    # Runtime checks cannot validate signatures. The strict type island owns
-    # that proof; this boundary preserves dynamic mocks and third-party adapters.
     return cast(_CapabilityT, candidate)
 
 
@@ -143,7 +138,6 @@ def run_categorized_query_benchmark(
     category: str,
     iterations: int = 1,
 ) -> dict[str, Any]:
-    """Run one category through the specialized direct-run contract."""
 
     runner = _capability_view(
         candidate,

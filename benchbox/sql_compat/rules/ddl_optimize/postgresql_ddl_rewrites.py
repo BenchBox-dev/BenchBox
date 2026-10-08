@@ -1,14 +1,3 @@
-"""PostgreSQL DDL rewrite rules for Phase.DDL_OPTIMIZE.
-
-PostgreSQL natively supports FOREIGN KEY constraints, but some PostgreSQL-compatible
-engines (e.g., CedarDB) reject certain FK patterns at CREATE TABLE time.
-PostgreSQLAdapter._optimize_table_definition() is not used; the FK strip is a
-retry-on-failure path inside PostgreSQLAdapter._execute_create_schema().
-
-This rule registers the REWRITE_DDL intent for governance - compat_lint enforcement
-only; transformer_id is not resolved at runtime.
-"""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.rules._registration import register_ddl_rewrite

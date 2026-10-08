@@ -1,23 +1,6 @@
-"""PostgreSQL Extension Comparison Report Generator.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Generates comparison reports between PostgreSQL baseline and extension
-benchmark results. Supports comparing any PostgreSQL extension (pg_duckdb,
-pg_mooncake, TimescaleDB) against vanilla PostgreSQL or against each other.
-
-Report types:
-- Query-by-query speedup ratios
-- Load time comparison
-- Total execution time comparison
-
-Example:
-    >>> from benchbox.core.pg_extension_comparison import generate_comparison_report
-    >>> report = generate_comparison_report(baseline_results, extension_results)
-    >>> emit(report)
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -34,7 +17,6 @@ def _format_metric_section(
     baseline_platform: str,
     extension_platform: str,
 ) -> list[str]:
-    """Format a simple baseline/extension metric comparison section."""
     if baseline_value is None or extension_value is None or baseline_value <= 0:
         return []
 
@@ -53,7 +35,6 @@ def _format_query_comparison_section(
     baseline_queries: dict[str, Any],
     extension_queries: dict[str, Any],
 ) -> list[str]:
-    """Format the query-by-query comparison section."""
     if not baseline_queries or not extension_queries:
         return []
 
@@ -104,7 +85,6 @@ def _format_summary_section(
     baseline_platform: str,
     extension_platform: str,
 ) -> list[str]:
-    """Format the summary section."""
     lines = [
         "Summary",
         "-" * 40,
@@ -130,19 +110,6 @@ def generate_comparison_report(
     baseline: dict[str, Any],
     extension: dict[str, Any],
 ) -> str:
-    """Generate a comparison report between two benchmark results.
-
-    Compares a baseline run (typically vanilla PostgreSQL) against an
-    extension run (pg_duckdb, pg_mooncake, etc.) and produces a formatted
-    report with speedup ratios and timing differences.
-
-    Args:
-        baseline: Result data from the baseline platform run.
-        extension: Result data from the extension platform run.
-
-    Returns:
-        Formatted multi-line comparison report string.
-    """
     lines = []
 
     baseline_platform = baseline.get("platform", "baseline")
@@ -192,14 +159,6 @@ def generate_comparison_report(
 
 
 def _geometric_mean(values: list[float]) -> float:
-    """Calculate geometric mean of positive values.
-
-    Args:
-        values: List of positive float values.
-
-    Returns:
-        Geometric mean of the values.
-    """
     if not values:
         return 0.0
     import math

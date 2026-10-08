@@ -1,5 +1,3 @@
-"""Production memory-policy coverage for ``BenchmarkExecutionMixin``."""
-
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -17,8 +15,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 class MemoryPolicyAdapter(BenchmarkExecutionMixin):
-    """Minimal adapter that records whether execution passed the memory gate."""
-
     platform_name = "Polars"
     family = "expression"
 
@@ -42,7 +38,7 @@ def _benchmark() -> SimpleNamespace:
 
 
 def test_run_benchmark_rejects_unsafe_memory(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The production capacity check aborts before an execution context is created."""
+
     monkeypatch.setattr("benchbox.core.dataframe.capabilities.get_available_memory_gb", lambda: 0.01)
     adapter = MemoryPolicyAdapter()
 
@@ -59,7 +55,7 @@ def test_run_benchmark_rejects_unsafe_memory(monkeypatch: pytest.MonkeyPatch) ->
 
 
 def test_run_benchmark_ignore_memory_warning_reaches_execution(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The explicit override bypasses the same unsafe host-memory condition."""
+
     monkeypatch.setattr("benchbox.core.dataframe.capabilities.get_available_memory_gb", lambda: 0.01)
     adapter = MemoryPolicyAdapter()
 

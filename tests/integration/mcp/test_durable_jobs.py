@@ -1,5 +1,3 @@
-"""Multi-worker, restart, and tenant acceptance tests for durable MCP jobs."""
-
 from __future__ import annotations
 
 import json
@@ -74,10 +72,8 @@ def test_restart_records_unknown_instead_of_rerunning_lost_lease(tmp_path: Path)
     restarted_worker.recover_expired()
     unknown = first_repository.get(submitted.execution_id)
     assert unknown is not None and unknown.state == "unknown"
-    # The lost attempt may still have executed, so no worker reruns it automatically.
     assert restarted_repository.claim(restarted_worker.worker_id) is None
 
-    # The operator inspects, then resubmits with a new idempotency key.
     resubmitted, created = first_repository.submit("tenant-a", _request(), idempotency_key="restart-after-unknown")
     assert created is True
     claimed = restarted_repository.claim(restarted_worker.worker_id)
@@ -111,7 +107,6 @@ def test_normalized_platform_options_survive_repository_round_trip(tmp_path: Pat
 
 
 def test_durable_replay_applies_duckdb_threads_to_the_real_adapter(tmp_path: Path) -> None:
-    """A replayed request must still change DuckDB execution, not just forward a key."""
     from benchbox.core.run_service import translate_platform_options_for_adapter as _prepare_adapter_platform_options
     from benchbox.platforms.duckdb import DuckDBAdapter
 
@@ -123,7 +118,6 @@ def test_durable_replay_applies_duckdb_threads_to_the_real_adapter(tmp_path: Pat
     assert persisted is not None
     assert persisted.request["platform_options"] == {"threads": 5}
 
-    # Replay the persisted request exactly as the worker would.
     prepared = _prepare_adapter_platform_options("duckdb", persisted.request["platform_options"])
     adapter = DuckDBAdapter.from_config(
         {
@@ -138,7 +132,6 @@ def test_durable_replay_applies_duckdb_threads_to_the_real_adapter(tmp_path: Pat
 
 
 def test_durable_admission_refuses_contradictory_databricks_clustering(tmp_path: Path) -> None:
-    """A request that can never succeed must not occupy a durable queue slot."""
     repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
 
     with pytest.raises(MCPValidationError, match="clustering options conflict"):
@@ -152,7 +145,6 @@ def test_durable_admission_refuses_contradictory_databricks_clustering(tmp_path:
 
 
 def test_durable_databricks_requests_persist_only_normalized_intent(tmp_path: Path) -> None:
-    """Replay reconstructs the tuning object; it never replays raw mappings."""
     repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
     options = validate_platform_options(
         "databricks",
@@ -167,12 +159,10 @@ def test_durable_databricks_requests_persist_only_normalized_intent(tmp_path: Pa
         "databricks_clustering_strategy": "liquid_clustering",
         "liquid_clustering_columns": "a,b",
     }
-    # The persisted request survives a JSON round trip and still validates.
     assert validate_platform_options("databricks", persisted.request["platform_options"]) == options
 
 
 def test_durable_admission_refuses_an_oversized_dask_envelope(tmp_path: Path) -> None:
-    """An over-envelope request must never reach the queue, let alone a worker."""
     repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
 
     with pytest.raises(MCPValidationError, match="thread budget"):
@@ -184,14 +174,12 @@ def test_durable_admission_refuses_an_oversized_dask_envelope(tmp_path: Path) ->
 
 
 def test_durable_worker_replay_re_enforces_the_dask_envelope(tmp_path: Path, monkeypatch) -> None:
-    """A budget tightened after submission is applied on replay, not bypassed."""
     repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
     options = validate_platform_options("dask", {"n_workers": 8, "threads_per_worker": 4})
     submitted, _ = repository.submit(
         "tenant-a", {**_request(), "platform": "dask-df", "mode": "dataframe", "platform_options": options}
     )
 
-    # The operator narrows the budget while the job is still queued.
     monkeypatch.setenv(MCP_DASK_MAX_TOTAL_THREADS_ENV, "8")
 
     claimed = repository.claim("worker-a")
@@ -205,7 +193,6 @@ def test_durable_worker_replay_re_enforces_the_dask_envelope(tmp_path: Path, mon
 
 
 def test_durable_clickhouse_requests_never_persist_a_connection_tuple(tmp_path: Path, monkeypatch) -> None:
-    """A retry replays the profile name, so it re-resolves against current policy."""
     monkeypatch.setenv(MCP_CLICKHOUSE_PROFILE_ENV, json.dumps({"reviewed": {"port": 9440, "secure": True}}))
     repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
     options = validate_platform_options("clickhouse-server", {"connection_profile": "reviewed"})
@@ -223,7 +210,6 @@ def test_durable_clickhouse_requests_never_persist_a_connection_tuple(tmp_path: 
 
 @pytest.mark.parametrize("platform", ["clickhouse", "clickhouse-server"])
 def test_durable_admission_refuses_clickhouse_port_and_tls_overrides(platform: str) -> None:
-    """Both ClickHouse spellings fail closed before a job can be persisted."""
     for options in ({"port": 9001}, {"secure": False}):
         with pytest.raises(MCPValidationError, match="not authorized"):
             validate_platform_options(platform, options)
@@ -322,8 +308,6 @@ def test_no_overadmission_after_lease_loss_until_confirmed_termination(tmp_path:
     with ThreadPoolExecutor(max_workers=1) as pool:
         running = pool.submit(anyio.run, worker._run_job, claimed)
         assert entered.wait(timeout=10)
-        # Impair the heartbeat at the repository seam so recovery can observe
-        # a stable expired lease, exactly as a fencing takeover refuses renewals.
         monkeypatch.setattr(repository, "renew", lambda execution_id, worker_id: False)
         cancelled = repository.cancel(first.execution_id, "tenant-a")
         assert cancelled is not None and cancelled[1] == "requested"
@@ -339,17 +323,14 @@ def test_no_overadmission_after_lease_loss_until_confirmed_termination(tmp_path:
         lost = repository.get(first.execution_id)
         assert lost is not None and lost.state == "unknown"
         assert lost.error_code == "cancellation_unconfirmed"
-        # The lost attempt still holds the only running slot: no over-admission.
         assert repository.claim("worker-b") is None
         release.set()
         running.result(timeout=30)
 
-    # The fenced executor's return creates a distinct durable quiescence proof.
     quiesced = repository.get(first.execution_id)
     assert quiesced is not None and quiesced.quiesced_at is not None
     assert repository.capacity_summary()["outstanding"] == 0
 
-    # Retention may purge only after that proof exists.
     with repository._connect() as connection:
         connection.execute(
             "UPDATE mcp_benchmark_jobs SET completed_at = ? WHERE execution_id = ?",
@@ -366,7 +347,6 @@ def test_no_overadmission_after_lease_loss_until_confirmed_termination(tmp_path:
 
 
 def _spawn_claim(db_path: str, worker_id: str, outcome: multiprocessing.Queue) -> None:
-    """Claim from a fresh process; the target must stay import-safe for spawn."""
     from benchbox.mcp.jobs import DurableJobRepository
     from benchbox.mcp.security import JobLimits
 

@@ -1,9 +1,6 @@
-"""Tests for database naming utilities with configuration characteristics.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -26,48 +23,36 @@ pytestmark = [
 
 
 class TestDatabaseNameGeneration:
-    """Test database name generation with configuration characteristics."""
-
     def test_basic_name_generation(self):
-        """Test basic database name generation without tuning."""
         name = generate_database_name("tpch", 1.0, "duckdb")
         assert name == "tpch_sf1_notuning_noconstraints"
 
     def test_scale_factor_formatting(self):
-        """Test scale factor formatting in database names."""
-        # Integer scale factors
         assert "sf1" in generate_database_name("tpch", 1.0, "duckdb")
         assert "sf10" in generate_database_name("tpch", 10.0, "duckdb")
 
-        # Decimal scale factors
         assert "sf01" in generate_database_name("tpch", 0.1, "duckdb")
         assert "sf001" in generate_database_name("tpch", 0.01, "duckdb")
         assert "sf0001" in generate_database_name("tpch", 0.001, "duckdb")
 
     def test_custom_name_override(self):
-        """Test custom name override functionality."""
         custom_name = "my_custom_database"
         name = generate_database_name("tpch", 1.0, "duckdb", custom_name=custom_name)
-        assert name == "mycustomdatabase"  # Cleaned version
+        assert name == "mycustomdatabase"
 
     def test_tuning_config_metadata_name(self):
-        """Test database name from tuning configuration metadata."""
         tuning_config = {"_metadata": {"database_name": "metadata_db_name"}}
         name = generate_database_name("tpch", 1.0, "duckdb", tuning_config=tuning_config)
-        assert name == "metadatadbname"  # Cleaned version
+        assert name == "metadatadbname"
 
     def test_tuning_mode_detection(self):
-        """Test different tuning mode detection."""
-        # No tuning configuration
         name = generate_database_name("tpch", 1.0, "duckdb")
         assert "notuning" in name
 
-        # Empty tuning configuration
         empty_config = {}
         name = generate_database_name("tpch", 1.0, "duckdb", empty_config)
         assert "notuning" in name
 
-        # Standard no-tuning configuration
         notuning_config = {
             "primary_keys": {"enabled": False},
             "foreign_keys": {"enabled": False},
@@ -77,7 +62,6 @@ class TestDatabaseNameGeneration:
         name = generate_database_name("tpch", 1.0, "duckdb", notuning_config)
         assert "notuning" in name
 
-        # Custom tuning configuration
         custom_config = {
             "primary_keys": {"enabled": True},
             "foreign_keys": {"enabled": False},
@@ -88,8 +72,6 @@ class TestDatabaseNameGeneration:
         assert "custom" in name
 
     def test_constraints_suffix_generation(self):
-        """Test constraints suffix generation."""
-        # No constraints
         config = {
             "primary_keys": {"enabled": False},
             "foreign_keys": {"enabled": False},
@@ -97,25 +79,19 @@ class TestDatabaseNameGeneration:
         name = generate_database_name("tpch", 1.0, "duckdb", config)
         assert "noconstraints" in name
 
-        # Primary keys only
         config = {"primary_keys": {"enabled": True}, "foreign_keys": {"enabled": False}}
         name = generate_database_name("tpch", 1.0, "duckdb", config)
         assert "pk" in name and "fk" not in name
 
-        # Both primary and foreign keys
         config = {"primary_keys": {"enabled": True}, "foreign_keys": {"enabled": True}}
         name = generate_database_name("tpch", 1.0, "duckdb", config)
         assert "pk" in name and "fk" in name
 
     def test_optimizations_suffix_generation(self):
-        """Test platform optimizations suffix generation."""
-        # No optimizations
         config = {"platform_optimizations": {}, "table_tunings": {}}
         name = generate_database_name("tpch", 1.0, "duckdb", config)
-        # Should not have optimization suffixes
         assert "part" not in name
 
-        # Platform optimizations
         config = {
             "platform_optimizations": {
                 "z_ordering_enabled": True,
@@ -125,7 +101,6 @@ class TestDatabaseNameGeneration:
         name = generate_database_name("tpch", 1.0, "duckdb", config)
         assert "zorder" in name
 
-        # Table-level optimizations
         config = {
             "platform_optimizations": {},
             "table_tunings": {
@@ -139,22 +114,17 @@ class TestDatabaseNameGeneration:
         assert "part" in name and "sort" in name
 
     def test_filename_generation(self):
-        """Test database filename generation with extensions."""
-        # DuckDB extension
         filename = generate_database_filename("tpch", 1.0, "duckdb")
         assert filename.endswith(".duckdb")
         assert filename.startswith("tpch_sf1")
 
-        # SQLite extension (changed from .db to .sqlite)
         filename = generate_database_filename("tpch", 1.0, "sqlite")
         assert filename.endswith(".sqlite")
 
-        # Unknown platform (gets unique extension from platform name)
         filename = generate_database_filename("tpch", 1.0, "unknown")
         assert filename.endswith(".unknown")
 
     def test_platform_extensions_unique(self):
-        """Test that each platform gets a unique extension to prevent collisions."""
         platforms = {
             "duckdb": ".duckdb",
             "sqlite": ".sqlite",
@@ -178,16 +148,13 @@ class TestDatabaseNameGeneration:
             )
 
     def test_no_db_extension_collision(self):
-        """Test that no platform uses .db extension (prevents SQLite collision)."""
         common_platforms = ["duckdb", "sqlite", "clickhouse", "datafusion", "polars", "pandas", "cudf", "spark"]
 
         for platform in common_platforms:
             filename = generate_database_filename("tpch", 1.0, platform)
-            # None of the known platforms should use .db anymore
             assert not filename.endswith(".db"), f"Platform '{platform}' uses .db extension which can cause collisions"
 
     def test_complex_configuration_naming(self):
-        """Test naming with complex configuration."""
         complex_config = {
             "primary_keys": {"enabled": True},
             "foreign_keys": {"enabled": True},
@@ -206,17 +173,14 @@ class TestDatabaseNameGeneration:
 
         name = generate_database_name("tpch", 0.01, "duckdb", complex_config)
 
-        # Should contain all expected components
         assert "tpch" in name
         assert "sf001" in name
-        assert "custom" in name  # Not standard config
+        assert "custom" in name
         assert "pk" in name and "fk" in name and "uniq" in name
         assert "zorder" in name
         assert "part" in name and "sort" in name and "clust" in name
 
     def test_name_length_limit(self):
-        """Test name length limitations."""
-        # Create a configuration that would generate a very long name
         long_config = {
             "primary_keys": {"enabled": True},
             "foreign_keys": {"enabled": True},
@@ -239,18 +203,13 @@ class TestDatabaseNameGeneration:
 
         name = generate_database_name("very_long_benchmark_name", 0.001, "duckdb", long_config)
 
-        # Should be within reasonable limits
         assert len(name) <= 63
 
-        # Should still contain essential components
         assert "verylongbenchmarkname" in name[:30] or "sf0001" in name
 
 
 class TestDatabaseNameParsing:
-    """Test database name parsing functionality."""
-
     def test_basic_name_parsing(self):
-        """Test basic database name parsing."""
         name = "tpch_sf1_notuning_noconstraints"
         parsed = parse_database_name(name)
 
@@ -261,7 +220,6 @@ class TestDatabaseNameParsing:
         assert parsed["has_optimizations"] is False
 
     def test_complex_name_parsing(self):
-        """Test parsing of complex database names."""
         name = "tpch_sf001_custom_pk_fk_part_sort.duckdb"
         parsed = parse_database_name(name)
 
@@ -277,62 +235,45 @@ class TestDatabaseNameParsing:
         assert "bloom" not in parsed["characteristics"]
 
     def test_filename_parsing(self):
-        """Test parsing database filenames with extensions."""
-        # DuckDB file
         parsed = parse_database_name("tpch_sf1_tuned_pk.duckdb")
         assert parsed["benchmark"] == "tpch"
         assert parsed["original_name"] == "tpch_sf1_tuned_pk.duckdb"
 
-        # SQLite file
         parsed = parse_database_name("tpcds_sf01_notuning.sqlite")
         assert parsed["benchmark"] == "tpcds"
 
     def test_invalid_name_parsing(self):
-        """Test parsing of invalid or malformed names."""
-        # Empty name
         parsed = parse_database_name("")
         assert parsed["benchmark"] == ""
         assert parsed["scale_factor"] is None
 
-        # Single component
         parsed = parse_database_name("tpch")
         assert parsed["benchmark"] == "tpch"
         assert parsed["scale_factor"] is None
 
 
 class TestDatabaseNameValidation:
-    """Test database name validation."""
-
     def test_valid_names(self):
-        """Test validation of valid database names."""
         assert validate_database_name("tpch_sf1_notuning", "duckdb") is True
         assert validate_database_name("valid_database_name_123", "duckdb") is True
         assert validate_database_name("a", "duckdb") is True
 
     def test_invalid_names(self):
-        """Test validation of invalid database names."""
-        # Empty name
         assert validate_database_name("", "duckdb") is False
 
-        # Too long
         long_name = "a" * 70
         assert validate_database_name(long_name, "duckdb") is False
 
-        # Invalid characters
         assert validate_database_name("invalid-name", "duckdb") is False
         assert validate_database_name("invalid name", "duckdb") is False
         assert validate_database_name("123_starts_with_number", "duckdb") is False
 
 
 class TestTuningConfigurationHelpers:
-    """Test tuning configuration helper functions."""
-
     def test_tuning_mode_detection(self):
-        """Test tuning mode detection helper."""
         assert _get_tuning_mode(None) == "notuning"
         assert _get_tuning_mode({}) == "notuning"
 
-        # Standard no-tuning
         notuning = {
             "primary_keys": {"enabled": False},
             "foreign_keys": {"enabled": False},
@@ -341,7 +282,6 @@ class TestTuningConfigurationHelpers:
         }
         assert _get_tuning_mode(notuning) == "notuning"
 
-        # Explicit metadata type
         explicit_notuning = {"_metadata": {"configuration_type": "notuning"}}
         assert _get_tuning_mode(explicit_notuning) == "notuning"
 
@@ -349,15 +289,12 @@ class TestTuningConfigurationHelpers:
         assert _get_tuning_mode(explicit_tuned) == "tuned"
 
     def test_constraints_suffix_helper(self):
-        """Test constraints suffix generation helper."""
         assert _get_constraints_suffix(None) == "noconstraints"
         assert _get_constraints_suffix({}) == "noconstraints"
 
-        # Primary keys only
         pk_config = {"primary_keys": {"enabled": True}}
         assert _get_constraints_suffix(pk_config) == "pk"
 
-        # Multiple constraints
         multi_config = {
             "primary_keys": {"enabled": True},
             "foreign_keys": {"enabled": True},
@@ -369,11 +306,9 @@ class TestTuningConfigurationHelpers:
         assert "uniq" in suffix
 
     def test_optimizations_suffix_helper(self):
-        """Test optimizations suffix generation helper."""
         assert _get_optimizations_suffix(None) == ""
         assert _get_optimizations_suffix({}) == ""
 
-        # Platform optimizations
         platform_config = {
             "platform_optimizations": {
                 "z_ordering_enabled": True,
@@ -383,7 +318,6 @@ class TestTuningConfigurationHelpers:
         assert "zorder" in suffix
         assert "bloom" not in suffix
 
-        # Table optimizations
         table_config = {
             "table_tunings": {
                 "test_table": {
@@ -397,7 +331,6 @@ class TestTuningConfigurationHelpers:
         assert "sort" in suffix
 
     def test_config_hash_helper(self):
-        """Test configuration hash generation helper."""
         assert _get_config_hash(None) == "000000"
 
         config1 = {"primary_keys": {"enabled": True}}
@@ -408,22 +341,16 @@ class TestTuningConfigurationHelpers:
         hash2 = _get_config_hash(config2)
         hash3 = _get_config_hash(config3)
 
-        # Different configs should have different hashes
         assert hash1 != hash2
 
-        # Same configs should have same hashes
         assert hash1 == hash3
 
-        # Hash should be 6 characters
         assert len(hash1) == 6
         assert hash1.isalnum()
 
 
 class TestDatabaseConfigurationListing:
-    """Test database configuration listing functionality."""
-
     def test_list_configurations(self):
-        """Test listing and parsing multiple database configurations."""
         names = [
             "tpch_sf1_notuning_noconstraints.duckdb",
             "tpch_sf001_tuned_pk_fk_part.duckdb",
@@ -434,30 +361,23 @@ class TestDatabaseConfigurationListing:
 
         assert len(configs) == 3
 
-        # Check first configuration
         assert configs[0]["benchmark"] == "tpch"
         assert configs[0]["scale_factor"] == 1.0
         assert configs[0]["tuning_mode"] == "notuning"
 
-        # Check second configuration
         assert configs[1]["benchmark"] == "tpch"
         assert configs[1]["scale_factor"] == 0.01
         assert configs[1]["tuning_mode"] == "tuned"
         assert configs[1]["has_constraints"] is True
         assert configs[1]["has_optimizations"] is True
 
-        # Check third configuration
         assert configs[2]["benchmark"] == "tpcds"
         assert configs[2]["scale_factor"] == 0.1
         assert configs[2]["tuning_mode"] == "custom"
 
 
 class TestDatabaseNamingIntegration:
-    """Integration tests for database naming functionality."""
-
     def test_real_world_tpch_configurations(self):
-        """Test naming with real-world TPC-H configurations."""
-        # Load a real no-tuning configuration structure
         notuning_config = {
             "primary_keys": {"enabled": False, "enforce_uniqueness": False},
             "foreign_keys": {"enabled": False, "enforce_referential_integrity": False},
@@ -485,14 +405,12 @@ class TestDatabaseNamingIntegration:
         assert "notuning" in name
         assert "noconstraints" in name
 
-        # Parse it back
         parsed = parse_database_name(name)
         assert parsed["benchmark"] == "tpch"
         assert parsed["scale_factor"] == 0.01
         assert parsed["tuning_mode"] == "notuning"
 
     def test_tuned_configuration_naming(self):
-        """Test naming with a tuned configuration."""
         tuned_config = {
             "primary_keys": {"enabled": False},
             "foreign_keys": {"enabled": False},
@@ -516,7 +434,7 @@ class TestDatabaseNamingIntegration:
         name = generate_database_name("tpch", 1.0, "duckdb", tuned_config)
         assert "tpch" in name
         assert "sf1" in name
-        assert "custom" in name  # Has table tunings but not standard tuned config
+        assert "custom" in name
         assert "noconstraints" in name
-        assert "part" in name  # Has partitioning
-        assert "sort" in name  # Has sorting
+        assert "part" in name
+        assert "sort" in name

@@ -1,21 +1,7 @@
-/**
- * Tests for FundingChip component.
- *
- * Cases:
- *   (a) Every FUNDING_SOURCES value except `unspecified` renders a curated chip
- *   (b) `unspecified` / empty / null render nothing (chip omitted)
- *   (c) Unrecognised values render verbatim rather than being dropped
- *   (d) Tone is uniformly neutral - funding is a disclosure, not a trust signal
- *   (e) data-role="funding" so pages and e2e can target funding chips
- *       independently of the orthogonal trust badge
- *   (f) compact form uses explicit short labels, never a first-word truncation
- */
-
 import { render, screen } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
 import { FundingChip } from "@/components/FundingChip";
 
-// Mirror of benchbox/core/results/provenance.py::FUNDING_SOURCES; keep in sync.
 const FUNDING_SOURCES = [
   "employer",
   "personal",
@@ -28,16 +14,12 @@ const FUNDING_SOURCES = [
 const DISCLOSED_SOURCES = FUNDING_SOURCES.filter((value) => value !== "unspecified");
 
 describe("FundingChip", () => {
-  // -----------------------------------------------------------------------
-  // (a) Known funding values
-  // -----------------------------------------------------------------------
 
   it.each(DISCLOSED_SOURCES)("%s renders a curated (non-unrecognised) chip", (funding) => {
     const { container } = render(<FundingChip funding={funding} />);
     const chip = container.querySelector(".badge");
     expect(chip).not.toBeNull();
     expect(chip?.getAttribute("title") ?? "").not.toContain("unrecognised");
-    // Curated values never echo the raw slug back as their visible text.
     expect(chip?.textContent).not.toBe(funding);
   });
 
@@ -56,10 +38,6 @@ describe("FundingChip", () => {
     const title = container.querySelector(".badge")?.getAttribute("title") ?? "";
     expect(title.length).toBeGreaterThan(0);
   });
-
-  // -----------------------------------------------------------------------
-  // (b) `unspecified` and missing values render nothing
-  // -----------------------------------------------------------------------
 
   it("unspecified renders no chip", () => {
     const { container } = render(<FundingChip funding="unspecified" />);
@@ -81,10 +59,6 @@ describe("FundingChip", () => {
     expect(container.querySelector(".badge")).toBeNull();
   });
 
-  // -----------------------------------------------------------------------
-  // (c) Unrecognised values surface rather than disappear
-  // -----------------------------------------------------------------------
-
   it("unrecognised value renders verbatim with an explanatory tooltip", () => {
     const { container } = render(<FundingChip funding="crowdfunded" />);
     const chip = container.querySelector(".badge");
@@ -93,10 +67,6 @@ describe("FundingChip", () => {
     expect(title).toContain("crowdfunded");
     expect(title).toContain("unrecognised");
   });
-
-  // -----------------------------------------------------------------------
-  // (d) Tone is uniformly neutral (no trust gradient)
-  // -----------------------------------------------------------------------
 
   it.each(DISCLOSED_SOURCES)("%s uses the neutral tone", (funding) => {
     const { container } = render(<FundingChip funding={funding} />);
@@ -112,24 +82,12 @@ describe("FundingChip", () => {
     expect(chip?.className).not.toContain("tone-warning");
   });
 
-  // -----------------------------------------------------------------------
-  // (e) role wiring
-  // -----------------------------------------------------------------------
-
   it('sets data-role="funding" so it is targetable apart from the trust badge', () => {
     const { container } = render(<FundingChip funding="grant" />);
     expect(container.querySelector(".badge")?.getAttribute("data-role")).toBe("funding");
   });
 
-  // -----------------------------------------------------------------------
-  // (f) compact form used on dense card rows
-  // -----------------------------------------------------------------------
-
   it("uses explicit compact labels rather than truncating to the first word", () => {
-    // "Vendor sponsored" must NOT compact to "Vendor": that is exactly the word
-    // TrustBadge's compact form renders for trust_label="vendor-supplied", and
-    // the two axes are independent. Collapsing them on a dense row would let a
-    // reader infer a trust tier from a funding disclosure.
     const { container } = render(<FundingChip funding="vendor-sponsored" compact />);
     expect(container.textContent).toContain("Sponsored");
     expect(container.textContent).not.toContain("Vendor");

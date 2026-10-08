@@ -1,5 +1,3 @@
-"""Adapter lifecycle contract tests."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -140,16 +138,6 @@ class _LifecycleAdapter(PlatformAdapter):
 
 
 class _DriftLifecycleAdapter(_LifecycleAdapter):
-    """Reused-DB adapter that stashes a drift result at connection-validation time.
-
-    Mirrors the real lifecycle: for a reused database the tuning drift check is
-    computed during ``create_connection()`` -> ``handle_existing_database()`` ->
-    ``DatabaseValidator``/``TuningValidator`` -> ``_validate_database_tunings``
-    (which sets ``self._drift_validation_result``), NOT during the later
-    validation phase. This lets the test prove the run-scoped reset does not
-    discard that capture before it reaches the ``.applied.json`` companion.
-    """
-
     def _validate_database_compatibility(self, **connection_config: Any) -> Any:
         from benchbox.core.tuning.metadata import MetadataValidationResult
 
@@ -162,11 +150,7 @@ class _DriftLifecycleAdapter(_LifecycleAdapter):
 
 
 def test_reused_db_drift_check_survives_reset_into_applied_ledger(tmp_path: Path) -> None:
-    """Regression: the run-scoped ``_drift_validation_result`` reset must precede
-    ``create_connection()`` so the reused-DB drift captured there survives into
-    the ``.applied.json`` companion. Resetting after connection (as the original
-    routing did) discarded the only capture and made the feature a no-op for the
-    exact reused-DB case it targets (PR #1277 review follow-up)."""
+
     adapter = _DriftLifecycleAdapter(existing_databases=[True])
     adapter.tuning_enabled = True
     benchmark = _LifecycleBenchmark(tmp_path)
@@ -235,11 +219,10 @@ def test_dry_run_mode_keeps_mode_but_clears_stale_captured_sql(tmp_path: Path) -
 
 
 def test_run_benchmark_applies_and_restores_analyze_plans(tmp_path: Path) -> None:
-    """analyze_plans (the first-class capture-detail knob) is applied from run_config
-    for the run and restored afterwards, exactly like capture_plans."""
+
     adapter = _LifecycleAdapter(existing_databases=[False])
     benchmark = _LifecycleBenchmark(tmp_path)
-    assert adapter.analyze_plans is False  # adapter default
+    assert adapter.analyze_plans is False
 
     adapter.run_benchmark(
         benchmark,
@@ -248,12 +231,11 @@ def test_run_benchmark_applies_and_restores_analyze_plans(tmp_path: Path) -> Non
         analyze_plans=True,
     )
 
-    # Restored to the adapter default after the run (saved/restored in run_benchmark).
     assert adapter.analyze_plans is False
 
 
 def test_run_benchmark_leaves_analyze_plans_default_when_run_config_omits_it(tmp_path: Path) -> None:
-    """A None/omitted analyze_plans in run_config must not override the adapter default."""
+
     adapter = _LifecycleAdapter(existing_databases=[False])
     benchmark = _LifecycleBenchmark(tmp_path)
 

@@ -1,15 +1,6 @@
-"""Additional coverage tests for SnowflakeAdapter uncovered paths.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Focuses on:
-- _get_query_statistics: retry-exhausted and exception paths
-- configure_for_benchmark: cache-control and suppress_nondeterministic edge cases
-- _build_ctas_sort_sql: method="ctas" and unsupported method branches
-- get_platform_info: warehouse SHOW result captured in compute_configuration
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -24,11 +15,6 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
-
-
-# ---------------------------------------------------------------------------
-# Shared fixture
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture(autouse=True)
@@ -54,30 +40,21 @@ def _make_adapter(**kwargs):
     return SnowflakeAdapter(**defaults)
 
 
-# ---------------------------------------------------------------------------
-# _get_query_statistics: retry-exhausted and exception paths
-# ---------------------------------------------------------------------------
-
-
 class TestGetQueryStatisticsRetry:
-    """Test _get_query_statistics branches not covered by existing tests."""
-
     def test_returns_note_when_no_result_after_max_retries(self):
-        """When fetchone always returns None, return the note dict after max_retries+1 attempts."""
         adapter = _make_adapter()
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
-        mock_cursor.fetchone.return_value = None  # never produces a row
+        mock_cursor.fetchone.return_value = None
 
         with patch("time.sleep"):
             result = adapter._get_query_statistics(mock_conn, "q-miss", max_retries=1, initial_delay=0.001)
 
         assert "note" in result
-        assert result["retrieval_attempts"] == 2  # max_retries+1
+        assert result["retrieval_attempts"] == 2
 
     def test_returns_statistics_error_when_execute_raises(self):
-        """A lookup error returns immediately, even when retries were requested."""
         adapter = _make_adapter()
         mock_conn = Mock()
         mock_cursor = Mock()
@@ -106,7 +83,6 @@ class TestGetQueryStatisticsRetry:
         sleep.assert_not_called()
 
     def test_query_history_projection_uses_table_function_columns(self):
-        """Pin the projection to the documented Information Schema table function."""
         import re
 
         adapter = _make_adapter()
@@ -117,7 +93,6 @@ class TestGetQueryStatisticsRetry:
         projection = re.search(r"SELECT\s+(.*?)\s+FROM TABLE", sql, re.IGNORECASE | re.DOTALL)
         assert projection is not None
         columns = {part.strip().upper() for part in projection.group(1).split(",")}
-        # https://docs.snowflake.com/en/sql-reference/functions/query_history#output
         assert columns == {
             "QUERY_ID",
             "TOTAL_ELAPSED_TIME",
@@ -131,12 +106,11 @@ class TestGetQueryStatisticsRetry:
         }
 
     def test_query_history_sql_contains_query_id(self):
-        """The SQL executed must query INFORMATION_SCHEMA.QUERY_HISTORY and filter by query_id."""
         adapter = _make_adapter()
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
-        mock_cursor.fetchone.return_value = None  # never finds result
+        mock_cursor.fetchone.return_value = None
 
         with patch("time.sleep"):
             adapter._get_query_statistics(mock_conn, "BENCHQ17", max_retries=0)
@@ -147,14 +121,7 @@ class TestGetQueryStatisticsRetry:
         assert "QUERY_TAG = 'BenchBox_BENCHQ17'" in executed_sqls[0]
 
 
-# ---------------------------------------------------------------------------
-# _build_ctas_sort_sql
-# ---------------------------------------------------------------------------
-
-
 class TestBuildCtasSortSql:
-    """Test _build_ctas_sort_sql method branches."""
-
     def test_returns_none_when_mode_is_off(self):
         adapter = _make_adapter()
         col = Mock()
@@ -189,14 +156,7 @@ class TestBuildCtasSortSql:
                 adapter._build_ctas_sort_sql("T", [col])
 
 
-# ---------------------------------------------------------------------------
-# get_platform_info: warehouse compute_configuration captured
-# ---------------------------------------------------------------------------
-
-
 class TestGetPlatformInfoWithWarehouse:
-    """Test get_platform_info populates compute_configuration from SHOW WAREHOUSES."""
-
     def test_warehouse_details_captured(self):
         adapter = _make_adapter(warehouse="MY_WH")
 
@@ -204,15 +164,14 @@ class TestGetPlatformInfoWithWarehouse:
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
 
-        # Simulate SHOW WAREHOUSES result row with 28+ columns
         wh_row = ["MY_WH", "STARTED", "STANDARD", "LARGE"] + [None] * 27
-        wh_row[4] = 1  # min_cluster_count
-        wh_row[5] = 3  # max_cluster_count
-        wh_row[11] = 300  # auto_suspend
-        wh_row[12] = True  # auto_resume
-        wh_row[21] = None  # enable_query_acceleration
-        wh_row[22] = None  # query_acceleration_max_scale_factor
-        wh_row[27] = "STANDARD"  # scaling_policy
+        wh_row[4] = 1
+        wh_row[5] = 3
+        wh_row[11] = 300
+        wh_row[12] = True
+        wh_row[21] = None
+        wh_row[22] = None
+        wh_row[27] = "STANDARD"
 
         def _execute_side_effect(sql):
             if "current_version" in sql.lower():
@@ -306,7 +265,6 @@ class TestGetPlatformInfoWithWarehouse:
         assert metadata["platform_raw_config"]["password"] == "<redacted>"
 
     def test_warehouse_show_exception_silenced(self):
-        """Exception querying SHOW WAREHOUSES should not propagate."""
         adapter = _make_adapter()
 
         mock_conn = Mock()
@@ -327,7 +285,6 @@ class TestGetPlatformInfoWithWarehouse:
         mock_cursor.execute = Mock(side_effect=_execute_side_effect)
 
         result = adapter.get_platform_info(connection=mock_conn)
-        # Should not raise; platform_version populated
         assert result["platform_version"] == "8.0.0"
         assert result["compute_configuration"]["metadata_collection_status"] == "unavailable"
         assert result["compute_configuration"]["collection_error_class"] == "RuntimeError"
@@ -351,14 +308,7 @@ class TestGetPlatformInfoWithWarehouse:
         assert metadata["platform_compute"]["collection_error_message"] == "permission denied"
 
 
-# ---------------------------------------------------------------------------
-# configure_for_benchmark: cache-control validation path
-# ---------------------------------------------------------------------------
-
-
 class TestConfigureForBenchmarkCacheControl:
-    """Test configure_for_benchmark triggers cache-control validation."""
-
     def test_cache_validation_called_when_disable_result_cache_true(self):
         adapter = _make_adapter(disable_result_cache=True)
 
@@ -388,14 +338,7 @@ class TestConfigureForBenchmarkCacheControl:
         mock_validate.assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# add_cli_arguments
-# ---------------------------------------------------------------------------
-
-
 class TestAdapterProperties:
-    """Test basic adapter properties and configuration."""
-
     def test_platform_name_property(self):
         adapter = _make_adapter()
         assert adapter.platform_name == "Snowflake"
@@ -469,14 +412,7 @@ class TestAdapterProperties:
         assert adapter.private_key_path == "/tmp/key.pem"
 
 
-# ---------------------------------------------------------------------------
-# from_config()
-# ---------------------------------------------------------------------------
-
-
 class TestFromConfig:
-    """Test from_config() class method behaviour."""
-
     def test_from_config_uses_provided_database(self):
         with patch("benchbox.platforms.snowflake.check_platform_dependencies", return_value=(True, [])):
             from benchbox.platforms.snowflake import SnowflakeAdapter
@@ -588,14 +524,7 @@ class TestFromConfig:
         assert adapter.delta_table_format == "DELTA"
 
 
-# ---------------------------------------------------------------------------
-# Constructor: ConfigurationError on missing fields
-# ---------------------------------------------------------------------------
-
-
 class TestConstructorValidation:
-    """Test that missing required fields raise ConfigurationError."""
-
     def test_missing_account_raises(self):
         from benchbox.core.exceptions import ConfigurationError
         from benchbox.platforms.snowflake import SnowflakeAdapter
@@ -633,16 +562,8 @@ class TestConstructorValidation:
             )
 
 
-# ---------------------------------------------------------------------------
-# create_connection() - password, key-pair, externalbrowser auth paths
-# ---------------------------------------------------------------------------
-
-
 class TestCreateConnection:
-    """Test create_connection() auth branches."""
-
     def test_password_auth_passes_correct_params(self):
-        """Default snowflake auth should pass user/password to connector."""
         import benchbox.platforms.snowflake as sf_module
 
         adapter = _make_adapter()
@@ -666,7 +587,6 @@ class TestCreateConnection:
         assert result is mock_conn
 
     def test_externalbrowser_auth_sets_authenticator_param(self):
-        """externalbrowser auth must set authenticator= in connection params."""
         import benchbox.platforms.snowflake as sf_module
 
         adapter = _make_adapter(authenticator="externalbrowser")
@@ -686,7 +606,6 @@ class TestCreateConnection:
         assert call_kwargs.get("authenticator") == "externalbrowser"
 
     def test_key_pair_auth_sets_private_key_and_removes_password(self):
-        """Key pair auth should set private_key and remove password."""
         import benchbox.platforms.snowflake as sf_module
 
         adapter = _make_adapter(private_key_path="/tmp/fake_key.pem")
@@ -696,7 +615,6 @@ class TestCreateConnection:
         mock_conn.cursor.return_value = mock_cursor
         mock_cursor.fetchall.return_value = [("8.0.0",)]
 
-        # Mock the cryptography imports inside create_connection
         mock_private_key = MagicMock()
         mock_pkb = b"fake_der_bytes"
         mock_private_key.private_bytes.return_value = mock_pkb
@@ -714,7 +632,7 @@ class TestCreateConnection:
             try:
                 adapter.create_connection()
             except Exception:
-                pass  # We care about the call args, not about success
+                pass
 
         if mock_connect.called:
             call_kwargs = mock_connect.call_args[1]
@@ -722,7 +640,6 @@ class TestCreateConnection:
             assert "private_key" in call_kwargs
 
     def test_role_added_when_configured(self):
-        """role parameter should be forwarded to connector.connect() when set."""
         import benchbox.platforms.snowflake as sf_module
 
         adapter = _make_adapter(role="ANALYST")
@@ -742,7 +659,6 @@ class TestCreateConnection:
         assert call_kwargs.get("role") == "ANALYST"
 
     def test_connection_failure_raises(self):
-        """When connector.connect() raises, the exception should propagate."""
         import benchbox.platforms.snowflake as sf_module
 
         adapter = _make_adapter()
@@ -755,14 +671,7 @@ class TestCreateConnection:
                 adapter.create_connection()
 
 
-# ---------------------------------------------------------------------------
-# execute_query()
-# ---------------------------------------------------------------------------
-
-
 class TestExecuteQuery:
-    """Test execute_query() paths."""
-
     def test_successful_execution_returns_result_dict(self):
         adapter = _make_adapter()
 
@@ -779,7 +688,6 @@ class TestExecuteQuery:
         assert result["status"] == "SUCCESS"
 
     def test_query_tag_set_before_execution(self):
-        """ALTER SESSION SET QUERY_TAG should be called with the query_id."""
         adapter = _make_adapter(query_tag="BENCH")
 
         mock_conn = Mock()
@@ -797,7 +705,6 @@ class TestExecuteQuery:
         assert any("Q5" in s for s in tag_sqls), f"No QUERY_TAG sql found in {tag_sqls}"
 
     def test_exception_returns_failed_status(self):
-        """When cursor.execute raises, status should be FAILED."""
         adapter = _make_adapter()
 
         mock_conn = Mock()
@@ -824,7 +731,6 @@ class TestExecuteQuery:
         assert result["rows_returned"] == 0
 
     def test_actual_query_passed_verbatim_to_cursor_execute(self):
-        """The user-supplied query string must appear verbatim in cursor.execute calls."""
         adapter = _make_adapter(query_tag="BENCH")
 
         mock_conn = Mock()
@@ -839,7 +745,6 @@ class TestExecuteQuery:
         assert "SELECT COUNT(*) FROM orders" in calls, f"Query not found in execute calls: {calls}"
 
     def test_cursor_closed_after_successful_execution(self):
-        """cursor.close() must be called in the finally block on success."""
         adapter = _make_adapter()
 
         mock_conn = Mock()
@@ -853,7 +758,6 @@ class TestExecuteQuery:
         mock_cursor.close.assert_called_once()
 
     def test_cursor_closed_even_on_execution_failure(self):
-        """cursor.close() must be called even when cursor.execute raises."""
         adapter = _make_adapter()
 
         mock_conn = Mock()
@@ -866,14 +770,7 @@ class TestExecuteQuery:
         mock_cursor.close.assert_called_once()
 
 
-# ---------------------------------------------------------------------------
-# _get_platform_metadata()
-# ---------------------------------------------------------------------------
-
-
 class TestGetPlatformMetadata:
-    """Test _get_platform_metadata() covers version, session info, warehouse info, and table metadata."""
-
     def _make_cursor(self, version="8.0.0", session_row=None, wh_row=None, tables=None):
         mock_cursor = Mock()
         session_row = session_row or ("user1", "role1", "WH1", "DB1", "PUBLIC", "AWS_US_EAST_1", "ACCT1")
@@ -988,16 +885,8 @@ class TestGetPlatformMetadata:
         assert "access denied" in result["metadata_error"]
 
 
-# ---------------------------------------------------------------------------
-# apply_table_tunings()
-# ---------------------------------------------------------------------------
-
-
 class TestApplyTableTunings:
-    """Test apply_table_tunings() ALTER TABLE CLUSTER BY paths."""
-
     def _make_tuning(self, table_name="ORDERS", cluster_cols=None, partition_cols=None, sort_cols=None):
-        """Return a fake table_tuning object."""
         mock_tuning = Mock()
         mock_tuning.table_name = table_name
         mock_tuning.has_any_tuning.return_value = True
@@ -1057,7 +946,6 @@ class TestApplyTableTunings:
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
 
-        # INFORMATION_SCHEMA query returns no existing clustering key
         mock_cursor.fetchone.return_value = (None,)
 
         col1 = self._make_col("o_orderdate", 0)
@@ -1081,7 +969,6 @@ class TestApplyTableTunings:
         col1 = self._make_col("o_orderdate", 0)
         tuning = self._make_tuning(table_name="ORDERS", cluster_cols=[col1])
 
-        # Simulate existing clustering key already matches desired
         mock_cursor.fetchone.return_value = ("(o_orderdate)",)
 
         adapter.apply_table_tunings(tuning, mock_conn)
@@ -1190,14 +1077,7 @@ class TestApplyTableTunings:
         assert "l_shipdate" in cluster_sqls[0]
 
 
-# ---------------------------------------------------------------------------
-# create_external_tables()
-# ---------------------------------------------------------------------------
-
-
 class TestCreateExternalTables:
-    """Test create_external_tables() with parquet and delta paths."""
-
     def _make_data_files(self, table_name="ORDERS", file_names=None):
         return {table_name: file_names or ["s3://bucket/path/orders/"]}
 
@@ -1267,27 +1147,18 @@ class TestCreateExternalTables:
         assert len(refresh_sqls) >= 1
 
     def test_validates_staging_root_requirement(self):
-        """validate_external_table_requirements should be called (raises when staging_root missing)."""
-        adapter = _make_adapter()  # no staging_root
+        adapter = _make_adapter()
 
         with pytest.raises(ValueError, match="staging_root"):
             adapter.create_external_tables(Mock(), Mock(), Mock())
 
 
-# ---------------------------------------------------------------------------
-# _get_existing_tables()
-# ---------------------------------------------------------------------------
-
-
 class TestGetExistingTables:
-    """Test _get_existing_tables normalises table names to lowercase."""
-
     def test_returns_lowercase_table_names(self):
         adapter = _make_adapter()
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
-        # SHOW TABLES: row[1] is the table name
         mock_cursor.fetchall.return_value = [
             (None, "LINEITEM", None),
             (None, "ORDERS", None),
@@ -1311,14 +1182,7 @@ class TestGetExistingTables:
         assert result == []
 
 
-# ---------------------------------------------------------------------------
-# _validate_data_integrity()
-# ---------------------------------------------------------------------------
-
-
 class TestValidateDataIntegrity:
-    """Test _validate_data_integrity() passes and fails correctly."""
-
     def test_returns_passed_when_all_tables_accessible(self):
         adapter = _make_adapter()
         mock_conn = Mock()
@@ -1366,14 +1230,7 @@ class TestValidateDataIntegrity:
         assert "integrity_error" in details
 
 
-# ---------------------------------------------------------------------------
-# configure_for_benchmark: OLAP warehouse modification paths
-# ---------------------------------------------------------------------------
-
-
 class TestConfigureForBenchmarkWarehouse:
-    """Test configure_for_benchmark warehouse modification branches."""
-
     def test_alter_warehouse_called_when_modify_warehouse_settings_true(self):
         adapter = _make_adapter(modify_warehouse_settings=True, disable_result_cache=False)
 
@@ -1416,7 +1273,6 @@ class TestConfigureForBenchmarkWarehouse:
         assert len(nondeterministic_sqls) >= 1
 
     def test_non_olap_benchmark_type_skips_cache_settings(self):
-        """Non-OLAP benchmark type should not set USE_CACHED_RESULT."""
         adapter = _make_adapter(disable_result_cache=False)
 
         mock_conn = Mock()
@@ -1430,14 +1286,7 @@ class TestConfigureForBenchmarkWarehouse:
         assert len(cache_sqls) == 0
 
 
-# ---------------------------------------------------------------------------
-# generate_tuning_clause()
-# ---------------------------------------------------------------------------
-
-
 class TestGenerateTuningClause:
-    """Test generate_tuning_clause() for clustering and partitioning."""
-
     def _make_col(self, name, order=0):
         col = Mock()
         col.name = name
@@ -1508,14 +1357,7 @@ class TestGenerateTuningClause:
             pytest.skip("TuningType not available")
 
 
-# ---------------------------------------------------------------------------
-# _optimize_table_definition()
-# ---------------------------------------------------------------------------
-
-
 class TestOptimizeTableDefinition:
-    """Test _optimize_table_definition() replaces CREATE TABLE with CREATE OR REPLACE TABLE."""
-
     def test_adds_or_replace_to_create_table(self):
         adapter = _make_adapter()
         sql = "CREATE TABLE ORDERS (o_orderkey INT)"
@@ -1535,14 +1377,7 @@ class TestOptimizeTableDefinition:
         assert result.count("OR REPLACE") == 1
 
 
-# ---------------------------------------------------------------------------
-# analyze_table() and close_connection()
-# ---------------------------------------------------------------------------
-
-
 class TestAnalyzeTableAndCloseConnection:
-    """Test analyze_table() and close_connection() paths."""
-
     def test_analyze_table_executes_recluster(self):
         adapter = _make_adapter()
         mock_conn = Mock()
@@ -1556,8 +1391,6 @@ class TestAnalyzeTableAndCloseConnection:
         assert len(recluster_sqls) >= 1
 
     def test_analyze_table_raises_on_failure(self):
-        """Must raise (not swallow) so gather_statistics()'s caller can detect
-        and record a real failure as status=FAILED."""
         adapter = _make_adapter()
         mock_conn = Mock()
         mock_cursor = Mock()
@@ -1578,7 +1411,6 @@ class TestAnalyzeTableAndCloseConnection:
 
     def test_close_connection_handles_none(self):
         adapter = _make_adapter()
-        # Should not raise
         adapter.close_connection(None)
 
     def test_close_connection_suppresses_exception(self):
@@ -1586,13 +1418,7 @@ class TestAnalyzeTableAndCloseConnection:
         mock_conn = Mock()
         mock_conn.close.side_effect = RuntimeError("already closed")
 
-        # Should not raise
         adapter.close_connection(mock_conn)
-
-
-# ---------------------------------------------------------------------------
-# get_target_dialect()
-# ---------------------------------------------------------------------------
 
 
 class TestGetTargetDialect:
@@ -1601,20 +1427,10 @@ class TestGetTargetDialect:
         assert adapter.get_target_dialect() == "snowflake"
 
 
-# ---------------------------------------------------------------------------
-# platform_name property
-# ---------------------------------------------------------------------------
-
-
 class TestPlatformName:
     def test_platform_name(self):
         adapter = _make_adapter()
         assert adapter.platform_name == "Snowflake"
-
-
-# ---------------------------------------------------------------------------
-# supports_tuning_type()
-# ---------------------------------------------------------------------------
 
 
 class TestSupportsTuningType:
@@ -1637,11 +1453,6 @@ class TestSupportsTuningType:
             pytest.skip("TuningType not available")
 
 
-# ---------------------------------------------------------------------------
-# _create_load_file_formats()
-# ---------------------------------------------------------------------------
-
-
 class TestCreateLoadFileFormats:
     def test_creates_csv_and_tbl_formats(self):
         adapter = _make_adapter()
@@ -1656,14 +1467,7 @@ class TestCreateLoadFileFormats:
         assert len(tbl_sqls) >= 1
 
 
-# ---------------------------------------------------------------------------
-# check_server_database_exists()
-# ---------------------------------------------------------------------------
-
-
 class TestCheckServerDatabaseExists:
-    """Test check_server_database_exists() via admin connection mock."""
-
     def test_returns_true_when_database_in_show_databases(self):
         import benchbox.platforms.snowflake as sf_module
 
@@ -1672,7 +1476,6 @@ class TestCheckServerDatabaseExists:
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
-        # SHOW DATABASES: row[1] is the db name
         mock_cursor.fetchall.return_value = [(None, "BENCHDB")]
 
         with patch.object(sf_module.snowflake.connector, "connect", return_value=mock_conn):
@@ -1689,8 +1492,8 @@ class TestCheckServerDatabaseExists:
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
         mock_cursor.fetchall.side_effect = [
-            [],  # SHOW DATABASES returns nothing
-            [],  # SHOW SCHEMAS returns nothing
+            [],
+            [],
         ]
         mock_cursor.fetchone.return_value = None
 
@@ -1710,20 +1513,12 @@ class TestCheckServerDatabaseExists:
         assert result is False
 
 
-# ---------------------------------------------------------------------------
-# _parse_copy_results()
-# ---------------------------------------------------------------------------
-
-
 class TestParseCopyResults:
-    """Test _parse_copy_results() logging paths."""
-
     def test_loaded_status_silently_ignored(self):
         adapter = _make_adapter()
         rows = [
             ("file1.csv", "LOADED", None, 100, None, None),
         ]
-        # Should not raise
         adapter._parse_copy_results(rows)
 
     def test_non_loaded_status_logged_as_warning(self):
@@ -1737,19 +1532,11 @@ class TestParseCopyResults:
 
     def test_short_rows_skipped(self):
         adapter = _make_adapter()
-        rows = [("file.csv", "LOADED")]  # len(row) <= 3
-        # Should not raise or warn
+        rows = [("file.csv", "LOADED")]
         adapter._parse_copy_results(rows)
 
 
-# ---------------------------------------------------------------------------
-# configure_for_benchmark: cache-control receipt persistence
-# ---------------------------------------------------------------------------
-
-
 class TestCacheControlReceiptPersistence:
-    """The session receipt must reach platform_compute as bundle evidence."""
-
     def test_receipt_stored_on_validation(self):
         from unittest.mock import Mock, patch
 

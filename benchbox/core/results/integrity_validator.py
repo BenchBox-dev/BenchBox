@@ -1,14 +1,6 @@
-"""Three-tier integrity validator for benchmark result JSON files.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tiers:
-  STRUCTURAL     - schema, required keys, cross-field math
-  COMPLETENESS   - expected queries, measurement presence, phases
-  BELIEVABILITY  - statistical plausibility, row counts, outliers
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -61,7 +53,6 @@ class IntegrityReport:
         return any(c.status == CheckStatus.WARN for c in self.checks)
 
 
-# Phase status values observed in real result files.
 _VALID_PHASE_STATUSES = frozenset(
     {
         "SUCCESS",
@@ -75,10 +66,8 @@ _VALID_PHASE_STATUSES = frozenset(
     }
 )
 
-# Benchmarks that should have tpc_metrics in summary.
 _TPC_METRICS_BENCHMARKS = frozenset({"tpch", "tpcds", "tpchavoc", "tpch_skew"})
 
-# Required top-level keys in result JSON.
 _REQUIRED_KEYS = frozenset(
     {
         "version",
@@ -95,7 +84,6 @@ _REQUIRED_KEYS = frozenset(
     }
 )
 
-# Benchmarks that don't load data (metadata-only).
 _NO_LOAD_BENCHMARKS = frozenset({"metadata_primitives"})
 
 _STRUCTURAL = CheckCategory.STRUCTURAL
@@ -176,8 +164,6 @@ def _check_timing_range(
 
 
 class ResultIntegrityValidator:
-    """Validates a raw result dict through structural, completeness, and believability checks."""
-
     def __init__(self) -> None:
         self._schema_validator = SchemaV2Validator()
 
@@ -188,7 +174,6 @@ class ResultIntegrityValidator:
 
         checks: list[CheckResult] = []
 
-        # Tier 1: Structural
         schema_ok = self._check_schema(raw, checks)
         if schema_ok:
             self._check_required_keys(raw, checks)
@@ -199,7 +184,6 @@ class ResultIntegrityValidator:
             self._check_query_entry_fields(raw, checks)
             self._check_query_ms_non_negative(raw, checks)
 
-        # Tier 2: Completeness
         spec = get_spec(benchmark_id)
         self._check_expected_query_ids(raw, spec, checks)
         self._check_measurement_queries_present(raw, checks)
@@ -207,7 +191,6 @@ class ResultIntegrityValidator:
         self._check_tables_object(raw, spec, checks)
         self._check_tpc_metrics(raw, benchmark_id, checks)
 
-        # Tier 3: Believability
         self._check_avg_between_min_max(raw, checks)
         self._check_geomean_plausible(raw, checks)
         self._check_success_rate(raw, spec, checks)
@@ -216,8 +199,6 @@ class ResultIntegrityValidator:
         self._check_no_duplicate_executions(raw, checks)
         self._check_load_time_nonzero(raw, benchmark_id, checks)
 
-        # Compute overall status and summary counts
-        # INFO does not elevate overall status - it is purely informational.
         status_counts = dict.fromkeys(CheckStatus, 0)
         for c in checks:
             status_counts[c.status] += 1
@@ -233,8 +214,6 @@ class ResultIntegrityValidator:
             checks=checks,
             summary={s.value: count for s, count in status_counts.items()},
         )
-
-    # --- Tier 1: Structural checks ---
 
     def _check_schema(self, raw: dict[str, Any], checks: list[CheckResult]) -> bool:
         try:
@@ -375,8 +354,6 @@ class ResultIntegrityValidator:
         else:
             _pass(checks, _STRUCTURAL, "query_ms_non_negative", "No queries with negative ms")
 
-    # --- Tier 2: Completeness checks ---
-
     def _check_expected_query_ids(self, raw: dict[str, Any], spec: Any | None, checks: list[CheckResult]) -> None:
         if spec is None:
             _pass(checks, _COMPLETENESS, "expected_query_ids", "Unknown benchmark - skipping query ID check")
@@ -488,8 +465,6 @@ class ResultIntegrityValidator:
                 f"TPC metrics absent for {canonical} benchmark (unofficial run - no QphH/QthDS expected)",
             )
 
-    # --- Tier 3: Believability checks ---
-
     def _check_avg_between_min_max(self, raw: dict[str, Any], checks: list[CheckResult]) -> None:
         _check_timing_range(raw, checks, "avg_between_min_max", "avg_ms", "Average within [min, max] range")
 
@@ -511,9 +486,6 @@ class ResultIntegrityValidator:
             _fail(checks, _BELIEVABILITY, "success_rate", "No queries recorded")
             return
 
-        # Compatibility-skipped queries (version-gated rules such as the
-        # StarRocks Q2 l2_distance skip) are not failures: discount them
-        # from both sides before applying the spec floor.
         billable = total - skipped
         if billable == 0:
             _fail(
@@ -570,7 +542,6 @@ class ResultIntegrityValidator:
             _pass(checks, _BELIEVABILITY, "sf1_row_counts", "No tables metadata to check")
             return
 
-        # Normalize tables format (list of dicts or dict of dicts)
         table_rows: dict[str, int] = {}
         if isinstance(tables, list):
             for t in tables:
@@ -583,11 +554,6 @@ class ResultIntegrityValidator:
                 elif isinstance(info, int):
                     table_rows[name] = info
 
-        # ±1% tolerance: spec values are exact DuckDB SF1 counts, but we allow
-        # slack for cross-platform variation (e.g. approximate COUNT(*), NULL
-        # handling differences during load) and minor generator evolution.
-        # The check targets gross failures (wrong SF → 10-100x off, failed
-        # load → 0 rows), not bit-exact reproducibility across platforms.
         tolerance = 0.01
 
         mismatches = {}
@@ -691,9 +657,6 @@ class ResultIntegrityValidator:
             )
 
 
-# --- Module-level convenience functions ---
-
-
 def _validate_path(path: Path, validator: ResultIntegrityValidator) -> IntegrityReport:
     try:
         with open(path, encoding="utf-8") as f:
@@ -704,7 +667,6 @@ def _validate_path(path: Path, validator: ResultIntegrityValidator) -> Integrity
 
 
 def validate_file(path: Path | str) -> IntegrityReport:
-    """Validate a single result JSON file."""
     return _validate_path(Path(path), ResultIntegrityValidator())
 
 
@@ -712,11 +674,6 @@ def validate_directory(
     path: Path | str,
     pattern: str = "*.json",
 ) -> list[IntegrityReport]:
-    """Validate all result JSON files in a directory.
-
-    Excludes .plans.json, .tuning.json, .applied.json, and .override.json
-    companion files.
-    """
     path = Path(path)
     validator = ResultIntegrityValidator()
     return [

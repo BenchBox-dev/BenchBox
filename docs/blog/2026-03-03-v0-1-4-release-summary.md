@@ -53,7 +53,6 @@ We also fixed several issues in the plan capture pipeline: DuckDB's JSON plan fo
 To opt out per-platform, set `analyze_plans: false` in your tuning config if you want estimated plans only:
 
 ```yaml
-# tuning.yaml
 analyze_plans: false
 ```
 

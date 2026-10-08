@@ -1,9 +1,6 @@
-"""BigQuery credentials setup and validation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import json
 import os
@@ -28,7 +25,6 @@ def _print_bigquery_auto_config(console, auto_config: dict) -> None:
 
 
 def _validate_service_account_file(console, credentials_path: str) -> bool:
-    """Validate that credentials_path exists and is a service-account JSON; print red error on failure."""
     credentials_path_obj = Path(credentials_path)
     if not credentials_path_obj.exists():
         console.print(f"[red]❌ File not found: {credentials_path}[/red]")
@@ -54,7 +50,6 @@ def _validate_service_account_file(console, credentials_path: str) -> bool:
 
 
 def _prompt_bigquery_full(console, existing_creds: Optional[dict]) -> Optional[dict]:
-    """Full interactive prompt path; returns config dict or None on required-field failure."""
     existing = existing_creds or {}
     console.print("\n[bold]BigQuery Configuration:[/bold]")
 
@@ -113,7 +108,6 @@ def _prompt_bigquery_full(console, existing_creds: Optional[dict]) -> Optional[d
 
 
 def _finalize_bigquery_credentials(cred_manager: CredentialManager, console, config: dict) -> None:
-    """Assemble, save, validate, and print next steps for BigQuery credentials."""
     credentials = {
         "project_id": config["project_id"],
         "credentials_path": config["credentials_path"],
@@ -154,12 +148,6 @@ def _finalize_bigquery_credentials(cred_manager: CredentialManager, console, con
 
 
 def setup_bigquery_credentials(cred_manager: CredentialManager, console: Union[Console, QuietConsoleProxy]) -> None:
-    """Interactive setup for BigQuery credentials.
-
-    Args:
-        cred_manager: Credential manager instance
-        console: Rich console for output
-    """
     console.print("\n📋 [bold]You'll need:[/bold]")
     console.print("  • Google Cloud project ID")
     console.print("  • Service account JSON key file")
@@ -194,7 +182,6 @@ def _prompt_default_output_location(
     credentials: dict,
     storage_bucket: Optional[str],
 ) -> None:
-    """Prompt for default cloud output location for BigQuery."""
     from benchbox.platforms.credentials.shared import prompt_default_output_location
 
     prompt_default_output_location(
@@ -210,7 +197,6 @@ def _prompt_default_output_location(
 
 
 def _validate_bigquery_credentials_file(credentials_path: str) -> Optional[str]:
-    """Return None if file exists and is a valid service-account JSON, else error message."""
     if not os.path.exists(credentials_path):
         return f"Credentials file not found: {credentials_path}"
     if not os.path.isfile(credentials_path):
@@ -228,7 +214,6 @@ def _validate_bigquery_credentials_file(credentials_path: str) -> Optional[str]:
 
 
 def _test_bigquery_storage_access(credentials_path: str, project_id: str, storage_bucket: str) -> Optional[str]:
-    """Verify Cloud Storage bucket access; returns None on success or an error message."""
     try:
         from google.cloud import storage
 
@@ -250,7 +235,6 @@ def _test_bigquery_storage_access(credentials_path: str, project_id: str, storag
 
 
 def _classify_bigquery_connection_error(error_msg: str, project_id: Optional[str]) -> str:
-    """Map raw BigQuery connection exception messages to user-friendly strings."""
     lower = error_msg.lower()
     if "could not find default credentials" in lower:
         return "Could not load credentials. Check that the service account JSON file is valid."
@@ -264,14 +248,6 @@ def _classify_bigquery_connection_error(error_msg: str, project_id: Optional[str
 
 
 def validate_bigquery_credentials(cred_manager: CredentialManager) -> tuple[bool, Optional[str]]:
-    """Validate BigQuery credentials by testing connection.
-
-    Args:
-        cred_manager: Credential manager instance
-
-    Returns:
-        Tuple of (success, error_message)
-    """
     creds = cred_manager.get_platform_credentials("bigquery")
     if not creds:
         return False, "No credentials found"
@@ -303,7 +279,6 @@ def validate_bigquery_credentials(cred_manager: CredentialManager) -> tuple[bool
         try:
             list(client.list_datasets(max_results=1))
         except Exception:
-            # Not fatal - user may lack list permission but can still use datasets
             pass
 
         storage_bucket = creds.get("storage_bucket")
@@ -319,14 +294,6 @@ def validate_bigquery_credentials(cred_manager: CredentialManager) -> tuple[bool
 
 
 def _auto_detect_bigquery(console: Union[Console, QuietConsoleProxy]) -> Optional[dict]:
-    """Attempt to auto-detect BigQuery configuration from environment variables.
-
-    Args:
-        console: Rich console for output
-
-    Returns:
-        Dictionary with detected config or None
-    """
     env_vars = {
         "credentials_path": os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
         "project_id": os.getenv("BIGQUERY_PROJECT"),
@@ -335,7 +302,6 @@ def _auto_detect_bigquery(console: Union[Console, QuietConsoleProxy]) -> Optiona
         "storage_bucket": os.getenv("BIGQUERY_STORAGE_BUCKET"),
     }
 
-    # Check if we have the required fields
     required = ["credentials_path", "project_id"]
     found_required = all(env_vars.get(field) for field in required)
 
@@ -348,13 +314,11 @@ def _auto_detect_bigquery(console: Union[Console, QuietConsoleProxy]) -> Optiona
         console.print(f"  ⚠️  Missing environment variables: {', '.join(missing)}")
         return None
 
-    # Validate credentials file exists
     credentials_path = os.path.expanduser(env_vars["credentials_path"])
     if not os.path.exists(credentials_path):
         console.print(f"  ⚠️  Credentials file not found: {credentials_path}")
         return None
 
-    # Set defaults for optional fields
     if not env_vars.get("dataset_id"):
         env_vars["dataset_id"] = "benchbox"
     if not env_vars.get("location"):
@@ -362,7 +326,6 @@ def _auto_detect_bigquery(console: Union[Console, QuietConsoleProxy]) -> Optiona
 
     console.print("  ✓ Found all required environment variables")
 
-    # Check for Cloud Storage configuration
     if env_vars.get("storage_bucket"):
         console.print("  ✓ Found Cloud Storage staging configuration")
 

@@ -1,10 +1,3 @@
-"""Tests for Redshift error-message capture in query results.
-
-Mirrors the ClickHouse error-capture pattern: any exception raised during
-query execution must land as a non-empty ``error`` string on the result
-dict, even if ``str(exception)`` returns an empty string.
-"""
-
 from unittest.mock import Mock, patch
 
 import pytest

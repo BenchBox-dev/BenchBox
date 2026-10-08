@@ -1,17 +1,6 @@
-"""Coverage tests for CoffeeShop DataFrame query implementations.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Targets the implementation functions in:
-  benchbox/core/coffeeshop/dataframe_queries/queries.py
-
-Verifies that:
-- _parse_date handles both str and date inputs
-- Each query function is callable and executes on a mock context
-- Registration via _register_all_queries() produces correct query objects
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -28,13 +17,10 @@ pytestmark = [
 
 
 def _make_mock_ctx() -> MockExpr:
-    """Create a mock DataFrameContext backed by MockExpr."""
     return MockExpr()
 
 
 class TestParseDateHelper:
-    """Tests for the _parse_date utility in queries.py."""
-
     def test_parse_string_date(self) -> None:
         from benchbox.core.coffeeshop.dataframe_queries.queries import _parse_date
 
@@ -56,8 +42,6 @@ class TestParseDateHelper:
 
 
 class TestCoffeeShopQueryFunctionCallable:
-    """Tests that each query implementation function exists and is callable."""
-
     @pytest.mark.parametrize(
         "func_name",
         [
@@ -94,8 +78,6 @@ class TestCoffeeShopQueryFunctionCallable:
 
 
 class TestCoffeeShopQueryRegistration:
-    """Tests for _register_all_queries registration output."""
-
     def test_all_query_ids_are_strings(self) -> None:
         from benchbox.core.coffeeshop.dataframe_queries import COFFEESHOP_DATAFRAME_QUERIES
 
@@ -149,8 +131,6 @@ class TestCoffeeShopQueryRegistration:
 
 
 class TestCoffeeShopExpressionImplExecution:
-    """Tests that expression_impl functions execute without error on mock context."""
-
     @pytest.mark.parametrize(
         "func_name",
         [
@@ -177,13 +157,6 @@ class TestCoffeeShopExpressionImplExecution:
 
 
 class TestCoffeeShopPandasImplExecution:
-    """Tests that pandas_impl functions execute (or exercise code paths) on mock context.
-
-    Some pandas_impl functions call numpy with mock objects, which numpy cannot
-    process as arrays. We allow ValueError/TypeError from numpy internals while
-    still verifying that the function body is entered and code paths are covered.
-    """
-
     @pytest.mark.parametrize(
         "func_name",
         [
@@ -209,6 +182,4 @@ class TestCoffeeShopPandasImplExecution:
             result = func(ctx)
             assert result is not None
         except (ValueError, TypeError):
-            # numpy operations on mock data raise ValueError/TypeError;
-            # the important thing is that we entered the function body (covered).
             pass

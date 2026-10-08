@@ -1,5 +1,3 @@
-"""Unit tests for the reference-aligned CoffeeShop benchmark."""
-
 from __future__ import annotations
 
 import csv
@@ -33,7 +31,6 @@ pytestmark = [
 ]
 
 
-# Skip marker for tests with Windows file handling issues (line ending differences)
 skip_windows_file_io = pytest.mark.skipif(
     sys.platform == "win32",
     reason="CoffeeShop file tests have cross-platform newline handling issues on Windows",
@@ -198,7 +195,6 @@ class TestCoffeeShopGenerator:
             assert manifest["benchmark"] == "coffeeshop"
             assert set(manifest["tables"].keys()) == {"dim_locations", "dim_products", "order_lines"}
 
-            # Handle V2 manifest format: dict[table, dict[format, list[entries]]]
             from benchbox.utils.datagen_manifest import get_table_files
 
             for table_name in manifest["tables"].keys():
@@ -207,7 +203,6 @@ class TestCoffeeShopGenerator:
                     assert not os.path.isabs(entry["path"])
 
             row_count = _count_pipe_rows(Path(tables["order_lines"]))
-            # Get entries for order_lines table using V2-aware helper
             order_lines_entries = get_table_files(manifest, "order_lines")
             manifest_row_count = order_lines_entries[0]["row_count"]
             assert manifest_row_count == row_count
@@ -237,7 +232,6 @@ class TestCoffeeShopGenerator:
 
 class TestCoffeeShopSeedErrors:
     def test_missing_seed_file_raises(self, monkeypatch, tmp_path):
-        # Ensure caches are clear before the test to exercise file loading.
         load_location_seeds.cache_clear()
         load_product_seeds.cache_clear()
 
@@ -252,7 +246,6 @@ class TestCoffeeShopSeedErrors:
         with pytest.raises(FileNotFoundError):
             load_location_seeds()
 
-        # Restore caches for subsequent tests.
         load_location_seeds.cache_clear()
         load_product_seeds.cache_clear()
 
@@ -346,11 +339,6 @@ class TestCoffeeShopErrors:
             benchmark.load_data_to_database(_MockConnection())
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def _count_pipe_rows(path: Path) -> int:
     with open(path, encoding="utf-8") as handle:
         return sum(1 for _ in handle)
@@ -377,7 +365,7 @@ class _MockCursor:
     def __init__(self):
         self.last_query: str | None = None
 
-    def execute(self, sql: str, params: list[str] | None = None):  # type: ignore[override]
+    def execute(self, sql: str, params: list[str] | None = None):
         self.last_query = sql
         return [("ok",)]
 
@@ -395,8 +383,8 @@ class _MockConnection:
     def cursor(self):
         return self.cursor_obj
 
-    def executescript(self, sql: str):  # pragma: no cover - unused in tests
+    def executescript(self, sql: str):  # pragma: no cover
         self.cursor_obj.last_query = sql
 
-    def commit(self):  # pragma: no cover - unused in tests
+    def commit(self):  # pragma: no cover
         pass

@@ -1,31 +1,9 @@
-"""TPC-DI (Data Integration) benchmark query management.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides a comprehensive suite of validation and analytical queries
-for the TPC-DI benchmark. TPC-DI is primarily an ETL benchmark, but includes
-extensive queries to validate the data integration process and perform analytical
-operations on the resulting data warehouse.
+# TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-DI specification.
 
-The complete query suite includes:
-- 12 Data quality validation queries (VQ1-VQ12): Referential integrity, completeness,
-  SCD Type 2 validation, consistency, business rules
-- 10 Business intelligence analytical queries (AQ1-AQ10): Customer profitability,
-  security performance, broker analysis, market trends, portfolio analysis
-- 8 ETL validation queries (EQ1-EQ8): Batch processing, incremental loads,
-  transformations, quality scores
-
-This represents a complete expansion from the original 8 basic queries to 30
-comprehensive queries covering all aspects of TPC-DI validation and analysis.
-
-For more information see:
-- http://www.tpc.org/tpcdi/
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DI specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import json
 from collections import Counter
@@ -69,17 +47,6 @@ def _base_query_data() -> dict[str, Any]:
 
 
 class TPCDIQueryManager(ParameterizedQueryManager):
-    """Comprehensive manager for TPC-DI benchmark queries.
-
-    This manager provides a unified interface to all TPC-DI queries including:
-    - Original validation and analytical queries (V1-V3, A1-A5)
-    - Extended validation queries (VQ1-VQ12)
-    - Extended analytical queries (AQ1-AQ10)
-    - ETL validation queries (EQ1-EQ8)
-
-    Total query count: 30 queries (8 original + 22 extended)
-    """
-
     def __init__(self) -> None:
         self.validation_queries = TPCDIValidationQueries()
         self.analytical_queries = TPCDIAnalyticalQueries()
@@ -231,9 +198,9 @@ class TPCDIQueryManager(ParameterizedQueryManager):
 
     def translate_query_text(self, query: str, dialect: str) -> str:
         try:
-            import sqlglot  # type: ignore[import-untyped]
+            import sqlglot
 
-            translated = sqlglot.transpile(query, read="ansi", write=dialect)  # type: ignore[attr-defined]
+            translated = sqlglot.transpile(query, read="ansi", write=dialect)
             return translated[0] if translated else query
         except ImportError:
             raise ImportError(

@@ -1,5 +1,3 @@
-"""Contract tests for the modular Makefile inventory guard."""
-
 from __future__ import annotations
 
 import importlib.util

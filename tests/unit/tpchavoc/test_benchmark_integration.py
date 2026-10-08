@@ -1,5 +1,3 @@
-"""Integration smoke tests for the TPC-Havoc benchmark with modular variants."""
-
 from __future__ import annotations
 
 import pytest

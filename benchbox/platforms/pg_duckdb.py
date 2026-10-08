@@ -1,22 +1,6 @@
-"""pg_duckdb platform adapter for BenchBox benchmarking.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Extends PostgreSQL adapter with pg_duckdb-specific functionality:
-- DuckDB vectorized execution engine on PostgreSQL heap tables
-- GUC parameter configuration (duckdb.force_execution, thread tuning)
-- MotherDuck deployment mode for hybrid cloud queries
-
-pg_duckdb is a PostgreSQL extension that embeds DuckDB's columnar-vectorized
-analytics engine inside PostgreSQL, accelerating OLAP queries without requiring
-SQL changes or data migration.
-
-Deployment modes:
-- self-hosted: Self-hosted PostgreSQL with pg_duckdb extension (default)
-- motherduck: MotherDuck-connected mode for hybrid local+cloud queries
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -40,20 +24,10 @@ try:
     from psycopg import sql as psycopg_sql
 except ImportError:
     psycopg = None
-    psycopg_sql = None  # type: ignore[assignment]
+    psycopg_sql = None
 
 
 class PgDuckDBAdapter(PostgreSQLAdapter):
-    """pg_duckdb platform adapter with DuckDB-accelerated query execution.
-
-    Extends PostgreSQLAdapter with pg_duckdb-specific features:
-    - DuckDB vectorized execution for analytical queries
-    - Configurable force_execution and thread tuning
-    - MotherDuck hybrid cloud mode
-
-    Requires PostgreSQL 14+ with pg_duckdb 1.0+ extension installed.
-    """
-
     plan_capture_phase_eligible = True
 
     @property
@@ -61,16 +35,13 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
         return "pg_duckdb"
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for pg_duckdb (PostgreSQL-compatible)."""
         return POSTGRES_DIALECT
 
     @staticmethod
     def add_cli_arguments(parser) -> None:
-        """Add pg_duckdb-specific CLI arguments."""
         if not hasattr(parser, "add_argument"):
             return
         try:
-            # Inherit PostgreSQL connection arguments
             parser.add_argument(
                 "--pgduckdb-host",
                 dest="host",
@@ -106,7 +77,6 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
                 default="public",
                 help="PostgreSQL schema name",
             )
-            # pg_duckdb-specific options
             parser.add_argument(
                 "--pgduckdb-force-execution",
                 dest="force_execution",
@@ -126,7 +96,6 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> PgDuckDBAdapter:
-        """Create pg_duckdb adapter from unified configuration."""
         adapter_config = _build_postgres_connection_kwargs(config)
         adapter_config["force_execution"] = config.get("force_execution", True)
         adapter_config["postgres_scan_threads"] = config.get("postgres_scan_threads", 0)
@@ -138,13 +107,9 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
         return cls(**adapter_config)
 
     def __init__(self, **config):
-        # Determine deployment mode with priority:
-        # 1. deployment_mode (from factory via colon syntax: pg-duckdb:motherduck)
-        # 2. Default to 'self-hosted'
         deployment_mode = config.get("deployment_mode", "self-hosted")
         self.deployment_mode = deployment_mode.lower()
 
-        # Validate deployment mode
         valid_modes = {"self-hosted", "motherduck"}
         if self.deployment_mode not in valid_modes:
             raise ValueError(
@@ -152,39 +117,23 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
                 f"Valid modes: {', '.join(sorted(valid_modes))}"
             )
 
-        # Configure for MotherDuck mode if specified
         if self.deployment_mode == "motherduck":
             self._configure_motherduck_mode(config)
 
         super().__init__(**config)
 
-        # pg_duckdb-specific configuration
         self.force_execution = config.get("force_execution", True)
         self.postgres_scan_threads = config.get("postgres_scan_threads", 0)
 
-        # Native DuckDB comparison (triggered by --platform-option compare_native=true).
-        # from_config() normalizes the string "true"/"false" to bool; direct callers
-        # may pass either type, so coerce here once.
         raw_compare = config.get("compare_native", False)
         self.compare_native: bool = (
             str(raw_compare).lower() == "true" if isinstance(raw_compare, str) else bool(raw_compare)
         )
         self.duckdb_db_path: str | None = config.get("duckdb_db_path")
 
-        # MotherDuck token (set in _configure_motherduck_mode or from env)
         self.motherduck_token = config.get("motherduck_token") or os.environ.get("MOTHERDUCK_TOKEN")
 
     def _configure_motherduck_mode(self, config: dict) -> None:
-        """Configure adapter for MotherDuck hybrid mode.
-
-        MotherDuck mode connects pg_duckdb to a MotherDuck cloud database,
-        enabling hybrid queries that join local PostgreSQL tables with
-        cloud-hosted MotherDuck data.
-
-        Credentials via:
-        - Config parameter: motherduck_token
-        - Environment variable: MOTHERDUCK_TOKEN
-        """
         token = config.get("motherduck_token") or os.environ.get("MOTHERDUCK_TOKEN")
         if not token:
             raise ValueError(
@@ -197,18 +146,15 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
         config["motherduck_token"] = token
 
     def create_connection(self, **connection_config) -> Any:
-        """Create PostgreSQL connection and configure pg_duckdb extension."""
         conn = super().create_connection(**connection_config)
 
         cursor = conn.cursor()
         try:
-            # Verify pg_duckdb extension is installed
             cursor.execute("SELECT extversion FROM pg_extension WHERE extname = 'pg_duckdb'")
             result = cursor.fetchone()
             if result:
                 self.logger.info(f"pg_duckdb extension version: {result[0]}")
             else:
-                # Try to create the extension
                 self.logger.info("pg_duckdb extension not found, attempting to create...")
                 cursor.execute("CREATE EXTENSION IF NOT EXISTS pg_duckdb")
                 conn.commit()
@@ -223,7 +169,6 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
                         "the 'postgresql' or 'duckdb' platform instead."
                     )
 
-            # Set pg_duckdb session GUCs (shared with per-stream sessions).
             self._apply_pgduckdb_session_gucs(cursor)
 
             conn.commit()
@@ -242,14 +187,6 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
         return conn
 
     def _apply_pgduckdb_session_gucs(self, cursor: Any) -> None:
-        """Apply pg_duckdb's session-local GUCs on an open cursor.
-
-        Shared by ``create_connection`` (setup connection) and
-        ``_apply_stream_session_state`` (each throughput/maintenance stream
-        connection) so both are configured identically. Keeping the two in
-        lockstep is what prevents a stream from silently routing through vanilla
-        PostgreSQL instead of DuckDB.
-        """
         if self.force_execution:
             cursor.execute("SET duckdb.force_execution = true")
             self.logger.info("Enabled duckdb.force_execution for DuckDB query routing")
@@ -258,7 +195,6 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
             cursor.execute(f"SET duckdb.threads_for_postgres_scan = {int(self.postgres_scan_threads)}")
             self.logger.info(f"Set duckdb.threads_for_postgres_scan = {self.postgres_scan_threads}")
 
-        # Configure MotherDuck if in motherduck mode
         if self.deployment_mode == "motherduck" and self.motherduck_token:
             cursor.execute(
                 psycopg_sql.SQL("SET duckdb.motherduck_token = {}").format(psycopg_sql.Literal(self.motherduck_token))
@@ -266,15 +202,6 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
             self.logger.info("Configured MotherDuck token for hybrid queries")
 
     def _apply_stream_session_state(self, connection: Any) -> None:
-        """Reapply pg_duckdb session GUCs to a fresh throughput-stream connection.
-
-        Without this, a stream connection built by the base
-        ``new_stream_connection`` would leave ``duckdb.force_execution`` unset
-        and route queries through vanilla PostgreSQL instead of DuckDB, silently
-        mismeasuring a multi-stream pg_duckdb run. Extension verification /
-        creation stays a one-time step in ``create_connection`` -- only the
-        session-scoped GUCs are reapplied here.
-        """
         cursor = connection.cursor()
         try:
             self._apply_pgduckdb_session_gucs(cursor)
@@ -282,18 +209,11 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
             cursor.close()
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
-        """Apply pg_duckdb optimizations for benchmark type.
-
-        pg_duckdb benefits from PostgreSQL OLAP settings but also adds
-        DuckDB-specific execution configuration.
-        """
-        # Apply PostgreSQL OLAP optimizations first
         super().configure_for_benchmark(connection, benchmark_type)
 
         cursor = connection.cursor()
         try:
             if benchmark_type == "olap":
-                # Ensure DuckDB execution is forced for analytical workloads
                 cursor.execute("SET duckdb.force_execution = true")
 
             connection.commit()
@@ -303,14 +223,11 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
             cursor.close()
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get pg_duckdb platform information."""
         platform_info = super().get_platform_info(connection)
 
-        # Override platform type and name
         platform_info["platform_type"] = "pg_duckdb"
         platform_info["platform_name"] = "pg_duckdb"
 
-        # Add pg_duckdb-specific configuration
         platform_info["configuration"]["force_execution"] = self.force_execution
         platform_info["configuration"]["postgres_scan_threads"] = self.postgres_scan_threads
         platform_info["configuration"]["deployment_mode"] = self.deployment_mode
@@ -319,7 +236,6 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
             try:
                 cursor = connection.cursor()
 
-                # Get pg_duckdb version
                 cursor.execute("SELECT extversion FROM pg_extension WHERE extname = 'pg_duckdb'")
                 result = cursor.fetchone()
                 if result:
@@ -337,36 +253,6 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
         query_sql_map: dict[str, str],
         scale_factor: float,
     ) -> Any:
-        """Compare pg_duckdb query timings against native DuckDB execution.
-
-        Replays each query from query_results on a native DuckDB connection,
-        then computes per-query timing deltas. Triggered via
-        --platform-option compare_native=true (self.compare_native must be True).
-
-        The native DuckDB connection uses self.duckdb_db_path when provided
-        (--platform-option duckdb_db_path=/path/to/db.duckdb), otherwise opens
-        an in-memory database. The in-memory path is useful for structural
-        timing comparisons (empty tables); point to a populated DuckDB file for
-        meaningful end-to-end comparison.
-
-        Timing caveat: pg_duckdb timings are *averaged* across all measurement
-        rows (potentially multiple warm iterations), while native DuckDB
-        timings are a single cold run. Positive deltas therefore overstate the
-        gap when pg_duckdb has had warmup benefit. Interpret deltas as
-        directional, not exact.
-
-        Args:
-            query_results: List of query result dicts from the pg_duckdb run.
-                Each dict must have 'query_id' and 'ms' (execution time in ms).
-                Only measurement rows (run_type == 'measurement' or absent) are used;
-                warmup rows are skipped.
-            query_sql_map: Mapping of query_id -> SQL string for native replay.
-            scale_factor: Scale factor of the benchmark (carried into the result).
-
-        Returns:
-            NativeComparison instance, or None if compare_native is False or
-            duckdb is not importable.
-        """
         if not self.compare_native:
             return None
 
@@ -381,7 +267,6 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
 
         from benchbox.core.results.models import NativeComparison, NativeComparisonEntry
 
-        # Build pg_duckdb timing lookup: query_id -> mean ms over measurement rows
         pg_timings: dict[str, list[float]] = {}
         for row in query_results:
             qid = row.get("query_id") or row.get("id")

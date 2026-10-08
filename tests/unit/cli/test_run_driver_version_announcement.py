@@ -1,12 +1,6 @@
-"""Tests for driver version display in the CLI 'Running ...' announcement line.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Verifies that benchbox/cli/commands/run.py emits the driver version after
-database_config is resolved, not before, and handles the no-driver case.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import sys
 import sys as _sys
@@ -18,12 +12,6 @@ from click.testing import CliRunner
 from benchbox.cli.main import cli
 from benchbox.core.schemas import DatabaseConfig
 
-# benchbox.cli.commands.__init__ re-exports `run` (a Click Command) under the
-# same name as the run submodule.  On Python 3.10 mock's string-based patch()
-# resolves the target via getattr(benchbox.cli.commands, "run"), which returns
-# the Command object, not the submodule.  Seeding sys.modules here via
-# __import__ and using patch.object() avoids the ambiguity on all Python
-# versions.
 __import__("benchbox.cli.commands.run")
 _run_module = _sys.modules["benchbox.cli.commands.run"]
 
@@ -51,7 +39,6 @@ def _make_mock_result():
 
 
 def _invoke_run(platform="duckdb", database_config=None):
-    """Invoke `benchbox run` with minimal mocking and return CliRunner result."""
     if database_config is None:
         database_config = _make_database_config(driver_version_actual="1.4.3")
 
@@ -109,24 +96,19 @@ def _invoke_run(platform="duckdb", database_config=None):
 
 @pytest.mark.unit
 class TestRunDriverVersionAnnouncement:
-    """The 'Running ...' line should include driver version when available."""
-
     def test_driver_version_included_when_resolved(self):
-        """When driver_version_actual is set, output includes [driver X.Y.Z]."""
         cfg = _make_database_config(driver_version_actual="1.4.3")
         result = _invoke_run(database_config=cfg)
 
         assert "Running tpch on duckdb at scale 0.01 [driver 1.4.3]" in result.output
 
     def test_driver_version_falls_back_to_resolved(self):
-        """When driver_version_actual is None, driver_version_resolved is used."""
         cfg = _make_database_config(driver_version_resolved="1.3.0")
         result = _invoke_run(database_config=cfg)
 
         assert "[driver 1.3.0]" in result.output
 
     def test_no_driver_clause_when_version_unavailable(self):
-        """Platforms without a driver package (e.g., SQLite) omit the driver clause."""
         cfg = DatabaseConfig(type="duckdb", name="DuckDB", driver_package=None)
         result = _invoke_run(database_config=cfg)
 
@@ -134,7 +116,6 @@ class TestRunDriverVersionAnnouncement:
         assert "Running tpch on duckdb at scale 0.01" in result.output
 
     def test_driver_version_actual_takes_precedence(self):
-        """driver_version_actual wins over driver_version_resolved."""
         cfg = _make_database_config(driver_version_actual="1.4.3", driver_version_resolved="1.3.0")
         result = _invoke_run(database_config=cfg)
 
@@ -142,7 +123,6 @@ class TestRunDriverVersionAnnouncement:
         assert "[driver 1.3.0]" not in result.output
 
     def test_polars_platform_includes_driver_version(self):
-        """Polars runs show driver version now that driver_package='polars' is set."""
         cfg = DatabaseConfig(type="polars", name="Polars", driver_package="polars", driver_version_actual="1.36.1")
         result = _invoke_run(platform="polars", database_config=cfg)
 

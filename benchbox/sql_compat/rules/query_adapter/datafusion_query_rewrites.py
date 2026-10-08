@@ -1,11 +1,3 @@
-"""DataFusion query rewrite rules for Phase.QUERY_ADAPTER.
-
-TPC-H Q11, Q16, Q18, Q20 produce incorrect results under DataFusion due to
-execution differences with HAVING scalar subqueries, NOT IN NULL semantics, IN
-with HAVING, and nested correlated IN. DataFusionQueryTransformer rewrites each
-into a semantically equivalent form that DataFusion executes correctly.
-"""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.actions import CompatAction
@@ -21,7 +13,6 @@ from benchbox.sql_compat.registry import REGISTRY
 _P = Phase.QUERY_ADAPTER
 _B = "tpch"
 
-# (query_id, rule_slug, description)
 _REWRITES = [
     (
         "11",

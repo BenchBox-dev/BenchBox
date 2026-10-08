@@ -1,26 +1,6 @@
-"""Metadata Primitives benchmark implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests database metadata introspection operations using INFORMATION_SCHEMA views
-and platform-specific catalog commands (SHOW, DESCRIBE, PRAGMA).
-
-Unlike Read/Write/Transaction Primitives that test data operations, this benchmark
-focuses on metadata operations critical for data catalog integration, schema discovery,
-IDE autocomplete, BI tool connectivity, and data governance workflows.
-
-Complexity Testing:
-The benchmark supports stress testing metadata operations under various complexity
-conditions using the MetadataGenerator class. This allows measuring how introspection
-performance scales with:
-- Wide tables (100-1000+ columns)
-- Nested view hierarchies (multiple levels of view dependencies)
-- Complex data types (ARRAY, STRUCT, MAP)
-- Large catalogs (100-500+ tables)
-- Foreign key constraints
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -61,17 +41,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class MetadataQueryResult:
-    """Result of executing a single metadata query.
-
-    Attributes:
-        query_id: Query identifier
-        category: Query category
-        execution_time_ms: Query execution time in milliseconds
-        row_count: Number of rows returned
-        success: Whether query executed successfully
-        error: Error message if query failed
-    """
-
     query_id: str
     category: str
     execution_time_ms: float
@@ -82,19 +51,6 @@ class MetadataQueryResult:
 
 @dataclass
 class MetadataBenchmarkResult:
-    """Results from running the Metadata Primitives benchmark.
-
-    Attributes:
-        total_queries: Total number of queries executed
-        successful_queries: Number of queries that completed successfully
-        failed_queries: Number of queries that failed
-        total_time_ms: Total execution time in milliseconds
-        results: List of individual query results
-        category_summary: Aggregated results by category
-        acl_mutation_results: Results from ACL mutation tests (GRANT/REVOKE timing)
-        acl_mutation_summary: Aggregated ACL mutation statistics
-    """
-
     total_queries: int = 0
     successful_queries: int = 0
     failed_queries: int = 0
@@ -107,16 +63,6 @@ class MetadataBenchmarkResult:
 
 @dataclass
 class ComplexityBenchmarkResult:
-    """Results from running the complexity benchmark.
-
-    Attributes:
-        complexity_config: Configuration used for complexity testing
-        generated_metadata: Metadata structures created for testing
-        setup_time_ms: Time to create metadata structures
-        teardown_time_ms: Time to cleanup metadata structures
-        benchmark_result: Underlying benchmark results
-    """
-
     complexity_config: MetadataComplexityConfig
     generated_metadata: GeneratedMetadata
     setup_time_ms: float = 0.0
@@ -126,19 +72,6 @@ class ComplexityBenchmarkResult:
 
 @dataclass
 class AclMutationResult:
-    """Result of a single GRANT/REVOKE operation.
-
-    Attributes:
-        operation: Operation type ("GRANT", "REVOKE", "CREATE_ROLE", "DROP_ROLE")
-        target_type: Object type ("table", "column", "role", "schema")
-        target_name: Name of the object
-        grantee: Role or user receiving/losing the grant
-        privileges: List of privileges involved
-        execution_time_ms: Operation execution time in milliseconds
-        success: Whether operation completed successfully
-        error: Error message if operation failed
-    """
-
     operation: str
     target_type: str
     target_name: str
@@ -151,19 +84,6 @@ class AclMutationResult:
 
 @dataclass
 class AclBenchmarkResult:
-    """Results from ACL benchmark operations.
-
-    Tracks timing for both ACL mutations (GRANT/REVOKE) and ACL introspection
-    queries.
-
-    Attributes:
-        setup_time_ms: Time to create roles and grants
-        teardown_time_ms: Time to revoke grants and drop roles
-        mutation_results: List of individual GRANT/REVOKE results
-        introspection_results: Results from ACL introspection queries
-        summary: Aggregated statistics
-    """
-
     setup_time_ms: float = 0.0
     teardown_time_ms: float = 0.0
     mutation_results: list[AclMutationResult] = field(default_factory=list)
@@ -171,12 +91,10 @@ class AclBenchmarkResult:
     summary: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        """Calculate summary statistics if not provided."""
         if not self.summary and self.mutation_results:
             self._calculate_summary()
 
     def _calculate_summary(self) -> None:
-        """Calculate summary statistics from mutation results."""
         total_ops = len(self.mutation_results)
         successful_ops = sum(1 for r in self.mutation_results if r.success)
         failed_ops = total_ops - successful_ops
@@ -210,21 +128,6 @@ class AclBenchmarkResult:
 
 
 class MetadataPrimitivesBenchmark(BaseBenchmark):
-    """Metadata Primitives benchmark implementation.
-
-    Tests metadata introspection operations across database platforms:
-    - Schema discovery (list databases, schemas, tables, views)
-    - Column introspection (column metadata, types, constraints)
-    - Table statistics (row counts, sizes, storage info)
-    - Query introspection (execution plans)
-
-    Unlike other primitives benchmarks, this benchmark does not require
-    data generation - it queries the database's own catalog metadata.
-
-    Attributes:
-        query_manager: Query manager for loading catalog queries
-    """
-
     SKIP_DATA_LOADING = True
 
     def __init__(
@@ -233,13 +136,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         output_dir: str | Path | None = None,
         **config: Any,
     ):
-        """Initialize Metadata Primitives benchmark.
-
-        Args:
-            scale_factor: Not used for metadata primitives (included for API compatibility)
-            output_dir: Not used for metadata primitives (included for API compatibility)
-            **config: Additional configuration (quiet, etc.)
-        """
         config = dict(config)
         quiet = config.pop("quiet", False)
 
@@ -252,7 +148,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         self.query_manager = MetadataPrimitivesQueryManager()
 
     def get_data_source_benchmark(self) -> str | None:
-        """Metadata Primitives does not require any data generation."""
         return None
 
     def generate_data(
@@ -260,13 +155,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         tables: list[str] | None = None,
         output_format: str = "csv",
     ) -> dict[str, str]:
-        """No data generation needed for Metadata Primitives.
-
-        This benchmark queries database catalog metadata, not user data.
-
-        Returns:
-            Empty dictionary (no data files to generate)
-        """
         return {}
 
     def get_create_tables_sql(
@@ -274,84 +162,28 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         dialect: str = "standard",
         tuning_config: Any = None,
     ) -> str:
-        """Generate CREATE TABLE SQL for the Metadata Primitives schema.
-
-        Creates TPC-H and TPC-DS schemas to provide a rich metadata
-        environment for testing INFORMATION_SCHEMA queries.
-
-        Args:
-            dialect: Target SQL dialect
-            tuning_config: Tuning configuration for constraint settings
-
-        Returns:
-            SQL script to create all tables (TPC-H + TPC-DS)
-        """
         return get_base_schema_sql(dialect=dialect, tuning_config=tuning_config)
 
     def get_table_names(self) -> list[str]:
-        """Get all table names in the Metadata Primitives schema.
-
-        Returns:
-            List of table names (TPC-H + TPC-DS tables)
-        """
         return get_base_table_names()
 
     def get_schema(self) -> dict[str, dict[str, Any]]:
-        """Get schema metadata for all tables.
-
-        Returns:
-            Dictionary mapping table names to their metadata (columns, types)
-        """
         return get_base_schema()
 
     def get_query(self, query_id: int | str, *, params: dict[str, Any] | None = None) -> str:
-        """Get SQL text for a specific Metadata Primitives query.
-
-        Args:
-            query_id: Query identifier (e.g., "schema_list_tables", "column_for_table")
-            params: Optional parameter values (not supported for Metadata Primitives)
-
-        Returns:
-            SQL text of the query
-
-        Raises:
-            ValueError: If query_id is not valid or params are provided
-        """
         if params is not None:
             raise ValueError("Metadata Primitives queries are static and don't accept parameters")
         return self.query_manager.get_query(str(query_id))
 
     def get_queries(self, dialect: str | None = None) -> dict[str, str]:
-        """Get all available Metadata Primitives queries.
-
-        Args:
-            dialect: Target SQL dialect. If provided, returns dialect-specific
-                    variants where available and excludes unsupported queries.
-
-        Returns:
-            Dictionary mapping query identifiers to their SQL text
-        """
         if dialect:
             return self.query_manager.get_queries_for_dialect(dialect)
         return self.query_manager.get_all_queries()
 
     def get_queries_by_category(self, category: str) -> dict[str, str]:
-        """Get queries filtered by category.
-
-        Args:
-            category: Category name (e.g., 'schema', 'column', 'stats', 'query')
-
-        Returns:
-            Dictionary mapping query IDs to SQL text for the category
-        """
         return self.query_manager.get_queries_by_category(category)
 
     def get_query_categories(self) -> list[str]:
-        """Get list of available query categories.
-
-        Returns:
-            List of category names (schema, column, stats, query)
-        """
         return self.query_manager.get_query_categories()
 
     def execute_query(
@@ -360,24 +192,12 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         connection: DatabaseConnection,
         dialect: str | None = None,
     ) -> MetadataQueryResult:
-        """Execute a single metadata query and return timing results.
-
-        Args:
-            query_id: Query identifier
-            connection: Database connection to execute against
-            dialect: Target dialect for query variants
-
-        Returns:
-            MetadataQueryResult with execution timing and status
-        """
         entry = self.query_manager.get_query_entry(query_id)
         category = entry.category
 
-        # Get dialect-appropriate SQL
         try:
             sql = self.query_manager.get_query(query_id, dialect=dialect)
         except ValueError as e:
-            # Query not supported on this dialect
             return MetadataQueryResult(
                 query_id=query_id,
                 category=category,
@@ -387,7 +207,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
                 error=str(e),
             )
 
-        # Execute and time the query
         start_time = time.perf_counter()
         try:
             if hasattr(connection, "execute"):
@@ -396,7 +215,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
                 cursor = connection.cursor()
                 cursor.execute(sql)
 
-            # Fetch results to ensure complete execution
             results = cursor.fetchall()
             row_count = len(results)
 
@@ -429,18 +247,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         query_ids: list[str] | None = None,
         iterations: int = 1,
     ) -> MetadataBenchmarkResult:
-        """Run the Metadata Primitives benchmark.
-
-        Args:
-            connection: Database connection to execute against
-            dialect: Target dialect for query variants
-            categories: Optional list of categories to run (default: all)
-            query_ids: Optional specific query IDs to run (overrides categories)
-            iterations: Number of times to run each query (default: 1)
-
-        Returns:
-            MetadataBenchmarkResult with all query timings and summary
-        """
         queries_to_run = self._select_queries_to_run(dialect=dialect, categories=categories, query_ids=query_ids)
 
         result = MetadataBenchmarkResult()
@@ -462,7 +268,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         result.results = all_results
         result.category_summary = self._build_category_summary(all_results)
 
-        # Run ACL mutation tests at the end (on supported platforms)
         if dialect and supports_acl(dialect):
             acl_results = self._run_default_acl_mutations(connection, dialect)
             result.acl_mutation_results = acl_results
@@ -477,7 +282,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         categories: list[str] | None,
         query_ids: list[str] | None,
     ) -> list[str]:
-        """Resolve the query IDs to execute for a benchmark run."""
         if query_ids:
             return query_ids
         if categories:
@@ -490,7 +294,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         return list(self.query_manager.get_all_queries().keys())
 
     def _build_category_summary(self, all_results: list[MetadataQueryResult]) -> dict[str, dict[str, float | int]]:
-        """Aggregate per-category execution statistics."""
         category_summary: dict[str, dict[str, float | int]] = {}
         for query_result in all_results:
             entry = category_summary.setdefault(
@@ -528,36 +331,12 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
             )
         return category_summary
 
-    # =========================================================================
-    # Complexity Testing Methods
-    # =========================================================================
-
     def setup_complexity(
         self,
         connection: DatabaseConnection,
         dialect: str,
         config: MetadataComplexityConfig | str,
     ) -> GeneratedMetadata:
-        """Set up metadata structures for complexity testing.
-
-        Creates tables, views, and other database objects based on the
-        complexity configuration. These structures can then be queried
-        using the complexity-specific query categories.
-
-        Args:
-            connection: Database connection to create structures
-            dialect: Target SQL dialect
-            config: Complexity configuration or preset name (e.g., 'wide_tables')
-
-        Returns:
-            GeneratedMetadata tracking all created objects
-
-        Example:
-            >>> benchmark = MetadataPrimitivesBenchmark()
-            >>> generated = benchmark.setup_complexity(conn, "duckdb", "wide_tables")
-            >>> result = benchmark.run_benchmark(conn, "duckdb", categories=["wide_table"])
-            >>> benchmark.teardown_complexity(conn, "duckdb", generated)
-        """
         if isinstance(config, str):
             config = get_complexity_preset(config)
 
@@ -570,15 +349,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         dialect: str,
         generated: GeneratedMetadata,
     ) -> None:
-        """Tear down metadata structures created for complexity testing.
-
-        Removes all tables and views created by setup_complexity().
-
-        Args:
-            connection: Database connection
-            dialect: Target SQL dialect
-            generated: Metadata tracking object from setup_complexity()
-        """
         generator = MetadataGenerator()
         generator.teardown(connection, dialect, generated)
 
@@ -588,18 +358,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         dialect: str,
         prefix: str = "benchbox_",
     ) -> int:
-        """Clean up all benchmark objects with given prefix.
-
-        Useful for cleaning up stale test objects from previous runs.
-
-        Args:
-            connection: Database connection
-            dialect: Target SQL dialect
-            prefix: Prefix to match (default: benchbox_)
-
-        Returns:
-            Number of objects dropped
-        """
         generator = MetadataGenerator()
         return generator.cleanup_all(connection, dialect, prefix)
 
@@ -611,40 +369,12 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         iterations: int = 1,
         categories: list[str] | None = None,
     ) -> ComplexityBenchmarkResult:
-        """Run a full complexity benchmark with setup and teardown.
-
-        This is a convenience method that:
-        1. Creates complexity structures based on configuration
-        2. Runs the benchmark against complexity-specific queries
-        3. Cleans up the created structures
-
-        Args:
-            connection: Database connection
-            dialect: Target SQL dialect
-            config: Complexity configuration or preset name
-            iterations: Number of times to run each query
-            categories: Optional list of categories to run. If not specified,
-                       automatically selects categories based on the config.
-
-        Returns:
-            ComplexityBenchmarkResult with timing and results
-
-        Example:
-            >>> benchmark = MetadataPrimitivesBenchmark()
-            >>> result = benchmark.run_complexity_benchmark(
-            ...     conn, "duckdb", "wide_tables", iterations=3
-            ... )
-            >>> emit(f"Setup: {result.setup_time_ms:.1f}ms")
-            >>> emit(f"Queries: {result.benchmark_result.total_queries}")
-        """
         if isinstance(config, str):
             config = get_complexity_preset(config)
 
-        # Auto-select categories based on config if not specified
         if categories is None:
             categories = self._get_complexity_categories(config)
 
-        # Setup
         logger.info(f"Setting up complexity structures: {config.to_dict()}")
         setup_start = time.perf_counter()
         generator = MetadataGenerator()
@@ -657,7 +387,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
             f"in {setup_time_ms:.1f}ms"
         )
 
-        # Run benchmark
         benchmark_result = None
         try:
             benchmark_result = self.run_benchmark(
@@ -667,7 +396,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
                 iterations=iterations,
             )
         finally:
-            # Always teardown
             logger.info("Tearing down complexity structures...")
             teardown_start = time.perf_counter()
             generator.teardown(connection, dialect, generated)
@@ -683,54 +411,33 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         )
 
     def _get_complexity_categories(self, config: MetadataComplexityConfig) -> list[str]:
-        """Determine which query categories to run based on complexity config.
-
-        Args:
-            config: Complexity configuration
-
-        Returns:
-            List of category names to run
-        """
         categories = []
 
-        # Wide table queries
         if config.width_factor > 0:
             categories.append("wide_table")
 
-        # Large catalog queries
         if config.catalog_size > 1:
             categories.append("large_catalog")
 
-        # View hierarchy queries
         if config.view_depth > 0:
             categories.append("view_hierarchy")
 
-        # Complex type queries
         from benchbox.core.metadata_primitives.complexity import TypeComplexity
 
         if config.type_complexity != TypeComplexity.SCALAR:
             categories.append("complex_type")
 
-        # Constraint queries
         from benchbox.core.metadata_primitives.complexity import ConstraintDensity
 
         if config.constraint_density != ConstraintDensity.NONE:
             categories.append("constraint")
 
-        # ACL queries
         if config.acl_role_count > 0:
             categories.append("acl")
 
         return categories
 
     def get_complexity_categories(self) -> list[str]:
-        """Get list of complexity-specific query categories.
-
-        These are categories designed to work with generated metadata structures.
-
-        Returns:
-            List of complexity category names
-        """
         return [
             "wide_table",
             "view_hierarchy",
@@ -740,10 +447,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
             "acl",
         ]
 
-    # =========================================================================
-    # ACL Benchmark Methods
-    # =========================================================================
-
     def run_acl_benchmark(
         self,
         connection: DatabaseConnection,
@@ -751,24 +454,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         config: MetadataComplexityConfig | str,
         iterations: int = 1,
     ) -> AclBenchmarkResult:
-        """Run a full ACL benchmark measuring GRANT/REVOKE performance.
-
-        This benchmark:
-        1. Creates test roles
-        2. Measures GRANT statement performance
-        3. Runs ACL introspection queries
-        4. Measures REVOKE statement performance
-        5. Cleans up roles
-
-        Args:
-            connection: Database connection
-            dialect: Target SQL dialect
-            config: Complexity configuration or preset name
-            iterations: Number of times to run each query
-
-        Returns:
-            AclBenchmarkResult with timing measurements
-        """
         if isinstance(config, str):
             config = get_complexity_preset(config)
 
@@ -784,7 +469,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         created_roles: list[str] = []
         created_grants: list[AclGrant] = []
 
-        # Phase 1: Create roles and measure timing
         setup_start = time.perf_counter()
 
         for i in range(config.acl_role_count):
@@ -794,11 +478,8 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
             if result.success:
                 created_roles.append(role_name)
 
-        # Phase 2: Create tables for grants (if not already existing)
-        # Use minimal tables for grant testing
         test_tables = self._create_grant_test_tables(connection, dialect, config)
 
-        # Phase 3: Measure GRANT performance
         grants_to_create = self._get_grants_per_table(config.acl_permission_density)
         privileges = ["SELECT", "INSERT", "UPDATE"]
 
@@ -812,7 +493,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
 
         setup_time_ms = (time.perf_counter() - setup_start) * 1000
 
-        # Phase 4: Run ACL introspection queries
         introspection_results = self.run_benchmark(
             connection,
             dialect=dialect,
@@ -820,18 +500,14 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
             iterations=iterations,
         )
 
-        # Phase 5: Measure REVOKE and cleanup
         teardown_start = time.perf_counter()
 
-        # Revoke grants
         for grant in reversed(created_grants):
             result = self._measure_revoke(connection, dialect, grant.grantee, grant.object_name, grant.privileges)
             mutation_results.append(result)
 
-        # Drop test tables
         self._drop_grant_test_tables(connection, dialect, test_tables)
 
-        # Drop roles
         for role_name in reversed(created_roles):
             result = self._measure_drop_role(connection, dialect, role_name)
             mutation_results.append(result)
@@ -851,7 +527,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         dialect: str,
         role_name: str,
     ) -> AclMutationResult:
-        """Measure CREATE ROLE timing."""
         sql = generate_create_role_sql(role_name, dialect)
 
         if sql.startswith("--"):
@@ -894,7 +569,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         dialect: str,
         role_name: str,
     ) -> AclMutationResult:
-        """Measure DROP ROLE timing."""
         sql = generate_drop_role_sql(role_name, dialect)
 
         if sql.startswith("--"):
@@ -939,7 +613,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         object_name: str,
         privileges: list[str],
     ) -> AclMutationResult:
-        """Measure GRANT timing."""
         sql = generate_grant_sql(
             grantee=grantee,
             object_name=object_name,
@@ -981,7 +654,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         object_name: str,
         privileges: list[str],
     ) -> AclMutationResult:
-        """Measure REVOKE timing."""
         sql = generate_revoke_sql(
             grantee=grantee,
             object_name=object_name,
@@ -1016,7 +688,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
             )
 
     def _get_grants_per_table(self, density: PermissionDensity) -> int:
-        """Get number of grants per table based on density setting."""
         density_map = {
             PermissionDensity.NONE: 0,
             PermissionDensity.SPARSE: 2,
@@ -1031,7 +702,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         dialect: str,
         config: MetadataComplexityConfig,
     ) -> list[str]:
-        """Create minimal test tables for GRANT testing."""
         test_tables: list[str] = []
         num_tables = min(5, config.catalog_size) if config.catalog_size > 0 else 3
 
@@ -1052,7 +722,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         dialect: str,
         table_names: list[str],
     ) -> None:
-        """Drop test tables created for GRANT testing."""
         for table_name in table_names:
             try:
                 sql = f"DROP TABLE IF EXISTS {table_name};"
@@ -1065,23 +734,10 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         connection: DatabaseConnection,
         dialect: str,
     ) -> list[AclMutationResult]:
-        """Run default ACL mutation tests (CREATE ROLE, GRANT, REVOKE, DROP ROLE).
-
-        This runs a minimal set of ACL operations to measure mutation performance
-        as part of the standard benchmark run.
-
-        Args:
-            connection: Database connection
-            dialect: Target SQL dialect
-
-        Returns:
-            List of AclMutationResult with timing for each operation
-        """
         results: list[AclMutationResult] = []
         created_roles: list[str] = []
-        created_grants: list[tuple[str, str, list[str]]] = []  # (role, table, privs)
+        created_grants: list[tuple[str, str, list[str]]] = []
 
-        # Create 3 test roles
         role_names = [
             "benchbox_test_role_reader",
             "benchbox_test_role_writer",
@@ -1094,7 +750,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
             if result.success:
                 created_roles.append(role_name)
 
-        # Create a test table for grants
         test_table = "benchbox_acl_mutation_test"
         try:
             self._execute(
@@ -1103,12 +758,10 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
             )
         except Exception as e:
             logger.warning(f"Could not create ACL test table: {e}")
-            # Clean up roles and return
             for role_name in reversed(created_roles):
                 results.append(self._measure_drop_role(connection, dialect, role_name))
             return results
 
-        # Issue GRANTs with different privilege sets
         privilege_sets = [
             ["SELECT"],
             ["SELECT", "INSERT"],
@@ -1121,18 +774,15 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
             if result.success:
                 created_grants.append((role_name, test_table, privs))
 
-        # Revoke all grants
         for role_name, table_name, privs in reversed(created_grants):
             result = self._measure_revoke(connection, dialect, role_name, table_name, privs)
             results.append(result)
 
-        # Drop test table
         try:
             self._execute(connection, f"DROP TABLE IF EXISTS {test_table};")
         except Exception as e:
             logger.warning(f"Could not drop ACL test table: {e}")
 
-        # Drop roles
         for role_name in reversed(created_roles):
             result = self._measure_drop_role(connection, dialect, role_name)
             results.append(result)
@@ -1140,14 +790,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         return results
 
     def _build_acl_summary(self, results: list[AclMutationResult]) -> dict[str, Any]:
-        """Build summary statistics from ACL mutation results.
-
-        Args:
-            results: List of ACL mutation results
-
-        Returns:
-            Summary dictionary with aggregated statistics
-        """
         if not results:
             return {}
 
@@ -1157,7 +799,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
 
         times = [r.execution_time_ms for r in results if r.success]
 
-        # Group by operation type
         by_operation: dict[str, list[AclMutationResult]] = {}
         for r in results:
             by_operation.setdefault(r.operation, []).append(r)
@@ -1185,7 +826,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         }
 
     def _execute(self, connection: DatabaseConnection, sql: str) -> Any:
-        """Execute SQL statement on connection."""
         if hasattr(connection, "execute"):
             return connection.execute(sql)
         elif hasattr(connection, "cursor"):
@@ -1195,22 +835,10 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         else:
             raise TypeError(f"Unsupported connection type: {type(connection)}")
 
-    # =========================================================================
-    # DataFrame Support Methods
-    # =========================================================================
-
     def supports_dataframe_mode(self) -> bool:
-        """Check if this benchmark supports DataFrame execution mode.
-
-        Returns:
-            True - Metadata Primitives supports DataFrame mode via the
-            DataFrameMetadataOperationsManager for schema introspection,
-            catalog operations, and lakehouse metadata.
-        """
         return True
 
     def skip_dataframe_data_loading(self) -> bool:
-        """Metadata Primitives bootstraps in-memory schema fixtures itself."""
         return True
 
     def get_dataframe_operations(
@@ -1218,27 +846,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         platform_name: str,
         spark_session: Any = None,
     ) -> Any:
-        """Get DataFrame metadata operations manager for a platform.
-
-        Returns a DataFrameMetadataOperationsManager configured for the given
-        platform. Use this to execute metadata introspection operations on
-        DataFrame platforms.
-
-        Args:
-            platform_name: Platform name (e.g., "polars-df", "pyspark-df")
-            spark_session: SparkSession instance (required for pyspark-df catalog ops)
-
-        Returns:
-            DataFrameMetadataOperationsManager instance
-
-        Raises:
-            ValueError: If platform doesn't support DataFrame operations
-
-        Example:
-            >>> benchmark = MetadataPrimitivesBenchmark()
-            >>> ops = benchmark.get_dataframe_operations("polars-df")
-            >>> result = ops.execute_get_schema(df)
-        """
         from benchbox.core.metadata_primitives.dataframe_operations import (
             get_dataframe_metadata_manager,
         )
@@ -1256,24 +863,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         platform_name: str,
         spark_session: Any = None,
     ) -> Any:
-        """Get DataFrame metadata capabilities for a platform.
-
-        Returns the DataFrameMetadataCapabilities describing what metadata
-        operations are supported on the given platform.
-
-        Args:
-            platform_name: Platform name (e.g., "polars-df", "pyspark-df")
-            spark_session: SparkSession instance (required for pyspark-df capability detection)
-
-        Returns:
-            DataFrameMetadataCapabilities instance
-
-        Example:
-            >>> benchmark = MetadataPrimitivesBenchmark()
-            >>> caps = benchmark.get_dataframe_capabilities("polars-df")
-            >>> if caps.supports_catalog:
-            ...     # Run catalog operations
-        """
         from benchbox.core.metadata_primitives.dataframe_operations import (
             get_dataframe_metadata_manager,
         )
@@ -1294,22 +883,15 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         adapter: Any,
         benchmark_config: Any,
         query_filter: set[str] | None = None,
-        monitor: Any | None = None,  # noqa: ARG002
-        run_options: Any | None = None,  # noqa: ARG002
+        monitor: Any | None = None,
+        run_options: Any | None = None,
     ) -> list[dict[str, Any]]:
-        """Execute Metadata Primitives in DataFrame mode.
-
-        This hook is called by the DataFrame adapter to execute the benchmark
-        workload using the Metadata Primitives operations manager.
-        """
         platform_name = adapter.platform_name
         spark_session = getattr(ctx, "spark_session", None) or getattr(adapter, "spark", None)
 
-        # Get iterations from config
         config_options = getattr(benchmark_config, "options", {}) or {}
         iterations = int(config_options.get("power_iterations", 1) or 1)
 
-        # Map categories if provided in config
         categories = config_options.get("metadata_categories")
         if isinstance(categories, str):
             categories = [c.strip() for c in categories.split(",")]
@@ -1325,7 +907,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         else:
             self._register_dataframes_with_adapter(adapter, dataframes)
 
-        # Run the benchmark
         result = self.run_dataframe_benchmark(
             platform_name=platform_name,
             dataframes=dataframes,
@@ -1334,13 +915,9 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
             iterations=iterations,
         )
 
-        # Convert MetadataBenchmarkResult to adapter-compatible list of dicts.
-        # run_dataframe_benchmark flattens iterations × operations, so we derive
-        # the iteration number from the number of unique operations.
         output = []
         unique_ops: dict[str, int] = {}
         for res in result.results:
-            # Filter by query_filter if provided
             if query_filter and res.query_id.upper() not in query_filter:
                 continue
 
@@ -1366,13 +943,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         adapter: Any,
         complexity_preset: MetadataComplexityConfig | str | None = None,
     ) -> dict[str, Any]:
-        """Build and register in-memory schema fixtures for DataFrame metadata ops.
-
-        When a complexity preset is given (DataFrame runs requesting the
-        "complexity" category), stress-scale fixtures from the shared DDL path
-        are merged in so wide-table and complex-type probes run against
-        stress catalog tables instead of only the small base schema.
-        """
         dataframes = self._build_dataframe_fixture_tables(adapter)
         if complexity_preset is not None:
             dataframes.update(self.build_complexity_dataframes(adapter, complexity_preset))
@@ -1387,7 +957,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
 
     @staticmethod
     def _register_dataframes_with_adapter(adapter: Any, dataframes: dict[str, Any]) -> None:
-        """Register tables with adapter-native catalogs when the adapter supports it."""
         register_table = getattr(adapter, "register_table", None)
         if not callable(register_table):
             return
@@ -1396,7 +965,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
             register_table(table_name, dataframe)
 
     def _build_dataframe_fixture_tables(self, adapter: Any) -> dict[str, Any]:
-        """Construct one representative in-memory table per metadata schema table."""
         schema = self.get_schema()
         return {
             table_name: self._create_fixture_dataframe(
@@ -1411,7 +979,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         table_name: str,
         columns: list[dict[str, Any]],
     ) -> dict[str, Any]:
-        """Build a deterministic fixture row from the benchmark schema metadata."""
         row: dict[str, Any] = {}
         for ordinal, column in enumerate(columns, start=1):
             column_name = str(column.get("name", f"col_{ordinal}"))
@@ -1432,14 +999,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         column_type: str,
         ordinal: int,
     ) -> Any:
-        """Return a single representative value for a schema column.
-
-        Values are typed so DataFrame schema inference preserves the DDL type
-        distribution: lists for arrays, dicts for structs/maps/objects, and
-        Decimal for decimals. The complex branches run before the scalar
-        branches because DDL type strings embed scalar keywords (e.g. the
-        "INTEGER" inside "STRUCT(x INTEGER, y INTEGER)").
-        """
         normalized = column_type.upper().strip()
         if (
             normalized.startswith("STRUCT")
@@ -1501,12 +1060,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         column_type: str,
         ordinal: int,
     ) -> dict[str, Any]:
-        """Return a dict value for a STRUCT/Tuple/OBJECT/JSONB column.
-
-        Field definitions ("STRUCT(key VARCHAR, value VARCHAR)") are sampled
-        per field so nested distributions survive; bare spellings ("OBJECT",
-        "JSONB") fall back to a representative key/value pair.
-        """
         inner = MetadataPrimitivesBenchmark._bracket_inner(column_type)
         if inner is not None:
             value: dict[str, Any] = {}
@@ -1535,7 +1088,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         column_type: str,
         ordinal: int,
     ) -> dict[str, Any]:
-        """Return a single-entry dict value for a MAP column."""
         inner = MetadataPrimitivesBenchmark._bracket_inner(column_type)
         if inner is not None:
             parts = MetadataPrimitivesBenchmark._split_top_level(inner)
@@ -1563,7 +1115,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
 
     @staticmethod
     def _bracket_inner(column_type: str) -> str | None:
-        """Return the text inside the outermost brackets, or None when absent."""
         for opening, closing in (("(", ")"), ("<", ">")):
             start = column_type.find(opening)
             end = column_type.rfind(closing)
@@ -1573,7 +1124,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
 
     @staticmethod
     def _split_top_level(text: str) -> list[str]:
-        """Split on top-level commas, ignoring nested brackets."""
         parts: list[str] = []
         depth = 0
         current: list[str] = []
@@ -1599,12 +1149,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         adapter: Any,
         config: MetadataComplexityConfig | str = "wide_tables",
     ) -> dict[str, Any]:
-        """Build stress-scale DataFrame fixtures from the shared DDL path.
-
-        Uses generate_wide_table_columns so the DataFrame surface validates
-        the same column distribution as SQL DDL generation. Returns a wide
-        table plus catalog_size narrow tables for large-catalog stress.
-        """
         if isinstance(config, str):
             config = get_complexity_preset(config)
         wide_columns = generate_wide_table_columns(
@@ -1634,7 +1178,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
 
     @staticmethod
     def _create_fixture_dataframe(adapter: Any, row: dict[str, Any]) -> Any:
-        """Create a platform-native single-row DataFrame fixture."""
         platform_name = str(getattr(adapter, "platform_name", "")).lower()
 
         if "polars" in platform_name:
@@ -1667,7 +1210,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
 
     @staticmethod
     def _get_registered_dataframes(ctx: Any) -> dict[str, Any]:
-        """Extract native registered DataFrames from a benchmark context."""
         if hasattr(ctx, "list_tables") and hasattr(ctx, "get_table"):
             dataframes: dict[str, Any] = {}
             for table_name in ctx.list_tables():
@@ -1693,28 +1235,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         categories: list[str] | None = None,
         iterations: int = 1,
     ) -> MetadataBenchmarkResult:
-        """Run Metadata Primitives benchmark on DataFrame platforms.
-
-        Executes metadata introspection operations on the provided DataFrames
-        and returns timing results.
-
-        Args:
-            platform_name: Platform name (e.g., "polars-df", "pyspark-df")
-            dataframes: Dictionary mapping table names to DataFrames
-            spark_session: SparkSession instance (required for pyspark-df catalog ops)
-            categories: Optional list of operation categories to run
-                       ("schema", "catalog", "lakehouse", "complexity")
-            iterations: Number of times to run each operation (default: 1)
-
-        Returns:
-            MetadataBenchmarkResult with all operation timings and summary
-
-        Example:
-            >>> import polars as pl
-            >>> benchmark = MetadataPrimitivesBenchmark()
-            >>> dfs = {"orders": pl.read_parquet("orders.parquet")}
-            >>> result = benchmark.run_dataframe_benchmark("polars-df", dfs)
-        """
         from benchbox.core.metadata_primitives.dataframe_operations import (
             OPERATION_CATEGORIES,
             MetadataOperationCategory,
@@ -1724,7 +1244,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         manager = self.get_dataframe_operations(platform_name, spark_session=spark_session)
         capabilities = manager.get_capabilities()
 
-        # Determine which operations to run
         operations_to_run = self._resolve_dataframe_operations(
             capabilities=capabilities,
             categories=categories,
@@ -1736,7 +1255,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         result = MetadataBenchmarkResult()
         all_results: list[MetadataQueryResult] = []
 
-        # Schema introspection operations run on each DataFrame
         dataframe_scoped_ops = {
             MetadataOperationType.LIST_COLUMNS,
             MetadataOperationType.GET_DTYPES,
@@ -1761,7 +1279,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         for _ in range(iterations):
             for op in operations_to_run:
                 if op in dataframe_scoped_ops:
-                    # Per-DataFrame introspection and complexity ops.
                     for table_name, df in dataframes.items():
                         df_result = self._execute_dataframe_operation(manager, op, df, table_name)
                         query_result = self._convert_df_result_to_query_result(df_result, table_name)
@@ -1774,7 +1291,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
                         result.total_time_ms += query_result.execution_time_ms
 
                 elif op in catalog_global_ops:
-                    # Catalog ops don't need a DataFrame
                     df_result = self._execute_catalog_operation(manager, op)
                     query_result = self._convert_df_result_to_query_result(df_result, "catalog")
                     all_results.append(query_result)
@@ -1800,7 +1316,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         result.total_queries = len(all_results)
         result.results = all_results
 
-        # Build category summary
         self._build_dataframe_category_summary(result, all_results)
 
         return result
@@ -1812,17 +1327,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         dataframe: Any,
         table_name: str,
     ) -> Any:
-        """Execute a single DataFrame metadata operation.
-
-        Args:
-            manager: DataFrameMetadataOperationsManager
-            operation: MetadataOperationType
-            dataframe: The DataFrame to introspect
-            table_name: Name of the table (for logging)
-
-        Returns:
-            DataFrameMetadataResult
-        """
         from benchbox.core.metadata_primitives.dataframe_operations import (
             MetadataOperationType,
         )
@@ -1841,7 +1345,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         if operation in op_map:
             return op_map[operation](dataframe)
 
-        # Unsupported operation
         from benchbox.core.metadata_primitives.dataframe_operations import (
             DataFrameMetadataResult,
         )
@@ -1858,15 +1361,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         *,
         table_name: str | None = None,
     ) -> Any:
-        """Execute a catalog metadata operation.
-
-        Args:
-            manager: DataFrameMetadataOperationsManager
-            operation: MetadataOperationType
-
-        Returns:
-            DataFrameMetadataResult
-        """
         from benchbox.core.metadata_primitives.dataframe_operations import (
             MetadataOperationType,
         )
@@ -1902,13 +1396,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         operation_type_cls: Any,
         category_cls: Any,
     ) -> list[Any]:
-        """Resolve benchmark-manageable DataFrame metadata operations.
-
-        The platform capability model is broader than the default benchmark
-        workload. Default execution stays focused on the core schema/catalog
-        subset, while explicit category selection can opt into additional
-        benchmark-manageable operations such as complexity probes.
-        """
         default_operations = [
             operation_type_cls.LIST_COLUMNS,
             operation_type_cls.GET_DTYPES,
@@ -1946,15 +1433,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         df_result: Any,
         table_name: str,
     ) -> MetadataQueryResult:
-        """Convert DataFrameMetadataResult to MetadataQueryResult.
-
-        Args:
-            df_result: DataFrameMetadataResult
-            table_name: Name of the table
-
-        Returns:
-            MetadataQueryResult
-        """
         from benchbox.core.metadata_primitives.dataframe_operations import (
             OPERATION_CATEGORIES,
         )
@@ -1976,12 +1454,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         result: MetadataBenchmarkResult,
         all_results: list[MetadataQueryResult],
     ) -> None:
-        """Build category summary from DataFrame benchmark results.
-
-        Args:
-            result: MetadataBenchmarkResult to update
-            all_results: List of MetadataQueryResult
-        """
         category_times: dict[str, list[float]] = {}
         category_counts: dict[str, int] = {}
         category_successes: dict[str, int] = {}

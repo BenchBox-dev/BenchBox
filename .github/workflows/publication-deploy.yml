@@ -1,8 +1,5 @@
 name: Publication Control Plane Deployment
 
-# Candidate builder for the single publication transaction writer. Normal
-# production writes use the transaction workflow; the explicit approved-manifest
-# path remains available as a bounded migration fallback.
 "on":
   workflow_dispatch:
     inputs:
@@ -76,7 +73,7 @@ jobs:
       candidate_artifact_id: ${{ steps.upload_candidate.outputs.artifact-id }}
     steps:
       - name: Checkout control-plane source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
 
@@ -190,12 +187,12 @@ jobs:
           test -d results-data/bundles
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install Python dependencies
         if: inputs.approved_manifest_digest == ''
@@ -239,9 +236,6 @@ jobs:
                   echo "::error::durable publication head lacks a complete attested parent binding"
                   exit 1
                 }
-                # Generations are monotonic but not dense: a voided pre-send
-                # reservation retires its number, so the durable head may
-                # precede this generation by more than one.
                 [ "$PARENT_GENERATION" -lt "$GENERATION" ] || {
                   echo "::error::durable generation $PARENT_GENERATION does not precede generation $GENERATION"
                   exit 1
@@ -316,9 +310,6 @@ jobs:
                 echo "::error::prior_live_receipt_id is stale; current live head is $RECEIPT_ID"
                 exit 1
               }
-              # Same density rule as the durable branch above: the new
-              # generation must strictly advance beyond the attested live
-              # head, which need not be its immediate predecessor.
               [ "$RECEIPT_GENERATION" -lt "$GENERATION" ] || {
                 echo "::error::generation $GENERATION does not advance beyond live generation $RECEIPT_GENERATION"
                 exit 1
@@ -441,7 +432,7 @@ jobs:
 
       - name: Set up Node.js
         if: inputs.approved_manifest_digest == ''
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: "20"
           cache: npm
@@ -722,7 +713,7 @@ jobs:
 
       - name: Upload candidate receipts for independent review
         if: inputs.approved_manifest_digest == '' && always() && steps.receipt.outcome == 'success'
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: publication-candidate-receipts-${{ steps.inputs.outputs.generation }}-${{ github.run_id }}
           path: receipt-dist/
@@ -750,7 +741,7 @@ jobs:
       - name: Upload immutable candidate bundle
         id: upload_candidate
         if: inputs.approved_manifest_digest == '' && (inputs.candidate_only == true || inputs.expect_noop == true)
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: publication-candidate-${{ github.run_id }}
           path: candidate-bundle/
@@ -784,14 +775,14 @@ jobs:
           fi
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
         with:
           name: publication-pages-${{ steps.inputs.outputs.generation }}
           path: site
           include-hidden-files: true
 
       - name: Retain immutable site artifact for attested rollback
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: ${{ steps.inputs.outputs.site_artifact }}
           path: site
@@ -799,7 +790,7 @@ jobs:
           retention-days: 90
 
       - name: Upload build receipts
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: publication-build-receipts-${{ steps.inputs.outputs.generation }}
           path: receipt-dist/
@@ -825,7 +816,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Revalidate authoritative live head
         env:
@@ -889,7 +880,7 @@ jobs:
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346
         with:
           artifact_name: publication-pages-${{ needs.build.outputs.generation }}
 
@@ -903,18 +894,18 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Download build receipts
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: publication-build-receipts-${{ needs.build.outputs.generation }}
           path: receipt-dist
@@ -940,7 +931,7 @@ jobs:
           PY
 
       - name: Upload provider deployment acknowledgement
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: publication-deployment-receipt-${{ needs.build.outputs.generation }}
           path: receipt-dist/deployment-receipt.json
@@ -1023,7 +1014,7 @@ jobs:
           PY
 
       - name: Upload attested live receipt
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: publication-live-receipt-${{ needs.build.outputs.generation }}
           path: receipt-dist/
@@ -1050,15 +1041,15 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Resolve last known-good attested receipt
         id: known_good
@@ -1104,7 +1095,7 @@ jobs:
           PY
             then
               ARTIFACT_NAME=$(uv run python -c "import json; print(json.load(open('candidate/live-receipt.json'))['rollback_artifact_name'])")
-              ARTIFACT_RUN_ID=$(uv run python -c "import json; print(json.load(open('candidate/live-receipt.json')).get('rollback_artifact_run_id', '$RUN_ID'))")
+              ARTIFACT_RUN_ID=$(uv run python -c "import json, sys; print(json.load(open('candidate/live-receipt.json')).get('rollback_artifact_run_id', sys.argv[1]))" "$RUN_ID")
               cp -R candidate/. known-good-receipt/
               echo "artifact_name=$ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
               echo "artifact_run_id=$ARTIFACT_RUN_ID" >> "$GITHUB_OUTPUT"
@@ -1130,14 +1121,14 @@ jobs:
           EXPECTED_ARTIFACT_NAME: ${{ steps.known_good.outputs.artifact_name }}
 
       - name: Upload attested rollback Pages artifact
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
         with:
           name: publication-rollback-pages-${{ github.run_id }}-${{ github.run_attempt }}
           path: restored-site
           include-hidden-files: true
 
       - name: Retain restored site artifact for the new rollback head
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: publication-site-${{ needs.build.outputs.generation }}-rollback
           path: restored-site
@@ -1146,7 +1137,7 @@ jobs:
 
       - name: Deploy attested rollback artifact to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346
         with:
           artifact_name: publication-rollback-pages-${{ github.run_id }}-${{ github.run_attempt }}
 
@@ -1179,7 +1170,7 @@ jobs:
           PY
 
       - name: Upload rollback provider acknowledgement
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: publication-rollback-deployment-receipt-${{ needs.build.outputs.generation }}
           path: known-good-receipt/rollback-deployment-receipt.json
@@ -1281,14 +1272,14 @@ jobs:
           cp known-good-receipt/rollback-live-receipt.json successor-live-receipt/live-receipt.json
 
       - name: Publish rollback as the new attested live head
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: publication-live-receipt-${{ needs.build.outputs.generation }}
           path: successor-live-receipt/
           retention-days: 90
 
       - name: Upload rollback audit receipt
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: publication-rollback-${{ github.run_id }}
           path: known-good-receipt/

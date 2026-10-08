@@ -1,18 +1,6 @@
-"""Live integration tests: transaction operations manager on real Delta Lake.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-These tests drive ``DataFrameTransactionOperationsManager`` with a real
-local PySpark + Delta Lake session and verify the operations actually
-produce correct results on real tables: atomic insert/update/delete/merge
-with version tracking, rollback to a previous version, time travel reads,
-and table-format validation.
-
-Marked ``live_integration``: excluded from the default suite. Requires
-PySpark, delta-spark, and a compatible Java (auto-selected when available).
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -40,7 +28,7 @@ pytestmark = [
 
 @pytest.fixture(scope="module")
 def spark(tmp_path_factory, pyspark_test_environment):
-    """Module-scoped real Spark session with Delta support."""
+
     warehouse = tmp_path_factory.mktemp("delta_execution_warehouse")
     session = make_delta_spark_session(warehouse, app_name="benchbox-delta-execution")
     yield session

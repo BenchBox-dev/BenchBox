@@ -5,10 +5,6 @@ const SAME_VERSION_RUNS = [fixtureIds.ids.duckdb, fixtureIds.ids.duckdbTuned] as
 
 test.describe("run identity in index tables", () => {
   test("run identity: same-version runs have distinguishable benchmark and platform index labels", async ({ page }) => {
-    // Matrix, Ranks, and List are all sections of one page now (rather than
-    // mutually exclusive states), so List's rows carry a `list-` prefixed
-    // testid to stay distinct from Matrix's rows, which keep the bare
-    // result-id testid used across the rest of the app.
     await page.goto("/results/tpch/?view=list");
     await waitForShell(page);
     const listRunIds = SAME_VERSION_RUNS.map((id) => `list-${id}`);
@@ -20,8 +16,6 @@ test.describe("run identity in index tables", () => {
     await page.goto("/results/p/duckdb/");
     await waitForDataElement(page, page.getByTestId(SAME_VERSION_RUNS[0]));
 
-    // On a platform page the platform is the page, so the row label carries
-    // the version plus whatever it takes to separate two runs of it.
     const platformLabels = await labelsForRows(page, SAME_VERSION_RUNS);
     expect(platformLabels).toHaveLength(2);
     expect(platformLabels[0]).not.toBe(platformLabels[1]);
@@ -34,8 +28,6 @@ test.describe("run identity in index tables", () => {
     await openAnalysisCard(page, "query_heatmap");
     await waitForDataElement(page, page.locator('[data-testid^="heatmap-compliance-marker-"]').first());
 
-    // The marker itself always names its reason; the matrix legend restates it
-    // for readers who open the legend rather than hovering a single cell.
     await expect(page.locator('[data-testid^="heatmap-compliance-marker-"]').first()).toHaveAttribute(
       "aria-label",
       /ranking/i,

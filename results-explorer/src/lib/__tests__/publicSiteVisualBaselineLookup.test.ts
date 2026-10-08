@@ -42,7 +42,6 @@ function fakeGithub(
   const calls: string[] = [];
   const github = async (path: string) => {
     calls.push(path);
-    // Like the real endpoint: 30 jobs per page unless per_page says otherwise (maximum 100).
     const jobsMatch = path.match(/\/actions\/runs\/(\d+)\/jobs(?:\?(.*))?$/);
     if (jobsMatch) {
       const query = new URLSearchParams(jobsMatch[2] ?? "");
@@ -232,7 +231,6 @@ describe("baselineShaOrder", () => {
     expect(order[0]).toBe(BASE);
     expect(order).not.toContain("not-a-sha");
     expect(new Set(order).size).toBe(order.length);
-    // Covers every SHA the classifier can emit (base plus 25 ancestors).
     expect(order.length).toBe(MAX_BASELINE_SHAS);
   });
 });
@@ -290,7 +288,6 @@ describe("waitForTrustedBaseline", () => {
     expect(result.artifact).toBeUndefined();
     expect(now()).toBeGreaterThanOrEqual(1_800_000);
     expect(now()).toBeLessThan(1_800_000 + 60_000);
-    // Short retries, then about one lookup per minute: bounded API use per follower.
     expect(result.attempts).toBeLessThan(45);
   });
 

@@ -1,11 +1,6 @@
-"""Transaction Primitives benchmark package.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests database transaction semantics using TPC-H schema.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from benchbox.core.transaction_primitives.benchmark import (
     OperationResult,

@@ -1,5 +1,3 @@
-"""Fixtures shared by DataFrame platform mixin tests."""
-
 from __future__ import annotations
 
 import pytest
@@ -9,12 +7,6 @@ from benchbox.core.dataframe import MemoryCheckResult
 
 @pytest.fixture
 def sufficient_dataframe_memory(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep mocked mixin execution independent of ambient host memory.
-
-    This fixture is intentionally not autouse. Test modules must opt in so
-    dedicated memory-policy tests continue to exercise the real capacity
-    check and its insufficient-memory behavior.
-    """
 
     def _sufficient_memory(_benchmark: str, scale_factor: float, platform: str) -> MemoryCheckResult:
         return MemoryCheckResult(

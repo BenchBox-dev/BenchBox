@@ -1,18 +1,6 @@
-"""Unit tests for post-load introspection receipts.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Covers ``benchbox.core.tuning.introspection`` (TODO
-``tuning-introspection-receipts-20260716`` / design note
-``docs/development/tuning-introspection-receipts.md``): the platform-agnostic
-:func:`corroborate` -- statement classification (verifiable / transient /
-maintenance / unverifiable), the per-statement verdicts (corroborated / absent
-/ mismatch), and the upgrade gate. The must-preserve invariant under test:
-verification is EARNED (every verifiable statement corroborated, >= 1 exists)
-and never asserted from the ledger alone or a degraded catalog read.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -53,9 +41,6 @@ from benchbox.core.tuning.introspection import (
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
-# ---------------------------------------------------------------------------
-# Helpers.
-# ---------------------------------------------------------------------------
 def _index_ledger(
     statement: str = "CREATE INDEX IF NOT EXISTS idx_lineitem_sort ON LINEITEM (L_ORDERKEY, L_LINENUMBER)",
 ):
@@ -75,9 +60,6 @@ def _index_state(columns=("l_orderkey", "l_linenumber"), table="lineitem", name=
     )
 
 
-# ---------------------------------------------------------------------------
-# Normalization.
-# ---------------------------------------------------------------------------
 class TestNormalization:
     def test_normalize_identifier_casefolds_and_strips_quotes(self):
         assert normalize_identifier('  "L_OrderKey" ') == "l_orderkey"
@@ -88,7 +70,6 @@ class TestNormalization:
         assert normalize_columns("A, b ,C") == ("a", "b", "c")
 
     def test_normalize_columns_from_bracketed_catalog_list(self):
-        # DuckDB duckdb_indexes().expressions returns a bracketed VARCHAR.
         assert normalize_columns("[L_ORDERKEY, L_LINENUMBER]") == ("l_orderkey", "l_linenumber")
 
     @pytest.mark.parametrize("raw", ["a, b", "(a, b)", "tuple(a, b)", "[a, b]"])
@@ -123,9 +104,6 @@ class TestNormalization:
         assert normalize_columns(None) == ()
 
 
-# ---------------------------------------------------------------------------
-# Corroboration outcomes.
-# ---------------------------------------------------------------------------
 class TestCorroborate:
     def test_corroborated_index_upgrades(self):
         receipt = corroborate(_index_ledger(), _index_state())
@@ -139,7 +117,6 @@ class TestCorroborate:
         assert entry.observed_columns == ("l_orderkey", "l_linenumber")
 
     def test_column_order_is_significant(self):
-        # Ledger (a, b) but catalog (b, a) -> mismatch, not corroborated.
         receipt = corroborate(_index_ledger(), _index_state(columns=("l_linenumber", "l_orderkey")))
         assert receipt.corroborated is False
         assert receipt.entries[0].verdict == MISMATCH
@@ -167,7 +144,6 @@ class TestCorroborate:
         assert verdict == ABSENT
 
     def test_mismatch_has_diff_and_no_upgrade(self):
-        # Catalog index over (a) only, ledger says (a, b).
         receipt = corroborate(_index_ledger(), _index_state(columns=("l_orderkey",)))
         assert receipt.corroborated is False
         entry = receipt.entries[0]
@@ -184,7 +160,6 @@ class TestCorroborate:
     def test_one_absent_among_corroborated_blocks_upgrade(self):
         ledger = _index_ledger()
         ledger.record("CREATE INDEX idx_orders_sort ON ORDERS (O_ORDERKEY)", PHASE_DDL)
-        # Only the LINEITEM index exists in the catalog; ORDERS is absent.
         receipt = corroborate(ledger, _index_state())
         assert receipt.corroborated is False
         verdicts = {e.verdict for e in receipt.entries}
@@ -234,14 +209,13 @@ class TestCorroborate:
 
 class TestSessionAndMaintenance:
     def test_session_sets_are_transient_and_non_blocking(self):
-        # A corroborated index PLUS a session SET -> still verified (SET noted).
         ledger = _index_ledger()
         ledger.record("SET threads=4", PHASE_SESSION)
         receipt = corroborate(ledger, _index_state())
         assert receipt.corroborated is True
         verdicts = [e.verdict for e in receipt.entries]
         assert TRANSIENT in verdicts
-        assert receipt.summary["gate_relevant_total"] == 1  # SET excluded from the gate
+        assert receipt.summary["gate_relevant_total"] == 1
 
     def test_failed_session_statement_is_transient_and_non_blocking(self):
         ledger = _index_ledger()
@@ -267,10 +241,9 @@ class TestSessionAndMaintenance:
         ledger.record("PRAGMA threads=4", PHASE_DDL)
         receipt = corroborate(ledger, IntrospectedState(platform="duckdb", objects=[]))
         assert receipt.entries[0].verdict == TRANSIENT
-        assert receipt.corroborated is False  # no verifiable statement
+        assert receipt.corroborated is False
 
     def test_optimize_is_maintenance_non_blocking(self):
-        # OPTIMIZE alongside a corroborated index -> still verified; OPTIMIZE noted.
         ledger = _index_ledger()
         ledger.record("OPTIMIZE TABLE LINEITEM FINAL", PHASE_POST_LOAD)
         receipt = corroborate(ledger, _index_state())
@@ -363,12 +336,6 @@ class TestPayloadAndProtocol:
 
 
 class TestMultiClauseCreateTable:
-    """A CREATE TABLE can apply two key layouts at once (ClickHouse MergeTree).
-    Each clause is classified independently, so each must corroborate on its
-    own -- corroborating the first while ignoring the second would let a run
-    reach applied_verified with a key that never applied (#1275 review).
-    """
-
     _DDL = "CREATE TABLE lineitem (a Int64) ENGINE = MergeTree() PARTITION BY (toYYYYMM(d)) ORDER BY (a, b)"
 
     def _ledger(self) -> AppliedTuningLedger:
@@ -416,10 +383,6 @@ class TestMultiClauseCreateTable:
 
 
 class TestUnparsableKeyClauseFailsClosed:
-    """A key clause we can see but cannot parse must block the upgrade, never
-    silently vanish while a sibling clause corroborates.
-    """
-
     def _corroborate(self, ddl: str) -> object:
         ledger = AppliedTuningLedger()
         ledger.record(ddl, PHASE_DDL, table="t")
@@ -443,20 +406,12 @@ class TestUnparsableKeyClauseFailsClosed:
         assert [e.verdict for e in receipt.entries] == [UNVERIFIABLE]
 
     def test_order_by_tuple_is_an_explicit_no_sort_key_not_a_dropped_clause(self):
-        # MergeTree's "no sort key" form carries no columns to corroborate; the
-        # tuned PARTITION BY alongside it must still be checked.
         receipt = self._corroborate("CREATE TABLE t (a Int64) PARTITION BY (d) ORDER BY tuple()")
         assert [e.kind for e in receipt.entries] == [KIND_PARTITION_KEY]
         assert receipt.corroborated is True
 
 
 class TestClusterKeyClassification:
-    """Snowflake applies its clustering key AFTER load, so the tuning footprint
-    arrives as ``ALTER TABLE ... CLUSTER BY``. Before this rule existed every
-    such statement classified ``unverifiable`` and BLOCKED the upgrade, so a
-    tuned Snowflake run could never reach applied_verified.
-    """
-
     def _ledger(self, statement: str) -> AppliedTuningLedger:
         ledger = AppliedTuningLedger()
         ledger.record(statement, PHASE_DDL, table="lineitem")
@@ -491,14 +446,11 @@ class TestClusterKeyClassification:
         ],
     )
     def test_recluster_is_maintenance_not_blocking(self, statement):
-        # Reorganizes existing data; the KEY is what the catalog reports, so
-        # these neither earn nor block verification (same class as OPTIMIZE).
         receipt = corroborate(self._ledger(statement), self._state())
         assert receipt.entries[0].verdict == MAINTENANCE
         assert receipt.summary["gate_relevant_total"] == 0
 
     def test_unparsable_cluster_clause_fails_closed(self):
-        # Visible CLUSTER BY we cannot parse must keep blocking, never vanish.
         receipt = corroborate(self._ledger("ALTER TABLE lineitem CLUSTER BY a, b"), self._state())
         assert receipt.entries[0].verdict == UNVERIFIABLE
         assert receipt.corroborated is False

@@ -1,12 +1,3 @@
-"""TPC-DS-OBT DataFrame query implementations.
-
-Queries are declared as data in ``_QUERY_SPECS`` and built by two shared
-constructor functions (expression family and pandas family), following the
-factory pattern used by the ClickBench DataFrame queries. This keeps the
-per-query surface declarative and avoids structural duplication across the
-single-table analytical workload.
-"""
-
 from __future__ import annotations
 
 import operator
@@ -37,14 +28,6 @@ _FILTER_OPS: dict[str, Callable[[Any, Any], Any]] = {
 
 @dataclass(frozen=True)
 class _ObtQuerySpec:
-    """Declarative single-table OBT query definition.
-
-    Null-semantics constraint: ``n_unique`` counts null as a distinct value
-    on the expression family (Polars ``n_unique``) but excludes it on pandas
-    (``nunique``) and in SQL (``COUNT(DISTINCT ...)``), so specs must only
-    apply ``n_unique`` to non-nullable columns.
-    """
-
     query_id: str
     query_name: str
     description: str
@@ -58,7 +41,6 @@ class _ObtQuerySpec:
     limit: int = 0
 
     def __post_init__(self) -> None:
-        """Fail fast on malformed specs instead of mid-benchmark-run."""
         for _, _, func in self.aggregations:
             if func not in _AGG_FUNCS:
                 raise ValueError(f"Unknown aggregation func {func!r} in {self.query_id}")
@@ -72,7 +54,6 @@ class _ObtQuerySpec:
 
 
 def _make_expression_impl(spec: _ObtQuerySpec) -> Callable[[DataFrameContext], Any]:
-    """Build the expression-family implementation for a spec."""
 
     def impl(ctx: DataFrameContext) -> Any:
         table = ctx.get_table(OBT_TABLE)
@@ -94,7 +75,6 @@ def _make_expression_impl(spec: _ObtQuerySpec) -> Callable[[DataFrameContext], A
 
 
 def _make_pandas_impl(spec: _ObtQuerySpec) -> Callable[[DataFrameContext], Any]:
-    """Build the pandas-family implementation for a spec."""
 
     def impl(ctx: DataFrameContext) -> Any:
         import pandas as pd
@@ -107,8 +87,6 @@ def _make_pandas_impl(spec: _ObtQuerySpec) -> Callable[[DataFrameContext], Any]:
             named_aggs = {
                 alias: (column, "nunique" if func == "n_unique" else func) for alias, column, func in spec.aggregations
             }
-            # dropna=False keeps NULL group keys, matching the expression
-            # family and SQL GROUP BY semantics.
             result = table.groupby(list(spec.group_keys), as_index=False, dropna=False).agg(**named_aggs)
         else:
             result = pd.DataFrame(
@@ -125,12 +103,6 @@ def _make_pandas_impl(spec: _ObtQuerySpec) -> Callable[[DataFrameContext], Any]:
 
 
 def _materialize(value: Any) -> Any:
-    """Compute a lazy frame/scalar (e.g. Dask) to a concrete value.
-
-    Pandas objects have no ``compute`` attribute and pass through unchanged,
-    so the pandas-family path stays backend-agnostic without importing
-    engine SDKs here.
-    """
     compute = getattr(value, "compute", None)
     if callable(compute):
         return compute()
@@ -138,9 +110,7 @@ def _materialize(value: Any) -> Any:
 
 
 def _pandas_scalar(table: Any, column: str, func: str) -> Any:
-    """Scalar aggregate for the ungrouped pandas path."""
     if func == "count":
-        # COUNT(column): exclude nulls like the expression family and SQL.
         return int(_materialize(table[column].count()))
     values = table[column]
     if func == "n_unique":
@@ -297,8 +267,6 @@ _QUERY_SPECS: tuple[_ObtQuerySpec, ...] = (
             ("high_value_sales", "sale_id", "count"),
             ("high_value_revenue", "net_paid", "sum"),
         ),
-        # Implementations report 0.0 (not NULL) for SUM over an empty filtered
-        # set on every backend, so the reference coalesces to match.
         sql_equivalent=(
             "SELECT COUNT(sale_id) AS high_value_sales, COALESCE(SUM(net_paid), 0) AS high_value_revenue "
             "FROM tpcds_sales_returns_obt WHERE net_paid >= 200"
@@ -370,7 +338,6 @@ _QUERY_SPECS: tuple[_ObtQuerySpec, ...] = (
             ("total_coupons", "coupon_amt", "sum"),
             ("coupon_revenue", "net_paid", "sum"),
         ),
-        # See Q10: ungrouped SUMs coalesce to match the 0.0 implementations report.
         sql_equivalent=(
             "SELECT COUNT(sale_id) AS coupon_sales, COALESCE(SUM(coupon_amt), 0) AS total_coupons, "
             "COALESCE(SUM(net_paid), 0) AS coupon_revenue "
@@ -388,7 +355,6 @@ _QUERY_SPECS: tuple[_ObtQuerySpec, ...] = (
             ("store_revenue", "net_paid", "sum"),
             ("store_profit", "net_profit", "sum"),
         ),
-        # See Q10: ungrouped SUMs coalesce to match the 0.0 implementations report.
         sql_equivalent=(
             "SELECT COUNT(sale_id) AS store_sales, COALESCE(SUM(net_paid), 0) AS store_revenue, "
             "COALESCE(SUM(net_profit), 0) AS store_profit "
@@ -406,7 +372,6 @@ _QUERY_SPECS: tuple[_ObtQuerySpec, ...] = (
             ("total_revenue_inc_tax", "net_paid_inc_tax", "sum"),
             ("total_profit", "net_profit", "sum"),
         ),
-        # See Q10: ungrouped SUMs coalesce to match the 0.0 implementations report.
         sql_equivalent=(
             "SELECT COUNT(sale_id) AS total_sales, COALESCE(SUM(net_paid), 0) AS total_revenue, "
             "COALESCE(SUM(net_paid_inc_tax), 0) AS total_revenue_inc_tax, "
@@ -426,5 +391,4 @@ _register_queries()
 
 
 def get_dataframe_queries() -> list[DataFrameQuery]:
-    """Return all registered OBT DataFrame queries in deterministic order."""
     return REGISTRY.get_all_queries()

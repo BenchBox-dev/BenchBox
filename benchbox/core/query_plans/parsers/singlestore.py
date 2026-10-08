@@ -1,32 +1,3 @@
-"""SingleStore (MemSQL) query plan parser.
-
-Parses SingleStore ``EXPLAIN <query>`` output into the harmonized
-``QueryPlanDAG``. SingleStore returns the plan as text rows that form a tree
-with two structural conventions:
-
-- The main pipeline is a vertical chain at the base level: each line is the
-  *input* (child) of the line above it, e.g. ``Project`` consumes ``Gather``
-  consumes ``HashGroupBy`` ... down to the leaf scan.
-- A ``|---`` connector marks an additional branch input (typically a join's
-  build side); deeper branches stack the connector (``|   |---``).
-
-Example::
-
-    Project [l_orderkey, revenue]
-    Gather partitions:all
-    Project [l_orderkey, revenue]
-    TopSort limit:[10] [revenue DESC]
-    HashGroupBy [SUM(l_extendedprice) AS revenue] groups:[l_orderkey]
-    HashJoin [INNER] ON lineitem.l_orderkey = orders.o_orderkey
-    |---ColumnStoreScan db.orders, KEY (o_orderkey) table_type:reference
-    ColumnStoreScan db.lineitem, KEY (l_orderkey) table_type:sharded
-
-There the ``HashJoin`` has two children: the ``|---`` build branch (orders) and
-the next base-level line (lineitem), which continues the chain as the probe
-input. Depth is the number of leading 4-character connector groups (``|---`` or
-``|   ``); base-level lines are depth 0.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -45,11 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 class SingleStoreQueryPlanParser(QueryPlanParser):
-    """Parser for SingleStore ``EXPLAIN`` connector-tree text output."""
-
-    # Ordered (substring, type) pairs; the first substring found in the
-    # lower-cased, space-stripped operator name wins. "TopSort" must precede the
-    # bare "top" (LIMIT) so a sort is not misread as a limit.
     _OPERATOR_KEYWORDS: tuple[tuple[str, LogicalOperatorType], ...] = (
         ("orderedcolumnstorescan", LogicalOperatorType.SCAN),
         ("columnstorescan", LogicalOperatorType.SCAN),
@@ -72,7 +38,6 @@ class SingleStoreQueryPlanParser(QueryPlanParser):
         ("project", LogicalOperatorType.PROJECT),
         ("window", LogicalOperatorType.WINDOW),
         ("union", LogicalOperatorType.UNION),
-        # Distributed data-movement operators have no dedicated logical type.
         ("gathermerge", LogicalOperatorType.OTHER),
         ("gather", LogicalOperatorType.OTHER),
         ("repartition", LogicalOperatorType.OTHER),
@@ -80,15 +45,11 @@ class SingleStoreQueryPlanParser(QueryPlanParser):
         ("shuffle", LogicalOperatorType.OTHER),
     )
 
-    # One nesting level: a "|---" branch connector or a "|   " ancestor filler.
     _PREFIX_RE = re.compile(r"^((?:\|---|\|   |\|--|    )*)(.*)$")
 
     def __init__(self):
         super().__init__("singlestore")
 
-    # Error-channel cleanup: EXPLAIN-failure producers now return None (capture
-    # records explain_failed), so these prefixes should no longer arrive here.
-    # Both stay rejected as defense so stray error text can never parse as a plan.
     def _parse_impl(self, query_id: str, explain_output: str) -> QueryPlanDAG:
         if not explain_output or not explain_output.strip():
             raise ValueError("Empty EXPLAIN output")
@@ -114,20 +75,13 @@ class SingleStoreQueryPlanParser(QueryPlanParser):
         for raw_line in explain_output.splitlines():
             if not raw_line.strip():
                 continue
-            # Drop the MySQL-client column border ("| ... |") if present so the
-            # parser works on both raw-connector and tabular renderings.
             line = raw_line.strip()
             if line.startswith("|") and line.endswith("|") and ("---" not in line):
                 line = line[1:-1]
             elif line.startswith("+") and set(line) <= {"+", "-"}:
-                continue  # table-border separator row
+                continue
             if line.strip() in ("EXPLAIN", "QUERY PLAN"):
                 continue
-            # Normalize SingleStore "| " (pipe + one space) branch-continuation
-            # prefix to the 4-char "|   " unit the depth formula (len // 4)
-            # expects. "|---" branch connectors are left unchanged (no space
-            # after "|---"). Without this, rows like "| HashTableBuild" that
-            # follow a "|---Join" connector are skipped because rest[0] == "|".
             line = re.sub(r"\| (?!-)", "|   ", line)
             prefix, rest = self._PREFIX_RE.match(line).groups()
             rest = rest.strip()
@@ -139,9 +93,6 @@ class SingleStoreQueryPlanParser(QueryPlanParser):
 
     def _build_tree(self, parsed_nodes: list[dict[str, Any]]) -> LogicalOperator | None:
         root: LogicalOperator | None = None
-        # The most recent operator seen at each depth. A base-level (depth 0) chain
-        # links each node to the previous depth-0 node; a deeper branch links to
-        # the most recent node one level shallower.
         last_at_depth: dict[int, LogicalOperator] = {}
 
         for node in parsed_nodes:
@@ -158,8 +109,6 @@ class SingleStoreQueryPlanParser(QueryPlanParser):
                 parent.children.append(logical_op)
 
             last_at_depth[depth] = logical_op
-            # Moving back to a shallower/equal depth invalidates deeper entries so
-            # a later branch cannot attach under a stale child.
             for deeper in [d for d in last_at_depth if d > depth]:
                 del last_at_depth[deeper]
 
@@ -200,8 +149,6 @@ class SingleStoreQueryPlanParser(QueryPlanParser):
 
     @staticmethod
     def _extract_table(content: str) -> str | None:
-        """Extract the table from a scan line, e.g. 'ColumnStoreScan db.orders, KEY (...)'."""
-        # The scanned relation follows the operator name: "<Scan> <db.table>[, ...]".
         match = re.match(r"[A-Za-z][\w]*\s+([A-Za-z_][\w.]*)", content)
         return match.group(1) if match else None
 

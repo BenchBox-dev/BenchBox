@@ -1,18 +1,6 @@
-"""Additional coverage tests for RedshiftAdapter uncovered paths.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Focuses on:
-- _connect_with_driver: redshift_connector vs psycopg selection
-- _get_copy_credentials_clause: session token path
-- staging_root non-S3 provider raises ValueError
-- _detect_deployment_type, _extract_region/_identifier from hostname
-- get_platform_info basic fields without connection
-- COMPUPDATE validation
-- add_cli_arguments
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -27,14 +15,8 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Shared fixtures / helpers
-# ---------------------------------------------------------------------------
-
-
 @pytest.fixture(autouse=True)
 def _mock_redshift_deps():
-    """Provide a clean mock of redshift_connector and boto3."""
     mock_rc = MagicMock()
     mock_boto = MagicMock()
     with (
@@ -65,14 +47,7 @@ def _make_adapter(**kwargs):
     return RedshiftAdapter(**defaults)
 
 
-# ---------------------------------------------------------------------------
-# _connect_with_driver: connector selection
-# ---------------------------------------------------------------------------
-
-
 class TestConnectWithDriverSelection:
-    """Test _connect_with_driver uses the available connector."""
-
     def test_uses_redshift_connector_when_available(self, _mock_redshift_deps):
         mock_rc = _mock_redshift_deps["rc"]
         mock_conn = Mock()
@@ -85,7 +60,6 @@ class TestConnectWithDriverSelection:
         assert result is mock_conn
 
     def test_falls_back_to_psycopg_when_rc_unavailable(self):
-        """When redshift_connector is None, psycopg.connect is called instead."""
         mock_pg = MagicMock()
         mock_conn = Mock()
         mock_pg.connect.return_value = mock_conn
@@ -139,14 +113,7 @@ class TestConnectWithDriverSelection:
         assert call_kwargs.get("sslmode") == "verify-full"
 
 
-# ---------------------------------------------------------------------------
-# _get_copy_credentials_clause: session token success path
-# ---------------------------------------------------------------------------
-
-
 class TestCopyCredentialsWithSessionToken:
-    """Test _get_copy_credentials_clause includes session token when set."""
-
     def test_session_token_appended_to_clause(self):
         adapter = _make_adapter(
             aws_access_key_id="AKIATEST",
@@ -170,14 +137,7 @@ class TestCopyCredentialsWithSessionToken:
         assert "ACCESS_KEY_ID 'AKIATEST'" in clause
 
 
-# ---------------------------------------------------------------------------
-# staging_root: non-S3 raises ValueError
-# ---------------------------------------------------------------------------
-
-
 class TestStagingRootValidation:
-    """Test non-S3 staging_root raises ValueError."""
-
     def test_gs_staging_root_raises(self):
         from benchbox.platforms.redshift import RedshiftAdapter
 
@@ -191,14 +151,7 @@ class TestStagingRootValidation:
             )
 
 
-# ---------------------------------------------------------------------------
-# _detect_deployment_type
-# ---------------------------------------------------------------------------
-
-
 class TestDetectDeploymentType:
-    """Test hostname-based deployment type detection."""
-
     def test_serverless_hostname_detected(self):
         adapter = _make_adapter()
         assert adapter._detect_deployment_type("wg.acct.us-east-1.redshift-serverless.amazonaws.com") == "serverless"
@@ -216,14 +169,7 @@ class TestDetectDeploymentType:
         assert adapter._detect_deployment_type("") == "unknown"
 
 
-# ---------------------------------------------------------------------------
-# _extract_region_from_hostname and _extract_identifier_from_hostname
-# ---------------------------------------------------------------------------
-
-
 class TestHostnameParsing:
-    """Test region and identifier extraction from hostname."""
-
     def test_provisioned_region_extracted(self):
         adapter = _make_adapter()
         region = adapter._extract_region_from_hostname("my-cluster.us-west-2.redshift.amazonaws.com", "provisioned")
@@ -254,14 +200,7 @@ class TestHostnameParsing:
         assert adapter._extract_identifier_from_hostname("", "serverless") is None
 
 
-# ---------------------------------------------------------------------------
-# COMPUPDATE validation
-# ---------------------------------------------------------------------------
-
-
 class TestCompupdateValidation:
-    """Test COMPUPDATE value validated on init."""
-
     def test_valid_preset_accepted(self):
         adapter = _make_adapter(compupdate="PRESET")
         assert adapter.compupdate == "PRESET"
@@ -283,14 +222,7 @@ class TestCompupdateValidation:
             )
 
 
-# ---------------------------------------------------------------------------
-# get_platform_info without connection
-# ---------------------------------------------------------------------------
-
-
 class TestGetPlatformInfoBasic:
-    """Test get_platform_info returns expected fields without a live connection."""
-
     def test_basic_fields_present(self):
         adapter = _make_adapter(
             host="cluster.us-east-1.redshift.amazonaws.com",
@@ -311,14 +243,7 @@ class TestGetPlatformInfoBasic:
         assert info["configuration"]["deployment_type"] == "serverless"
 
 
-# ---------------------------------------------------------------------------
-# add_cli_arguments
-# ---------------------------------------------------------------------------
-
-
 class TestRedshiftAddCliArguments:
-    """Test add_cli_arguments registers expected flags."""
-
     def test_host_arg(self):
         import argparse
 
@@ -350,14 +275,7 @@ class TestRedshiftAddCliArguments:
         assert args.iam_role == "arn:aws:iam::123:role/r"
 
 
-# ---------------------------------------------------------------------------
-# _upload_file_to_s3: happy path and ClientError branches
-# ---------------------------------------------------------------------------
-
-
 class TestUploadFileToS3:
-    """Test _upload_file_to_s3 S3 URI construction and error handling."""
-
     def test_happy_path_returns_s3_uri(self, tmp_path):
         from pathlib import Path
 
@@ -434,14 +352,7 @@ class TestUploadFileToS3:
             adapter._upload_file_to_s3(mock_s3, file_path, "supplier", 0)
 
 
-# ---------------------------------------------------------------------------
-# _load_table_via_s3: format and compression branches
-# ---------------------------------------------------------------------------
-
-
 class TestLoadTableViaS3:
-    """Test _load_table_via_s3 COPY SQL generation for different formats."""
-
     def _make_s3_adapter(self):
         return _make_adapter(
             staging_root="s3://bench-bucket/bench-prefix",
@@ -561,14 +472,7 @@ class TestLoadTableViaS3:
         assert "ZSTD" in copy_call
 
 
-# ---------------------------------------------------------------------------
-# _optimize_table_definition: DDL transformation branches
-# ---------------------------------------------------------------------------
-
-
 class TestOptimizeTableDefinition:
-    """Test _optimize_table_definition Redshift DDL enhancement."""
-
     def test_non_create_table_returned_unchanged(self):
         adapter = _make_adapter()
         sql = "SELECT * FROM lineitem"
@@ -585,20 +489,11 @@ class TestOptimizeTableDefinition:
         adapter = _make_adapter()
         sql = "CREATE TABLE orders (o_orderkey INT) DISTSTYLE EVEN"
         result = adapter._optimize_table_definition(sql)
-        # DISTSTYLE already present - should not add DISTSTYLE AUTO again
         assert result.upper().count("DISTSTYLE") == 1
-        # SORTKEY not present - should append SORTKEY AUTO
         assert "SORTKEY AUTO" in result
 
 
-# ---------------------------------------------------------------------------
-# _create_direct_connection: WLM query group SET statement
-# ---------------------------------------------------------------------------
-
-
 class TestCreateDirectConnectionWlm:
-    """Test _create_direct_connection applies WLM query group when configured."""
-
     def test_wlm_queue_name_issues_set_statement(self):
         adapter = _make_adapter(wlm_query_queue_name="my_queue")
 
@@ -614,7 +509,7 @@ class TestCreateDirectConnectionWlm:
         mock_cursor.close.assert_called_once()
 
     def test_no_wlm_queue_name_skips_set_statement(self):
-        adapter = _make_adapter()  # no wlm_query_queue_name
+        adapter = _make_adapter()
 
         mock_conn = MagicMock()
 
@@ -625,30 +520,15 @@ class TestCreateDirectConnectionWlm:
         mock_conn.cursor.assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# _create_s3_client: partial credential XOR check
-# ---------------------------------------------------------------------------
-
-
 class TestCreateS3ClientCredentialXor:
-    """Test _create_s3_client raises ValueError when only one of the key pair is set."""
-
     def test_key_id_without_secret_raises(self):
         adapter = _make_adapter(aws_access_key_id="AKIATEST")
-        # aws_secret_access_key is not set - XOR mismatch
 
         with pytest.raises(ValueError, match="both"):
             adapter._create_s3_client()
 
 
-# ---------------------------------------------------------------------------
-# from_config() factory
-# ---------------------------------------------------------------------------
-
-
 class TestFromConfig:
-    """Test from_config() class method creates adapter correctly."""
-
     def test_generates_database_name_from_benchmark(self):
         from benchbox.platforms.redshift import RedshiftAdapter
 
@@ -661,7 +541,6 @@ class TestFromConfig:
                 "scale_factor": 1,
             }
             adapter = RedshiftAdapter.from_config(config)
-            # Database name should be generated (not empty)
             assert adapter.database is not None
             assert len(adapter.database) > 0
 
@@ -737,14 +616,7 @@ class TestFromConfig:
         assert adapter.port == 5440
 
 
-# ---------------------------------------------------------------------------
-# Missing host raises ConfigurationError
-# ---------------------------------------------------------------------------
-
-
 class TestMissingHostRaisesConfigurationError:
-    """Test that missing host raises ConfigurationError on init."""
-
     def test_missing_host_raises(self):
         from benchbox.core.exceptions import ConfigurationError
         from benchbox.platforms.redshift import RedshiftAdapter
@@ -775,14 +647,7 @@ class TestMissingHostRaisesConfigurationError:
             )
 
 
-# ---------------------------------------------------------------------------
-# get_platform_info with connection (Serverless path)
-# ---------------------------------------------------------------------------
-
-
 class TestGetPlatformInfoWithConnectionServerless:
-    """Test get_platform_info returns serverless metadata when connection is provided."""
-
     def test_serverless_path_calls_version_and_metadata(self):
         adapter = _make_adapter(host="wg.123456789.us-east-1.redshift-serverless.amazonaws.com")
 
@@ -792,7 +657,6 @@ class TestGetPlatformInfoWithConnectionServerless:
         mock_cursor.fetchone.return_value = ("PostgreSQL 8.0.2 on Redshift 1.0.1234",)
         mock_cursor.fetchall.return_value = []
 
-        # Mock the _get_serverless_metadata_api to return workgroup info
         serverless_meta = {
             "workgroup_name": "my-workgroup",
             "base_capacity_rpu": 128,
@@ -825,18 +689,10 @@ class TestGetPlatformInfoWithConnectionServerless:
         ):
             info = adapter.get_platform_info(connection=mock_conn)
 
-        # _get_serverless_metadata_sql was used as fallback; deployment_type still serverless
         assert info["configuration"]["deployment_type"] == "serverless"
 
 
-# ---------------------------------------------------------------------------
-# get_platform_info with connection (Provisioned path)
-# ---------------------------------------------------------------------------
-
-
 class TestGetPlatformInfoWithConnectionProvisioned:
-    """Test get_platform_info returns provisioned metadata when connection is provided."""
-
     def test_provisioned_path_with_api_metadata(self):
         adapter = _make_adapter(host="my-cluster.us-east-1.redshift.amazonaws.com")
 
@@ -885,14 +741,7 @@ class TestGetPlatformInfoWithConnectionProvisioned:
         assert info["configuration"]["number_of_nodes"] == 2
 
 
-# ---------------------------------------------------------------------------
-# normalized result metadata
-# ---------------------------------------------------------------------------
-
-
 class TestNormalizedResultMetadata:
-    """Test Redshift normalized execution/runtime metadata mappings."""
-
     def _mock_connection(self):
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
@@ -1003,14 +852,7 @@ class TestNormalizedResultMetadata:
         assert metadata["platform_compute"]["collection_status"] == "available"
 
 
-# ---------------------------------------------------------------------------
-# _get_serverless_metadata_api: boto3 calls
-# ---------------------------------------------------------------------------
-
-
 class TestGetServerlessMetadataApi:
-    """Test _get_serverless_metadata_api returns workgroup data from boto3."""
-
     def test_returns_workgroup_data(self, _mock_redshift_deps):
         mock_boto = _mock_redshift_deps["boto3"]
 
@@ -1062,14 +904,7 @@ class TestGetServerlessMetadataApi:
         assert result == {}
 
 
-# ---------------------------------------------------------------------------
-# _get_provisioned_metadata_api: boto3 calls
-# ---------------------------------------------------------------------------
-
-
 class TestGetProvisionedMetadataApi:
-    """Test _get_provisioned_metadata_api returns cluster data from boto3."""
-
     def test_returns_cluster_data(self, _mock_redshift_deps):
         mock_boto = _mock_redshift_deps["boto3"]
 
@@ -1121,14 +956,7 @@ class TestGetProvisionedMetadataApi:
         assert result == {}
 
 
-# ---------------------------------------------------------------------------
-# _get_serverless_metadata_sql
-# ---------------------------------------------------------------------------
-
-
 class TestGetServerlessMetadataSql:
-    """Test _get_serverless_metadata_sql reads sys_serverless_usage table."""
-
     def test_returns_rpu_capacity_from_cursor(self):
         adapter = _make_adapter()
         mock_cursor = MagicMock()
@@ -1154,14 +982,7 @@ class TestGetServerlessMetadataSql:
         assert result == {}
 
 
-# ---------------------------------------------------------------------------
-# _get_provisioned_metadata_sql
-# ---------------------------------------------------------------------------
-
-
 class TestGetProvisionedMetadataSql:
-    """Test _get_provisioned_metadata_sql reads stv_cluster_configuration."""
-
     def test_returns_cluster_info(self):
         adapter = _make_adapter()
         mock_cursor = MagicMock()
@@ -1189,14 +1010,7 @@ class TestGetProvisionedMetadataSql:
         assert result == {}
 
 
-# ---------------------------------------------------------------------------
-# drop_database() paths
-# ---------------------------------------------------------------------------
-
-
 class TestDropDatabase:
-    """Test drop_database terminates connections and drops the database."""
-
     def test_active_connections_terminated_then_dropped(self):
         adapter = _make_adapter()
 
@@ -1213,9 +1027,7 @@ class TestDropDatabase:
         ):
             adapter.drop_database(database="test_db")
 
-        # Verify cursor.execute was called (terminate + drop)
         assert mock_cursor.execute.call_count >= 2
-        # Last execute call should be DROP DATABASE
         last_call_sql = mock_cursor.execute.call_args_list[-1][0][0]
         assert "DROP DATABASE" in last_call_sql
 
@@ -1226,7 +1038,6 @@ class TestDropDatabase:
             patch.object(adapter, "check_server_database_exists", return_value=False),
             patch.object(adapter, "create_connection") as mock_conn,
         ):
-            # Should return without error and without trying to connect
             adapter.drop_database(database="nonexistent_db")
             mock_conn.assert_not_called()
 
@@ -1241,13 +1052,12 @@ class TestDropDatabase:
         mock_cursor2 = MagicMock()
         mock_conn2.cursor.return_value = mock_cursor2
 
-        # First DROP raises "active connection" error, second succeeds
         drop_error = Exception("database is being accessed")
         drop_error.args = ({"C": "55006"},)
 
         mock_cursor1.execute.side_effect = [
-            None,  # first pg_terminate_backend SELECT
-            drop_error,  # first DROP fails
+            None,
+            drop_error,
         ]
 
         connections = [mock_conn1, mock_conn2]
@@ -1260,7 +1070,6 @@ class TestDropDatabase:
         ):
             adapter.drop_database(database="test_db")
 
-        # Second connection should have been used for retry
         assert mock_conn2.cursor.called
 
     def test_non_database_in_use_error_re_raised(self):
@@ -1270,12 +1079,11 @@ class TestDropDatabase:
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
 
-        # Error with pgcode that is NOT 55006
         drop_error = Exception("syntax error")
         drop_error.args = ({"C": "42601"},)
         mock_cursor.execute.side_effect = [
-            None,  # pg_terminate_backend
-            drop_error,  # DROP fails with non-55006 code
+            None,
+            drop_error,
         ]
 
         with (
@@ -1288,14 +1096,7 @@ class TestDropDatabase:
                 adapter.drop_database(database="test_db")
 
 
-# ---------------------------------------------------------------------------
-# _build_s3_copy_source: manifest generation
-# ---------------------------------------------------------------------------
-
-
 class TestBuildS3CopySource:
-    """Test _build_s3_copy_source generates manifest when multiple files exist."""
-
     def test_single_file_returns_direct_uri(self):
         adapter = _make_adapter(
             staging_root="s3://my-bucket/my-prefix",
@@ -1326,7 +1127,6 @@ class TestBuildS3CopySource:
         assert "manifest" in copy_path
         assert manifest_opt == "manifest"
         mock_s3.put_object.assert_called_once()
-        # Verify JSON body contains entries
         call_kwargs = mock_s3.put_object.call_args[1]
         import json
 
@@ -1351,14 +1151,7 @@ class TestBuildS3CopySource:
             adapter._build_s3_copy_source(mock_s3, uris, "orders")
 
 
-# ---------------------------------------------------------------------------
-# _load_table_via_s3: MANIFEST keyword and MAXERROR tests
-# ---------------------------------------------------------------------------
-
-
 class TestLoadTableViaS3Extended:
-    """Test _load_table_via_s3 COPY SQL contains MANIFEST and COMPUPDATE options."""
-
     def _make_s3_adapter(self):
         return _make_adapter(
             staging_root="s3://bench-bucket/bench-prefix",
@@ -1433,21 +1226,14 @@ class TestLoadTableViaS3Extended:
 
         def alternate_is_parquet(f):
             call_count[0] += 1
-            return call_count[0] % 2 == 1  # True, False alternating
+            return call_count[0] % 2 == 1
 
         with patch("benchbox.platforms.redshift.is_parquet_format", side_effect=alternate_is_parquet):
             with pytest.raises(ValueError, match="uniform"):
                 adapter._load_table_via_s3(cursor, mock_s3, "orders", [f1, f2], MagicMock())
 
 
-# ---------------------------------------------------------------------------
-# _sanitize_copy_credential
-# ---------------------------------------------------------------------------
-
-
 class TestSanitizeCopyCredential:
-    """Test _sanitize_copy_credential rejects values containing single quotes."""
-
     def test_valid_value_returned_unchanged(self):
         from benchbox.platforms.redshift import RedshiftAdapter
 
@@ -1461,14 +1247,7 @@ class TestSanitizeCopyCredential:
             RedshiftAdapter._sanitize_copy_credential("it's invalid", "iam_role")
 
 
-# ---------------------------------------------------------------------------
-# _map_external_column_type: type mapping
-# ---------------------------------------------------------------------------
-
-
 class TestMapExternalColumnType:
-    """Test _map_external_column_type maps benchmark types to Spectrum types."""
-
     def test_bigint(self):
         from benchbox.platforms.redshift import RedshiftAdapter
 
@@ -1521,27 +1300,13 @@ class TestMapExternalColumnType:
         assert RedshiftAdapter._map_external_column_type("JSONB") == "VARCHAR(65535)"
 
 
-# ---------------------------------------------------------------------------
-# get_target_dialect
-# ---------------------------------------------------------------------------
-
-
 class TestGetTargetDialect:
-    """Test get_target_dialect returns redshift."""
-
     def test_returns_redshift(self):
         adapter = _make_adapter()
         assert adapter.get_target_dialect() == "redshift"
 
 
-# ---------------------------------------------------------------------------
-# _get_connection_params
-# ---------------------------------------------------------------------------
-
-
 class TestGetConnectionParams:
-    """Test _get_connection_params returns correct dict."""
-
     def test_returns_all_fields(self):
         adapter = _make_adapter(
             host="cluster.us-east-1.redshift.amazonaws.com",
@@ -1565,14 +1330,7 @@ class TestGetConnectionParams:
         assert params["database"] == "override_db"
 
 
-# ---------------------------------------------------------------------------
-# check_server_database_exists
-# ---------------------------------------------------------------------------
-
-
 class TestCheckServerDatabaseExists:
-    """Test check_server_database_exists returns correct bool."""
-
     def test_returns_true_when_db_found(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
@@ -1606,24 +1364,15 @@ class TestCheckServerDatabaseExists:
         assert result is False
 
 
-# ---------------------------------------------------------------------------
-# _compute_connect_timeout
-# ---------------------------------------------------------------------------
-
-
 class TestComputeConnectTimeout:
-    """Test _compute_connect_timeout returns appropriate timeouts."""
-
     def test_unknown_deployment_returns_default(self):
         adapter = _make_adapter(host="custom.example.com")
-        # unknown deployment type - no API call, returns default
         result = adapter._compute_connect_timeout()
         assert result == adapter.connect_timeout
 
     def test_serverless_returns_extended_timeout(self):
         adapter = _make_adapter(host="wg.123456789.us-east-1.redshift-serverless.amazonaws.com")
         result = adapter._compute_connect_timeout()
-        # Serverless uses extended timeout >= 60
         assert result >= 60
 
     def test_provisioned_available_returns_default(self, _mock_redshift_deps):
@@ -1649,14 +1398,7 @@ class TestComputeConnectTimeout:
         assert result >= 120
 
 
-# ---------------------------------------------------------------------------
-# _filter_valid_files
-# ---------------------------------------------------------------------------
-
-
 class TestFilterValidFiles:
-    """Test _filter_valid_files filters out non-existent and empty files."""
-
     def test_existing_file_included(self, tmp_path):
         adapter = _make_adapter()
         f = tmp_path / "data.tbl"
@@ -1692,35 +1434,19 @@ class TestFilterValidFiles:
         assert len(result) == 1
 
 
-# ---------------------------------------------------------------------------
-# validate_external_table_requirements
-# ---------------------------------------------------------------------------
-
-
 class TestValidateExternalTableRequirements:
-    """Test validate_external_table_requirements raises for missing S3 or IAM."""
-
     def test_missing_s3_bucket_raises(self):
         adapter = _make_adapter()
-        # No s3_bucket configured
         with pytest.raises(ValueError, match="S3 staging"):
             adapter.validate_external_table_requirements()
 
     def test_missing_iam_role_raises(self):
         adapter = _make_adapter(staging_root="s3://bucket/prefix")
-        # s3_bucket set but no iam_role
         with pytest.raises(ValueError, match="IAM role"):
             adapter.validate_external_table_requirements()
 
 
-# ---------------------------------------------------------------------------
-# execute_query: success and failure paths
-# ---------------------------------------------------------------------------
-
-
 class TestExecuteQuery:
-    """Test execute_query returns timing and row count data."""
-
     def test_successful_query_returns_result_dict(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
@@ -1776,14 +1502,7 @@ class TestExecuteQuery:
         assert result["rows_returned"] == 0
 
 
-# ---------------------------------------------------------------------------
-# configure_for_benchmark
-# ---------------------------------------------------------------------------
-
-
 class TestConfigureForBenchmark:
-    """Test configure_for_benchmark applies session settings."""
-
     def test_olap_benchmark_applies_settings(self):
         adapter = _make_adapter(auto_vacuum=False, auto_analyze=False)
         mock_conn = MagicMock()
@@ -1797,7 +1516,6 @@ class TestConfigureForBenchmark:
         ):
             adapter.configure_for_benchmark(mock_conn, "tpch")
 
-        # Multiple settings should have been applied
         assert mock_cursor.execute.call_count >= 3
 
     def test_non_olap_benchmark_applies_fewer_settings(self):
@@ -1828,14 +1546,7 @@ class TestConfigureForBenchmark:
         mock_cursor.close.assert_called()
 
 
-# ---------------------------------------------------------------------------
-# analyze_table and vacuum_table
-# ---------------------------------------------------------------------------
-
-
 class TestAnalyzeAndVacuumTable:
-    """Test analyze_table and vacuum_table execute SQL."""
-
     def test_analyze_table_executes_analyze(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
@@ -1846,8 +1557,6 @@ class TestAnalyzeAndVacuumTable:
         mock_cursor.execute.assert_called_once_with("ANALYZE lineitem")
 
     def test_analyze_table_raises_on_failure(self):
-        """Must raise (not swallow) so gather_statistics()'s caller can detect
-        and record a real failure as status=FAILED."""
         adapter = _make_adapter()
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
@@ -1878,14 +1587,7 @@ class TestAnalyzeAndVacuumTable:
         mock_cursor.execute.assert_called_once_with("VACUUM orders")
 
 
-# ---------------------------------------------------------------------------
-# get_query_plan
-# ---------------------------------------------------------------------------
-
-
 class TestGetQueryPlan:
-    """Test get_query_plan returns EXPLAIN output."""
-
     def test_returns_plan_text(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
@@ -1910,14 +1612,7 @@ class TestGetQueryPlan:
         assert plan is None
 
 
-# ---------------------------------------------------------------------------
-# close_connection
-# ---------------------------------------------------------------------------
-
-
 class TestCloseConnection:
-    """Test close_connection gracefully handles close errors."""
-
     def test_closes_connection(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
@@ -1940,14 +1635,7 @@ class TestCloseConnection:
             mock_warn.assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# _get_existing_tables
-# ---------------------------------------------------------------------------
-
-
 class TestGetExistingTables:
-    """Test _get_existing_tables returns lowercase table names."""
-
     def test_returns_lowercase_table_names(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
@@ -1969,14 +1657,7 @@ class TestGetExistingTables:
         assert result == []
 
 
-# ---------------------------------------------------------------------------
-# _get_query_statistics
-# ---------------------------------------------------------------------------
-
-
 class TestGetQueryStatistics:
-    """Test _get_query_statistics parses system table responses."""
-
     def test_returns_empty_when_no_query_id(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
@@ -2004,8 +1685,8 @@ class TestGetQueryStatistics:
         mock_conn.cursor.return_value = mock_cursor
 
         mock_cursor.fetchone.side_effect = [
-            (12345,),  # pg_last_query_id
-            (12345, 5000000, 4000000, 1024, 512, 2, 2, 0),  # stl_query row (aborted=0)
+            (12345,),
+            (12345, 5000000, 4000000, 1024, 512, 2, 2, 0),
         ]
 
         result = adapter._get_query_statistics(mock_conn, "Q1")
@@ -2020,7 +1701,7 @@ class TestGetQueryStatistics:
         mock_conn.cursor.return_value = mock_cursor
 
         mock_cursor.fetchone.side_effect = [
-            (99999,),  # pg_last_query_id
+            (99999,),
             (99999, 3000000, 3000000, 0, 0, 1, 1, "success"),
         ]
 
@@ -2035,22 +1716,15 @@ class TestGetQueryStatistics:
         mock_conn.cursor.return_value = mock_cursor
 
         mock_cursor.fetchone.side_effect = [
-            (12345,),  # pg_last_query_id
-            None,  # no stats row
+            (12345,),
+            None,
         ]
 
         result = adapter._get_query_statistics(mock_conn, "Q3")
         assert result == {}
 
 
-# ---------------------------------------------------------------------------
-# _normalize_table_name_in_sql and _extract_table_name
-# ---------------------------------------------------------------------------
-
-
 class TestNormalizeAndExtractTableName:
-    """Test SQL normalization helpers."""
-
     def test_normalize_table_name_lowercases_table(self):
         adapter = _make_adapter()
         result = adapter._normalize_table_name_in_sql("SELECT * FROM LINEITEM")
@@ -2062,27 +1736,13 @@ class TestNormalizeAndExtractTableName:
         assert result is not None
 
 
-# ---------------------------------------------------------------------------
-# platform_name property
-# ---------------------------------------------------------------------------
-
-
 class TestPlatformNameProperty:
-    """Test platform_name returns 'Redshift'."""
-
     def test_platform_name(self):
         adapter = _make_adapter()
         assert adapter.platform_name == "Redshift"
 
 
-# ---------------------------------------------------------------------------
-# _long_running_timeout
-# ---------------------------------------------------------------------------
-
-
 class TestLongRunningTimeout:
-    """Test _long_running_timeout applies floor correctly."""
-
     def test_returns_floor_when_below_floor(self):
         adapter = _make_adapter()
         with patch.object(adapter, "_resolve_connect_timeout", return_value=10):
@@ -2096,14 +1756,7 @@ class TestLongRunningTimeout:
         assert result == 500
 
 
-# ---------------------------------------------------------------------------
-# _resolve_connect_timeout (caching)
-# ---------------------------------------------------------------------------
-
-
 class TestResolveConnectTimeout:
-    """Test _resolve_connect_timeout caches the result."""
-
     def test_cached_result_returned_on_second_call(self):
         adapter = _make_adapter()
         adapter._cached_connect_timeout = 42
@@ -2118,14 +1771,7 @@ class TestResolveConnectTimeout:
         assert adapter._cached_connect_timeout == result
 
 
-# ---------------------------------------------------------------------------
-# _get_platform_metadata with connection
-# ---------------------------------------------------------------------------
-
-
 class TestGetPlatformMetadata:
-    """Test _get_platform_metadata fetches version and tables."""
-
     def test_returns_metadata_dict(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
@@ -2152,14 +1798,7 @@ class TestGetPlatformMetadata:
         assert "metadata_error" in result
 
 
-# ---------------------------------------------------------------------------
-# _run_vacuum_analyze_isolated
-# ---------------------------------------------------------------------------
-
-
 class TestRunVacuumAnalyzeIsolated:
-    """Test _run_vacuum_analyze_isolated runs VACUUM/ANALYZE on a separate connection."""
-
     def test_runs_vacuum_and_analyze_for_each_table(self):
         adapter = _make_adapter(auto_vacuum=True, auto_analyze=True)
         main_conn = MagicMock()
@@ -2175,7 +1814,7 @@ class TestRunVacuumAnalyzeIsolated:
             with patch.object(adapter, "_long_running_timeout", return_value=300):
                 adapter._run_vacuum_analyze_isolated(main_conn)
 
-        assert maint_cursor.execute.call_count >= 4  # SET + 2*VACUUM + 2*ANALYZE
+        assert maint_cursor.execute.call_count >= 4
 
     def test_empty_table_list_returns_immediately(self):
         adapter = _make_adapter(auto_vacuum=True, auto_analyze=True)
@@ -2205,14 +1844,7 @@ class TestRunVacuumAnalyzeIsolated:
                     assert "connection refused" in mock_warn.call_args[0][0]
 
 
-# ---------------------------------------------------------------------------
-# apply_unified_tuning (no-op paths)
-# ---------------------------------------------------------------------------
-
-
 class TestApplyUnifiedTuning:
-    """Test apply_unified_tuning with empty/None config is a no-op."""
-
     def test_none_config_is_noop(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
@@ -2244,14 +1876,7 @@ class TestApplyUnifiedTuning:
             mock_info.assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# create_connection: new database path
-# ---------------------------------------------------------------------------
-
-
 class TestCreateConnection:
-    """Test create_connection creates DB if it doesn't exist."""
-
     def test_creates_new_database_when_missing(self):
         adapter = _make_adapter()
 
@@ -2353,14 +1978,7 @@ class TestCreateConnection:
         assert any("statement_timeout" in c for c in execute_calls)
 
 
-# ---------------------------------------------------------------------------
-# create_schema
-# ---------------------------------------------------------------------------
-
-
 class TestCreateSchema:
-    """Test create_schema executes schema DDL statements."""
-
     def test_creates_schema_and_executes_ddl(self):
         adapter = _make_adapter(schema="public")
 
@@ -2380,7 +1998,6 @@ class TestCreateSchema:
                     with patch.object(adapter, "_optimize_table_definition", side_effect=lambda s: s):
                         adapter.create_schema(mock_benchmark, mock_conn)
 
-        # Should have executed multiple statements
         assert mock_cursor.execute.call_count >= 2
 
     def test_non_public_schema_creates_schema_first(self):
@@ -2419,14 +2036,7 @@ class TestCreateSchema:
                         adapter.create_schema(mock_benchmark, mock_conn)
 
 
-# ---------------------------------------------------------------------------
-# _load_table_via_insert
-# ---------------------------------------------------------------------------
-
-
 class TestLoadTableViaInsert:
-    """Test _load_table_via_insert loads rows via INSERT statements."""
-
     def test_loads_rows_from_delimited_file(self, tmp_path):
         adapter = _make_adapter()
 
@@ -2456,14 +2066,7 @@ class TestLoadTableViaInsert:
         assert row_count == 0
 
 
-# ---------------------------------------------------------------------------
-# load_data: S3 and non-S3 paths
-# ---------------------------------------------------------------------------
-
-
 class TestLoadData:
-    """Test load_data dispatches to S3 or INSERT path correctly."""
-
     def test_s3_path_calls_load_table_via_s3(self, tmp_path):
         adapter = _make_adapter(
             staging_root="s3://bench-bucket/prefix",
@@ -2491,7 +2094,6 @@ class TestLoadData:
 
     def test_no_s3_bucket_uses_insert_path(self, tmp_path):
         adapter = _make_adapter()
-        # No S3 bucket configured
         adapter.s3_bucket = None
 
         mock_conn = MagicMock()
@@ -2559,14 +2161,7 @@ class TestLoadData:
         assert table_stats["part"] == 0
 
 
-# ---------------------------------------------------------------------------
-# configure_for_benchmark: auto_vacuum/auto_analyze path
-# ---------------------------------------------------------------------------
-
-
 class TestConfigureForBenchmarkVacuumAnalyze:
-    """Test configure_for_benchmark invokes _run_vacuum_analyze_isolated."""
-
     def test_auto_vacuum_calls_run_vacuum_analyze_isolated(self):
         adapter = _make_adapter(auto_vacuum=True, auto_analyze=False)
         mock_conn = MagicMock()
@@ -2604,14 +2199,7 @@ class TestConfigureForBenchmarkVacuumAnalyze:
         mock_vacuum.assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# _build_ctas_sort_sql: vacuum_sort and ctas paths
-# ---------------------------------------------------------------------------
-
-
 class TestBuildCtasSortSql:
-    """Test _build_ctas_sort_sql covers all strategy paths."""
-
     def test_off_returns_none(self):
         adapter = _make_adapter()
         with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("off", None)):
@@ -2643,14 +2231,7 @@ class TestBuildCtasSortSql:
                 adapter._build_ctas_sort_sql("orders", [])
 
 
-# ---------------------------------------------------------------------------
-# _get_serverless_metadata_api: namespace sub-path + error paths
-# ---------------------------------------------------------------------------
-
-
 class TestGetServerlessMetadataApi:
-    """Test _get_serverless_metadata_api covers namespace details and error branches."""
-
     def test_namespace_details_fetched_when_present(self, _mock_redshift_deps):
         mock_boto = _mock_redshift_deps["boto3"]
         adapter = _make_adapter(host="wg.123456789.us-east-1.redshift-serverless.amazonaws.com")
@@ -2696,7 +2277,6 @@ class TestGetServerlessMetadataApi:
         mock_client.get_namespace.side_effect = Exception("forbidden")
 
         result = adapter._get_serverless_metadata_api("my-wg", "us-east-1")
-        # Should still return workgroup data even if namespace fails
         assert result["workgroup_name"] == "my-wg"
         assert "encrypted" not in result
 
@@ -2737,14 +2317,7 @@ class TestGetServerlessMetadataApi:
         assert result == {}
 
 
-# ---------------------------------------------------------------------------
-# _get_provisioned_metadata_api: storage_capacity path + error paths
-# ---------------------------------------------------------------------------
-
-
 class TestGetProvisionedMetadataApi:
-    """Test _get_provisioned_metadata_api covers storage capacity and error paths."""
-
     def test_storage_capacity_included_when_present(self, _mock_redshift_deps):
         mock_boto = _mock_redshift_deps["boto3"]
         adapter = _make_adapter(host="mycluster.abc123.us-west-2.redshift.amazonaws.com")
@@ -2832,14 +2405,7 @@ class TestGetProvisionedMetadataApi:
         assert result == {}
 
 
-# ---------------------------------------------------------------------------
-# _compute_connect_timeout: provisioned status paths + serverless path
-# ---------------------------------------------------------------------------
-
-
 class TestComputeConnectTimeout:
-    """Test _compute_connect_timeout covers cluster status branching."""
-
     def test_provisioned_available_returns_default_timeout(self, _mock_redshift_deps):
         mock_boto = _mock_redshift_deps["boto3"]
         adapter = _make_adapter(host="mycluster.abc123.us-east-1.redshift.amazonaws.com")
@@ -2907,22 +2473,12 @@ class TestComputeConnectTimeout:
         first = adapter._resolve_connect_timeout()
         second = adapter._resolve_connect_timeout()
         assert first == second
-        # describe_clusters called only once due to caching
         assert mock_client.describe_clusters.call_count == 1
 
 
-# ---------------------------------------------------------------------------
-# _get_platform_info: psycopg fallback + WLM path
-# ---------------------------------------------------------------------------
-
-
 class TestGetPlatformInfoPsycopgPath:
-    """Test get_platform_info when only psycopg is available."""
-
     def test_client_library_version_none_when_no_version_attr(self, _mock_redshift_deps):
-        """When redshift_connector has no __version__ attribute, version is None."""
         mock_rc = _mock_redshift_deps["rc"]
-        # Remove __version__ from the mock so AttributeError is raised
         del mock_rc.__version__
 
         adapter = _make_adapter()
@@ -2930,7 +2486,6 @@ class TestGetPlatformInfoPsycopgPath:
         assert result["client_library_version"] is None
 
     def test_psycopg_version_path_via_import(self):
-        """Test psycopg path: redshift_connector=None triggers psycopg version lookup."""
         import sys
 
         import benchbox.platforms.redshift as rs_module
@@ -2938,15 +2493,11 @@ class TestGetPlatformInfoPsycopgPath:
         mock_psycopg = MagicMock()
         mock_psycopg.__version__ = "3.1.0"
 
-        # Save originals so they can be fully restored - psycopg IS installed in
-        # this environment, so the module attribute must be put back, not deleted.
         original_rc = rs_module.redshift_connector
         original_pg_attr = getattr(rs_module, "psycopg", _SENTINEL := object())
         original_sys_pg = sys.modules.get("psycopg")
 
-        # Inject mock psycopg into sys.modules so `import psycopg` inside get_platform_info returns it
         sys.modules["psycopg"] = mock_psycopg
-        # Also set psycopg at module level so the __init__ check doesn't fail
         rs_module.psycopg = mock_psycopg
         try:
             rs_module.redshift_connector = None
@@ -2955,12 +2506,10 @@ class TestGetPlatformInfoPsycopgPath:
             assert result["client_library_version"] == "3.1.0"
         finally:
             rs_module.redshift_connector = original_rc
-            # Restore sys.modules["psycopg"] to its original value
             if original_sys_pg is not None:
                 sys.modules["psycopg"] = original_sys_pg
             else:
                 sys.modules.pop("psycopg", None)
-            # Restore rs_module.psycopg to its original value
             if original_pg_attr is not _SENTINEL:
                 rs_module.psycopg = original_pg_attr
             elif hasattr(rs_module, "psycopg"):
@@ -2968,8 +2517,6 @@ class TestGetPlatformInfoPsycopgPath:
 
 
 class TestGetPlatformInfoWlmPath:
-    """Test get_platform_info collects WLM queue data from pg_wlm_auto_explain."""
-
     def test_wlm_query_configuration_collected(self):
         adapter = _make_adapter()
 
@@ -2977,8 +2524,6 @@ class TestGetPlatformInfoWlmPath:
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
 
-        # Mock calls in sequence: version, deployment meta SQL attempts, session info,
-        # table info, pg_wlm_configuration
         version_row = ("PostgreSQL 8.0.2 on Amazon Redshift 1.0.50481",)
         session_row = ("admin", "testdb", "public", "10.0.0.1", 5439)
         tables_rows = []
@@ -2991,14 +2536,7 @@ class TestGetPlatformInfoWlmPath:
         assert result["platform_version"] == version_row[0]
 
 
-# ---------------------------------------------------------------------------
-# _get_query_statistics: provisioned and serverless paths
-# ---------------------------------------------------------------------------
-
-
 class TestGetQueryStatistics:
-    """Test _get_query_statistics covers both deployment paths."""
-
     def test_provisioned_path_returns_stats(self):
         adapter = _make_adapter(host="mycluster.abc123.us-east-1.redshift.amazonaws.com")
 
@@ -3007,7 +2545,7 @@ class TestGetQueryStatistics:
         mock_conn.cursor.return_value = mock_cursor
 
         query_id = 12345
-        stats_row = (query_id, 500000, 480000, 0, 0, 1, 1, 0)  # aborted=0
+        stats_row = (query_id, 500000, 480000, 0, 0, 1, 1, 0)
 
         mock_cursor.fetchone.side_effect = [(query_id,), stats_row]
 
@@ -3088,14 +2626,7 @@ class TestGetQueryStatistics:
         assert result == {}
 
 
-# ---------------------------------------------------------------------------
-# _get_platform_metadata: serverless + provisioned cluster info paths
-# ---------------------------------------------------------------------------
-
-
 class TestGetPlatformMetadata:
-    """Test _get_platform_metadata covers serverless and provisioned cluster queries."""
-
     def test_serverless_cluster_info_path(self):
         adapter = _make_adapter(host="wg.123456789.us-east-1.redshift-serverless.amazonaws.com")
 
@@ -3104,7 +2635,7 @@ class TestGetPlatformMetadata:
         mock_conn.cursor.return_value = mock_cursor
 
         version_row = ("PostgreSQL 8.0.2",)
-        serverless_row = (64,)  # compute_capacity_rpu
+        serverless_row = (64,)
         session_row = ("admin", "testdb", "public", "10.0.0.1", 5439)
         tables_rows = [("public", "lineitem", "admin", None, False, False, False)]
 
@@ -3145,11 +2676,9 @@ class TestGetPlatformMetadata:
 
         version_row = ("PostgreSQL 8.0.2",)
 
-        # Second fetchone raises to simulate permission denied on cluster info
         mock_cursor.fetchone.side_effect = [version_row, Exception("permission denied")]
 
         result = adapter._get_platform_metadata(mock_conn)
-        # Should not raise; metadata_error key set
         assert "metadata_error" in result or "redshift_version" in result
 
     def test_outer_exception_sets_metadata_error(self):
@@ -3163,14 +2692,7 @@ class TestGetPlatformMetadata:
         assert "metadata_error" in result
 
 
-# ---------------------------------------------------------------------------
-# apply_table_tunings: distribution/sort key mismatch, no-table found path
-# ---------------------------------------------------------------------------
-
-
 class TestApplyTableTunings:
-    """Test apply_table_tunings covers pg_table_def query and maintenance paths."""
-
     def test_table_found_needs_recreation_logs_warning(self):
         adapter = _make_adapter(auto_vacuum=True)
         mock_conn = MagicMock()
@@ -3197,7 +2719,6 @@ class TestApplyTableTunings:
             [dist_col] if t == TuningType.DISTRIBUTION else [sort_col] if t == TuningType.SORTING else []
         )
 
-        # Simulates current config with different dist/sort keys
         pg_row = ("public", "lineitem", "EVEN", None, None, None, None, None)
         mock_cursor.fetchone.return_value = pg_row
 
@@ -3209,12 +2730,9 @@ class TestApplyTableTunings:
         mock_cursor.execute.reset_mock()
         config = SimpleNamespace(table_tunings={mock_table_tuning.table_name: mock_table_tuning})
 
-        # auto_vacuum/auto_analyze are on: the isolated pass in configure_for_benchmark owns
-        # maintenance, so the hook must not repeat it on the benchmark connection.
         assert adapter.apply_post_load_tunings(mock_table_tuning.table_name, config, mock_conn) is False
         assert mock_cursor.execute.call_args_list == []
 
-        # With auto_analyze off nothing else analyzes the table; VACUUM stays with the isolated pass.
         adapter.auto_analyze = False
         assert adapter.apply_post_load_tunings(mock_table_tuning.table_name, config, mock_conn) is True
         post_load_sqls = [str(c.args[0]) for c in mock_cursor.execute.call_args_list]
@@ -3237,7 +2755,7 @@ class TestApplyTableTunings:
         mock_table_tuning.table_name = "nonexistent_table"
         mock_table_tuning.get_columns_by_type.return_value = []
 
-        mock_cursor.fetchone.return_value = None  # Table not found in pg_table_def
+        mock_cursor.fetchone.return_value = None
 
         adapter.apply_table_tunings(mock_table_tuning, mock_conn)
 
@@ -3304,20 +2822,12 @@ class TestApplyTableTunings:
 
         mock_cursor.fetchone.return_value = ("public", "orders", "AUTO", None, None, None, None, None)
 
-        # Should not raise
         with patch.object(adapter.logger, "info") as mock_info:
             adapter.apply_table_tunings(mock_table_tuning, mock_conn)
             mock_info.assert_called()
 
 
-# ---------------------------------------------------------------------------
-# _build_external_column_definitions + _map_external_column_type
-# ---------------------------------------------------------------------------
-
-
 class TestMapExternalColumnType:
-    """Test all type mapping branches of _map_external_column_type."""
-
     def test_empty_type_returns_varchar_max(self):
         from benchbox.platforms.redshift import RedshiftAdapter
 
@@ -3392,11 +2902,9 @@ class TestMapExternalColumnType:
 
 
 class TestBuildExternalColumnDefinitions:
-    """Test _build_external_column_definitions covers error and happy paths."""
-
     def test_no_get_schema_raises(self):
         adapter = _make_adapter(s3_bucket="my-bucket", iam_role="arn:aws:iam::123:role/MyRole")
-        mock_benchmark = object()  # No get_schema method
+        mock_benchmark = object()
 
         with pytest.raises(ValueError, match="Benchmark schema metadata unavailable"):
             adapter._build_external_column_definitions(mock_benchmark, "lineitem")
@@ -3423,7 +2931,7 @@ class TestBuildExternalColumnDefinitions:
         mock_benchmark.get_schema.return_value = {
             "lineitem": {
                 "columns": [
-                    {"name": "", "type": "INTEGER"},  # empty name - skipped
+                    {"name": "", "type": "INTEGER"},
                     {"name": "l_orderkey", "type": "BIGINT"},
                 ]
             }
@@ -3431,7 +2939,6 @@ class TestBuildExternalColumnDefinitions:
 
         result = adapter._build_external_column_definitions(mock_benchmark, "lineitem")
         assert "l_orderkey BIGINT" in result
-        # Empty-named column should not appear
         assert result.startswith("l_orderkey")
 
     def test_all_empty_names_raises(self):
@@ -3461,14 +2968,7 @@ class TestBuildExternalColumnDefinitions:
         assert "l_shipdate DATE" in result
 
 
-# ---------------------------------------------------------------------------
-# create_external_tables: parquet and delta paths
-# ---------------------------------------------------------------------------
-
-
 class TestCreateExternalTables:
-    """Test create_external_tables covers parquet and delta source paths."""
-
     def test_parquet_path_creates_external_table(self, tmp_path):
         adapter = _make_adapter(
             s3_bucket="my-bucket",
@@ -3527,26 +3027,19 @@ class TestCreateExternalTables:
                 adapter.create_external_tables(mock_benchmark, mock_conn, tmp_path)
 
     def test_validate_external_table_requirements_no_bucket_raises(self):
-        adapter = _make_adapter()  # No s3_bucket configured
+        adapter = _make_adapter()
         with pytest.raises(ValueError, match="requires S3 staging"):
             adapter.validate_external_table_requirements()
 
     def test_validate_external_table_requirements_no_iam_role_raises(self):
-        adapter = _make_adapter(s3_bucket="my-bucket")  # No iam_role
+        adapter = _make_adapter(s3_bucket="my-bucket")
         with pytest.raises(ValueError, match="requires IAM role"):
             adapter.validate_external_table_requirements()
 
 
-# ---------------------------------------------------------------------------
-# load_data: direct INSERT fallback path (no s3_bucket)
-# ---------------------------------------------------------------------------
-
-
 class TestLoadDataDirectInsertPath:
-    """Test load_data falls back to INSERT when no S3 bucket is configured."""
-
     def test_direct_insert_path_used_when_no_s3_bucket(self, tmp_path):
-        adapter = _make_adapter()  # No s3_bucket
+        adapter = _make_adapter()
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
@@ -3603,14 +3096,7 @@ class TestLoadDataDirectInsertPath:
         assert table_stats["orders"] == 0
 
 
-# ---------------------------------------------------------------------------
-# _build_redshift_config: module-level config builder
-# ---------------------------------------------------------------------------
-
-
 class TestBuildRedshiftConfig:
-    """Test _build_redshift_config merges credentials correctly."""
-
     def test_saved_credentials_merged_with_options(self):
         from benchbox.platforms.redshift import _build_redshift_config
 
@@ -3618,7 +3104,6 @@ class TestBuildRedshiftConfig:
         mock_info.display_name = "Amazon Redshift"
         mock_info.driver_package = "redshift-connector"
 
-        # CredentialManager is imported locally inside _build_redshift_config
         with patch("benchbox.security.credentials.CredentialManager") as mock_cm_cls:
             mock_cm = MagicMock()
             mock_cm.get_platform_credentials.return_value = {
@@ -3635,7 +3120,6 @@ class TestBuildRedshiftConfig:
                 mock_info,
             )
 
-        # Saved creds win over registered defaults (options without _explicit_platform_options)
         assert result.host == "saved-host.us-east-1.redshift.amazonaws.com"
 
     def test_database_override_included_when_provided(self):
@@ -3673,14 +3157,7 @@ class TestBuildRedshiftConfig:
         assert result.admin_database == "dev"
 
 
-# ---------------------------------------------------------------------------
-# _resolve_data_files: centralized DataSourceResolver delegation
-# ---------------------------------------------------------------------------
-
-
 class TestResolveDataFiles:
-    """Test _resolve_data_files delegates to DataSourceResolver."""
-
     def test_resolve_data_files_delegates_to_resolver(self, tmp_path):
         adapter = _make_adapter()
         benchmark = MagicMock()
@@ -3703,14 +3180,7 @@ class TestResolveDataFiles:
                 adapter._resolve_data_files(MagicMock(), tmp_path)
 
 
-# ---------------------------------------------------------------------------
-# apply_unified_tuning: None/empty config early return
-# ---------------------------------------------------------------------------
-
-
 class TestApplyUnifiedTuning:
-    """Test apply_unified_tuning covers None config early return."""
-
     def test_none_config_returns_early(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
@@ -3739,14 +3209,7 @@ class TestApplyUnifiedTuning:
         mock_constraint.assert_called_once()
 
 
-# ---------------------------------------------------------------------------
-# get_platform_info: provisioned + serverless SQL fallback paths
-# ---------------------------------------------------------------------------
-
-
 class TestGetPlatformInfoDeploymentPaths:
-    """Test get_platform_info collects deployment-specific metadata via SQL."""
-
     def test_serverless_deployment_sql_metadata_collected(self):
         adapter = _make_adapter(host="wg.123456789.us-east-1.redshift-serverless.amazonaws.com")
 
@@ -3754,7 +3217,6 @@ class TestGetPlatformInfoDeploymentPaths:
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
 
-        # Mock version query and serverless SQL metadata
         version_row = ("PostgreSQL 8.0.2 on Amazon Redshift 1.0.50481",)
         mock_cursor.fetchone.side_effect = [version_row]
         mock_cursor.fetchall.return_value = []
@@ -3813,14 +3275,7 @@ class TestGetPlatformInfoDeploymentPaths:
         assert result["platform_version"] is None
 
 
-# ---------------------------------------------------------------------------
-# create_schema: schema creation and DROP TABLE IF EXISTS paths
-# ---------------------------------------------------------------------------
-
-
 class TestCreateSchema:
-    """Test create_schema covers non-public schema creation and DROP TABLE paths."""
-
     def test_non_public_schema_creates_schema(self):
         adapter = _make_adapter()
         adapter.schema = "benchmark_schema"
@@ -3831,11 +3286,9 @@ class TestCreateSchema:
 
         mock_benchmark = MagicMock()
 
-        # _create_schema_with_tuning returns the raw SQL string
         with patch.object(adapter, "_create_schema_with_tuning", return_value=""):
             adapter.create_schema(mock_benchmark, mock_conn)
 
-        # CREATE SCHEMA IF NOT EXISTS should be called for non-public schema
         executed_sqls = [str(c.args[0]) for c in mock_cursor.execute.call_args_list]
         assert any("CREATE SCHEMA" in sql for sql in executed_sqls)
 
@@ -3874,14 +3327,7 @@ class TestCreateSchema:
         assert any("DROP TABLE IF EXISTS" in sql for sql in executed_sqls)
 
 
-# ---------------------------------------------------------------------------
-# configure_for_benchmark: cache-control receipt persistence
-# ---------------------------------------------------------------------------
-
-
 class TestCacheControlReceiptPersistence:
-    """The session receipt must reach platform_compute as bundle evidence."""
-
     def test_receipt_stored_on_validation(self):
         from unittest.mock import Mock, patch
 

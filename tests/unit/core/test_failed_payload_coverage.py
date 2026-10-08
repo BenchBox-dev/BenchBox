@@ -1,14 +1,5 @@
-"""Unit tests for FAILED payload handling across transactional benchmarks and tuning metadata.
-
-Cloud platforms (e.g. BigQuery, Snowflake) may report query failures as a
-`{"status": "FAILED", "error": "..."}` result payload on the cursor/connection wrapper
-rather than raising an exception. These tests verify that all setup, manifest,
-lock, population, cleanup, and tuning metadata paths inspect `failed_platform_error`
-and either fail loud or handle the failure safely according to contract.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -32,8 +23,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 class MockFailedCursor:
-    """Cursor that wraps a FAILED platform result payload."""
-
     def __init__(self, error_message: str = "Simulated platform error"):
         self.platform_result = {"status": "FAILED", "error": error_message}
         self.rowcount = -1
@@ -52,8 +41,6 @@ class MockFailedCursor:
 
 
 class MockOkCursor:
-    """Cursor that wraps a successful query result."""
-
     def __init__(self, rows: list[tuple] | None = None, rowcount: int = 1):
         self.rows = rows or [(1,)]
         self.platform_result = {"status": "SUCCESS", "rows_returned": len(self.rows)}
@@ -73,8 +60,6 @@ class MockOkCursor:
 
 
 class MockDatabaseConnection:
-    """Connection mock that returns configured cursors for execute()."""
-
     def __init__(self, default_cursor: Any = None):
         self.default_cursor = default_cursor or MockOkCursor()
         self.query_responses: dict[str, Any] = {}
@@ -89,11 +74,6 @@ class MockDatabaseConnection:
 
     def cursor(self):
         return self
-
-
-# ============================================================================
-# primitives_benchmark_utils tests
-# ============================================================================
 
 
 class TestPrimitivesBenchmarkUtilsFailedPayload:
@@ -142,11 +122,6 @@ class TestPrimitivesBenchmarkUtilsFailedPayload:
         assert fetch_count_probe(conn, "SELECT COUNT(*) FROM orders") == 105
 
 
-# ============================================================================
-# TransactionalBenchmarkBase tests
-# ============================================================================
-
-
 class ConcreteTransactionalBenchmark(TransactionalBenchmarkBase[Any]):
     def generate_data(self, *args, **kwargs):
         pass
@@ -177,7 +152,6 @@ class TestTransactionalBenchmarkBaseFailedPayload:
 
     def test_staging_source_digest_handles_failed_count_probe(self, tx_benchmark):
         conn = MockDatabaseConnection(default_cursor=MockFailedCursor("Failed to count table orders"))
-        # Should not crash; treats count as 0 for digest stability
         digest = tx_benchmark._staging_source_digest(conn, ["orders", "lineitem"])
         assert isinstance(digest, str)
         assert len(digest) > 0
@@ -204,11 +178,6 @@ class TestTransactionalBenchmarkBaseFailedPayload:
         conn = MockDatabaseConnection()
         conn.query_responses["source_digest"] = MockFailedCursor("Catalog lookup failed")
         assert tx_benchmark._staging_manifest_matches(conn, ["orders"]) is False
-
-
-# ============================================================================
-# TransactionPrimitivesBenchmark tests
-# ============================================================================
 
 
 class TestTransactionPrimitivesFailedPayload:
@@ -252,11 +221,8 @@ class TestTransactionPrimitivesFailedPayload:
 
     def test_operation_cleanup_failure_records_cleanup_warning(self, tp_benchmark):
         conn = MockDatabaseConnection()
-        # write_result succeeds
         conn.query_responses["INSERT INTO txn_orders"] = MockOkCursor(rowcount=1)
-        # validation succeeds
         conn.query_responses["SELECT COUNT(*) FROM txn_orders"] = MockOkCursor(rows=[(1,)])
-        # cleanup fails
         conn.query_responses["DELETE FROM txn_orders"] = MockFailedCursor("Cleanup DELETE failed on engine")
 
         op = WriteOperation(
@@ -275,11 +241,6 @@ class TestTransactionPrimitivesFailedPayload:
         assert res.cleanup_success is False
         assert res.cleanup_warning is not None
         assert "Cleanup DELETE failed on engine" in res.cleanup_warning
-
-
-# ============================================================================
-# WritePrimitivesBenchmark tests
-# ============================================================================
 
 
 class TestWritePrimitivesFailedPayload:
@@ -331,11 +292,6 @@ class TestWritePrimitivesFailedPayload:
         assert success is False
         assert warning is not None
         assert "Cleanup error on engine" in warning
-
-
-# ============================================================================
-# TuningMetadataManager tests
-# ============================================================================
 
 
 class TestTuningMetadataManagerFailedPayload:

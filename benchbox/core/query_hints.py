@@ -1,12 +1,5 @@
-"""Query complexity hints — benchmark-owned metadata for MCP/CLI/analysis surfaces.
-
-Previously in ``benchbox.mcp.tools.benchmark._get_query_complexity_hints``.
-Moved to core so the hint table is a single source of truth owned by the
-benchmark domain, not the MCP transport.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -99,15 +92,6 @@ _TPCH_HINTS: dict[str, dict[str, Any]] = {
 
 
 def get_query_complexity_hints(benchmark: str, query_id: str) -> dict[str, Any]:
-    """Get complexity hints for a specific query.
-
-    Args:
-        benchmark: Benchmark id (e.g. ``"tpch"``).
-        query_id: Normalised query id without prefix (e.g. ``"1"``).
-
-    Returns:
-        Hint dict for known queries, or an ``unknown`` sentinel.
-    """
     if benchmark == "tpch" and query_id in _TPCH_HINTS:
         return _TPCH_HINTS[query_id]
 

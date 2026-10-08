@@ -1,5 +1,3 @@
-"""Require an assigned pytest shard to be collected and executed completely."""
-
 from __future__ import annotations
 
 import json
@@ -26,8 +24,6 @@ class ShardEvidence:
         self.outcomes: dict[str, list[dict[str, str | None]]] = {}
 
     def pytest_collection_finish(self, session: pytest.Session) -> None:
-        # xdist controllers delegate collection to workers. Capture each
-        # worker's actual selection through the xdist collection hook below.
         if not session.config.getoption("numprocesses", default=0):
             self.collections.append(sorted(item.nodeid for item in session.items))
 

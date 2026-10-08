@@ -1,5 +1,3 @@
-"""Tests for DataFusion query plan capture wiring."""
-
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -11,14 +9,14 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-# Minimal DataFusion EXPLAIN text output as the parser expects
+
 _EXPLAIN_TEXT = (
     "logical_plan | TableScan: t1 projection=[id, val]\nphysical_plan | DataSourceExec: file_groups={1 group}"
 )
 
 
 def _make_explain_batch(plan_type_val, plan_text_val):
-    """Return a minimal mock RecordBatch for EXPLAIN output."""
+
     col0 = MagicMock()
     col0.__getitem__ = lambda self, i: MagicMock(as_py=lambda: plan_type_val)
     col1 = MagicMock()
@@ -88,7 +86,6 @@ class TestDataFusionPlanCapture:
         mock_plan.plan_fingerprint = "df_fp"
         monkeypatch.setattr(adapter, "capture_query_plan", lambda *a, **k: (mock_plan, 2.5))
 
-        # Patch the underlying sql execution to return a success result
         from unittest.mock import patch as _patch
 
         fake_result = MagicMock()

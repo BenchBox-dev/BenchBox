@@ -1,16 +1,6 @@
-"""Load testing framework for database workload analysis.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-
-This module provides tools for testing database performance under concurrent load:
-- Generic concurrent query execution with configurable patterns
-- Queue analysis and wait time measurement
-- Connection pool stress testing
-- Workload pattern simulation (steady, burst, ramp-up, spike)
-- Contention detection and bottleneck identification
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from benchbox.experimental.load_testing.analyzer import (
     ContentionAnalysis,
@@ -42,12 +32,10 @@ from benchbox.experimental.load_testing.pool_tester import (
 )
 
 __all__ = [
-    # Executor
     "ConcurrentLoadExecutor",
     "ConcurrentLoadConfig",
     "ConcurrentLoadResult",
     "StreamResult",
-    # Patterns
     "WorkloadPattern",
     "WorkloadPhase",
     "SteadyPattern",
@@ -57,12 +45,10 @@ __all__ = [
     "StepPattern",
     "WavePattern",
     "MultiWriterPattern",
-    # Analysis
     "LoadAnalyzer",
     "QueueAnalysis",
     "ContentionAnalysis",
     "ScalingAnalysis",
-    # Pool Testing
     "ConnectionPoolTester",
     "PoolTestConfig",
     "PoolTestResult",

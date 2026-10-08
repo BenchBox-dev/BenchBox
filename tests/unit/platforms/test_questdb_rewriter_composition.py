@@ -1,15 +1,6 @@
-"""Unit tests for the QuestDB rewriter entrypoint composition.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Pins that rewrite() applies all four fixup stages end to end: comma-JOIN
-expansion, INTERVAL arithmetic to dateadd(), SUBSTRING FROM/FOR, and CTE
-column-list removal. Individual stages are covered in test_questdb_rewriter;
-these tests pin the composed behavior on single queries needing multiple
-or zero fixups.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -79,9 +70,7 @@ class TestRewriteComposition:
         assert "JOIN" in result.upper()
 
     def test_interval_fixup_composes_with_join_expansion(self) -> None:
-        # The comma-JOIN stage runs sqlglot first, which normalizes
-        # INTERVAL '90' DAY to INTERVAL '90 DAY'. The interval stage must
-        # still eliminate it in the same rewrite() pass.
+
         sql = (
             "SELECT l.l_orderkey FROM lineitem l, orders o "
             "WHERE l.l_orderkey = o.o_orderkey AND o.o_orderdate > "

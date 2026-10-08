@@ -1,5 +1,3 @@
-"""Tests for TPC-Havoc DataFrame variant registration."""
-
 from __future__ import annotations
 
 from datetime import date
@@ -11,11 +9,11 @@ try:
     from polars.testing import assert_frame_equal
 
     from benchbox.platforms.dataframe.polars_df import POLARS_AVAILABLE, PolarsDataFrameAdapter
-except ImportError:  # pragma: no cover - dependency-gated tests
+except ImportError:  # pragma: no cover
     POLARS_AVAILABLE = False
-    pl = None  # type: ignore[assignment]
-    assert_frame_equal = None  # type: ignore[assignment]
-    PolarsDataFrameAdapter = None  # type: ignore[assignment]
+    pl = None
+    assert_frame_equal = None
+    PolarsDataFrameAdapter = None
 
 from benchbox.core.benchmark_registry import BENCHMARK_METADATA
 from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
@@ -42,8 +40,6 @@ Q1_COLUMNS = [
 
 
 class TestTPCHavocDataFrameRegistry:
-    """DataFrame registry metadata coverage."""
-
     def test_all_220_variants_registered(self) -> None:
         registry = get_dataframe_queries()
         assert len(registry) == 220
@@ -80,8 +76,6 @@ class TestTPCHavocDataFrameRegistry:
 
 @pytest.mark.skipif(not POLARS_AVAILABLE, reason="Polars not installed")
 class TestQ1Equivalence:
-    """Q1 variants should preserve canonical TPC-H output."""
-
     @pytest.fixture
     def q1_context(self):
         ctx = PolarsDataFrameAdapter().create_context()
@@ -124,7 +118,6 @@ def _collect_q1(result) -> pl.DataFrame:
 
 
 def _collect_frame(result):
-    """Collect any expression-family or native frame to a plain Polars DataFrame."""
     if hasattr(result, "native"):
         result = result.native
     if hasattr(result, "collect"):
@@ -133,7 +126,6 @@ def _collect_frame(result):
 
 
 def _collect_pandas(result):
-    """Collect a pandas-family result to a plain pandas DataFrame."""
     import pandas as pd
 
     if hasattr(result, "native"):
@@ -145,8 +137,6 @@ def _collect_pandas(result):
 
 @pytest.mark.skipif(not POLARS_AVAILABLE, reason="Polars not installed")
 class TestQ16Q18VariantMetadata:
-    """Rebuilt Q16-Q18 structural variants must preserve canonical query metadata."""
-
     @pytest.mark.parametrize(
         ("variant_id", "expected_row_count"),
         [(f"Q16v{v}", None) for v in range(1, 11)]
@@ -169,14 +159,6 @@ class TestQ16Q18VariantMetadata:
 
 @pytest.mark.skipif(not POLARS_AVAILABLE, reason="Polars not installed")
 class TestQ16Q18StructuralShapes:
-    """Fixed variants must execute genuinely distinct structural plans.
-
-    Each regression pins the defect it fixes: multi-branch concats must carry
-    more than one non-empty input, nation bands must be disjoint and jointly
-    non-empty, threshold filters must run before the large join, and Q16v9 must
-    not repeat the Q16v2 complaint-key expression plan.
-    """
-
     @pytest.fixture
     def q17_context(self):
         ctx = PolarsDataFrameAdapter().create_context()
@@ -268,7 +250,6 @@ class TestQ16Q18StructuralShapes:
         return ctx
 
     def test_q17v6_concats_two_nonempty_branches(self, q17_context) -> None:
-        """Q17v6 must concat two independently joined, non-empty size-band branches."""
         heights: list[list[int]] = []
         original_concat = q17_context.concat
         q17_context.concat = lambda dfs: (
@@ -282,13 +263,6 @@ class TestQ16Q18StructuralShapes:
         )
 
     def test_q17v10_filters_before_part_join(self, q17_context, monkeypatch) -> None:
-        """Q17v10 must apply the quantity threshold before joining part.
-
-        The first join must be the lineitem-to-average threshold leg (both
-        sides carry ``l_`` columns) rather than the part-to-lineitem join,
-        and a filter must run on the threshold leg before any frame carrying
-        ``p_`` columns is joined.
-        """
         from benchbox.platforms.dataframe.unified_frame import UnifiedLazyFrame
 
         joins: list[tuple[list[str], list[str]]] = []
@@ -324,11 +298,6 @@ class TestQ16Q18StructuralShapes:
         assert filtered_lineitem_legs["count"] >= 1, "Q17v10 must filter the threshold leg before the part join"
 
     def test_q18v4_threshold_gate_skips_prune_for_small_thresholds(self, q18_context, monkeypatch) -> None:
-        """Q18v4 must not prune single-line orders when the threshold allows them.
-
-        At threshold 30 the single-line order 1 (total 100) qualifies, so the
-        line-count prune must be skipped and v4 must match v1 exactly.
-        """
         import benchbox.core.tpch.dataframe_queries as tpch_queries
         import benchbox.core.tpchavoc.dataframe_queries.q18 as q18_module
 
@@ -340,12 +309,6 @@ class TestQ16Q18StructuralShapes:
         assert_frame_equal(result, base)
 
     def test_q18v4_threshold_gate_skips_prune_for_small_thresholds_pandas(self, q18_context, monkeypatch) -> None:
-        """Q18v4 pandas must not prune single-line orders when the threshold allows them.
-
-        Mirrors the expression-family gate test on the pandas backend: at
-        threshold 30 the single-line order 1 (total 100) qualifies, so the
-        line-count prune must be skipped and v4 must match v1 exactly.
-        """
         pytest.importorskip("pandas")
         from pandas.testing import assert_frame_equal as assert_pandas_equal
 
@@ -365,7 +328,6 @@ class TestQ16Q18StructuralShapes:
         assert_pandas_equal(result, base, check_dtype=False)
 
     def test_q18v6_bands_are_disjoint_nonempty_and_cover_large_orders(self, q18_context) -> None:
-        """Q18v6 must split large orders into disjoint, non-empty nation bands that union exactly."""
         seen: list[list[int]] = []
         original_concat = q18_context.concat
 
@@ -385,12 +347,6 @@ class TestQ16Q18StructuralShapes:
         )
 
     def test_q16v9_differs_from_q16v2_plan(self, q16_context, monkeypatch) -> None:
-        """Q16v9 must not repeat the Q16v2 complaint-key expression plan.
-
-        Q16v2 deduplicates only the complaint-key Series, making no
-        DataFrame-level dedup call, while Q16v9 deduplicates the four-column
-        group-supplier pair frame before counting.
-        """
         import pandas as pd
 
         import benchbox.core.tpchavoc.dataframe_queries.q16 as q16_module
@@ -413,12 +369,6 @@ class TestQ16Q18StructuralShapes:
         assert widths["Q16v9"] == [4], f"Q16v9 must dedup the 4-column pair frame, got {widths['Q16v9']}"
 
     def test_q16v3_semi_joins_distinct_part_keys(self, q16_context, monkeypatch) -> None:
-        """Q16v3 must prune partsupp through a distinct single-column key frame.
-
-        The canonical plan (and Q16v2) never deduplicate a DataFrame; Q16v3
-        must deduplicate exactly the one-column part-key frame feeding the
-        semi-join.
-        """
         import pandas as pd
 
         import benchbox.core.tpchavoc.dataframe_queries.q16 as q16_module
@@ -437,11 +387,6 @@ class TestQ16Q18StructuralShapes:
         assert widths == [1], f"Q16v3 must dedup only the 1-column key frame, got {widths}"
 
     def test_q16v7_filters_after_the_join(self, q16_context, monkeypatch) -> None:
-        """Q16v7 must apply the part predicates to the joined rows, not to part alone.
-
-        The first boolean-mask filter must see ``ps_`` columns (the partsupp
-        side), proving the part/partsupp merge ran before any filtering.
-        """
         import pandas as pd
 
         import benchbox.core.tpchavoc.dataframe_queries.q16 as q16_module
@@ -469,7 +414,6 @@ class TestQ16Q18StructuralShapes:
         )
 
     def test_q17v7_left_joins_average_table(self, q17_context, monkeypatch) -> None:
-        """Q17v7 must left-join the average table instead of inner-joining it."""
         from benchbox.platforms.dataframe.unified_frame import UnifiedLazyFrame
 
         hows: list[str] = []
@@ -484,7 +428,6 @@ class TestQ16Q18StructuralShapes:
         assert "left" in hows, f"Q17v7 must use a left join for the average table, got {hows}"
 
     def test_q17v8_commutes_division_before_sum(self, monkeypatch) -> None:
-        """Q17v8 pandas must divide per-row revenue before summing, not delegate to the baseline sum."""
         pytest.importorskip("pandas")
         import pandas as pd
 
@@ -519,7 +462,6 @@ class TestQ16Q18StructuralShapes:
         assert result["avg_yearly"][0] == pytest.approx(10.0 / 7.0)
 
     def test_q18v2_inner_joins_distinct_keys(self, q18_context, monkeypatch) -> None:
-        """Q18v2 must inner-join deduplicated large-order keys instead of semi-joining."""
         from benchbox.platforms.dataframe.unified_frame import UnifiedLazyFrame
 
         hows: list[str] = []
@@ -535,7 +477,6 @@ class TestQ16Q18StructuralShapes:
         assert "inner" in hows, f"Q18v2 must inner-join the distinct keys, got {hows}"
 
     def test_q18v7_left_joins_large_order_keys(self, q18_context, monkeypatch) -> None:
-        """Q18v7 must left-join the large-order keys with an is-null exclusion."""
         from benchbox.platforms.dataframe.unified_frame import UnifiedLazyFrame
 
         hows: list[str] = []
@@ -551,7 +492,6 @@ class TestQ16Q18StructuralShapes:
         assert "semi" not in hows, f"Q18v7 must not semi-join, got {hows}"
 
     def test_q18v8_aggregates_before_enrichment(self, q18_context, monkeypatch) -> None:
-        """Q18v8 must aggregate per-order sums before joining customer columns."""
         from benchbox.platforms.dataframe.unified_frame import UnifiedLazyFrame
 
         joins: list[tuple[list[str], list[str]]] = []
@@ -575,7 +515,6 @@ class TestQ16Q18StructuralShapes:
         )
 
     def test_q18v9_limits_before_lineitem_join(self, q18_context, monkeypatch) -> None:
-        """Q18v9 must rank and limit qualifying orders before fanning out lineitem."""
         from benchbox.platforms.dataframe.unified_frame import UnifiedLazyFrame
 
         events: list[str] = []
@@ -602,14 +541,6 @@ class TestQ16Q18StructuralShapes:
 
 @pytest.mark.skipif(not POLARS_AVAILABLE, reason="Polars not installed")
 class TestQ16Q18VariantEquivalence:
-    """Every rebuilt Q16-Q18 structural variant must match its canonical output.
-
-    Both backends are covered for all ten variants per family, and multi-row
-    results are compared in the canonical TPC-H ordering (Q16: supplier count
-    descending, then brand/type/size; Q18: total price descending, then order
-    date) rather than an arbitrary re-sort.
-    """
-
     @pytest.fixture
     def q17_expr_context(self):
         ctx = PolarsDataFrameAdapter().create_context()
@@ -628,8 +559,6 @@ class TestQ16Q18VariantEquivalence:
             "lineitem",
             pl.DataFrame(
                 {
-                    # Every part contributes survivors so no band or part is
-                    # vacuous: part1 [1,2]<2.2, part2 0.5<1.0, part4 0.5<1.0.
                     "l_partkey": [1, 1, 1, 2, 2, 3, 4, 4],
                     "l_quantity": [1.0, 2.0, 30.0, 0.5, 9.5, 5.0, 0.5, 9.5],
                     "l_extendedprice": [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0],
@@ -700,9 +629,6 @@ class TestQ16Q18VariantEquivalence:
         ctx.register_table(
             "supplier",
             pl.DataFrame(
-                # Supplier 10 (a supplier of surviving part 2) carries a
-                # complaint so the complaint anti-join is load-bearing: an
-                # implementation that drops it reports supplier_cnt 2, not 1.
                 {
                     "s_suppkey": [10, 11, 12],
                     "s_comment": ["Customer Complaints here", "has Customer Complaints issue", "ok"],
@@ -828,18 +754,12 @@ class TestQ16Q18VariantEquivalence:
 
     @pytest.mark.parametrize("variant_id", [f"Q18v{v}" for v in range(1, 11)])
     def test_q18_expression_variants_match_baseline(self, q18_expr_context, variant_id: str) -> None:
-        # Canonical TPC-H Q18 ordering: total price descending, then order date.
-        # Compared in emitted order (no re-sort) so a variant that breaks
-        # ordering fails instead of being masked.
         base = _collect_frame(get_query("Q18v1").expression_impl(q18_expr_context))
         result = _collect_frame(get_query(variant_id).expression_impl(q18_expr_context))
         assert_frame_equal(result, base)
 
     @pytest.mark.parametrize("variant_id", [f"Q16v{v}" for v in range(1, 11)])
     def test_q16_expression_variants_match_baseline(self, q16_expr_context, variant_id: str) -> None:
-        # Canonical TPC-H Q16 ordering: supplier count descending, then brand/type/size.
-        # Compared in emitted order (no re-sort) so a variant that breaks
-        # ordering fails instead of being masked.
         base = _collect_frame(get_query("Q16v1").expression_impl(q16_expr_context))
         result = _collect_frame(get_query(variant_id).expression_impl(q16_expr_context))
         assert_frame_equal(result, base)
@@ -856,9 +776,6 @@ class TestQ16Q18VariantEquivalence:
     def test_q18_pandas_variants_match_baseline(self, q18_pandas_context, variant_id: str) -> None:
         from pandas.testing import assert_frame_equal as assert_pandas_equal
 
-        # Canonical TPC-H Q18 ordering: total price descending, then order date.
-        # Compared in emitted order (no re-sort) so a variant that breaks
-        # ordering fails instead of being masked.
         base = _collect_pandas(get_query("Q18v1").pandas_impl(q18_pandas_context)).reset_index(drop=True)
         result = _collect_pandas(get_query(variant_id).pandas_impl(q18_pandas_context)).reset_index(drop=True)
         assert_pandas_equal(result, base, check_dtype=False)
@@ -867,16 +784,12 @@ class TestQ16Q18VariantEquivalence:
     def test_q16_pandas_variants_match_baseline(self, q16_pandas_context, variant_id: str) -> None:
         from pandas.testing import assert_frame_equal as assert_pandas_equal
 
-        # Canonical TPC-H Q16 ordering: supplier count descending, then brand/type/size.
-        # Compared in emitted order (no re-sort) so a variant that breaks
-        # ordering fails instead of being masked.
         base = _collect_pandas(get_query("Q16v1").pandas_impl(q16_pandas_context)).reset_index(drop=True)
         result = _collect_pandas(get_query(variant_id).pandas_impl(q16_pandas_context)).reset_index(drop=True)
         assert_pandas_equal(result, base, check_dtype=False)
 
 
 def _collect_scalar(result) -> pl.DataFrame:
-    """Collect any expression-family or native frame to a plain Polars DataFrame."""
     if hasattr(result, "native"):
         result = result.native
     if hasattr(result, "collect"):
@@ -886,23 +799,8 @@ def _collect_scalar(result) -> pl.DataFrame:
 
 @pytest.mark.skipif(not POLARS_AVAILABLE, reason="Polars not installed")
 class TestQ14v8Regression:
-    """Regression tests for Q14v8 expression implementation.
-
-    Q14v8 uses a dual-join approach (separate promo/non-promo part tables) and
-    must return a native expression-family frame - not a Pandas DataFrame and
-    not the result of ctx.scalar().
-    """
-
     @pytest.fixture
     def q14_context(self):
-        """Minimal synthetic Q14 context.
-
-        Lineitem rows within the 1995-09 window:
-          partkey=10, extprice=100, disc=0  → promo (PROMO ANODIZED STEEL)
-          partkey=20, extprice=200, disc=0  → non-promo (STANDARD BRASS)
-
-        Expected promo_revenue = 100 * 100 / 300 = 33.333...
-        """
         ctx = PolarsDataFrameAdapter().create_context()
         ctx.register_table(
             "lineitem",
@@ -913,10 +811,10 @@ class TestQ14v8Regression:
                     "l_extendedprice": [100.0, 200.0, 999.0, 999.0],
                     "l_discount": [0.0, 0.0, 0.0, 0.0],
                     "l_shipdate": [
-                        date(1995, 9, 2),  # within window → row included
-                        date(1995, 9, 15),  # within window → row included
-                        date(1994, 1, 1),  # before window → excluded
-                        date(1995, 10, 1),  # at exclusive end → excluded
+                        date(1995, 9, 2),
+                        date(1995, 9, 15),
+                        date(1994, 1, 1),
+                        date(1995, 10, 1),
                     ],
                 }
             ).lazy(),
@@ -938,31 +836,23 @@ class TestQ14v8Regression:
         return ctx
 
     def test_q14v8_expression_executes_without_error(self, q14_context) -> None:
-        """Q14v8 expression_impl must not raise - specifically no ctx.scalar() or Pandas attrs."""
         query = get_query("Q14v8")
         result = _collect_scalar(query.expression_impl(q14_context))
         assert "promo_revenue" in result.columns
 
     def test_q14v8_expression_result_shape(self, q14_context) -> None:
-        """Q14v8 must produce exactly one row with a promo_revenue column."""
         query = get_query("Q14v8")
         result = _collect_scalar(query.expression_impl(q14_context))
         assert result.shape == (1, 1)
         assert result.columns == ["promo_revenue"]
 
     def test_q14v8_promo_revenue_value(self, q14_context) -> None:
-        """Q14v8 promo_revenue must equal 100 * promo_sum / total_sum."""
-        # Only rows 1 and 2 fall in the 1995-09 window.
-        # Row 1: partkey=10 → PROMO → revenue=100
-        # Row 2: partkey=20 → not PROMO → revenue=200
-        # promo_revenue = 100 * 100 / 300 = 33.333...
         query = get_query("Q14v8")
         result = _collect_scalar(query.expression_impl(q14_context))
         value = result["promo_revenue"][0]
         assert abs(value - 100.0 * 100.0 / 300.0) < 1e-6
 
     def test_q14v8_parity_with_q14v1(self, q14_context) -> None:
-        """Q14v8 expression result must match Q14v1 on identical synthetic data."""
         v1 = _collect_scalar(get_query("Q14v1").expression_impl(q14_context))
         v8 = _collect_scalar(get_query("Q14v8").expression_impl(q14_context))
         assert_frame_equal(v8, v1, check_exact=False, atol=1e-6)

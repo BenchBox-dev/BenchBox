@@ -1,9 +1,6 @@
-"""Resource utilization reporting and chart generation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -19,8 +16,6 @@ from .profiler import ResourceTimeline, ResourceType, ResourceUtilization, calcu
 
 @dataclass
 class ResourceChart:
-    """ASCII chart representation of resource utilization over time."""
-
     resource_type: ResourceType
     width: int = 60
     height: int = 10
@@ -30,7 +25,6 @@ class ResourceChart:
     max_value: float = 0.0
 
     def render(self) -> str:
-        """Render chart as string."""
         lines = []
         if self.title:
             lines.append(self.title)
@@ -50,19 +44,6 @@ def _series_to_line_chart(
     use_color: bool = False,
     use_unicode: bool = True,
 ) -> str:
-    """Render a time series using textcharts LineChart.
-
-    Args:
-        series: List of values to chart.
-        width: Chart width in characters.
-        height: Chart height in rows.
-        unit: Unit label for Y-axis.
-        use_color: Whether to include ANSI color codes.
-        use_unicode: Whether to use unicode box-drawing characters.
-
-    Returns:
-        Rendered chart string (no title - caller handles title).
-    """
     points = [LinePoint(series="value", x=float(i), y=v) for i, v in enumerate(series)]
     options = ChartOptions(
         width=width,
@@ -84,20 +65,6 @@ def generate_ascii_chart(
     use_color: bool = False,
     use_unicode: bool = True,
 ) -> ResourceChart:
-    """Generate an ASCII chart from a time series.
-
-    Args:
-        series: List of values to chart.
-        width: Chart width in characters.
-        height: Chart height in rows.
-        title: Optional chart title.
-        unit: Unit label for values.
-        use_color: Whether to include ANSI color codes.
-        use_unicode: Whether to use unicode box-drawing characters.
-
-    Returns:
-        ResourceChart with rendered ASCII chart.
-    """
     if not series:
         return ResourceChart(
             resource_type=ResourceType.CPU, width=width, height=height, title=title, chart_lines=["(no data)"]
@@ -123,29 +90,18 @@ def generate_ascii_chart(
 
 @dataclass
 class ResourceReport:
-    """Comprehensive resource utilization report."""
-
     timeline: ResourceTimeline
     analysis: BottleneckAnalysis
     utilizations: dict[ResourceType, ResourceUtilization] = field(default_factory=dict)
     charts: dict[ResourceType, ResourceChart] = field(default_factory=dict)
 
     def generate_text_report(self, include_charts: bool = True) -> str:
-        """Generate full text report.
-
-        Args:
-            include_charts: Whether to include ASCII charts.
-
-        Returns:
-            Formatted text report.
-        """
         lines = []
         lines.append("=" * 70)
         lines.append("RESOURCE UTILIZATION REPORT")
         lines.append("=" * 70)
         lines.append("")
 
-        # Summary section
         lines.append("SUMMARY")
         lines.append("-" * 70)
         lines.append(f"Duration: {self.timeline.duration_seconds:.1f} seconds")
@@ -156,7 +112,6 @@ class ResourceReport:
         lines.append(self.analysis.summary)
         lines.append("")
 
-        # Utilization table
         lines.append("RESOURCE UTILIZATION")
         lines.append("-" * 70)
         lines.append(f"{'Resource':<20} {'Min':>10} {'Avg':>10} {'Max':>10} {'P95':>10} {'Unit':>8}")
@@ -175,7 +130,6 @@ class ResourceReport:
                 )
         lines.append("")
 
-        # Bottleneck indicators
         lines.append("BOTTLENECK ANALYSIS")
         lines.append("-" * 70)
 
@@ -192,7 +146,6 @@ class ResourceReport:
                     lines.append(f"  > {rec}")
                 lines.append("")
 
-        # Charts
         if include_charts:
             lines.append("RESOURCE CHARTS")
             lines.append("-" * 70)
@@ -206,7 +159,6 @@ class ResourceReport:
         return "\n".join(lines)
 
     def generate_json(self) -> dict[str, Any]:
-        """Generate JSON-serializable report."""
         return {
             "summary": {
                 "duration_seconds": self.timeline.duration_seconds,
@@ -219,17 +171,6 @@ class ResourceReport:
 
 
 class ResourceReporter:
-    """Generate resource utilization reports from timeline data.
-
-    Combines resource profiling data with bottleneck analysis to produce
-    comprehensive reports with charts and recommendations.
-
-    Example:
-        >>> reporter = ResourceReporter()
-        >>> report = reporter.generate_report(timeline)
-        >>> emit(report.generate_text_report())
-    """
-
     def __init__(
         self,
         chart_width: int = 60,
@@ -238,15 +179,6 @@ class ResourceReporter:
         use_color: bool = False,
         use_unicode: bool = True,
     ):
-        """Initialize resource reporter.
-
-        Args:
-            chart_width: Width of ASCII charts.
-            chart_height: Height of ASCII charts.
-            detector: Optional custom bottleneck detector.
-            use_color: Whether to include ANSI color codes in charts.
-            use_unicode: Whether to use unicode box-drawing characters.
-        """
         self.chart_width = chart_width
         self.chart_height = chart_height
         self.detector = detector or BottleneckDetector()
@@ -258,24 +190,12 @@ class ResourceReporter:
         timeline: ResourceTimeline,
         include_charts: bool = True,
     ) -> ResourceReport:
-        """Generate comprehensive resource report.
-
-        Args:
-            timeline: Resource timeline to report on.
-            include_charts: Whether to generate ASCII charts.
-
-        Returns:
-            ResourceReport with analysis and visualizations.
-        """
-        # Run bottleneck analysis
         analysis = self.detector.analyze(timeline)
 
-        # Calculate utilizations
         utilizations = {}
         for resource_type in ResourceType:
             utilizations[resource_type] = calculate_utilization(timeline, resource_type)
 
-        # Generate charts
         charts = {}
         if include_charts:
             chart_configs = [
@@ -310,14 +230,6 @@ class ResourceReporter:
         )
 
     def generate_summary_line(self, timeline: ResourceTimeline) -> str:
-        """Generate a single-line summary of resource usage.
-
-        Args:
-            timeline: Resource timeline to summarize.
-
-        Returns:
-            Single-line summary string.
-        """
         if timeline.sample_count == 0:
             return "No resource data collected"
 
@@ -339,14 +251,6 @@ class ResourceReporter:
 
 
 def format_bytes(num_bytes: int) -> str:
-    """Format byte count to human-readable string.
-
-    Args:
-        num_bytes: Number of bytes.
-
-    Returns:
-        Formatted string like "1.5 GB" or "256 MB".
-    """
     if num_bytes < 1024:
         return f"{num_bytes} B"
     elif num_bytes < 1024 * 1024:
@@ -358,14 +262,6 @@ def format_bytes(num_bytes: int) -> str:
 
 
 def format_duration(seconds: float) -> str:
-    """Format duration to human-readable string.
-
-    Args:
-        seconds: Duration in seconds.
-
-    Returns:
-        Formatted string like "2h 30m" or "45.2s".
-    """
     if seconds < 60:
         return f"{seconds:.1f}s"
     elif seconds < 3600:

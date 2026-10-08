@@ -1,15 +1,6 @@
-"""Import-branch tests for the Databricks DataFrame adapter miss clusters.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Covers the module-level availability probes that only run at import time:
-a working databricks.connect, a crashing one (defensive guard), and a
-missing pyspark. Each case reloads the module with a staged sys.modules
-entry and restores the real environment in a finally block (manual
-save/restore, since the restore reload must observe the real tree).
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -48,7 +39,7 @@ def _unstage(entries: dict[str, object], saved: dict[str, object]) -> None:
 
 
 def test_reload_with_working_databricks_connect():
-    """A working databricks.connect marks the extra available."""
+
     initial_available = mod.DATABRICKS_CONNECT_AVAILABLE
     initial_error = mod._databricks_connect_error
     pkg = types.ModuleType("databricks")
@@ -69,7 +60,6 @@ def test_reload_with_working_databricks_connect():
 
 
 def test_reload_with_crashing_databricks_connect():
-    """A databricks.connect that explodes on import stays unavailable with cause."""
 
     def _raise(_name):
         raise RuntimeError("shim boom")
@@ -90,7 +80,7 @@ def test_reload_with_crashing_databricks_connect():
 
 
 def test_reload_without_pyspark():
-    """Missing pyspark degrades the adapter module to Any aliases."""
+
     import typing
 
     staged = {"pyspark.sql": None}

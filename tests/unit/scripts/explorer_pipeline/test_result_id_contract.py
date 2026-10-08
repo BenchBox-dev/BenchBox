@@ -1,15 +1,3 @@
-"""Pins the public result-ID derivation contract.
-
-Decision (2026-08-03): a public result ID hashes the bytes that are actually
-published, not the raw source bundle. A public content address the public
-cannot fetch is not verifiable, and hashing raw bytes also publishes a
-confirmable fingerprint of private content.
-
-`pipeline.py` gets this right today, but only by statement order - the ID is
-derived after `_public_bundle_data`. Reordering those two lines would silently
-revert the contract and no existing test would fail, so pin it here.
-"""
-
 from __future__ import annotations
 
 import json
@@ -38,7 +26,6 @@ def _bundle() -> dict:
 
 
 def test_result_id_hashes_published_bytes_not_raw_bytes(tmp_path: Path) -> None:
-    """The ID must be reproducible from the published artifact alone."""
     transformer = BundleTransformer()
     raw_data = _bundle()
     path = tmp_path / "bundle.json"
@@ -53,17 +40,11 @@ def test_result_id_hashes_published_bytes_not_raw_bytes(tmp_path: Path) -> None:
     raw_id = transformer.result_id_from_bundle(path, data=raw_data, raw=raw_bytes)
 
     assert published_id != raw_id
-    # Anyone holding only the published bundle can recompute the ID.
     recomputed = transformer.result_id_from_bundle(path, data=public_data, raw=public_bytes)
     assert recomputed == published_id
 
 
 def test_pipeline_derives_the_id_after_anonymizing() -> None:
-    """Guard the statement order the contract depends on.
-
-    `result_id` must be computed from `public_raw`. If it is ever derived from
-    `bundle_raw` again the published ID stops matching the published bytes.
-    """
     source = (
         Path(__file__).resolve().parents[4] / "_project" / "scripts" / "explorer_pipeline" / "pipeline.py"
     ).read_text(encoding="utf-8")
@@ -78,14 +59,6 @@ def test_pipeline_derives_the_id_after_anonymizing() -> None:
 
 
 def test_published_artifact_bytes_recompute_the_result_id(data_dir: Path, tmp_path: Path) -> None:
-    """Recompute the ID from the emitted artifact, not from in-memory bytes.
-
-    The two tests above pass even if the publisher stops writing the bytes it
-    hashed - one feeds the same `public_bytes` to the transformer twice, the
-    other only inspects the derivation call. The advertised contract is that
-    anyone holding `bundles/{result_id}.json` can recompute its name, so run
-    the pipeline and check the artifact it actually wrote.
-    """
     output = tmp_path / "out"
     ExplorerPipeline().run(data_dir, output)
 

@@ -15,7 +15,7 @@ class FakeDSQGen:
 
     def generate(self, qid, *, seed=None, scale_factor=1.0, stream_id=None, dialect="ansi"):
         self.calls.append(("generate", qid, seed, scale_factor, stream_id, dialect))
-        # Return explicit SQL or raise for specific ids
+
         if qid == 1:
             return "-- SQL 1"
         if qid == 2:
@@ -45,13 +45,13 @@ class FakeDSQGen:
 
 def make_manager_with_fake():
     mgr = TPCDSQueryManager()
-    mgr.dsqgen = FakeDSQGen()  # swap implementation
+    mgr.dsqgen = FakeDSQGen()
     return mgr
 
 
 def test_get_query_validates_inputs_and_calls_generate():
     mgr = make_manager_with_fake()
-    # invalid types
+
     with pytest.raises(TypeError):
         mgr.get_query("1")
     with pytest.raises(ValueError):
@@ -67,28 +67,24 @@ def test_get_query_validates_inputs_and_calls_generate():
     with pytest.raises(TypeError):
         mgr.get_query(1, stream_id="x")
 
-    # valid call
     sql = mgr.get_query(1, seed=42, scale_factor=10.0, stream_id=2, dialect="ansi")
     assert "SQL 1" in sql
-    # Confirm call recorded
+
     assert ("generate", 1, 42, 10.0, 2, "ansi") in mgr.dsqgen.calls
 
 
 def test_get_all_queries_skips_failures_and_collects():
     mgr = make_manager_with_fake()
-    # Only 1 and 2 will succeed under our FakeDSQGen setup for ids 1..4
-    # The manager will attempt 1..99; we’ll just assert our two are present
+
     res = mgr.get_all_queries(scale_factor=1.0)
     assert 1 in res and 2 in res
     assert 3 not in res and 4 not in res
 
 
 def test_get_all_queries_raises_when_all_zero_queries_generated():
-    """get_all_queries must raise RuntimeError when dsqgen fails for every query."""
     mgr = TPCDSQueryManager()
     mgr.dsqgen = FakeDSQGen()
 
-    # Monkey-patch generate to always raise TPCDSError
     def always_fail(qid, **kwargs):
         raise TPCDSError("dsqgen binary not found")
 
@@ -98,18 +94,15 @@ def test_get_all_queries_raises_when_all_zero_queries_generated():
 
 
 def test_get_all_queries_logs_warnings_for_individual_failures(caplog):
-    """get_all_queries must emit warning logs for each dsqgen failure."""
     import logging
 
     mgr = make_manager_with_fake()
 
-    # Override generate so Q3 and Q4 fail (already the case in FakeDSQGen).
     with caplog.at_level(logging.WARNING, logger="benchbox.core.tpcds.queries"):
         result = mgr.get_all_queries(scale_factor=1.0)
 
-    # Queries 3 and 4 fail in FakeDSQGen - at least one warning must be logged.
     assert any("dsqgen failed for query" in r.message for r in caplog.records)
-    # Successful queries still returned.
+
     assert 1 in result and 2 in result
 
 

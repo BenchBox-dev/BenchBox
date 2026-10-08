@@ -1,17 +1,3 @@
-"""LazyFrameLike protocol conformance for the supported backends.
-
-The protocol only constrains the structural surface that UnifiedLazyFrame
-genuinely shares across backends today (see protocol.py module docstring
-for why it's intentionally minimal). These tests pin that contract so a
-silent upstream rename of ``.columns`` would surface here, not deep in
-benchmark execution.
-
-DataFusion is intentionally excluded: it routes column access via
-``schema().fields[].name`` rather than a ``.columns`` attribute, so
-``isinstance(df, LazyFrameLike)`` is False by design. The wrapper
-handles that path through runtime introspection.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -45,10 +31,7 @@ def test_pandas_dataframe_satisfies_protocol() -> None:
 def test_pyarrow_table_satisfies_protocol() -> None:
     pa = pytest.importorskip("pyarrow")
     table = pa.table({"a": [1, 2], "b": [3, 4]})
-    # PyArrow's column_names is the public attribute; .columns returns Arrays.
-    # Confirm .columns is a list of Arrays, not names - pyarrow Table technically
-    # has both. The protocol accepts either typing; the runtime check passes
-    # because pyarrow Table has a ``columns`` attribute.
+
     assert isinstance(table, LazyFrameLike)
 
 
@@ -58,7 +41,6 @@ def test_protocol_rejects_non_dataframe() -> None:
 
 
 def test_protocol_accepts_minimal_duck() -> None:
-    """A duck-typed object with .columns should satisfy the protocol."""
 
     class _Duck:
         @property

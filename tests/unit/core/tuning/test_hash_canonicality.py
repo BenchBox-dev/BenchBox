@@ -1,26 +1,6 @@
-"""Canonicality tests for the two tuning-configuration hash helpers.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-From the 2026-07-12 tuning review, finding R7: neither
-`BenchmarkTunings.get_configuration_hash` (benchbox/core/tuning/interface.py)
-nor `hash_tuning_template` (benchbox/core/tuning/profile_validation.py) had
-any test coverage for the properties that make a hash usable as a stable
-identity key:
-
-- Dict-ordering stability: semantically identical configs built by inserting
-  the same tables/keys in a different order must hash identically (both
-  helpers serialize with `json.dumps(..., sort_keys=True)`, so this should
-  hold, but nothing pinned it).
-- Distinctness: a materially different config must hash differently.
-- Truncation posture: the two helpers use *different* digest lengths. This
-  module documents and pins that difference so a future "let's just reuse
-  hash_tuning_template everywhere" refactor doesn't silently swap a
-  full-collision-resistant hash for a truncated one (or vice versa) without
-  the change being visible here.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -41,7 +21,7 @@ pytestmark = [
 
 
 def _tunings_with_tables(table_order: list[str]) -> BenchmarkTunings:
-    """Build a BenchmarkTunings with the same two tables, added in `table_order`."""
+
     tunings = BenchmarkTunings("tpch")
     columns = {
         "orders": [TuningColumn(name="o_orderkey", type="INTEGER", order=1)],
@@ -53,8 +33,6 @@ def _tunings_with_tables(table_order: list[str]) -> BenchmarkTunings:
 
 
 class TestGetConfigurationHashCanonicality:
-    """BenchmarkTunings.get_configuration_hash (SHA-256, full hexdigest)."""
-
     def test_stable_across_table_insertion_order(self) -> None:
         forward = _tunings_with_tables(["orders", "customer"])
         reverse = _tunings_with_tables(["customer", "orders"])
@@ -108,8 +86,6 @@ class TestGetConfigurationHashCanonicality:
 
 
 class TestHashTuningTemplateCanonicality:
-    """profile_validation.hash_tuning_template (SHA-256, truncated to 16 hex chars)."""
-
     def test_stable_across_dict_key_order(self) -> None:
         forward = {"a": 1, "b": 2, "nested": {"x": 1, "y": 2}}
         reverse = {"nested": {"y": 2, "x": 1}, "b": 2, "a": 1}

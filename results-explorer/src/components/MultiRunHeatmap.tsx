@@ -12,38 +12,18 @@ import {
 } from "@/lib/chartMath";
 import { formatTimingExclusion, timingValueForQuery } from "@/lib/displayEligibility";
 
-/**
- * Query x run heatmap of ratios against the chosen baseline.
- *
- * DIVERGING, not sequential, and that is the whole reason this is a separate
- * component from QueryHeatmap rather than a mode of it. QueryHeatmap encodes
- * magnitude from a floor (ratio-to-fastest, always >= 1), where a single-hue
- * ramp is correct. This encodes direction from a midpoint, where polarity --
- * faster or slower than baseline -- is the point. A sequential ramp would paint
- * 0.5x and 2.0x as different intensities of one hue and lose the sign, which is
- * the one thing this chart exists to show. See w0.log for the full decision.
- *
- * Reused from QueryHeatmap deliberately: role="grid" / role="gridcell"
- * semantics and the practice of carrying the value as TEXT in every cell, so
- * colour is never the only encoding.
- */
 export interface MultiRunHeatmapProps {
   results: DetailResult[];
   baselineIndex: number;
   runLabels: readonly string[];
-  /** How many query rows to render; the caption always names the total. */
   limit?: number;
-  /** Filter or ordering to apply to query rows. */
   limiter?: QueryDiffLimiter;
-  /** Order rows by where the runs disagree most, rather than by query id. */
   orderByDisagreement?: boolean;
-  /** Explicit query IDs to display (from shared limiter selection). */
   queryFilter?: readonly string[];
 }
 
 export interface HeatmapCell {
   ratio: number | null;
-  /** [-1, 1] position on the diverging scale, or null when unanswerable. */
   position: number | null;
   timingMs: number | null;
   missingKind: "none" | "run_missing" | "baseline_missing";
@@ -56,7 +36,6 @@ export interface HeatmapCell {
 export interface HeatmapRow {
   queryId: string;
   cells: HeatmapCell[];
-  /** Log-space spread across runs; null when fewer than two could answer. */
   disagreement: number | null;
 }
 
@@ -137,7 +116,6 @@ export function buildHeatmapRows(
     });
 }
 
-/** Rows ordered by disagreement, unanswerable-heavy rows last. */
 export function orderRowsByDisagreement(rows: readonly HeatmapRow[]): HeatmapRow[] {
   return [...rows].sort((a, b) => {
     if (a.disagreement === null && b.disagreement === null) return 0;
@@ -147,7 +125,6 @@ export function orderRowsByDisagreement(rows: readonly HeatmapRow[]): HeatmapRow
   });
 }
 
-/** Filter and rank heatmap rows according to the chosen limiter. */
 export function filterHeatmapRows(
   rows: readonly HeatmapRow[],
   limiter: QueryDiffLimiter = "all",
@@ -183,9 +160,6 @@ export function filterHeatmapRows(
 
 export function heatmapCellStyle(position: number | null): string {
   if (position === null) return "";
-  // Two hues around a neutral midpoint. Emitted as CSS custom properties for
-  // the same reason QueryHeatmap does it: dark mode and prefers-contrast
-  // override without touching this component.
   const hue = position < 0 ? 150 : 15;
   const lightness = 95 - Math.abs(position) * 35;
   const darkLightness = 22 + Math.abs(position) * 18;
@@ -302,7 +276,6 @@ export function MultiRunHeatmap({
                     aria-label={cell.ratio !== null ? `${cell.ratio.toFixed(2)} times baseline` : unavailableCellDescription(cell)}
                     data-testid={`cell-${row.queryId}-${i}`}
                   >
-                    {/* Value as text in every cell: colour is never the only encoding. */}
                     {cell.missingKind === "baseline_missing" && cell.timingMs !== null ? (
                       <span>
                         {cell.timingMs.toFixed(1)} ms{" "}

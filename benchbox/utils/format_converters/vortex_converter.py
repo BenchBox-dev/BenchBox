@@ -1,9 +1,3 @@
-"""Vortex format converter for BenchBox.
-
-Converts TPC benchmark data from TBL (pipe-delimited) format to Vortex columnar format.
-Vortex is a high-performance columnar file format optimized for analytics workloads.
-"""
-
 from __future__ import annotations
 
 import contextlib
@@ -24,29 +18,13 @@ from benchbox.utils.format_converters.base import (
 
 
 class VortexConverter(BaseFormatConverter):
-    """Converter for TBL -> Vortex format.
-
-    Converts pipe-delimited TPC benchmark data files to Vortex columnar format.
-    Uses the vortex Python package for efficient columnar storage with compression.
-    """
-
     def get_file_extension(self) -> str:
-        """Get file extension for Vortex format."""
         return ".vortex"
 
     def get_format_name(self) -> str:
-        """Get human-readable format name."""
         return "Vortex"
 
     def _get_vortex_module(self):
-        """Get the vortex module, raising helpful error if not installed.
-
-        Returns:
-            The vortex module
-
-        Raises:
-            ConversionError: If vortex is not installed
-        """
         try:
             import vortex
 
@@ -58,14 +36,6 @@ class VortexConverter(BaseFormatConverter):
             ) from e
 
     def _write_with_duckdb_vortex(self, combined_table: Any, output_path: Path) -> tuple[bool, str | None]:
-        """Write a Vortex file via DuckDB extension when available.
-
-        DuckDB-written Vortex files are currently more interoperable with DuckDB's
-        `read_vortex()` than files written via the Python Vortex bindings.
-
-        Returns:
-            Tuple of (success, error_message). error_message is None on success.
-        """
         try:
             import duckdb
         except ImportError:
@@ -91,15 +61,6 @@ class VortexConverter(BaseFormatConverter):
     def _get_vortex_writer_functions(
         self, vortex_module: Any
     ) -> tuple[Callable[[Any], Any], Callable[[Any, str], None]]:
-        """Resolve Vortex writer API across supported package variants.
-
-        Supports both:
-        - Modern API: ``vortex.array(...)`` + ``vortex.io.write(...)``
-        - Legacy API: ``vortex.encoding.array(...)`` + ``vortex.io.write(...)``
-
-        Raises:
-            ConversionError: If installed ``vortex`` module does not expose a compatible API.
-        """
 
         array_builder = getattr(vortex_module, "array", None)
         if not callable(array_builder):
@@ -123,10 +84,6 @@ class VortexConverter(BaseFormatConverter):
         )
 
     def _write_vortex_file(self, combined_table: Any, output_path: Path, opts: ConversionOptions) -> str:
-        """Write table data to Vortex format, trying DuckDB extension first.
-
-        Returns the writer name used ('duckdb-extension' or 'python-bindings').
-        """
         duckdb_ok, duckdb_error = self._write_with_duckdb_vortex(combined_table, output_path)
         if duckdb_ok:
             return "duckdb-extension"
@@ -152,32 +109,14 @@ class VortexConverter(BaseFormatConverter):
         options: ConversionOptions | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> ConversionResult:
-        """Convert TBL files to Vortex format.
-
-        Args:
-            source_files: List of source TBL file paths (may be sharded)
-            table_name: Name of the table being converted
-            schema: Table schema definition
-            options: Conversion options (uses defaults if None)
-            progress_callback: Optional callback for progress updates
-
-        Returns:
-            ConversionResult with details about the conversion
-
-        Raises:
-            ConversionError: If conversion fails
-            SchemaError: If schema is invalid
-        """
         opts = options or ConversionOptions()
 
-        # Validate inputs
         self.validate_source_files(source_files)
         self.validate_schema(schema)
 
         if progress_callback:
             progress_callback(f"Starting Vortex conversion for {table_name}", 0.0)
 
-        # Build PyArrow schema
         try:
             self._build_arrow_schema(schema)
         except SchemaError:
@@ -185,15 +124,12 @@ class VortexConverter(BaseFormatConverter):
         except Exception as e:
             raise SchemaError(f"Failed to build Arrow schema: {e}") from e
 
-        # Read TBL files using shared method
         combined_table = self.read_tbl_files(
             source_files, schema, progress_callback, progress_start=0.0, progress_end=0.8
         )
 
-        # Get column names for metadata
         column_names = [col["name"] for col in schema["columns"]]
 
-        # Determine output path
         source_dir = source_files[0].parent
         output_dir = opts.output_dir if opts.output_dir else source_dir
         output_path = output_dir / f"{table_name}.vortex"
@@ -211,12 +147,10 @@ class VortexConverter(BaseFormatConverter):
                     output_path.unlink()
             raise ConversionError(f"Failed to write Vortex file: {e}") from e
 
-        # Calculate metrics
         source_size = self.calculate_file_size(source_files)
         output_size = output_path.stat().st_size
         row_count = combined_table.num_rows
 
-        # Validate row count integrity
         if opts.validate_row_count:
             try:
                 self.validate_row_count(source_files, row_count, table_name)
@@ -226,7 +160,6 @@ class VortexConverter(BaseFormatConverter):
                         output_path.unlink()
                 raise
 
-        # Build metadata
         metadata = {
             "compression": opts.compression,
             "num_columns": len(column_names),

@@ -1,5 +1,3 @@
-"""Tests for query plan comparison summary functionality."""
-
 from __future__ import annotations
 
 import pytest
@@ -24,25 +22,16 @@ pytestmark = [
 
 
 def _qr(query_id: str, execution_time_ms: float = 100.0, query_plan: QueryPlanDAG | None = None) -> dict:
-    """Build a query_results dict matching the real BenchmarkResults.query_results shape."""
     return {"query_id": query_id, "execution_time_ms": execution_time_ms, "query_plan": query_plan}
 
 
 def _create_simple_plan(query_id: str, table_name: str = "orders") -> QueryPlanDAG:
-    """Create a simple query plan for testing."""
     root = LogicalOperator(
         operator_id="1",
         operator_type=LogicalOperatorType.SCAN,
         table_name=table_name,
         children=[],
     )
-    # No explicit plan_fingerprint: let it compute the real structural
-    # fingerprint so the plan is VERIFIED/trusted and versioned. The summary
-    # fast path now (qpc-03) requires trusted, same-version fingerprints, so a
-    # fixture with a fabricated non-matching fingerprint left UNVERIFIED would
-    # no longer be eligible for the unchanged fast path. The real fingerprint
-    # still distinguishes tables (orders vs customers) and matches identical
-    # structures, preserving each test's intent.
     return QueryPlanDAG(
         query_id=query_id,
         platform="test",
@@ -52,7 +41,6 @@ def _create_simple_plan(query_id: str, table_name: str = "orders") -> QueryPlanD
 
 
 def _create_join_plan(query_id: str) -> QueryPlanDAG:
-    """Create a join query plan for testing."""
     left_scan = LogicalOperator(
         operator_id="2",
         operator_type=LogicalOperatorType.SCAN,
@@ -70,7 +58,6 @@ def _create_join_plan(query_id: str) -> QueryPlanDAG:
         operator_type=LogicalOperatorType.JOIN,
         children=[left_scan, right_scan],
     )
-    # See _create_simple_plan: compute the real fingerprint (trusted, versioned).
     return QueryPlanDAG(
         query_id=query_id,
         platform="test",
@@ -80,10 +67,8 @@ def _create_join_plan(query_id: str) -> QueryPlanDAG:
 
 
 class TestPlanComparisonSummary:
-    """Tests for PlanComparisonSummary dataclass."""
-
     def test_to_dict_basic(self) -> None:
-        """Test basic to_dict conversion."""
+
         summary = PlanComparisonSummary(
             baseline_run_id="run1",
             current_run_id="run2",
@@ -105,7 +90,7 @@ class TestPlanComparisonSummary:
         assert result["performance_correlations"] == []
 
     def test_to_dict_with_differences(self) -> None:
-        """Test to_dict with structural differences."""
+
         summary = PlanComparisonSummary(
             baseline_run_id="run1",
             current_run_id="run2",
@@ -146,10 +131,8 @@ class TestPlanComparisonSummary:
 
 
 class TestGeneratePlanComparisonSummary:
-    """Tests for generate_plan_comparison_summary function."""
-
     def test_identical_plans(self) -> None:
-        """Test comparison when all plans are identical."""
+
         plan1 = _create_simple_plan("q1", "orders")
         plan2 = _create_simple_plan("q1", "orders")
 
@@ -171,7 +154,7 @@ class TestGeneratePlanComparisonSummary:
         assert summary.plans_changed == 0
 
     def test_different_plans(self) -> None:
-        """Test comparison when plans differ."""
+
         plan1 = _create_simple_plan("q1", "orders")
         plan2 = _create_simple_plan("q1", "customers")
 
@@ -194,11 +177,6 @@ class TestGeneratePlanComparisonSummary:
         assert summary.structural_differences[0].change_type != "unchanged"
 
     def test_fingerprint_version_bump_on_identical_plan_is_not_a_change(self) -> None:
-        """A pure fingerprint-encoding-version bump (v1 -> v2) on an otherwise
-        structurally identical plan must not be misreported as plan_changed
-        (qpc-03 anti-pattern, #1028 review F-comparison). fingerprints_comparable
-        is False here (version mismatch), so the fast path is skipped and the
-        full tree-walk fallback must correct the verdict to "unchanged"."""
         plan1 = _create_simple_plan("q1", "orders")
         plan2 = _create_simple_plan("q1", "orders")
         plan2.fingerprint_version = plan1.fingerprint_version + 1
@@ -220,11 +198,11 @@ class TestGeneratePlanComparisonSummary:
         assert summary.structural_differences[0].change_type == "unchanged"
 
     def test_multiple_queries(self) -> None:
-        """Test comparison with multiple queries."""
+
         plan1a = _create_simple_plan("q1", "orders")
-        plan1b = _create_simple_plan("q1", "orders")  # Same
+        plan1b = _create_simple_plan("q1", "orders")
         plan2a = _create_simple_plan("q2", "customers")
-        plan2b = _create_simple_plan("q2", "products")  # Different
+        plan2b = _create_simple_plan("q2", "products")
 
         baseline = make_benchmark_results(
             run_id="baseline",
@@ -242,7 +220,7 @@ class TestGeneratePlanComparisonSummary:
         assert summary.plans_changed == 1
 
     def test_regression_detection(self) -> None:
-        """Test regression detection with performance degradation."""
+
         plan1 = _create_simple_plan("q1", "orders")
         plan2 = _create_join_plan("q1")
 
@@ -252,7 +230,6 @@ class TestGeneratePlanComparisonSummary:
         )
         current = make_benchmark_results(
             run_id="current",
-            # 150% slower (from 100ms to 250ms)
             query_results=[_qr("q1", 250.0, plan2)],
         )
 
@@ -269,9 +246,9 @@ class TestGeneratePlanComparisonSummary:
         assert corr.is_regression is True
 
     def test_no_regression_if_plan_unchanged(self) -> None:
-        """Test that unchanged plans don't count as regressions even if slower."""
+
         plan1 = _create_simple_plan("q1", "orders")
-        plan2 = _create_simple_plan("q1", "orders")  # Same plan
+        plan2 = _create_simple_plan("q1", "orders")
 
         baseline = make_benchmark_results(
             run_id="baseline",
@@ -279,7 +256,6 @@ class TestGeneratePlanComparisonSummary:
         )
         current = make_benchmark_results(
             run_id="current",
-            # Slower but plan unchanged
             query_results=[_qr("q1", 200.0, plan2)],
         )
 
@@ -292,7 +268,7 @@ class TestGeneratePlanComparisonSummary:
         assert corr.is_regression is False
 
     def test_custom_regression_threshold(self) -> None:
-        """Test custom regression threshold."""
+
         plan1 = _create_simple_plan("q1", "orders")
         plan2 = _create_join_plan("q1")
 
@@ -302,25 +278,22 @@ class TestGeneratePlanComparisonSummary:
         )
         current = make_benchmark_results(
             run_id="current",
-            # 15% slower - below 20% threshold but above 10%
             query_results=[_qr("q1", 115.0, plan2)],
         )
 
-        # With 20% threshold - not a regression
         summary20 = generate_plan_comparison_summary(baseline, current, regression_threshold_pct=20.0)
         assert summary20.performance_correlations[0].is_regression is False
 
-        # With 10% threshold - is a regression
         summary10 = generate_plan_comparison_summary(baseline, current, regression_threshold_pct=10.0)
         assert summary10.performance_correlations[0].is_regression is True
 
     def test_missing_plans_skipped(self) -> None:
-        """Test that queries without plans are skipped."""
+
         plan = _create_simple_plan("q1", "orders")
 
         baseline = make_benchmark_results(
             run_id="baseline",
-            query_results=[_qr("q1", 100.0, plan), _qr("q2", 100.0, None)],  # q2: no plan
+            query_results=[_qr("q1", 100.0, plan), _qr("q2", 100.0, None)],
         )
         current = make_benchmark_results(
             run_id="current",
@@ -329,10 +302,10 @@ class TestGeneratePlanComparisonSummary:
 
         summary = generate_plan_comparison_summary(baseline, current)
 
-        assert summary.plans_compared == 1  # Only q1 with plans
+        assert summary.plans_compared == 1
 
     def test_non_common_queries_skipped(self) -> None:
-        """Test that queries not in both runs are skipped."""
+
         plan1 = _create_simple_plan("q1", "orders")
         plan2 = _create_simple_plan("q2", "customers")
 
@@ -347,10 +320,10 @@ class TestGeneratePlanComparisonSummary:
 
         summary = generate_plan_comparison_summary(baseline, current)
 
-        assert summary.plans_compared == 0  # No common queries
+        assert summary.plans_compared == 0
 
     def test_multiple_phases(self) -> None:
-        """Test that all queries in query_results are collected regardless of phase."""
+
         plan1 = _create_simple_plan("q1", "orders")
         plan2 = _create_simple_plan("q2", "customers")
 
@@ -369,10 +342,8 @@ class TestGeneratePlanComparisonSummary:
 
 
 class TestQueryPlanChange:
-    """Tests for QueryPlanChange dataclass."""
-
     def test_creation(self) -> None:
-        """Test QueryPlanChange creation."""
+
         change = QueryPlanChange(
             query_id="q1",
             change_type="structure_change",
@@ -387,10 +358,8 @@ class TestQueryPlanChange:
 
 
 class TestPerformanceCorrelation:
-    """Tests for PerformanceCorrelation dataclass."""
-
     def test_creation(self) -> None:
-        """Test PerformanceCorrelation creation."""
+
         corr = PerformanceCorrelation(
             query_id="q1",
             plan_changed=True,

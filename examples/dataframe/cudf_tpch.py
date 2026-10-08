@@ -1,43 +1,6 @@
 #!/usr/bin/env python3
-"""Run TPC-H benchmark using cuDF (GPU-accelerated DataFrames).
-
-cuDF is NVIDIA's GPU DataFrame library, part of the RAPIDS ecosystem.
-It provides massive performance improvements through GPU acceleration
-while maintaining a Pandas-compatible API.
-
-Prerequisites:
-    1. NVIDIA GPU with CUDA support (compute capability 6.0+)
-    2. NVIDIA CUDA Toolkit installed
-    3. cuDF library installed:
-       pip install cudf-cu12  # For CUDA 12.x
-       pip install cudf-cu11  # For CUDA 11.x
-
-GPU Memory Considerations:
-    - cuDF loads entire DataFrames into GPU memory
-    - TPC-H SF=0.01 requires ~50MB GPU memory
-    - TPC-H SF=1.0 requires ~1GB GPU memory
-    - TPC-H SF=10.0 requires ~10GB GPU memory
-    - Enable spill_to_host=True to avoid OOM errors
-
-Performance Notes:
-    - 10-100x faster than CPU Pandas for large datasets
-    - Best for compute-intensive operations (joins, aggregations)
-    - Data transfer GPU<->CPU is the main bottleneck
-    - Pre-load data to GPU, run many queries, then extract results
-
-Usage:
-    # Generate data first (if not already done)
-    benchbox run --platform duckdb --benchmark tpch --scale 0.01 --phases load
-
-    # Run cuDF benchmark
-    python examples/dataframe/cudf_tpch.py
-
-    # With different scale factor
-    python examples/dataframe/cudf_tpch.py --scale 1.0
-
-Copyright 2026 Joe Harris / BenchBox Project.
-Licensed under the MIT License.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project.
+# Licensed under the MIT License.
 
 from __future__ import annotations
 
@@ -46,13 +9,11 @@ import sys
 import time
 from pathlib import Path
 
-# Check GPU availability early
 try:
     import cudf
 
     print(f"cuDF version: {cudf.__version__}")
 
-    # Check CUDA availability
     try:
         import cupy
 
@@ -75,11 +36,6 @@ except ImportError:
 
 
 def check_gpu_memory() -> dict[str, float]:
-    """Check available GPU memory.
-
-    Returns:
-        Dictionary with free and total memory in GB.
-    """
     try:
         import cupy
 
@@ -100,20 +56,10 @@ def check_gpu_memory() -> dict[str, float]:
 
 
 def estimate_memory_requirement(scale_factor: float) -> float:
-    """Estimate GPU memory required for TPC-H at given scale.
-
-    Args:
-        scale_factor: TPC-H scale factor
-
-    Returns:
-        Estimated memory requirement in GB.
-    """
-    # Approximate: ~500MB per SF=0.1
     return scale_factor * 0.5
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run cuDF DataFrame TPC-H benchmark demonstration."""
     parser = argparse.ArgumentParser(description="Run TPC-H on cuDF (GPU)")
     parser.add_argument("--scale", type=float, default=0.01, help="Scale factor")
     parser.add_argument("--device", type=int, default=0, help="CUDA device ID")
@@ -127,7 +73,6 @@ def main(argv: list[str] | None = None) -> int:
     print("cuDF GPU DataFrame TPC-H Benchmark")
     print("=" * 70)
 
-    # Check GPU memory
     print("\nGPU Status:")
     mem_info = check_gpu_memory()
     if mem_info["total_gb"] > 0:
@@ -146,7 +91,6 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print("  Could not query GPU memory")
 
-    # Check data availability
     data_dir = Path(f"benchmark_runs/tpch/sf{scale_factor}/data")
     if not data_dir.exists():
         print(f"\nWarning: Data directory not found: {data_dir}")
@@ -155,11 +99,9 @@ def main(argv: list[str] | None = None) -> int:
         print("\nSkipping query execution.")
         return 0
 
-    # Import BenchBox components
     print("\nLoading BenchBox DataFrame components...")
     from benchbox.platforms.dataframe.cudf_df import CuDFDataFrameAdapter
 
-    # Create adapter with GPU configuration
     print(f"\nCreating cuDF adapter (device={device_id}, spill={args.spill})...")
     adapter = CuDFDataFrameAdapter(
         device_id=device_id,
@@ -167,10 +109,8 @@ def main(argv: list[str] | None = None) -> int:
         verbose=True,
     )
 
-    # Create context
     ctx = adapter.create_context()
 
-    # Load tables from Parquet
     parquet_dir = data_dir / "parquet"
     if not parquet_dir.exists():
         print(f"Parquet directory not found: {parquet_dir}")
@@ -195,7 +135,6 @@ def main(argv: list[str] | None = None) -> int:
         table_path = parquet_dir / f"{table}.parquet"
         if table_path.exists():
             try:
-                # Load directly to GPU memory
                 start = time.time()
                 df = cudf.read_parquet(str(table_path))
                 load_time = time.time() - start
@@ -213,21 +152,18 @@ def main(argv: list[str] | None = None) -> int:
     total_load_time = time.time() - load_start
     print(f"\nTotal load time: {total_load_time:.2f}s")
 
-    # Check GPU memory after loading
     mem_after = check_gpu_memory()
     if mem_after["total_gb"] > 0:
         used = mem_after["total_gb"] - mem_after["free_gb"]
         print(f"GPU memory used: {used:.2f} GB / {mem_after['total_gb']:.1f} GB")
 
-    # Execute sample queries
     print("\n" + "-" * 70)
     print("Executing Sample Queries")
     print("-" * 70)
 
-    # Import TPC-H query definitions
     from benchbox.core.tpch.dataframe_queries import get_query
 
-    sample_queries = ["Q1", "Q6"]  # Simple aggregation queries that work well on GPU
+    sample_queries = ["Q1", "Q6"]
 
     for qid in sample_queries:
         try:
@@ -240,28 +176,24 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  Description: {query.description}")
 
         try:
-            # Execute on GPU
             start = time.time()
-            result = query.execute(ctx, "pandas")  # cuDF uses pandas family API
+            result = query.execute(ctx, "pandas")
             exec_time = time.time() - start
 
             print(f"  Execution time: {exec_time:.4f}s (GPU)")
             print(f"  Result shape: {result.shape}")
             print("  First 3 rows:")
 
-            # Convert to pandas for display (small result set)
             display_df = result.head(3).to_pandas() if hasattr(result, "to_pandas") else result.head(3)
             print(display_df)
 
         except Exception as e:
             print(f"  Error: {e}")
 
-    # Cleanup
     print("\n" + "-" * 70)
     print("Cleanup")
     print("-" * 70)
 
-    # Clear GPU memory
     try:
         import cupy
 

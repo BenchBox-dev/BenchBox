@@ -45,7 +45,7 @@ Slow-marked reproducer jobs remain required PR CI through the `core` unit, becau
 
 ### A. Submitting & Arming a PR
 
-Developers submit and arm PRs through repository standard Makefile targets:
+Developers submit and arm PRs through repository standard Makefile targets. `make pr-open` opens the PR against `develop` with a currency check. When the PR is ready for merge, `make pr-ready` runs the exact readiness transaction and arms it:
 
 ```bash
 make pr-open

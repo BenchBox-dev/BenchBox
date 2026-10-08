@@ -1,5 +1,3 @@
-"""Coverage tests for cli/commands/compare.py helper logic."""
-
 from __future__ import annotations
 
 import importlib
@@ -184,29 +182,24 @@ def test_compare_mode_selection_and_errors(monkeypatch: pytest.MonkeyPatch, tmp_
     f1.write_text("{}", encoding="utf-8")
     f2.write_text("{}", encoding="utf-8")
 
-    # list-platforms path
     called = {}
     monkeypatch.setattr(mod, "_list_available_platforms", lambda: called.setdefault("list", True))
     assert CliRunner().invoke(mod.compare, ["--list-platforms"]).exit_code == 0
     assert called["list"] is True
 
-    # conflicting modes
     conflict = CliRunner().invoke(mod.compare, [str(f1), str(f2), "-p", "duckdb"])
     assert conflict.exit_code == 1
 
-    # platforms => run mode
     monkeypatch.setattr(mod, "_run_platform_comparison", lambda **_k: called.setdefault("run", True))
     run = CliRunner().invoke(mod.compare, ["-p", "duckdb", "-p", "sqlite"])
     assert run.exit_code == 0
     assert called["run"] is True
 
-    # files => file mode
     monkeypatch.setattr(mod, "_run_file_comparison", lambda **_k: called.setdefault("file", True))
     file_mode = CliRunner().invoke(mod.compare, [str(f1), str(f2)])
     assert file_mode.exit_code == 0
     assert called["file"] is True
 
-    # no args + non-interactive => error
     noargs = CliRunner().invoke(mod.compare, ["--non-interactive"])
     assert noargs.exit_code == 1
 
@@ -245,9 +238,6 @@ def test_run_platform_comparison_formats(monkeypatch: pytest.MonkeyPatch, tmp_pa
             self.__dict__.update(kwargs)
 
     class _Result:
-        # success_rate / query_results model a platform that ran cleanly, so
-        # this format-coverage test exercises the output paths rather than the
-        # failure exit that _exit_on_comparison_failure now enforces.
         platform = "duckdb"
         success_rate = 100.0
         query_results: list = []
@@ -301,7 +291,6 @@ def test_run_platform_comparison_formats(monkeypatch: pytest.MonkeyPatch, tmp_pa
         ),
     )
 
-    # text (stdout)
     mod._run_platform_comparison(
         platforms=["duckdb", "sqlite"],
         platform_type="auto",
@@ -317,7 +306,6 @@ def test_run_platform_comparison_formats(monkeypatch: pytest.MonkeyPatch, tmp_pa
         theme="light",
     )
 
-    # json to file path
     out = tmp_path / "cmp"
     mod._run_platform_comparison(
         platforms=["duckdb", "sqlite"],
@@ -336,7 +324,6 @@ def test_run_platform_comparison_formats(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert (out / "comparison.json").exists()
     assert (out / "charts").exists()
 
-    # html to explicit file
     html = tmp_path / "r.html"
     mod._run_platform_comparison(
         platforms=["duckdb", "sqlite"],
@@ -402,15 +389,14 @@ def test_run_file_comparison_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
 
     monkeypatch.setattr(mod, "ResultExporter", lambda: _Exporter())
 
-    # text path
     t = tmp_path / "x.txt"
     mod._run_file_comparison((str(b), str(c)), None, "text", str(t), True, include_plans=False)
     assert t.exists()
-    # json path
+
     j = tmp_path / "x.json"
     mod._run_file_comparison((str(b), str(c)), None, "json", str(j), True, include_plans=True)
     assert j.exists()
-    # html path + regression check success
+
     h = tmp_path / "x.html"
     mod._run_file_comparison((str(b), str(c)), "10%", "html", str(h), True, include_plans=False)
     assert h.exists()

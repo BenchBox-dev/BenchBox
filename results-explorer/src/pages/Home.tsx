@@ -25,29 +25,17 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
 const SUPPORTED_BENCHMARK_COUNT = new Set(Object.values(BENCHMARK_LABELS)).size;
 const RECENT_RESULT_COUNT = 5;
 
-/**
- * The corpus overview: what BenchBox holds and what arrived most recently.
- *
- * The ranking table and its filters live on the compare route, which is where
- * a reader who wants to rank runs against each other is already headed. This
- * page answers the prior question - what is in the corpus at all - without
- * putting a filter between the reader and the answer.
- */
 export function Home(_: RoutableProps) {
   const recentResultsScrollerRef = useRef<HTMLDivElement>(null);
   useDocumentTitle("Overview · BenchBox");
   const [results, setResults] = useState<ResultRow[] | null>(null);
   const [metaLeaderboard, setMetaLeaderboard] = useState<MetaLeaderboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Bumped by the ErrorMessage retry button so a reader can re-issue this
-  // read after a DuckDB worker fault without reloading the page.
   const [resultsRetryToken, setResultsRetryToken] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    // The overview reports the whole corpus, so it reads it unfiltered rather
-    // than through the facet state the ranking table maintains.
     listResults()
       .then((rows) => {
         if (!cancelled) setResults(rows);
@@ -67,8 +55,6 @@ export function Home(_: RoutableProps) {
         if (!cancelled) setMetaLeaderboard(data);
       })
       .catch(() => {
-        // The rankings only supply a count here. Losing them leaves the rest of
-        // the overview usable, so this failure is not surfaced as a page error.
         if (!cancelled) setMetaLeaderboard(null);
       });
     return () => {
@@ -239,7 +225,6 @@ const FLYWHEEL_STEPS = [
   { label: "Submit a bundle", href: "/docs/contributing-results.html" },
 ];
 
-/** Entry point to user dashboards: always linked, previews names when any exist. */
 function DashboardStrip() {
   const [names, setNames] = useState<string[]>([]);
   useEffect(() => {

@@ -1,17 +1,3 @@
-"""CSV-direct empty-string/null semantics across DataFrame adapters + SQL parity.
-
-#904 made empty-string-vs-null CSV loading uniform but pinned only DataFusion and
-PySpark. This parametrizes the same contract across every installed DataFrame adapter
-(pandas/polars/dask, cudf availability-skipped) and adds a CSV-path
-SQL<->DataFrame parity case (``prefer_parquet=False``), so the uniformity the #904
-metric claims is actually pinned. Test-only: a surfaced gap is a defect TODO, not an
-in-test fix.
-
-Contract (a bare empty field, header CSV):
-  * ``null_marker is None``  -> the empty field loads as ``""`` (empty string);
-  * ``null_marker == ""``    -> the empty field loads as NULL.
-"""
-
 from __future__ import annotations
 
 import contextlib
@@ -37,8 +23,6 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-# Sentinel returned in place of a NULL so "" and NULL stay distinguishable after
-# normalizing each adapter's NULL spelling (None / NaN / pandas NA).
 _NULL = "<NULL>"
 
 
@@ -71,11 +55,6 @@ def _write_events_csv(tmp_path: Path) -> Path:
 
 
 def _normalize_null(value: Any) -> Any:
-    """Collapse every adapter's NULL spelling (None / float NaN / pandas NA) to _NULL.
-
-    Keeps the empty string ``""`` distinct from NULL -- that distinction is the whole
-    contract under test; only the *spelling* of NULL is adapter-specific noise.
-    """
     if value is None:
         return _NULL
     if isinstance(value, float) and math.isnan(value):
@@ -95,13 +74,13 @@ def _to_pandas(adapter: Any, native_table: Any) -> Any:
     if callable(to_pandas):
         return to_pandas(native_table)
     table = native_table
-    if hasattr(table, "collect"):  # polars LazyFrame
+    if hasattr(table, "collect"):
         table = table.collect()
-    if hasattr(table, "to_pandas"):  # polars eager frame
+    if hasattr(table, "to_pandas"):
         return table.to_pandas()
-    if hasattr(table, "compute"):  # dask DataFrame
+    if hasattr(table, "compute"):
         return table.compute()
-    return table  # already a pandas DataFrame
+    return table
 
 
 def _load_phrase_values(adapter: Any, csv_path: Path, null_marker: str | None) -> list[Any]:
@@ -117,7 +96,6 @@ def _load_phrase_values(adapter: Any, csv_path: Path, null_marker: str | None) -
 
 
 def _sql_phrase_values(csv_path: Path, null_marker: str | None) -> list[Any]:
-    """The SQL surface: DuckDB ``read_csv`` with the production null-marker semantics."""
     import duckdb
 
     nullstr = DUCKDB_NO_NULL_CONVERSION_SENTINEL if null_marker is None else null_marker
@@ -145,13 +123,6 @@ def _make_pyspark() -> Any:
 
 
 def _make_dask() -> Any:
-    # DaskDataFrameAdapter defaults use_distributed=True, which starts a
-    # LocalCluster (worker processes) in the constructor -- BEFORE
-    # _adapter_context's scoped dask.config.set(scheduler="synchronous") can make
-    # the later .compute() calls local. This entire test file is marked `fast`, so
-    # a coverage-only check must not need worker processes (can fail or be slow on
-    # resource-constrained dev/CI hosts). use_distributed=False keeps Dask on the
-    # single-process synchronous/threaded path this fast lane requires.
     return DaskDataFrameAdapter(use_distributed=False)
 
 
@@ -165,29 +136,15 @@ _ADAPTER_CASES = [
 ]
 
 
-# Cheap, in-process adapters used for the cross-surface SQL<->DataFrame parity case,
-# whose value is the surface boundary, not per-engine loading (already covered per
-# adapter). Excludes pyspark/dask so the case adds no Spark-session/cluster cost.
 _CROSS_SURFACE_IDS = {"datafusion", "pandas", "polars"}
 
 
 @contextlib.contextmanager
 def _adapter_context(case: _AdapterCase) -> Any:
     if not case.available:
-        # Essential-driver skip -- do NOT "un-skip" this by isolating the adapter
-        # constructor. These tests load the CSV *through* the adapter (see
-        # ``load_benchmark_into_context`` in ``_load_phrase_values``) and assert on
-        # the driver's own empty-string-vs-NULL result, so the driver *is* the
-        # system under test and an absent driver cannot be isolated away. This looks
-        # like PR #1290's ``from_config()`` forwarding sweep -- which does swap in
-        # ``PlatformAdapter.__init__`` to drop the driver gate -- but that test only
-        # inspects constructor-set attributes; here the assertion is on loaded data,
-        # so the same isolation would assert nothing (or crash on the driver import).
         pytest.skip(f"{case.id} DataFrame adapter is not installed")
     with contextlib.ExitStack() as stack:
         if case.id == "dask":
-            # Synchronous scheduler: avoid spawning a process pool in the fast lane.
-            # Scoped (not global) so it cannot leak into other tests on this worker.
             import dask
 
             stack.enter_context(dask.config.set(scheduler="synchronous"))
@@ -231,13 +188,6 @@ def test_csv_direct_preserves_null_when_null_marker_is_empty_string(csv_adapter:
 def test_cross_surface_csv_path_sql_dataframe_parity(
     cheap_csv_adapter: Any, tmp_path: Path, null_marker: str | None
 ) -> None:
-    """Force the CSV load path (``prefer_parquet=False``) and pin SQL<->DataFrame parity.
-
-    The same fixture is loaded by the DuckDB SQL surface (``read_csv`` with the
-    production null-marker semantics) and by an in-process DataFrame adapter; the
-    empty-string vs NULL outcome must agree across the surface boundary, not only per
-    adapter.
-    """
     csv_path = _write_events_csv(tmp_path)
     sql_values = _sql_phrase_values(csv_path, null_marker)
     dataframe_values = _load_phrase_values(cheap_csv_adapter, csv_path, null_marker)

@@ -1,5 +1,3 @@
-"""Tests for shared benchmark query retrieval helpers."""
-
 from __future__ import annotations
 
 import pytest
@@ -26,14 +24,12 @@ def _build_benchmark(name: str, tmp_path):
     if name == "ssb":
         return SSBBenchmark(scale_factor=0.01, output_dir=tmp_path, compress_data=False, compression_type="none")
     if name == "joinorder":
-        # Canonical JoinOrder only supports scale_factor=1.0.
         return JoinOrderBenchmark(scale_factor=1.0, output_dir=tmp_path)
     raise AssertionError(f"Unknown benchmark: {name}")
 
 
 @pytest.mark.parametrize("benchmark_name", ["amplab", "clickbench", "h2odb", "ssb", "joinorder"])
 def test_get_queries_without_dialect_returns_base_queries(benchmark_name: str, tmp_path) -> None:
-    """Benchmarks should return their query-manager SQL unchanged without a dialect."""
     benchmark = _build_benchmark(benchmark_name, tmp_path)
 
     assert benchmark.get_queries() == benchmark.query_manager.get_all_queries()
@@ -45,7 +41,6 @@ def test_get_queries_with_dialect_translates_each_query(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Benchmarks should translate each query exactly once when a dialect is requested."""
     benchmark = _build_benchmark(benchmark_name, tmp_path)
     base_queries = benchmark.query_manager.get_all_queries()
     calls: list[tuple[str, str]] = []

@@ -1,11 +1,3 @@
-"""Fail-closed result checks for ClickHouse server certification artifacts.
-
-The UAT runner records loaded rows per table in its result JSON and the data
-generator records expected rows per file in ``_datagen_manifest``. Certification
-compares those independently-produced records exactly; an aggregate total can
-hide a table-level omission or duplication.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -17,21 +9,27 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+CLI_DESCRIPTION = (
+    "Fail-closed result checks for ClickHouse server certification artifacts.\n"
+    "\n"
+    "The UAT runner records loaded rows per table in its result JSON and the data\n"
+    "generator records expected rows per file in ``_datagen_manifest``. Certification\n"
+    "compares those independently-produced records exactly; an aggregate total can\n"
+    "hide a table-level omission or duplication.\n"
+)
+
 
 class CertificationArtifactError(ValueError):
-    """Raised when a certification artifact cannot support an exact-row gate."""
+    pass
 
 
 @dataclass(frozen=True)
 class ExactRowValidation:
-    """Per-table manifest/result comparison."""
-
     expected: dict[str, int]
     actual: dict[str, int]
 
     @property
     def mismatches(self) -> dict[str, tuple[int | None, int | None]]:
-        """Return every missing, extra, or differently-sized table."""
         mismatches: dict[str, tuple[int | None, int | None]] = {}
         for table in sorted(set(self.expected) | set(self.actual)):
             expected = self.expected.get(table)
@@ -42,11 +40,9 @@ class ExactRowValidation:
 
     @property
     def passed(self) -> bool:
-        """Whether every manifest table has exactly its recorded result count."""
         return not self.mismatches
 
     def require_pass(self) -> None:
-        """Raise with table-level diagnostics when exact row accounting fails."""
         if self.passed:
             return
         details = ", ".join(
@@ -72,7 +68,6 @@ def _non_negative_count(value: Any, *, path: Path, table: str, field: str) -> in
 
 
 def manifest_table_rows(path: Path, table_format: str) -> dict[str, int]:
-    """Aggregate the format that the ClickHouse run was instructed to load."""
     payload = _read_json(path)
     tables = payload.get("tables")
     if not isinstance(tables, dict) or not tables:
@@ -98,7 +93,6 @@ def manifest_table_rows(path: Path, table_format: str) -> dict[str, int]:
 
 
 def result_table_rows(path: Path) -> dict[str, int]:
-    """Read per-table loaded rows from a benchmark result artifact."""
     payload = _read_json(path)
     tables = payload.get("tables")
     if not isinstance(tables, dict) or not tables:
@@ -113,7 +107,6 @@ def result_table_rows(path: Path) -> dict[str, int]:
 
 
 def validate_exact_manifest_rows(manifest_path: Path, result_path: Path, table_format: str) -> ExactRowValidation:
-    """Compare the loaded ClickHouse workload with its exact manifest format."""
     manifest = _read_json(Path(manifest_path))
     benchmark = manifest.get("benchmark")
     scale_factor = manifest.get("scale_factor")
@@ -148,7 +141,7 @@ def validate_exact_manifest_rows(manifest_path: Path, result_path: Path, table_f
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--result", type=Path, required=True)
     parser.add_argument(
@@ -164,5 +157,5 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-if __name__ == "__main__":  # pragma: no cover - exercised by the operator gate
+if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())

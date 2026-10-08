@@ -1,9 +1,6 @@
-"""Unit tests for DataFrame tuning configuration interface.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -26,17 +23,15 @@ pytestmark = [
 
 
 class TestParallelismConfiguration:
-    """Tests for ParallelismConfiguration dataclass."""
-
     def test_default_values(self):
-        """Test that default values are None."""
+
         config = ParallelismConfiguration()
         assert config.thread_count is None
         assert config.worker_count is None
         assert config.threads_per_worker is None
 
     def test_custom_values(self):
-        """Test custom values are set correctly."""
+
         config = ParallelismConfiguration(
             thread_count=8,
             worker_count=4,
@@ -47,29 +42,26 @@ class TestParallelismConfiguration:
         assert config.threads_per_worker == 2
 
     def test_validation_thread_count_negative(self):
-        """Test that negative thread_count raises ValueError."""
+
         with pytest.raises(ValueError, match="thread_count must be >= 1"):
             ParallelismConfiguration(thread_count=0)
 
     def test_validation_worker_count_negative(self):
-        """Test that negative worker_count raises ValueError."""
+
         with pytest.raises(ValueError, match="worker_count must be >= 1"):
             ParallelismConfiguration(worker_count=-1)
 
     def test_is_default(self):
-        """Test is_default() method."""
         assert ParallelismConfiguration().is_default() is True
         assert ParallelismConfiguration(thread_count=4).is_default() is False
 
     def test_to_dict(self):
-        """Test to_dict() serialization."""
         config = ParallelismConfiguration(thread_count=8)
         result = config.to_dict()
         assert result["thread_count"] == 8
         assert result["worker_count"] is None
 
     def test_from_dict(self):
-        """Test from_dict() deserialization."""
         data = {"thread_count": 8, "worker_count": 4}
         config = ParallelismConfiguration.from_dict(data)
         assert config.thread_count == 8
@@ -77,10 +69,8 @@ class TestParallelismConfiguration:
 
 
 class TestMemoryConfiguration:
-    """Tests for MemoryConfiguration dataclass."""
-
     def test_default_values(self):
-        """Test default values."""
+
         config = MemoryConfiguration()
         assert config.memory_limit is None
         assert config.chunk_size is None
@@ -88,28 +78,26 @@ class TestMemoryConfiguration:
         assert config.rechunk_after_filter is True
 
     def test_memory_limit_valid_formats(self):
-        """Test valid memory limit formats."""
+
         valid_formats = ["4GB", "2GiB", "512MB", "1.5GB", "100MiB"]
         for fmt in valid_formats:
             config = MemoryConfiguration(memory_limit=fmt)
             assert config.memory_limit == fmt
 
     def test_memory_limit_invalid_format(self):
-        """Test invalid memory limit format raises ValueError."""
+
         with pytest.raises(ValueError, match="Invalid memory_limit format"):
             MemoryConfiguration(memory_limit="4 gigabytes")
 
     def test_chunk_size_validation(self):
-        """Test chunk_size validation."""
+
         with pytest.raises(ValueError, match="chunk_size must be >= 1"):
             MemoryConfiguration(chunk_size=0)
 
 
 class TestExecutionConfiguration:
-    """Tests for ExecutionConfiguration dataclass."""
-
     def test_default_values(self):
-        """Test default values."""
+
         config = ExecutionConfiguration()
         assert config.streaming_mode is False
         assert config.engine_affinity is None
@@ -117,16 +105,14 @@ class TestExecutionConfiguration:
         assert config.collect_timeout is None
 
     def test_collect_timeout_validation(self):
-        """Test collect_timeout validation."""
+
         with pytest.raises(ValueError, match="collect_timeout must be >= 1"):
             ExecutionConfiguration(collect_timeout=0)
 
 
 class TestDataTypeConfiguration:
-    """Tests for DataTypeConfiguration dataclass."""
-
     def test_default_values(self):
-        """Test default values."""
+
         config = DataTypeConfiguration()
         assert config.dtype_backend == "numpy_nullable"
         assert config.enable_string_cache is False
@@ -134,21 +120,19 @@ class TestDataTypeConfiguration:
         assert config.categorical_threshold == 0.5
 
     def test_dtype_backend_validation(self):
-        """Test dtype_backend validation."""
+
         with pytest.raises(ValueError, match="Invalid dtype_backend"):
             DataTypeConfiguration(dtype_backend="invalid")
 
     def test_categorical_threshold_validation(self):
-        """Test categorical_threshold validation."""
+
         with pytest.raises(ValueError, match="categorical_threshold must be between"):
             DataTypeConfiguration(categorical_threshold=1.5)
 
 
 class TestIOConfiguration:
-    """Tests for IOConfiguration dataclass."""
-
     def test_default_values(self):
-        """Test default values."""
+
         config = IOConfiguration()
         assert config.memory_pool == "default"
         assert config.memory_map is False
@@ -156,16 +140,14 @@ class TestIOConfiguration:
         assert config.row_group_size is None
 
     def test_memory_pool_validation(self):
-        """Test memory_pool validation."""
+
         with pytest.raises(ValueError, match="Invalid memory_pool"):
             IOConfiguration(memory_pool="invalid_pool")
 
 
 class TestGPUConfiguration:
-    """Tests for GPUConfiguration dataclass."""
-
     def test_default_values(self):
-        """Test default values."""
+
         config = GPUConfiguration()
         assert config.enabled is False
         assert config.device_id == 0
@@ -173,32 +155,28 @@ class TestGPUConfiguration:
         assert config.pool_type == "default"
 
     def test_device_id_validation(self):
-        """Test device_id validation."""
+
         with pytest.raises(ValueError, match="device_id must be >= 0"):
             GPUConfiguration(device_id=-1)
 
     def test_pool_type_validation(self):
-        """Test pool_type validation."""
+
         with pytest.raises(ValueError, match="Invalid pool_type"):
             GPUConfiguration(pool_type="invalid")
 
 
 class TestDataFrameTuningConfiguration:
-    """Tests for DataFrameTuningConfiguration dataclass."""
-
     def test_default_configuration(self):
-        """Test default configuration is all defaults."""
+
         config = DataFrameTuningConfiguration()
         assert config.is_default() is True
 
     def test_get_enabled_settings_empty(self):
-        """Test get_enabled_settings() returns empty set for defaults."""
         config = DataFrameTuningConfiguration()
         enabled = config.get_enabled_settings()
         assert len(enabled) == 0
 
     def test_get_enabled_settings_with_custom(self):
-        """Test get_enabled_settings() returns correct settings."""
         config = DataFrameTuningConfiguration(
             parallelism=ParallelismConfiguration(thread_count=8),
             execution=ExecutionConfiguration(streaming_mode=True),
@@ -209,7 +187,6 @@ class TestDataFrameTuningConfiguration:
         assert len(enabled) == 2
 
     def test_to_dict(self):
-        """Test to_dict() serialization."""
         config = DataFrameTuningConfiguration(
             parallelism=ParallelismConfiguration(thread_count=8),
         )
@@ -218,15 +195,12 @@ class TestDataFrameTuningConfiguration:
         assert result["parallelism"]["thread_count"] == 8
 
     def test_to_dict_omits_defaults(self):
-        """Test to_dict() omits default sections."""
         config = DataFrameTuningConfiguration()
         result = config.to_dict()
-        # All sections should be omitted since they're all defaults
         assert "parallelism" not in result
         assert "memory" not in result
 
     def test_from_dict(self):
-        """Test from_dict() deserialization."""
         data = {
             "parallelism": {"thread_count": 8},
             "execution": {"streaming_mode": True},
@@ -236,7 +210,6 @@ class TestDataFrameTuningConfiguration:
         assert config.execution.streaming_mode is True
 
     def test_to_full_dict(self):
-        """Test to_full_dict() includes all sections."""
         config = DataFrameTuningConfiguration()
         result = config.to_full_dict()
         assert "parallelism" in result
@@ -247,7 +220,6 @@ class TestDataFrameTuningConfiguration:
         assert "gpu" in result
 
     def test_get_summary(self):
-        """Test get_summary() method."""
         config = DataFrameTuningConfiguration(
             execution=ExecutionConfiguration(streaming_mode=True),
             gpu=GPUConfiguration(enabled=True),
@@ -259,10 +231,8 @@ class TestDataFrameTuningConfiguration:
 
 
 class TestTuningMetadata:
-    """Tests for TuningMetadata dataclass."""
-
     def test_default_values(self):
-        """Test default values."""
+
         metadata = TuningMetadata()
         assert metadata.version == "1.0"
         assert metadata.format == "dataframe_tuning"
@@ -270,7 +240,6 @@ class TestTuningMetadata:
         assert metadata.description is None
 
     def test_to_dict(self):
-        """Test to_dict() method."""
         metadata = TuningMetadata(
             platform="polars",
             description="Test configuration",
@@ -281,7 +250,6 @@ class TestTuningMetadata:
         assert result["version"] == "1.0"
 
     def test_from_dict(self):
-        """Test from_dict() method."""
         data = {"platform": "dask", "description": "Test"}
         metadata = TuningMetadata.from_dict(data)
         assert metadata.platform == "dask"

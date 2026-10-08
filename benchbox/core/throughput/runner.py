@@ -21,17 +21,6 @@ from .result import (
 
 
 class _RunnerConfig(Protocol):
-    """Structural type for config objects accepted by StreamRunner.
-
-    Both ``TPCHThroughputTestConfig`` and ``TPCDSThroughputTestConfig``
-    satisfy this protocol; no explicit ``implements`` declaration is needed.
-
-    ``cancel_on_timeout`` is deliberately NOT declared here: it is an
-    optional, opt-in attribute read defensively via ``getattr(...,
-    False)`` in ``execute()`` so configs (and test doubles) that predate it
-    keep working unchanged.
-    """
-
     num_streams: int
     max_workers: int | None
     base_seed: int
@@ -41,8 +30,6 @@ class _RunnerConfig(Protocol):
 
 
 class StreamRunner:
-    """Concurrent-stream executor shared by TPC-H and TPC-DS throughput tests."""
-
     @staticmethod
     def execute(
         stream_fn: Callable[[int, int, Any], ThroughputStreamResult],
@@ -68,7 +55,7 @@ class StreamRunner:
             if cooperative_cancel
             else {}
         )
-        config._stream_cancel_events = cancel_events  # type: ignore[attr-defined]
+        config._stream_cancel_events = cancel_events
 
         future_to_stream_id: dict[concurrent.futures.Future[ThroughputStreamResult], int] = {}
         pending: set[concurrent.futures.Future[ThroughputStreamResult]] = set()
@@ -175,7 +162,7 @@ class StreamRunner:
             raise
         finally:
             executor.shutdown(wait=False, cancel_futures=True)
-            result._outstanding_futures = outstanding_futures  # type: ignore[attr-defined]
+            result._outstanding_futures = outstanding_futures
             result.cleanup_state = "outstanding" if result.outstanding_stream_ids else "complete"
             if result.outstanding_stream_ids:
                 record_outstanding_result(result)
@@ -187,28 +174,8 @@ class StreamRunner:
         start_time: float,
         queries_per_stream: int | None = None,
     ) -> bool:
-        """Compute TTT, Throughput@Size, and query throughput; mutates *result*.
-
-        Sets ``result.end_time``, ``result.total_time``,
-        ``result.throughput_at_size``, and ``result.query_throughput``.
-        A metric is emitted only when every requested stream completed and
-        reported success. Returning ``False`` lets both TPC drivers use this
-        product-level validity gate without duplicating it.
-
-        Args:
-            result: Mutable ``ThroughputResult`` populated by ``execute()``.
-            config: Test configuration (needs ``num_streams`` and
-                ``scale_factor``).
-            start_time: ``mono_time()`` captured before the test body began;
-                used as a fallback total-time when no streams recorded timing.
-            queries_per_stream: Per-stream query count used as Q in
-                Throughput@Size; defaults to the executed statement count.
-        """
         result.end_time = datetime.now().isoformat()
 
-        # Per TPC-H/DS specification: Total Test Time (TTT) is measured from
-        # when the first stream begins execution until the last stream completes.
-        # This is the actual concurrent execution time, excluding setup overhead.
         if result.stream_results:
             first_stream = min(result.stream_results, key=lambda sr: sr.start_time)
             last_stream = max(result.stream_results, key=lambda sr: sr.end_time)
@@ -216,14 +183,11 @@ class StreamRunner:
             result.start_time = first_stream.start_wall_time or result.start_time
             result.end_time = last_stream.end_wall_time or result.end_time
         else:
-            # Fallback if no streams executed (shouldn't happen in normal operation)
             total_time = elapsed_seconds(start_time)
 
         result.total_time = total_time
 
         if not throughput_result_succeeded(result, config.num_streams) or total_time <= 0:
-            # Keep the internal numeric sentinel compatible with spec-local
-            # log formatting. The adapter/export seam omits this invalid metric.
             result.throughput_at_size = 0.0
             result.query_throughput = 0.0
             result.success = False

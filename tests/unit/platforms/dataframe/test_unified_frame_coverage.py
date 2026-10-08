@@ -1,5 +1,3 @@
-"""Coverage-focused tests for unified_frame helper utilities."""
-
 from __future__ import annotations
 
 import sys
@@ -294,10 +292,10 @@ class _DefaultNativeExpr:
     def __rtruediv__(self, other):
         return _DefaultNativeExpr(("rdiv", getattr(other, "value", other), self.value))
 
-    def __eq__(self, other):  # noqa: PLR0124
+    def __eq__(self, other):
         return _DefaultNativeExpr(("eq", self.value, getattr(other, "value", other)))
 
-    def __ne__(self, other):  # noqa: PLR0124
+    def __ne__(self, other):
         return _DefaultNativeExpr(("ne", self.value, getattr(other, "value", other)))
 
     def __lt__(self, other):
@@ -436,14 +434,13 @@ def test_unified_expr_default_branches_cover_core_methods():
     expr = uf.UnifiedExpr(_DefaultNativeExpr("base"))
     other = uf.UnifiedExpr(_DefaultNativeExpr("other"))
 
-    # Arithmetic/comparison/boolean
     assert isinstance(expr + other, uf.UnifiedExpr)
     assert isinstance(expr - 1, uf.UnifiedExpr)
     assert isinstance(expr * 2, uf.UnifiedExpr)
     assert isinstance(expr / 3, uf.UnifiedExpr)
     assert isinstance(3 / expr, uf.UnifiedExpr)
-    assert isinstance(expr == other, uf.UnifiedExpr)  # noqa: PLR0124
-    assert isinstance(expr != other, uf.UnifiedExpr)  # noqa: PLR0124
+    assert isinstance(expr == other, uf.UnifiedExpr)
+    assert isinstance(expr != other, uf.UnifiedExpr)
     assert isinstance(expr < other, uf.UnifiedExpr)
     assert isinstance(expr <= other, uf.UnifiedExpr)
     assert isinstance(expr > other, uf.UnifiedExpr)
@@ -452,7 +449,6 @@ def test_unified_expr_default_branches_cover_core_methods():
     assert isinstance(expr | other, uf.UnifiedExpr)
     assert isinstance(~expr, uf.UnifiedExpr)
 
-    # Aggregates/aliases/casts
     assert isinstance(expr.sum(), uf.UnifiedExpr)
     assert isinstance(expr.mean(), uf.UnifiedExpr)
     assert isinstance(expr.avg(), uf.UnifiedExpr)
@@ -481,7 +477,6 @@ def test_unified_expr_default_branches_cover_core_methods():
     assert isinstance(expr.cum_max(), uf.UnifiedExpr)
     assert isinstance(expr.cum_min(), uf.UnifiedExpr)
 
-    # Namespace accessors
     assert isinstance(expr.str.starts_with("a"), uf.UnifiedExpr)
     assert isinstance(expr.str.ends_with("z"), uf.UnifiedExpr)
     assert isinstance(expr.str.contains("x"), uf.UnifiedExpr)

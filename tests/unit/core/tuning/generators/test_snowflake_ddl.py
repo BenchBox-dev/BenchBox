@@ -1,16 +1,6 @@
-"""Unit tests for Snowflake DDL Generator.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the SnowflakeDDLGenerator class for:
-- CLUSTER BY clause generation
-- Clustering column limit enforcement
-- Search optimization generation
-- Mapping of sorting to clustering
-- Partitioning and distribution warnings
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -33,15 +23,13 @@ pytestmark = [
 
 
 class TestSnowflakeDDLGeneratorBasics:
-    """Tests for SnowflakeDDLGenerator basic properties."""
-
     def test_platform_name(self) -> None:
-        """Test platform name property."""
+
         generator = SnowflakeDDLGenerator()
         assert generator.platform_name == "snowflake"
 
     def test_supported_tuning_types(self) -> None:
-        """Test supported tuning types."""
+
         generator = SnowflakeDDLGenerator()
         assert generator.supports_tuning_type("clustering")
         assert generator.supports_tuning_type("sorting")
@@ -50,10 +38,8 @@ class TestSnowflakeDDLGeneratorBasics:
 
 
 class TestClusterByGeneration:
-    """Tests for CLUSTER BY clause generation."""
-
     def test_basic_cluster_by(self) -> None:
-        """Test basic CLUSTER BY generation."""
+
         generator = SnowflakeDDLGenerator()
         table_tuning = TableTuning(
             table_name="lineitem",
@@ -66,7 +52,7 @@ class TestClusterByGeneration:
         assert clauses.cluster_by == "CLUSTER BY (l_shipdate, l_orderkey)"
 
     def test_cluster_by_respects_order(self) -> None:
-        """Test that clustering columns are sorted by order property."""
+
         generator = SnowflakeDDLGenerator()
         table_tuning = TableTuning(
             table_name="orders",
@@ -80,7 +66,7 @@ class TestClusterByGeneration:
         assert clauses.cluster_by == "CLUSTER BY (o_orderdate, o_custkey, o_orderkey)"
 
     def test_cluster_by_limit_enforced(self) -> None:
-        """Test that clustering is limited to max columns with warning."""
+
         generator = SnowflakeDDLGenerator(max_cluster_columns=3)
         table_tuning = TableTuning(
             table_name="wide_table",
@@ -98,11 +84,10 @@ class TestClusterByGeneration:
             mock_logger.warning.assert_called_once()
             assert "max 3 clustering columns" in mock_logger.warning.call_args[0][0]
 
-        # Should only use first 3 columns
         assert clauses.cluster_by == "CLUSTER BY (col1, col2, col3)"
 
     def test_sorting_maps_to_clustering(self) -> None:
-        """Test that sorting columns are treated as clustering columns."""
+
         generator = SnowflakeDDLGenerator()
         table_tuning = TableTuning(
             table_name="events",
@@ -115,7 +100,7 @@ class TestClusterByGeneration:
         assert clauses.cluster_by == "CLUSTER BY (event_date, event_id)"
 
     def test_combined_clustering_and_sorting(self) -> None:
-        """Test that clustering and sorting columns are combined."""
+
         generator = SnowflakeDDLGenerator()
         table_tuning = TableTuning(
             table_name="events",
@@ -126,7 +111,7 @@ class TestClusterByGeneration:
         assert clauses.cluster_by == "CLUSTER BY (event_date, user_id)"
 
     def test_no_clustering_produces_empty_clauses(self) -> None:
-        """Test that no clustering/sorting produces empty clauses."""
+
         generator = SnowflakeDDLGenerator()
         table_tuning = TableTuning(table_name="simple_table")
         clauses = generator.generate_tuning_clauses(table_tuning)
@@ -135,10 +120,8 @@ class TestClusterByGeneration:
 
 
 class TestDistributionWarning:
-    """Tests for distribution warning (not supported in Snowflake)."""
-
     def test_distribution_logs_warning(self) -> None:
-        """Test that distribution columns trigger a warning."""
+
         generator = SnowflakeDDLGenerator()
         table_tuning = TableTuning(
             table_name="orders",
@@ -152,10 +135,8 @@ class TestDistributionWarning:
 
 
 class TestPartitioningInfo:
-    """Tests for partitioning info logging."""
-
     def test_partitioning_logs_info(self) -> None:
-        """Test that partitioning columns trigger an info message."""
+
         generator = SnowflakeDDLGenerator()
         table_tuning = TableTuning(
             table_name="orders",
@@ -169,10 +150,8 @@ class TestPartitioningInfo:
 
 
 class TestCreateTableDDL:
-    """Tests for CREATE TABLE DDL generation."""
-
     def test_basic_create_table(self) -> None:
-        """Test basic CREATE TABLE without clustering."""
+
         generator = SnowflakeDDLGenerator()
         columns = [
             ColumnDefinition("id", "NUMBER(38,0)", ColumnNullability.NOT_NULL),
@@ -185,7 +164,7 @@ class TestCreateTableDDL:
         assert ddl.endswith(";")
 
     def test_create_table_with_clustering(self) -> None:
-        """Test CREATE TABLE with CLUSTER BY."""
+
         generator = SnowflakeDDLGenerator()
         columns = [
             ColumnDefinition("l_orderkey", "NUMBER(38,0)", ColumnNullability.NOT_NULL),
@@ -206,14 +185,14 @@ class TestCreateTableDDL:
         assert ddl.endswith(";")
 
     def test_create_table_if_not_exists(self) -> None:
-        """Test CREATE TABLE IF NOT EXISTS."""
+
         generator = SnowflakeDDLGenerator()
         columns = [ColumnDefinition("id", "NUMBER(38,0)")]
         ddl = generator.generate_create_table_ddl("test", columns, if_not_exists=True)
         assert "CREATE TABLE IF NOT EXISTS test" in ddl
 
     def test_create_table_with_schema(self) -> None:
-        """Test CREATE TABLE with schema prefix."""
+
         generator = SnowflakeDDLGenerator()
         columns = [ColumnDefinition("id", "NUMBER(38,0)")]
         ddl = generator.generate_create_table_ddl("orders", columns, schema="tpch")
@@ -221,10 +200,8 @@ class TestCreateTableDDL:
 
 
 class TestSearchOptimization:
-    """Tests for search optimization generation."""
-
     def test_generate_search_optimization_equality(self) -> None:
-        """Test search optimization for equality predicates."""
+
         generator = SnowflakeDDLGenerator()
         sql = generator.generate_search_optimization(
             table_name="lineitem",
@@ -235,7 +212,7 @@ class TestSearchOptimization:
         assert sql.endswith(";")
 
     def test_generate_search_optimization_substring(self) -> None:
-        """Test search optimization for LIKE queries."""
+
         generator = SnowflakeDDLGenerator()
         sql = generator.generate_search_optimization(
             table_name="customer",
@@ -245,7 +222,7 @@ class TestSearchOptimization:
         assert "ON SUBSTRING(c_name)" in sql
 
     def test_generate_search_optimization_with_schema(self) -> None:
-        """Test search optimization with schema-qualified table."""
+
         generator = SnowflakeDDLGenerator()
         sql = generator.generate_search_optimization(
             table_name="lineitem",
@@ -256,10 +233,8 @@ class TestSearchOptimization:
 
 
 class TestClusteringInfoQuery:
-    """Tests for clustering info query generation."""
-
     def test_generate_clustering_info_query(self) -> None:
-        """Test clustering info query generation."""
+
         generator = SnowflakeDDLGenerator()
         sql = generator.generate_clustering_info_query(
             table_name="lineitem",
@@ -271,26 +246,22 @@ class TestClusteringInfoQuery:
 
 
 class TestResumeRecluster:
-    """Tests for RESUME RECLUSTER generation."""
-
     def test_generate_resume_recluster(self) -> None:
-        """Test RESUME RECLUSTER statement generation."""
+
         generator = SnowflakeDDLGenerator()
         sql = generator.generate_resume_recluster("lineitem")
         assert sql == "ALTER TABLE lineitem RESUME RECLUSTER;"
 
     def test_generate_resume_recluster_with_schema(self) -> None:
-        """Test RESUME RECLUSTER with schema-qualified table."""
+
         generator = SnowflakeDDLGenerator()
         sql = generator.generate_resume_recluster("lineitem", schema="tpch")
         assert sql == "ALTER TABLE tpch.lineitem RESUME RECLUSTER;"
 
 
 class TestSearchOptimizationEnum:
-    """Tests for SearchOptimizationType enum."""
-
     def test_enum_values(self) -> None:
-        """Test enum values."""
+
         assert SearchOptimizationType.EQUALITY.value == "EQUALITY"
         assert SearchOptimizationType.SUBSTRING.value == "SUBSTRING"
         assert SearchOptimizationType.GEO.value == "GEO"

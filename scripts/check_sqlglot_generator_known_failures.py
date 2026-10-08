@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Validate the age-bounded SQLGlot generator known-failure policy."""
 
 from __future__ import annotations
 
@@ -11,6 +10,8 @@ from collections.abc import Mapping
 from datetime import date, datetime, timezone
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from urllib.parse import urlsplit
+
+CLI_DESCRIPTION = "Validate the age-bounded SQLGlot generator known-failure policy."
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_POLICY = REPO_ROOT / "_project/sqlglot-upstream/generator-policy.json"
@@ -339,7 +340,6 @@ def _validate_known_failure(
 
 
 def validate_policy(value: object, today: date, repo_root: Path = REPO_ROOT) -> list[str]:
-    """Return every policy validation error in deterministic order."""
     errors: list[str] = []
     if not isinstance(value, dict):
         return ["policy: top-level value must be an object"]
@@ -388,7 +388,7 @@ def _load_policy(path: Path) -> object:
 
 
 def main(argv: list[str] | None = None, *, repo_root: Path = REPO_ROOT) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--policy", type=Path, default=DEFAULT_POLICY, help="Policy JSON to validate")
     parser.add_argument("--today", help="UTC date override in YYYY-MM-DD form for deterministic checks")
     args = parser.parse_args(argv)

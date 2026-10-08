@@ -1,9 +1,6 @@
-"""Unit tests for shared Iceberg table-layout helpers.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -75,7 +72,7 @@ def test_resolve_returns_none_without_metadata_files(tmp_path):
 
 
 def test_relocate_rewrites_graph_for_new_location(tmp_path):
-    """Relocating a table yields a loadable graph rooted at the new URI."""
+
     pytest.importorskip("pyiceberg", reason="relocation needs pyiceberg")
     pa = pytest.importorskip("pyarrow", reason="relocation needs pyarrow")
     from pyiceberg.catalog.sql import SqlCatalog
@@ -98,7 +95,6 @@ def test_relocate_rewrites_graph_for_new_location(tmp_path):
     dest = tmp_path / "dest" / "t"
     relocated = relocate_iceberg_table(src / "t", dest.as_uri(), staging)
 
-    # Simulate the cloud upload: data files unchanged, graph files rewritten.
     dest.mkdir(parents=True)
     for rel in relocated.data_files:
         target = dest / rel
@@ -115,7 +111,6 @@ def test_relocate_rewrites_graph_for_new_location(tmp_path):
     assert result.num_rows == 2
     assert sorted(result.column("id").to_pylist()) == [1, 2]
 
-    # No rewritten graph file still references the source location.
     for staged in relocated.graph_files.values():
         if staged.suffix == ".json":
             assert (src / "t").as_uri() not in staged.read_text(encoding="utf-8")

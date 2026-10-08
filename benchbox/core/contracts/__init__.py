@@ -1,5 +1,3 @@
-"""Runtime contracts for core benchmark/lifecycle integration."""
-
 from benchbox.core.contracts.benchmark_runtime import (
     EXTENDED_RUNTIME_METHODS,
     REQUIRED_RUNTIME_METHODS,

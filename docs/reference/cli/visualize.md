@@ -29,27 +29,30 @@ benchbox visualize [SOURCES...] [OPTIONS]
 ## Usage Examples
 
 ```bash
-# Auto-discover recent results and render all applicable charts
 benchbox visualize
 
-# Visualize a specific result file
 benchbox visualize benchmark_runs/results/duckdb_tpch_sf01.json
 
-# Compare two results side-by-side
 benchbox visualize result_a.json result_b.json --chart-type speedup
 
-# Render a specific chart type
 benchbox visualize result.json --chart-type performance_bar
 
-# Use a named template
 benchbox visualize result.json --template overview
 
-# Pipe-friendly output (no color, no unicode)
 benchbox visualize result.json --no-color --no-unicode > charts.txt
 
-# Dark theme for dark terminal backgrounds
 benchbox visualize result.json --theme dark
 ```
+
+In order, the commands:
+
+- Auto-discover recent results and render all applicable charts.
+- Visualize a specific result file.
+- Compare two results side by side.
+- Render a specific chart type.
+- Use a named template.
+- Produce pipe-friendly output (no color, no unicode).
+- Use a dark theme for dark terminal backgrounds.
 
 ## Notes
 

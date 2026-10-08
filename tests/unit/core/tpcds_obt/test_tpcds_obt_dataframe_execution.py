@@ -1,13 +1,4 @@
-"""Execution tests for TPC-DS-OBT DataFrame query implementations.
-
-Runs every registered OBT query (Q1-Q17) on both backends against a small
-deterministic ``tpcds_sales_returns_obt`` fixture and asserts the backends
-agree. The fixture holds ten rows so no query's LIMIT truncates tied groups:
-with no truncation both backends return the same groups and an
-order-insensitive comparison is exact.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -28,9 +19,9 @@ try:
 
     DEPS_AVAILABLE = True
 except ImportError:
-    pd = None  # type: ignore[assignment]
-    pl = None  # type: ignore[assignment]
-    PolarsDataFrameAdapter = None  # type: ignore[assignment]
+    pd = None
+    pl = None
+    PolarsDataFrameAdapter = None
     DEPS_AVAILABLE = False
 
 pytestmark.append(pytest.mark.skipif(not DEPS_AVAILABLE, reason="pandas/polars not installed"))
@@ -41,8 +32,6 @@ TABLE_NAME = "tpcds_sales_returns_obt"
 
 
 class _PandasContext:
-    """Minimal pandas-family context used by OBT pandas implementations."""
-
     def __init__(self, tables: dict[str, Any]) -> None:
         self._tables = tables
 
@@ -51,7 +40,7 @@ class _PandasContext:
 
 
 def _make_obt() -> Any:
-    """Ten deterministic OBT rows covering every filter/group/derive column."""
+
     return pd.DataFrame(
         {
             "channel": [
@@ -82,7 +71,7 @@ def _make_obt() -> Any:
 
 
 def _to_pandas_result(result: Any) -> Any:
-    """Normalize an expression/pandas query result to pandas."""
+
     if hasattr(result, "collect"):
         result = result.collect()
     if isinstance(result, pl.DataFrame):
@@ -93,14 +82,12 @@ def _to_pandas_result(result: Any) -> Any:
 
 
 def _normalized(frame: Any) -> Any:
-    """Order-insensitive frame comparison helper: rows fully sorted."""
+
     frame = frame.copy()
     return frame.sort_values(by=list(frame.columns)).reset_index(drop=True)
 
 
 class TestObtQueryExecution:
-    """Every OBT query executes on both backends with identical results."""
-
     @pytest.fixture(scope="class")
     def obt(self):
         return _make_obt()

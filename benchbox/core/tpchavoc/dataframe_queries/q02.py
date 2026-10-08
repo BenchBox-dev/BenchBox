@@ -1,12 +1,6 @@
-"""TPC-Havoc DataFrame variants for Q2.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Implements 10 structurally diverse variants of TPC-H Q2 (Minimum Cost Supplier).
-Q2 involves a correlated subquery pattern: find the min-cost supplier per part in a region.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -20,10 +14,6 @@ from benchbox.core.tpch.dataframe_queries import (
 )
 from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_SUBQUERY_SORT, build_yaml_variants
 
-# ---------------------------------------------------------------------------
-# v1: baseline
-# ---------------------------------------------------------------------------
-
 
 def q2_v1_expression_impl(ctx: DataFrameContext) -> Any:
     return _q2_expr_base(ctx)
@@ -31,11 +21,6 @@ def q2_v1_expression_impl(ctx: DataFrameContext) -> Any:
 
 def q2_v1_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q2_pandas_base(ctx)
-
-
-# ---------------------------------------------------------------------------
-# v2: pre-filter - filter part and region tables before joining
-# ---------------------------------------------------------------------------
 
 
 def q2_v2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -52,11 +37,9 @@ def q2_v2_expression_impl(ctx: DataFrameContext) -> Any:
     type_suffix = params["type_suffix"]
     region_name = params["region_name"]
 
-    # Pre-filter part and region before any join
     filtered_part = part.filter((col("p_size") == lit(size)) & col("p_type").str.ends_with(type_suffix))
     filtered_region = region.filter(col("r_name") == lit(region_name))
 
-    # Build min cost subquery
     min_cost_per_part = (
         partsupp.join(supplier, left_on="ps_suppkey", right_on="s_suppkey")
         .join(nation, left_on="s_nationkey", right_on="n_nationkey")
@@ -99,17 +82,14 @@ def q2_v2_pandas_impl(ctx: DataFrameContext) -> Any:
     type_suffix = params["type_suffix"]
     region_name = params["region_name"]
 
-    # Pre-filter
     filtered_part = part[(part["p_size"] == size) & (part["p_type"].str.endswith(type_suffix))]
     filtered_region = region[region["r_name"] == region_name]
 
-    # Min cost subquery
     region_nations = filtered_region.merge(nation, left_on="r_regionkey", right_on="n_regionkey")
     region_suppliers = region_nations.merge(supplier, left_on="n_nationkey", right_on="s_nationkey")
     region_partsupp = region_suppliers.merge(partsupp, left_on="s_suppkey", right_on="ps_suppkey")
     min_cost = region_partsupp.groupby("ps_partkey", as_index=False).agg(min_cost=("ps_supplycost", "min"))
 
-    # Main query
     joined = filtered_part.merge(partsupp, left_on="p_partkey", right_on="ps_partkey")
     joined = joined.merge(supplier, left_on="ps_suppkey", right_on="s_suppkey")
     joined = joined.merge(nation, left_on="s_nationkey", right_on="n_nationkey")
@@ -122,11 +102,6 @@ def q2_v2_pandas_impl(ctx: DataFrameContext) -> Any:
         .sort_values(["s_acctbal", "n_name", "s_name", "p_partkey"], ascending=[False, True, True, True])
         .head(100)
     )
-
-
-# ---------------------------------------------------------------------------
-# v3: column prune - project subquery to only needed columns early
-# ---------------------------------------------------------------------------
 
 
 def q3_v3_expression_impl_q2(ctx: DataFrameContext) -> Any:
@@ -143,7 +118,6 @@ def q3_v3_expression_impl_q2(ctx: DataFrameContext) -> Any:
     type_suffix = params["type_suffix"]
     region_name = params["region_name"]
 
-    # Min cost subquery with pruned columns
     min_cost_per_part = (
         partsupp.select("ps_suppkey", "ps_partkey", "ps_supplycost")
         .join(supplier.select("s_suppkey", "s_nationkey"), left_on="ps_suppkey", right_on="s_suppkey")
@@ -187,7 +161,6 @@ def q2_v3_pandas_impl(ctx: DataFrameContext) -> Any:
     type_suffix = params["type_suffix"]
     region_name = params["region_name"]
 
-    # Pruned columns for subquery
     partsupp_pruned = partsupp[["ps_suppkey", "ps_partkey", "ps_supplycost"]]
     supplier_pruned = supplier[["s_suppkey", "s_nationkey"]]
     nation_pruned = nation[["n_nationkey", "n_regionkey"]]
@@ -212,11 +185,6 @@ def q2_v3_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
-# v4: intermediate vars - build each join as named step
-# ---------------------------------------------------------------------------
-
-
 def q2_v4_expression_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
     supplier = ctx.get_table("supplier")
@@ -231,19 +199,16 @@ def q2_v4_expression_impl(ctx: DataFrameContext) -> Any:
     type_suffix = params["type_suffix"]
     region_name = params["region_name"]
 
-    # Build region nations
     region_filtered = region.filter(col("r_name") == lit(region_name))
     nation_in_region = nation.join(region_filtered, left_on="n_regionkey", right_on="r_regionkey")
     suppliers_in_region = supplier.join(nation_in_region, left_on="s_nationkey", right_on="n_nationkey")
 
-    # Min cost subquery
     min_cost_per_part = (
         partsupp.join(suppliers_in_region, left_on="ps_suppkey", right_on="s_suppkey")
         .group_by("ps_partkey")
         .agg(col("ps_supplycost").min().alias("min_cost"))
     )
 
-    # Main query
     filtered_part = part.filter((col("p_size") == lit(size)) & col("p_type").str.ends_with(type_suffix))
     part_with_partsupp = filtered_part.join(partsupp, left_on="p_partkey", right_on="ps_partkey")
     with_supplier = part_with_partsupp.join(supplier, left_on="ps_suppkey", right_on="s_suppkey")
@@ -288,11 +253,6 @@ def q2_v4_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
-# v5: pre-compute derived - compute value column in partsupp before groupby
-# ---------------------------------------------------------------------------
-
-
 def q2_v5_expression_impl(ctx: DataFrameContext) -> Any:
     return _q2_expr_base(ctx)
 
@@ -313,7 +273,6 @@ def q2_v5_pandas_impl(ctx: DataFrameContext) -> Any:
     europe_nations = europe_region.merge(nation, left_on="r_regionkey", right_on="n_regionkey")
     europe_suppliers = europe_nations.merge(supplier, left_on="n_nationkey", right_on="s_nationkey")
     supplier_parts = europe_suppliers.merge(partsupp, left_on="s_suppkey", right_on="ps_suppkey")
-    # Pre-compute supply value
     supplier_parts = supplier_parts.copy()
     supplier_parts["supply_value"] = supplier_parts["ps_supplycost"]
     min_cost = supplier_parts.groupby("ps_partkey", as_index=False).agg(min_cost=("supply_value", "min"))
@@ -331,11 +290,6 @@ def q2_v5_pandas_impl(ctx: DataFrameContext) -> Any:
         .sort_values(["s_acctbal", "n_name", "s_name", "p_partkey"], ascending=[False, True, True, True])
         .head(100)
     )
-
-
-# ---------------------------------------------------------------------------
-# v6: chained style
-# ---------------------------------------------------------------------------
 
 
 def q2_v6_expression_impl(ctx: DataFrameContext) -> Any:
@@ -375,11 +329,6 @@ def q2_v6_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q2_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
-# v7: join reorder - start subquery from nation→partsupp instead of partsupp→supplier
-# ---------------------------------------------------------------------------
-
-
 def q2_v7_expression_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
     supplier = ctx.get_table("supplier")
@@ -394,7 +343,6 @@ def q2_v7_expression_impl(ctx: DataFrameContext) -> Any:
     type_suffix = params["type_suffix"]
     region_name = params["region_name"]
 
-    # Reordered: start from region → nation → supplier → partsupp for subquery
     region_nation = region.filter(col("r_name") == lit(region_name)).join(
         nation, left_on="r_regionkey", right_on="n_regionkey"
     )
@@ -432,7 +380,6 @@ def q2_v7_pandas_impl(ctx: DataFrameContext) -> Any:
     type_suffix = params["type_suffix"]
     region_name = params["region_name"]
 
-    # Reordered: region → nation → supplier → partsupp
     region_filtered = region[region["r_name"] == region_name]
     region_nation = region_filtered.merge(nation, left_on="r_regionkey", right_on="n_regionkey")
     region_suppliers = region_nation.merge(supplier, left_on="n_nationkey", right_on="s_nationkey")
@@ -454,11 +401,6 @@ def q2_v7_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
-# v8: filter combination - combined region+type filter in single predicate
-# ---------------------------------------------------------------------------
-
-
 def q2_v8_expression_impl(ctx: DataFrameContext) -> Any:
     return q2_v2_expression_impl(ctx)
 
@@ -467,22 +409,12 @@ def q2_v8_pandas_impl(ctx: DataFrameContext) -> Any:
     return q2_v7_pandas_impl(ctx)
 
 
-# ---------------------------------------------------------------------------
-# v9: explicit sort - pass descending flags and nulls_last explicitly
-# ---------------------------------------------------------------------------
-
-
 def q2_v9_expression_impl(ctx: DataFrameContext) -> Any:
     return _q2_expr_base(ctx)
 
 
 def q2_v9_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q2_pandas_base(ctx)
-
-
-# ---------------------------------------------------------------------------
-# v10: alternative formula - same logic, different subquery build order
-# ---------------------------------------------------------------------------
 
 
 def q2_v10_expression_impl(ctx: DataFrameContext) -> Any:
@@ -501,7 +433,6 @@ def q2_v10_pandas_impl(ctx: DataFrameContext) -> Any:
     type_suffix = params["type_suffix"]
     region_name = params["region_name"]
 
-    # Alternative: build from part outward (part→partsupp→supplier→nation→region)
     filtered_part = part[(part["p_size"] == size) & (part["p_type"].str.endswith(type_suffix))]
     part_ps = filtered_part.merge(partsupp, left_on="p_partkey", right_on="ps_partkey")
     part_ps_s = part_ps.merge(supplier, left_on="ps_suppkey", right_on="s_suppkey")
@@ -509,7 +440,6 @@ def q2_v10_pandas_impl(ctx: DataFrameContext) -> Any:
     part_ps_s_n_r = part_ps_s_n.merge(region, left_on="n_regionkey", right_on="r_regionkey")
     in_region = part_ps_s_n_r[part_ps_s_n_r["r_name"] == region_name]
 
-    # Min cost per part using the in-region data
     min_cost = in_region.groupby("p_partkey", as_index=False).agg(min_cost=("ps_supplycost", "min"))
     result_df = in_region.merge(min_cost, on="p_partkey")
     result_df = result_df[result_df["ps_supplycost"] == result_df["min_cost"]]
@@ -519,9 +449,5 @@ def q2_v10_pandas_impl(ctx: DataFrameContext) -> Any:
         .head(100)
     )
 
-
-# ---------------------------------------------------------------------------
-# Registry
-# ---------------------------------------------------------------------------
 
 Q2_VARIANTS = build_yaml_variants(__file__, globals(), 2, JOIN_SUBQUERY_SORT)

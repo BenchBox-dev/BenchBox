@@ -1,15 +1,6 @@
-"""Atomic single-flight publication and run-local validation policy.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Covers expected-results-singleflight-run-policy: waiters observe the
-published result or the classified failure (never a false miss), cached
-answer data stays policy-independent, concurrent run policies cannot
-contaminate one another, and validation output distinguishes the five
-outcomes.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import threading
 import time
@@ -37,18 +28,11 @@ pytestmark = [
 
 @pytest.fixture
 def fresh_registry():
-    """Provide a fresh registry instance for each test."""
     return ExpectedResultsRegistry()
 
 
 @pytest.fixture(autouse=True)
 def _isolate_run_policy(monkeypatch):
-    """Guard every test against run-policy leakage.
-
-    Validation-mode context persists on the current worker thread. Reset it
-    before and after each test, and force the environment channel empty so
-    test order and ambient CI variables never matter.
-    """
     clear_validation_mode_context()
     monkeypatch.delenv("BENCHBOX_QUERY_VALIDATION_MODE", raising=False)
     yield
@@ -89,7 +73,6 @@ class TestAtomicPublication:
         threads = [threading.Thread(target=wait_for_load, args=(i,)) for i in range(5)]
         for thread in threads:
             thread.start()
-        # All five waiters are blocked inside the load while the provider runs once.
         time.sleep(0.2)
         assert calls["count"] == 1
         release.set()
@@ -153,7 +136,7 @@ class TestAtomicPublication:
 
         loader = threading.Thread(target=load_in_background)
         loader.start()
-        time.sleep(0.05)  # Let the loader thread claim the slot first.
+        time.sleep(0.05)
         timed_out, waiter_outcome = fresh_registry.get_expected_result_detailed("policy_bench", "1")
 
         assert timed_out is None
@@ -163,7 +146,6 @@ class TestAtomicPublication:
         loader.join(timeout=10)
         assert loader_outcome["outcome"] is LoadOutcome.HIT
 
-        # A later caller observes the normally published outcome.
         result, outcome = fresh_registry.get_expected_result_detailed("policy_bench", "1")
         assert result is not None
         assert outcome is LoadOutcome.HIT
@@ -201,7 +183,6 @@ def _tpcds_answer_set(count=100):
 
 @pytest.fixture
 def policy_validator(fresh_registry):
-    """Validator wired to a fresh registry serving one SKIP-baked TPC-DS answer."""
     calls = {"count": 0}
 
     def stub_tpcds(sf):
@@ -325,7 +306,6 @@ class TestRunLocalPolicy:
         assert outcomes["loose"].is_valid
         assert outcomes["skip"].validation_mode == ValidationMode.SKIP
         assert outcomes["skip"].is_valid
-        # One shared load served all three policies.
         assert policy_validator.provider_calls["count"] == 1
 
     def test_exact_mode_still_fails_mismatches(self, policy_validator):
@@ -372,7 +352,6 @@ class TestRunLocalPolicy:
 
         assert exact_result.validation_mode == ValidationMode.EXACT
         assert skip_result.validation_mode == ValidationMode.SKIP
-        # The cached answer data itself never absorbed the EXACT policy.
         cached = fresh_registry._cache["tpcds"][1.0].query_results["1"]
         assert cached.validation_mode == ValidationMode.SKIP
         assert policy_validator.provider_calls["count"] == 1
@@ -390,7 +369,6 @@ class TestRunLocalPolicy:
         assert cached.validation_mode == ValidationMode.SKIP
 
     def test_environment_fallback_still_applies_without_context(self, policy_validator, monkeypatch):
-        """The BENCHBOX_QUERY_VALIDATION_MODE channel keeps working for single runs."""
         monkeypatch.setenv("BENCHBOX_QUERY_VALIDATION_MODE", "loose")
 
         result = policy_validator.validate_query_result(
@@ -488,7 +466,6 @@ class TestOutcomeDistinction:
         assert "stream 2" in result.warning_message
 
     def test_sf1_fallback_failure_propagates_provider_outcome(self, fresh_registry):
-        """A failed SF=1 fallback load must not degrade to NO_ANSWER_SET."""
 
         def sf_gapped_provider(sf):
             if sf == 1.0:

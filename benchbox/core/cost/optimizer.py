@@ -1,18 +1,6 @@
-"""Cost Optimization Engine with rule-based recommendations.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides automated cost optimization analysis with:
-- Rule-based detection of optimization opportunities
-- Savings estimates with confidence levels
-- Implementation guides with actionable steps
-- Priority-ranked recommendations
-
-The engine analyzes benchmark costs across platforms and generates
-actionable recommendations to reduce cloud database spending.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -30,16 +18,11 @@ from benchbox.core.cost.pricing import (
 
 
 class _FallbackPriceSuppressed(Exception):
-    """Internal signal: a rule's pricing input fell back, so suppress the rule with a stated reason."""
+    pass
 
 
 def _verified_price(resolution: PriceResolution, *, what: str) -> float:
-    """Return a resolved price, refusing fallback values.
 
-    Raises:
-        _FallbackPriceSuppressed: When the lookup used a fallback value or
-            resolved to nothing, stating the table and reason.
-    """
     if resolution.value is None or resolution.fallback_used:
         detail = resolution.reason or "no verified price"
         raise _FallbackPriceSuppressed(f"{what}: fallback pricing used for {resolution.table} ({detail})")
@@ -47,47 +30,29 @@ def _verified_price(resolution: PriceResolution, *, what: str) -> float:
 
 
 class OptimizationCategory(Enum):
-    """Categories of cost optimization recommendations."""
-
-    PLATFORM_TIER = "platform_tier"  # Tier/edition changes
-    REGION = "region"  # Region optimization
-    RESOURCE_SIZING = "resource_sizing"  # Warehouse/cluster sizing
-    PRICING_MODEL = "pricing_model"  # Reserved vs on-demand
-    QUERY = "query"  # Query-level optimizations
-    DATA_MANAGEMENT = "data_management"  # Data lifecycle, partitioning
+    PLATFORM_TIER = "platform_tier"
+    REGION = "region"
+    RESOURCE_SIZING = "resource_sizing"
+    PRICING_MODEL = "pricing_model"
+    QUERY = "query"
+    DATA_MANAGEMENT = "data_management"
 
 
 class ConfidenceLevel(Enum):
-    """Confidence level for savings estimates."""
-
-    HIGH = "high"  # Based on actual pricing data
-    MEDIUM = "medium"  # Based on typical patterns
-    LOW = "low"  # Rough estimate, may vary significantly
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
 
 
 class ImplementationEffort(Enum):
-    """Effort level for implementing a recommendation."""
-
-    TRIVIAL = "trivial"  # Minutes, configuration change only
-    LOW = "low"  # Hours, simple changes
-    MEDIUM = "medium"  # Days, moderate changes
-    HIGH = "high"  # Weeks, significant changes
+    TRIVIAL = "trivial"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
 
 
 @dataclass
 class SavingsEstimate:
-    """Estimated cost savings from implementing a recommendation.
-
-    Attributes:
-        amount: Estimated savings amount per period
-        currency: Currency code
-        period: Time period for savings (e.g., "monthly", "annual")
-        confidence: Confidence level of the estimate
-        range_low: Low end of savings range (optional)
-        range_high: High end of savings range (optional)
-        percentage: Savings as percentage of current cost
-    """
-
     amount: float
     currency: str = "USD"
     period: str = "annual"
@@ -97,7 +62,7 @@ class SavingsEstimate:
     percentage: Optional[float] = None
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary representation."""
+
         result = {
             "amount": round(self.amount, 2),
             "currency": self.currency,
@@ -115,16 +80,6 @@ class SavingsEstimate:
 
 @dataclass
 class ImplementationGuide:
-    """Step-by-step guide for implementing a recommendation.
-
-    Attributes:
-        steps: List of implementation steps
-        prerequisites: Requirements before implementation
-        risks: Potential risks or considerations
-        rollback: How to revert if needed
-        estimated_time: Estimated implementation time
-    """
-
     steps: list[str]
     prerequisites: list[str] = field(default_factory=list)
     risks: list[str] = field(default_factory=list)
@@ -132,7 +87,7 @@ class ImplementationGuide:
     estimated_time: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary representation."""
+
         result = {
             "steps": self.steps,
         }
@@ -149,23 +104,6 @@ class ImplementationGuide:
 
 @dataclass
 class Recommendation:
-    """A cost optimization recommendation.
-
-    Attributes:
-        id: Unique identifier for the recommendation
-        title: Short title describing the recommendation
-        description: Detailed description of the optimization
-        category: Category of the optimization
-        savings: Estimated savings from implementing
-        effort: Implementation effort level
-        guide: Implementation guide
-        priority: Priority score (higher = more important)
-        platform: Target platform (if platform-specific)
-        current_config: Current configuration being optimized
-        recommended_config: Recommended configuration
-        metadata: Additional context-specific data
-    """
-
     id: str
     title: str
     description: str
@@ -173,14 +111,14 @@ class Recommendation:
     savings: SavingsEstimate
     effort: ImplementationEffort
     guide: ImplementationGuide
-    priority: int = 50  # 1-100, higher = more important
+    priority: int = 50
     platform: Optional[str] = None
     current_config: Optional[dict[str, Any]] = None
     recommended_config: Optional[dict[str, Any]] = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary representation."""
+
         result = {
             "id": self.id,
             "title": self.title,
@@ -204,18 +142,6 @@ class Recommendation:
 
 @dataclass
 class OptimizationReport:
-    """Complete cost optimization report.
-
-    Attributes:
-        recommendations: List of recommendations sorted by priority
-        total_potential_savings: Sum of all recommended savings
-        currency: Currency code
-        platform: Platform analyzed
-        analysis_date: When the analysis was performed
-        benchmark_cost: Original benchmark cost analyzed
-        metadata: Additional report metadata
-    """
-
     recommendations: list[Recommendation] = field(default_factory=list)
     total_potential_savings: float = 0.0
     currency: str = "USD"
@@ -225,7 +151,7 @@ class OptimizationReport:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary representation."""
+
         return {
             "recommendations": [r.to_dict() for r in self.recommendations],
             "total_potential_savings": round(self.total_potential_savings, 2),
@@ -237,18 +163,11 @@ class OptimizationReport:
         }
 
     def get_by_category(self, category: OptimizationCategory) -> list[Recommendation]:
-        """Get recommendations filtered by category."""
+
         return [r for r in self.recommendations if r.category == category]
 
     def get_quick_wins(self, max_effort: ImplementationEffort = ImplementationEffort.LOW) -> list[Recommendation]:
-        """Get recommendations that are easy to implement.
 
-        Args:
-            max_effort: Maximum effort level to include
-
-        Returns:
-            List of low-effort recommendations sorted by savings
-        """
         effort_order = [
             ImplementationEffort.TRIVIAL,
             ImplementationEffort.LOW,
@@ -263,53 +182,25 @@ class OptimizationReport:
 
 
 class CostOptimizer:
-    """Cost optimization engine with rule-based recommendations.
-
-    The optimizer analyzes benchmark costs and generates actionable
-    recommendations for reducing cloud database spending. It uses
-    rule-based detection to identify optimization opportunities
-    across multiple categories.
-
-    Example:
-        >>> from benchbox.core.cost import CostCalculator, BenchmarkCost
-        >>> from benchbox.core.cost.optimizer import CostOptimizer
-        >>>
-        >>> # Analyze benchmark cost
-        >>> optimizer = CostOptimizer()
-        >>> report = optimizer.analyze(benchmark_cost, platform_config)
-        >>>
-        >>> # Get prioritized recommendations
-        >>> for rec in report.recommendations:
-        ...     emit(f"{rec.title}: Save ${rec.savings.amount}/year")
-        >>>
-        >>> # Get quick wins
-        >>> quick_wins = report.get_quick_wins()
-    """
-
     def __init__(self) -> None:
-        """Initialize the cost optimizer."""
+
         self._rules: list[tuple[str, callable]] = []
         self._register_default_rules()
 
     def _register_default_rules(self) -> None:
-        """Register default optimization rules."""
-        # Platform tier rules
+
         self._rules.append(("snowflake_tier", self._check_snowflake_tier))
         self._rules.append(("databricks_tier", self._check_databricks_tier))
 
-        # Region rules
         self._rules.append(("snowflake_region", self._check_snowflake_region))
         self._rules.append(("bigquery_region", self._check_bigquery_region))
         self._rules.append(("redshift_region", self._check_redshift_region))
 
-        # Resource sizing rules
         self._rules.append(("redshift_node_type", self._check_redshift_node_type))
         self._rules.append(("databricks_workload", self._check_databricks_workload))
 
-        # Pricing model rules
         self._rules.append(("reserved_capacity", self._check_reserved_capacity))
 
-        # Query optimization rules
         self._rules.append(("high_cost_queries", self._check_high_cost_queries))
         self._rules.append(("bigquery_bytes", self._check_bigquery_bytes_scanned))
 
@@ -319,19 +210,7 @@ class CostOptimizer:
         platform_config: Optional[dict[str, Any]] = None,
         annual_runs: int = 12,
     ) -> OptimizationReport:
-        """Analyze benchmark costs and generate optimization recommendations.
 
-        Args:
-            benchmark_cost: Benchmark cost to analyze
-            platform_config: Platform configuration details
-            annual_runs: Expected number of benchmark runs per year
-
-        Returns:
-            OptimizationReport with prioritized recommendations. Rules whose
-            pricing inputs fall back are suppressed, not computed; each
-            suppression is recorded under
-            ``metadata["suppressed_rules"]`` as ``{"rule", "reason"}``.
-        """
         platform_config = platform_config or {}
         platform = platform_config.get(
             "platform",
@@ -343,9 +222,6 @@ class CostOptimizer:
 
         input_unavailable = unavailable_cost_warning(benchmark_cost.warnings)
         if input_unavailable is not None:
-            # The run total itself is fallback-derived, so every rule builds
-            # on it: suppress all of them with the stated reason instead of
-            # computing savings from an unpublishable number.
             suppressed = [{"rule": name, "reason": input_unavailable} for name, _ in self._rules]
             return OptimizationReport(
                 recommendations=[],
@@ -361,7 +237,6 @@ class CostOptimizer:
                 },
             )
 
-        # Run all applicable rules
         for rule_name, rule_func in self._rules:
             try:
                 rec = rule_func(
@@ -378,13 +253,10 @@ class CostOptimizer:
             except _FallbackPriceSuppressed as exc:
                 suppressed.append({"rule": rule_name, "reason": str(exc)})
             except Exception:
-                # Skip rules that fail - don't break the entire analysis
                 pass
 
-        # Sort by priority (descending)
         recommendations.sort(key=lambda r: r.priority, reverse=True)
 
-        # Calculate total potential savings
         total_savings = sum(r.savings.amount for r in recommendations)
 
         return OptimizationReport(
@@ -401,10 +273,6 @@ class CostOptimizer:
             },
         )
 
-    # =========================================================================
-    # Platform Tier Rules
-    # =========================================================================
-
     def _check_snowflake_tier(
         self,
         benchmark_cost: BenchmarkCost,
@@ -412,18 +280,17 @@ class CostOptimizer:
         platform: str,
         annual_runs: int,
     ) -> Optional[Recommendation]:
-        """Check if Snowflake edition can be downgraded."""
+
         if platform.lower() != "snowflake":
             return None
 
         edition = platform_config.get("edition", "").lower()
         if edition not in ("enterprise", "business_critical"):
-            return None  # Already on standard
+            return None
 
         cloud = platform_config.get("cloud", "aws")
         region = platform_config.get("region", "us-east-1")
 
-        # Calculate current vs standard pricing
         current_price = _verified_price(
             resolve_snowflake_credit_price(edition, cloud, region),
             what=f"snowflake credit price for {edition}/{cloud}/{region}",
@@ -436,11 +303,9 @@ class CostOptimizer:
         if current_price <= standard_price:
             return None
 
-        # Estimate credits from cost
         credits_used = benchmark_cost.total_cost / current_price
         annual_credits = credits_used * annual_runs
 
-        # Calculate savings
         current_annual = annual_credits * current_price
         standard_annual = annual_credits * standard_price
         savings = current_annual - standard_annual
@@ -448,7 +313,6 @@ class CostOptimizer:
 
         target_edition = "Standard"
         if edition == "business_critical":
-            # Check if Enterprise is an option
             enterprise_price = _verified_price(
                 resolve_snowflake_credit_price("enterprise", cloud, region),
                 what=f"snowflake credit price for enterprise/{cloud}/{region}",
@@ -456,7 +320,6 @@ class CostOptimizer:
             enterprise_annual = annual_credits * enterprise_price
             enterprise_savings = current_annual - enterprise_annual
 
-            # If Enterprise saves significant money, recommend that instead
             if enterprise_savings > savings * 0.5:
                 target_edition = "Enterprise"
                 savings = enterprise_savings
@@ -514,7 +377,7 @@ class CostOptimizer:
         platform: str,
         annual_runs: int,
     ) -> Optional[Recommendation]:
-        """Check if Databricks tier can be downgraded."""
+
         if platform.lower() != "databricks":
             return None
 
@@ -525,13 +388,11 @@ class CostOptimizer:
         cloud = platform_config.get("cloud", "aws")
         workload_type = platform_config.get("workload_type", "sql_warehouse")
 
-        # Calculate current vs lower tier pricing
         current_price = _verified_price(
             resolve_databricks_dbu_price(cloud, tier, workload_type),
             what=f"databricks DBU price for {cloud}/{tier}/{workload_type}",
         )
 
-        # Determine target tier
         if tier == "enterprise":
             target_tier = "premium"
         else:
@@ -545,7 +406,6 @@ class CostOptimizer:
         if current_price <= target_price:
             return None
 
-        # Estimate DBUs from cost (rough estimate)
         dbu_consumed = benchmark_cost.total_cost / current_price
         annual_dbus = dbu_consumed * annual_runs
 
@@ -594,10 +454,6 @@ class CostOptimizer:
             recommended_config={"tier": target_tier, "price_per_dbu": target_price},
         )
 
-    # =========================================================================
-    # Region Optimization Rules
-    # =========================================================================
-
     def _check_snowflake_region(
         self,
         benchmark_cost: BenchmarkCost,
@@ -605,7 +461,7 @@ class CostOptimizer:
         platform: str,
         annual_runs: int,
     ) -> Optional[Recommendation]:
-        """Check if a cheaper Snowflake region is available."""
+
         if platform.lower() != "snowflake":
             return None
 
@@ -613,13 +469,11 @@ class CostOptimizer:
         cloud = platform_config.get("cloud", "aws")
         edition = platform_config.get("edition", "standard")
 
-        # Get current price
         current_price = _verified_price(
             resolve_snowflake_credit_price(edition, cloud, region),
             what=f"snowflake credit price for {edition}/{cloud}/{region}",
         )
 
-        # Check US regions (typically cheapest)
         us_price = _verified_price(
             resolve_snowflake_credit_price(edition, cloud, "us-east-1"),
             what=f"snowflake credit price for {edition}/{cloud}/us-east-1",
@@ -628,7 +482,6 @@ class CostOptimizer:
         if current_price <= us_price:
             return None
 
-        # Calculate potential savings
         credits_used = benchmark_cost.total_cost / current_price
         annual_credits = credits_used * annual_runs
 
@@ -674,7 +527,7 @@ class CostOptimizer:
                 rollback="Maintain original region as fallback during transition",
                 estimated_time="4-8 weeks",
             ),
-            priority=40,  # Lower priority due to high effort
+            priority=40,
             platform="snowflake",
             current_config={"region": region, "price_per_credit": current_price},
             recommended_config={"region": "us-east-1", "price_per_credit": us_price},
@@ -687,7 +540,7 @@ class CostOptimizer:
         platform: str,
         annual_runs: int,
     ) -> Optional[Recommendation]:
-        """Check if a cheaper BigQuery region is available."""
+
         if platform.lower() != "bigquery":
             return None
 
@@ -704,7 +557,6 @@ class CostOptimizer:
         if current_price <= us_price:
             return None
 
-        # Estimate TB processed
         tb_processed = benchmark_cost.total_cost / current_price
         annual_tb = tb_processed * annual_runs
 
@@ -760,7 +612,7 @@ class CostOptimizer:
         platform: str,
         annual_runs: int,
     ) -> Optional[Recommendation]:
-        """Check if a cheaper Redshift region is available."""
+
         if platform.lower() != "redshift":
             return None
 
@@ -779,7 +631,6 @@ class CostOptimizer:
         if current_price <= us_east_price:
             return None
 
-        # Estimate node-hours
         node_count = platform_config.get("node_count", 1)
         node_hours = benchmark_cost.total_cost / (current_price * node_count)
         annual_node_hours = node_hours * annual_runs
@@ -827,10 +678,6 @@ class CostOptimizer:
             recommended_config={"region": "us-east-1", "price_per_node_hour": us_east_price},
         )
 
-    # =========================================================================
-    # Resource Sizing Rules
-    # =========================================================================
-
     def _check_redshift_node_type(
         self,
         benchmark_cost: BenchmarkCost,
@@ -838,7 +685,7 @@ class CostOptimizer:
         platform: str,
         annual_runs: int,
     ) -> Optional[Recommendation]:
-        """Check if a different Redshift node type would be more cost-effective."""
+
         if platform.lower() != "redshift":
             return None
 
@@ -846,9 +693,7 @@ class CostOptimizer:
         region = platform_config.get("region", "us-east-1")
         node_count = platform_config.get("node_count", 1)
 
-        # Check if using legacy DS2 nodes
         if node_type.startswith("ds2"):
-            # RA3 nodes with managed storage are often more cost-effective
             current_price = _verified_price(
                 resolve_redshift_node_price(node_type, region),
                 what=f"redshift node price for {node_type}/{region}",
@@ -858,12 +703,9 @@ class CostOptimizer:
                 what=f"redshift node price for ra3.xlplus/{region}",
             )
 
-            # RA3 nodes have different performance characteristics
-            # This is a rough comparison
             if ra3_price < current_price:
                 savings_per_node_hour = current_price - ra3_price
 
-                # Estimate hours
                 hours = benchmark_cost.total_cost / (current_price * node_count)
                 annual_hours = hours * annual_runs
 
@@ -882,7 +724,7 @@ class CostOptimizer:
                     savings=SavingsEstimate(
                         amount=savings,
                         period="annual",
-                        confidence=ConfidenceLevel.LOW,  # Performance varies
+                        confidence=ConfidenceLevel.LOW,
                         percentage=savings_pct,
                     ),
                     effort=ImplementationEffort.MEDIUM,
@@ -919,13 +761,13 @@ class CostOptimizer:
         platform: str,
         annual_runs: int,
     ) -> Optional[Recommendation]:
-        """Check if a more cost-effective Databricks workload type is available."""
+
         if platform.lower() != "databricks":
             return None
 
         workload_type = platform_config.get("workload_type", "").lower()
         if workload_type != "all_purpose":
-            return None  # Only recommend switching FROM all_purpose
+            return None
 
         cloud = platform_config.get("cloud", "aws")
         tier = platform_config.get("tier", "premium")
@@ -942,7 +784,6 @@ class CostOptimizer:
         if jobs_price >= current_price:
             return None
 
-        # Estimate DBUs
         dbus = benchmark_cost.total_cost / current_price
         annual_dbus = dbus * annual_runs
 
@@ -989,10 +830,6 @@ class CostOptimizer:
             recommended_config={"workload_type": "jobs", "price_per_dbu": jobs_price},
         )
 
-    # =========================================================================
-    # Pricing Model Rules
-    # =========================================================================
-
     def _check_reserved_capacity(
         self,
         benchmark_cost: BenchmarkCost,
@@ -1000,22 +837,19 @@ class CostOptimizer:
         platform: str,
         annual_runs: int,
     ) -> Optional[Recommendation]:
-        """Check if reserved capacity would be beneficial."""
+
         platform_lower = platform.lower()
 
-        # Reserved capacity typically saves 20-40% for committed usage
         annual_cost = benchmark_cost.total_cost * annual_runs
 
-        # Only recommend for significant annual spend
-        if annual_cost < 10000:  # $10K minimum for reserved capacity consideration
+        if annual_cost < 10000:
             return None
 
-        # Define savings by platform
         savings_pct_map = {
-            "snowflake": 30,  # Capacity commitments
-            "redshift": 35,  # Reserved instances
-            "databricks": 25,  # Committed use
-            "bigquery": 20,  # Flat-rate pricing
+            "snowflake": 30,
+            "redshift": 35,
+            "databricks": 25,
+            "bigquery": 20,
         }
 
         if platform_lower not in savings_pct_map:
@@ -1045,8 +879,8 @@ class CostOptimizer:
                 period="annual",
                 confidence=ConfidenceLevel.MEDIUM,
                 percentage=savings_pct,
-                range_low=savings * 0.8,  # Conservative estimate
-                range_high=savings * 1.2,  # Optimistic estimate
+                range_low=savings * 0.8,
+                range_high=savings * 1.2,
             ),
             effort=ImplementationEffort.MEDIUM,
             guide=ImplementationGuide(
@@ -1075,10 +909,6 @@ class CostOptimizer:
             recommended_config={"pricing_model": "reserved", "savings_percent": savings_pct},
         )
 
-    # =========================================================================
-    # Query Optimization Rules
-    # =========================================================================
-
     def _check_high_cost_queries(
         self,
         benchmark_cost: BenchmarkCost,
@@ -1086,11 +916,10 @@ class CostOptimizer:
         platform: str,
         annual_runs: int,
     ) -> Optional[Recommendation]:
-        """Identify high-cost queries that could be optimized."""
+
         if not benchmark_cost.phase_costs:
             return None
 
-        # Collect all query costs
         query_costs: list[tuple[str, float]] = []
         for phase in benchmark_cost.phase_costs:
             if phase.query_costs:
@@ -1100,15 +929,12 @@ class CostOptimizer:
         if not query_costs:
             return None
 
-        # Find queries that account for disproportionate cost
         total_cost = sum(c for _, c in query_costs)
         if total_cost == 0:
             return None
 
-        # Sort by cost descending
         query_costs.sort(key=lambda x: x[1], reverse=True)
 
-        # Find queries that account for >20% of cost each
         high_cost_queries = [
             (name, cost, cost / total_cost * 100) for name, cost in query_costs if cost / total_cost > 0.20
         ]
@@ -1116,7 +942,6 @@ class CostOptimizer:
         if not high_cost_queries:
             return None
 
-        # Estimate 30% optimization potential for high-cost queries
         optimization_potential = 0.30
         potential_savings = sum(cost for _, cost, _ in high_cost_queries) * optimization_potential
         annual_savings = potential_savings * annual_runs
@@ -1175,16 +1000,14 @@ class CostOptimizer:
         platform: str,
         annual_runs: int,
     ) -> Optional[Recommendation]:
-        """Check if BigQuery bytes scanned can be reduced through partitioning/clustering."""
+
         if platform.lower() != "bigquery":
             return None
 
-        # Check for high bytes scanned in pricing details
         pricing_details = benchmark_cost.platform_details.get("pricing_details", {})
         bytes_processed = pricing_details.get("total_bytes_processed", 0)
 
         if bytes_processed == 0:
-            # Try to estimate from cost
             location = platform_config.get("location", "us")
             price_per_tb = _verified_price(
                 resolve_bigquery_price_per_tb(location),
@@ -1193,10 +1016,9 @@ class CostOptimizer:
             tb_processed = benchmark_cost.total_cost / price_per_tb
             bytes_processed = tb_processed * (1024**4)
 
-        if bytes_processed < 100 * (1024**3):  # Less than 100GB, skip
+        if bytes_processed < 100 * (1024**3):
             return None
 
-        # Estimate 50% reduction potential through partitioning/clustering
         reduction_potential = 0.50
         annual_cost = benchmark_cost.total_cost * annual_runs
         potential_savings = annual_cost * reduction_potential
@@ -1216,8 +1038,8 @@ class CostOptimizer:
                 amount=potential_savings,
                 period="annual",
                 confidence=ConfidenceLevel.MEDIUM,
-                range_low=potential_savings * 0.5,  # 25% reduction
-                range_high=potential_savings * 1.8,  # 90% reduction
+                range_low=potential_savings * 0.5,
+                range_high=potential_savings * 1.8,
             ),
             effort=ImplementationEffort.MEDIUM,
             guide=ImplementationGuide(

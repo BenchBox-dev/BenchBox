@@ -1,5 +1,3 @@
-"""Shared SQL execution helpers for DBAPI-style platform adapters."""
-
 from __future__ import annotations
 
 import json
@@ -15,21 +13,6 @@ logger = logging.getLogger(__name__)
 
 
 def join_explain_rows(plan_rows: Sequence[Any] | None) -> str | None:
-    """Join raw EXPLAIN rows into plan text, robust to driver row shapes.
-
-    Drivers differ in how they chunk EXPLAIN output: a single row holding the
-    full text (Trino JSON), one row per plan line (ClickHouse text), or JSON
-    fragmented across rows. Cells may also arrive as decoded ``dict``/``list``
-    objects (JSON drivers), ``bytes``, or be padded with ``None``/extra
-    columns. All of those shapes must yield the same plan text — otherwise a
-    driver upgrade silently zeroes out capture while unit tests stay green.
-
-    Args:
-        plan_rows: Raw rows from ``cursor.fetchall()`` / ``collect()``.
-
-    Returns:
-        Joined plan text, or ``None`` when there is nothing to join.
-    """
     if not plan_rows:
         return None
     parts: list[str] = []
@@ -37,11 +20,6 @@ def join_explain_rows(plan_rows: Sequence[Any] | None) -> str | None:
         if row is None:
             continue
         if isinstance(row, dict):
-            # A single-column mapping row (e.g. RealDictCursor-style
-            # {"plan": value}): the single value is the plan text, mirroring
-            # row[0] first-column semantics. A multi-key mapping has no column
-            # order to resolve, so it falls through to defensive serialization
-            # below rather than guessing a column.
             values = list(row.values())
             cell = values[0] if len(values) == 1 else row
         elif isinstance(row, (str, bytes, bytearray)):
@@ -50,8 +28,6 @@ def join_explain_rows(plan_rows: Sequence[Any] | None) -> str | None:
             try:
                 cell = row[0]
             except IndexError:
-                # Empty sequence row: nothing to join; the ``None`` check
-                # below skips it.
                 cell = None
             except (TypeError, KeyError):
                 cell = row
@@ -73,32 +49,6 @@ def get_query_plan_from_cursor(
     explain_prefix: str = "EXPLAIN",
     logger: logging.Logger | None = None,
 ) -> str | None:
-    """Get query execution plan via EXPLAIN on a DBAPI connection.
-
-    Shared implementation for platforms that use the standard
-    cursor -> EXPLAIN -> fetchall -> join pattern.
-
-    Args:
-        connection: DBAPI connection.
-        query: SQL query to explain.
-        explain_prefix: EXPLAIN variant, e.g. "EXPLAIN (FORMAT JSON)".
-        logger: Logger for the failure warning. Defaults to this module's
-            logger; adapters pass their own so the warning keeps its
-            platform identity in multi-platform runs.
-
-    Returns:
-        Newline-joined plan rows, ``""`` when EXPLAIN returns no rows
-        (historical contract: only failures yield ``None``), or ``None``
-        on failure.
-
-    On failure this returns ``None`` and logs the exception, rather than
-    returning the error text AS the plan (qpc-05 / F4.2). Encoding the error in
-    the data channel was actively harmful: the display path printed
-    ``"Could not get query plan: ..."`` as if it were a plan, and the capture
-    path (``capture_query_plan``) would hand that error string to the platform
-    parser as though it were EXPLAIN output. A ``None`` return is treated as a
-    clean capture failure by callers and simply skips best-effort display.
-    """
     log = logger or logging.getLogger(__name__)
     cursor = connection.cursor()
     try:
@@ -124,13 +74,9 @@ def execute_sql_query(
     validate_row_count: bool = True,
     stream_id: int | None = None,
 ) -> dict[str, Any]:
-    """Execute a SQL query and build the standard BenchBox result payload."""
     start_time = mono_time()
     log_verbose(f"Executing query {query_id}")
 
-    # Support both DB-API connections (need a new cursor) and pre-created cursors
-    # (e.g. a psycopg2 cursor already created by _make_stream_cursor in the TPC-DS
-    # power-test path).  DB-API cursors lack a callable .cursor() method.
     _owns_cursor = callable(getattr(connection, "cursor", None))
     cursor = connection.cursor() if _owns_cursor else connection
     try:
@@ -153,8 +99,6 @@ def execute_sql_query(
                 stream_id=stream_id,
             )
 
-        # Gate-only value oracle: digest the FULL result set (behind
-        # BENCHBOX_EMIT_RESULT_DIGEST, stream 0 only). Absent on a normal run.
         from benchbox.core.results.result_digest import compute_result_digest, result_digest_enabled
 
         result_digest = compute_result_digest(results) if result_digest_enabled() and stream_id in (None, 0) else None
@@ -171,7 +115,6 @@ def execute_sql_query(
 
     except Exception as exc:
         execution_time = elapsed_seconds(start_time)
-        # Rollback to clear aborted-transaction state (psycopg3 requires this after any error)
         try:
             real_conn = connection if _owns_cursor else getattr(cursor, "connection", None)
             if real_conn is not None and hasattr(real_conn, "rollback"):

@@ -45,53 +45,50 @@ benchbox shell [OPTIONS]
 ### Interactive Database Selection
 
 ```bash
-# Discover and select from available databases
 benchbox shell
 
-# List all available databases without connecting
 benchbox shell --list
 ```
+
+The first command discovers the available databases and lets you select one. `--list` lists all available databases without connecting.
 
 ### Quick Connection
 
 ```bash
-# Connect to most recent database
 benchbox shell --last
 
-# Connect to most recent TPC-H database
 benchbox shell --last --benchmark tpch
 
-# Connect to specific scale factor
 benchbox shell --benchmark tpch --scale 1.0
 ```
+
+These commands connect to the most recent database, the most recent TPC-H database, and the TPC-H database at scale factor 1.0.
 
 ### Direct Connection
 
 ```bash
-# Connect to specific DuckDB database
 benchbox shell --platform duckdb --database benchmark.duckdb
 
-# Connect to SQLite database
 benchbox shell --platform sqlite --database benchmark.db
 
-# Auto-detect platform from file extension
-benchbox shell --database benchmark.duckdb  # Detects DuckDB
+benchbox shell --database benchmark.duckdb
 ```
+
+The first two commands connect to a specific DuckDB database and a specific SQLite database. The third omits `--platform`, so the platform is auto-detected from the file extension (here, DuckDB).
 
 ### Custom Output Directory
 
 ```bash
-# Use database from specific benchmark run
 benchbox shell --output benchmark_runs/results/tpch_20250101_120000
 
-# Filter within custom directory
 benchbox shell --output ./my-benchmarks --benchmark tpcds --scale 10
 ```
+
+The first command uses the database from a specific benchmark run. The second filters within a custom directory.
 
 ### Remote Database Connection
 
 ```bash
-# ClickHouse connection
 benchbox shell --platform clickhouse-server --host localhost --port 9000 \
   --user default --database benchbox
 ```
@@ -126,49 +123,45 @@ benchbox shell --platform clickhouse-server --host localhost --port 9000 \
 ### Debugging Query Results
 
 ```bash
-# Connect to benchmark database
 benchbox shell --last --benchmark tpch
 
-# Verify data loaded correctly
 duckdb> SELECT COUNT(*) FROM lineitem;
 duckdb> .tables
 
-# Test individual queries
 duckdb> SELECT l_returnflag, COUNT(*) FROM lineitem GROUP BY l_returnflag;
 
-# Exit when done
 duckdb> .quit
 ```
+
+The session connects to the benchmark database, verifies that the data loaded correctly, tests individual queries, and exits when done.
 
 ### Exploring Schema
 
 ```bash
-# Connect and explore
 benchbox shell --database benchmark.duckdb
 
-# Show all table schemas
 duckdb> .schema
 
-# Inspect specific table
 duckdb> .schema customer
 duckdb> SELECT * FROM customer LIMIT 5;
 ```
 
+`.schema` shows all table schemas. `.schema customer` inspects one table.
+
 ### Comparing Scale Factors
 
 ```bash
-# List available databases to compare
 benchbox shell --list
 
-# Connect to SF 0.1
 benchbox shell --benchmark tpch --scale 0.1
 duckdb> SELECT COUNT(*) FROM orders;
 duckdb> .quit
 
-# Connect to SF 1.0
 benchbox shell --benchmark tpch --scale 1.0
 duckdb> SELECT COUNT(*) FROM orders;
 ```
+
+`--list` shows the available databases to compare. The two sessions connect to scale factor 0.1 and scale factor 1.0 in turn.
 
 ## Database Discovery
 
@@ -201,21 +194,17 @@ When multiple databases match your criteria:
 
 ## Troubleshooting
 
-**No databases found:**
+**No databases found:** verify that databases exist, then run a benchmark first to create one.
 ```bash
-# Verify databases exist
 ls benchmark_runs/datagen/
 
-# Run a benchmark first to create database
 benchbox run --benchmark tpch --scale 0.1 --platform duckdb
 ```
 
-**Wrong database selected:**
+**Wrong database selected:** use more specific filters, or connect directly.
 ```bash
-# Use more specific filters
 benchbox shell --benchmark tpch --scale 1.0 --platform duckdb
 
-# Or connect directly
 benchbox shell --database /path/to/specific/database.duckdb
 ```
 

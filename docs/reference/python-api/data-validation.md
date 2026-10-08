@@ -31,7 +31,6 @@ BenchBox provides data validation utilities for benchmark data generation. These
 ```python
 from benchbox.utils.data_validation import BenchmarkDataValidator
 
-# Validate TPC-H data
 validator = BenchmarkDataValidator("tpch", scale_factor=1.0)
 result = validator.validate_data_directory("data/tpch_sf1")
 
@@ -153,6 +152,8 @@ A `DataValidationResult`. The class is not part of the public contract; the exam
 - **Rows:** lines are counted across the table's files, decompressing `.gz` and `.zst`. The count must be within 5% of the expected rows (`int(expected * 0.05)`, at least 1) or the table is added to `row_count_mismatches`. A count of 0 is not compared.
 
 **Checks for other benchmarks:** the directory is valid when it holds at least one `.tbl`, `.dat`, `.csv` or `.parquet` file. An empty file is listed in `issues` as `Empty data file: <name>` but does not make the directory invalid. With no such file, `issues` has `No data files found in directory`.
+
+Review `issues` and `tables_validated` as well as the `valid` flag. The method is a data reuse check, not an official TPC correctness certification.
 
 ##### Raises
 
@@ -332,7 +333,6 @@ The values of `TPCH_TABLE_EXPECTATIONS` and `TPCDS_TABLE_EXPECTATIONS` are `Tabl
 ```python
 from benchbox.utils.data_validation import BenchmarkDataValidator
 
-# Validate TPC-H SF 1.0 data
 validator = BenchmarkDataValidator("tpch", scale_factor=1.0)
 result = validator.validate_data_directory("data/tpch_sf1")
 
@@ -350,11 +350,9 @@ else:
 ```python
 from benchbox.utils.data_validation import BenchmarkDataValidator
 
-# Validate TPC-DS SF 0.1 data
 validator = BenchmarkDataValidator("tpcds", scale_factor=0.1)
 result = validator.validate_data_directory("data/tpcds_sf0.1")
 
-# Check specific tables
 if not result.tables_validated.get("store_sales", False):
     print("store_sales table has issues")
     if "store_sales" in result.missing_tables:
@@ -369,13 +367,8 @@ if not result.tables_validated.get("store_sales", False):
 ```python
 from benchbox.utils.data_validation import BenchmarkDataValidator
 
-# Validator automatically handles .gz and .zst compression
 validator = BenchmarkDataValidator("tpch", scale_factor=1.0)
 
-# Works with both compressed and uncompressed files
-# - customer.tbl
-# - customer.tbl.gz
-# - customer.tbl.zst
 result = validator.validate_data_directory("data/tpch_compressed")
 
 if result.valid:
@@ -384,16 +377,12 @@ if result.valid:
         print(f"  {file}: {size / (1024**2):.2f} MB")
 ```
 
+The validator handles `.gz` and `.zst` compression automatically, and works with both compressed and uncompressed files. For example, `customer.tbl`, `customer.tbl.gz` and `customer.tbl.zst` are all recognized.
+
 ### Chunked/Parallel Data Validation
 
 ```python
 from benchbox.utils.data_validation import BenchmarkDataValidator
-
-# Validator handles chunked files from parallel generation
-# - lineitem_1_4.dat
-# - lineitem_2_4.dat
-# - lineitem_3_4.dat
-# - lineitem_4_4.dat
 
 validator = BenchmarkDataValidator("tpch", scale_factor=10.0)
 result = validator.validate_data_directory("data/tpch_sf10_parallel")
@@ -402,6 +391,8 @@ if result.valid:
     print("Chunked data validated successfully")
 ```
 
+The validator handles chunked files from parallel generation, such as `lineitem_1_4.dat`, `lineitem_2_4.dat`, `lineitem_3_4.dat` and `lineitem_4_4.dat`.
+
 ### Data Regeneration Decision
 
 ```python
@@ -409,7 +400,6 @@ from pathlib import Path
 from benchbox.utils.data_validation import BenchmarkDataValidator
 
 def ensure_valid_data(benchmark_name, scale_factor, data_dir):
-    """Ensure data is valid, regenerating if needed."""
     validator = BenchmarkDataValidator(benchmark_name, scale_factor)
 
     should_regen, result = validator.should_regenerate_data(data_dir)
@@ -417,7 +407,6 @@ def ensure_valid_data(benchmark_name, scale_factor, data_dir):
     if should_regen:
         print(f"Data needs regeneration: {', '.join(result.issues[:3])}")
 
-        # Generate data
         if benchmark_name == "tpch":
             from benchbox.tpch import TPCH
             bench = TPCH(scale_factor=scale_factor, output_dir=data_dir)
@@ -427,7 +416,6 @@ def ensure_valid_data(benchmark_name, scale_factor, data_dir):
             bench = TPCDS(scale_factor=scale_factor, output_dir=data_dir)
             bench.generate_data()
 
-        # Validate after generation
         result = validator.validate_data_directory(data_dir)
         if result.valid:
             print("✅ Data generation successful")
@@ -440,16 +428,16 @@ def ensure_valid_data(benchmark_name, scale_factor, data_dir):
 ensure_valid_data("tpch", 1.0, "data/tpch_sf1")
 ```
 
+`ensure_valid_data` regenerates the data when it is not valid, then validates it again.
+
 ### Custom Benchmark Validation
 
 ```python
 from benchbox.utils.data_validation import BenchmarkDataValidator
 
-# For custom benchmarks, validation checks for any data files
 validator = BenchmarkDataValidator("custom_benchmark", scale_factor=1.0)
 result = validator.validate_data_directory("data/custom")
 
-# Checks for .tbl, .dat, .csv, .parquet files
 if result.valid:
     print(f"Found {len(result.file_size_info)} data files")
     for file, size in result.file_size_info.items():
@@ -458,25 +446,21 @@ else:
     print("No valid data files found")
 ```
 
-An empty data file appears in `result.issues` but does not make the result invalid, so check `result.issues` as well as `result.valid` for custom benchmarks.
+For custom benchmarks, validation checks for any data files: `.tbl`, `.dat`, `.csv` and `.parquet`. An empty data file appears in `result.issues` but does not make the result invalid, so check `result.issues` as well as `result.valid` for custom benchmarks.
 
 ### Manifest-Based Validation
 
 ```python
 from benchbox.utils.data_validation import BenchmarkDataValidator
 
-# Validator uses _datagen_manifest.json for fast validation
-# Manifest is auto-generated during data generation
-
 validator = BenchmarkDataValidator("tpch", scale_factor=1.0)
 result = validator.validate_data_directory("data/tpch_sf1")
-
-# With manifest: fast validation (reads JSON, checks file sizes)
-# Without manifest: full validation (counts rows, scans directory)
 
 if result.valid:
     print(f"Validated at {result.validation_timestamp}")
 ```
+
+The validator uses `_datagen_manifest.json` for fast validation, and data generation creates the manifest automatically. With a manifest, validation is fast: it reads the JSON and checks file sizes. Without a manifest, validation is full: it counts rows and scans the directory.
 
 ### Validation Report Integration
 
@@ -487,7 +471,6 @@ from benchbox.utils.data_validation import BenchmarkDataValidator
 validator = BenchmarkDataValidator("tpcds", scale_factor=1.0)
 result = validator.validate_data_directory("data/tpcds_sf1")
 
-# Exit with error code if validation fails
 if not result.valid:
     validator.print_validation_report(result, verbose=True)
     sys.exit(1)
@@ -495,48 +478,47 @@ if not result.valid:
 print(f"All {len(result.tables_validated)} tables validated")
 ```
 
+This example exits with an error code if validation fails.
+
 ## Best Practices
 
 1. **Always Validate Before Benchmarking**
 
    ```python
-   # Check data validity before running benchmarks
    validator = BenchmarkDataValidator("tpch", scale_factor=1.0)
    should_regen, _ = validator.should_regenerate_data("data/tpch_sf1")
 
    if should_regen:
-       # Regenerate data first
        benchmark.generate_data()
 
-   # Now run benchmark
    results = adapter.run_benchmark(benchmark)
    ```
+
+   Check the data before the run, and regenerate it first if the check says to.
 
 2. **Use Manifest for Performance**
 
    ```python
-   # Manifest-based validation avoids re-scanning files
-   # Let data generation create manifest automatically
-   benchmark.generate_data()  # Creates _datagen_manifest.json
+   benchmark.generate_data()
 
-   # Future validations will be fast
    result = validator.validate_data_directory(data_dir)
    ```
+
+   Manifest-based validation avoids re-scanning files. Let data generation create the manifest automatically: `generate_data()` creates `_datagen_manifest.json`, and future validations are then fast.
 
 3. **Handle Compressed Data**
 
    ```python
-   # Validator accepts .gz and .zst variants of the expected file names
-   # (customer.tbl.gz, customer.tbl.zst) and counts their rows
    result = validator.validate_data_directory(data_dir)
    ```
+
+   The validator accepts `.gz` and `.zst` variants of the expected file names (`customer.tbl.gz`, `customer.tbl.zst`) and counts their rows. Use compression for large datasets, and validation works transparently.
 
 4. **Check Specific Tables**
 
    ```python
    result = validator.validate_data_directory(data_dir)
 
-   # Check critical tables only
    critical_tables = ["customer", "orders", "lineitem"]
    all_critical_valid = all(
        result.tables_validated.get(t, False)
@@ -544,18 +526,19 @@ print(f"All {len(result.tables_validated)} tables validated")
    )
    ```
 
+   This checks only the critical tables.
+
 5. **Tolerate Small Variances**
 
    ```python
-   # Validator allows up to 5% row count variance
-   # This is normal for some data generators
-
    if result.row_count_mismatches:
        for table, (expected, actual) in result.row_count_mismatches.items():
            variance_pct = abs(actual - expected) / expected * 100
            if variance_pct > 10:
                print(f"⚠️  Large variance in {table}: {variance_pct:.1f}%")
    ```
+
+   The validator allows about 5% row count variance. This is normal for some data generators.
 
 ## Common Issues
 

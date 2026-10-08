@@ -1,10 +1,3 @@
-"""Tests for CoffeeShop benchmark data generator.
-
-Verifies initialization, order count calculation, weighted distribution,
-product window construction, daily order distribution, trend weighting,
-pattern expansion, and end-to-end data generation.
-"""
-
 from __future__ import annotations
 
 from datetime import date, time
@@ -25,9 +18,6 @@ def gen(tmp_path: Path) -> CoffeeShopDataGenerator:
     return CoffeeShopDataGenerator(scale_factor=0.000001, output_dir=tmp_path)
 
 
-# ---------------------------------------------------------------------------
-# Initialization
-# ---------------------------------------------------------------------------
 class TestCoffeeShopInit:
     def test_default_dates(self, gen: CoffeeShopDataGenerator):
         assert gen.start_date == date(2023, 1, 1)
@@ -46,9 +36,6 @@ class TestCoffeeShopInit:
         assert len(gen._location_seeds) > 0
 
 
-# ---------------------------------------------------------------------------
-# Order count calculation
-# ---------------------------------------------------------------------------
 class TestCalculateOrderCount:
     def test_sf_1_gives_8_5m(self):
         assert CoffeeShopDataGenerator.calculate_order_count(1.0) == 8_500_000
@@ -62,9 +49,6 @@ class TestCalculateOrderCount:
         assert count_2 == pytest.approx(count_1 * 2, abs=1)
 
 
-# ---------------------------------------------------------------------------
-# Pattern expansion
-# ---------------------------------------------------------------------------
 class TestExpandPattern:
     def test_simple_expansion(self):
         result = CoffeeShopDataGenerator._expand_pattern([(1, 3), (2, 2)])
@@ -79,9 +63,6 @@ class TestExpandPattern:
         assert len(result) == sum(w for _, w in CoffeeShopDataGenerator.ORDER_LINE_PATTERN)
 
 
-# ---------------------------------------------------------------------------
-# Weighted distribution
-# ---------------------------------------------------------------------------
 class TestDistributeWithWeights:
     def test_sums_to_total(self, gen: CoffeeShopDataGenerator):
         weights = {"a": 3.0, "b": 1.0, "c": 1.0}
@@ -110,9 +91,6 @@ class TestDistributeWithWeights:
         assert sum(result.values()) == 10
 
 
-# ---------------------------------------------------------------------------
-# Trend weight
-# ---------------------------------------------------------------------------
 class TestTrendWeight:
     def test_start_weight(self, gen: CoffeeShopDataGenerator):
         weight = gen._trend_weight(0, 100)
@@ -132,9 +110,6 @@ class TestTrendWeight:
         assert weight == pytest.approx(expected, abs=0.01)
 
 
-# ---------------------------------------------------------------------------
-# Daily order distribution
-# ---------------------------------------------------------------------------
 class TestDailyDistribution:
     def test_sums_to_total_orders(self, gen: CoffeeShopDataGenerator):
         total = gen.calculate_order_count(gen.scale_factor)
@@ -148,9 +123,6 @@ class TestDailyDistribution:
             assert gen.start_date <= d <= gen.end_date
 
 
-# ---------------------------------------------------------------------------
-# Product window construction
-# ---------------------------------------------------------------------------
 class TestBuildProductWindows:
     def test_windows_have_seeds(self, gen: CoffeeShopDataGenerator):
         for w in gen._product_windows:
@@ -162,9 +134,6 @@ class TestBuildProductWindows:
             assert gen._product_windows[i].start <= gen._product_windows[i + 1].start
 
 
-# ---------------------------------------------------------------------------
-# Location grouping
-# ---------------------------------------------------------------------------
 class TestGroupLocationsByRegion:
     def test_all_seeds_grouped(self, gen: CoffeeShopDataGenerator):
         grouped = gen._group_locations_by_region()
@@ -178,9 +147,6 @@ class TestGroupLocationsByRegion:
             assert len(region) > 0
 
 
-# ---------------------------------------------------------------------------
-# Product selection
-# ---------------------------------------------------------------------------
 class TestSelectProductForDate:
     def test_selects_product_for_valid_date(self, gen: CoffeeShopDataGenerator):
         seed = gen._select_product_for_date(date(2023, 6, 15), "Coffee")
@@ -192,9 +158,6 @@ class TestSelectProductForDate:
             gen._select_product_for_date(date(1900, 1, 1), "Coffee")
 
 
-# ---------------------------------------------------------------------------
-# Reset generation state
-# ---------------------------------------------------------------------------
 class TestResetGenerationState:
     def test_clears_row_counts(self, gen: CoffeeShopDataGenerator):
         gen._table_row_counts["test"] = 100
@@ -202,9 +165,6 @@ class TestResetGenerationState:
         assert gen._table_row_counts == {}
 
 
-# ---------------------------------------------------------------------------
-# End-to-end generation
-# ---------------------------------------------------------------------------
 class TestGenerateData:
     def test_generates_all_tables(self, tmp_path: Path):
         gen = CoffeeShopDataGenerator(scale_factor=0.000001, output_dir=tmp_path)

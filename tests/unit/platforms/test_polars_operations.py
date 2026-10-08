@@ -1,10 +1,3 @@
-"""Tests for Polars platform adapter operations: context lifecycle, table
-registration with LazyFrame scanning, result conversion, and external table
-support.
-
-Covers gaps not in test_polars_adapter.py.
-"""
-
 from __future__ import annotations
 
 import tempfile
@@ -19,16 +12,9 @@ from benchbox.platforms.polars_platform import PolarsAdapter, PolarsDataFrameCon
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
-# ---------------------------------------------------------------------------
-# PolarsDataFrameContext lifecycle & table registration
-# ---------------------------------------------------------------------------
-
-
 class TestPolarsDataFrameContextLifecycle:
-    """Extended tests for PolarsDataFrameContext beyond basic CRUD."""
-
     def test_register_eager_dataframe_converts_to_lazyframe(self):
-        """Registering an eager DataFrame should store it as a LazyFrame."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = PolarsAdapter(working_dir=tmpdir)
             ctx = PolarsDataFrameContext(adapter)
@@ -40,7 +26,7 @@ class TestPolarsDataFrameContextLifecycle:
             assert isinstance(result, pl.LazyFrame)
 
     def test_register_lazyframe_stores_directly(self):
-        """Registering a LazyFrame should store it without conversion."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = PolarsAdapter(working_dir=tmpdir)
             ctx = PolarsDataFrameContext(adapter)
@@ -54,7 +40,7 @@ class TestPolarsDataFrameContextLifecycle:
             assert collected["x"].to_list() == [10, 20, 30]
 
     def test_register_overwrites_existing_table(self):
-        """Re-registering the same table name should overwrite."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = PolarsAdapter(working_dir=tmpdir)
             ctx = PolarsDataFrameContext(adapter)
@@ -66,7 +52,7 @@ class TestPolarsDataFrameContextLifecycle:
             assert result["v"][0] == 99
 
     def test_get_tables_returns_all_registered(self):
-        """get_tables should list every registered table name."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = PolarsAdapter(working_dir=tmpdir)
             ctx = PolarsDataFrameContext(adapter)
@@ -79,31 +65,24 @@ class TestPolarsDataFrameContextLifecycle:
             assert set(tables) == {"region", "nation", "customer"}
 
     def test_unregister_nonexistent_table_is_noop(self):
-        """Unregistering a table that does not exist should not raise."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = PolarsAdapter(working_dir=tmpdir)
             ctx = PolarsDataFrameContext(adapter)
 
-            ctx.unregister_table("ghost")  # should not raise
+            ctx.unregister_table("ghost")
 
     def test_context_stores_adapter_reference(self):
-        """Context should hold a reference to its parent adapter."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = PolarsAdapter(working_dir=tmpdir)
             ctx = PolarsDataFrameContext(adapter)
             assert ctx._adapter is adapter
 
 
-# ---------------------------------------------------------------------------
-# Result conversion: LazyFrame -> dicts
-# ---------------------------------------------------------------------------
-
-
 class TestPolarsResultConversion:
-    """Tests for converting Polars LazyFrame results to Python dicts/rows."""
-
     def test_collect_to_dicts(self):
-        """LazyFrame.collect().to_dicts() produces list of dicts."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = PolarsAdapter(working_dir=tmpdir)
             ctx = PolarsDataFrameContext(adapter)
@@ -125,7 +104,7 @@ class TestPolarsResultConversion:
             assert rows[2]["score"] == 92.3
 
     def test_collect_filtered_lazyframe(self):
-        """Filtering a LazyFrame then collecting should produce correct results."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = PolarsAdapter(working_dir=tmpdir)
             ctx = PolarsDataFrameContext(adapter)
@@ -139,7 +118,7 @@ class TestPolarsResultConversion:
             assert filtered["val"].to_list() == [95, 96, 97, 98, 99]
 
     def test_aggregation_on_registered_table(self):
-        """Aggregation on a registered table should work correctly."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = PolarsAdapter(working_dir=tmpdir)
             ctx = PolarsDataFrameContext(adapter)
@@ -160,7 +139,7 @@ class TestPolarsResultConversion:
             assert result["amount"].to_list() == [90, 60]
 
     def test_collect_first_row(self):
-        """Collecting first row emulates first_row behavior."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = PolarsAdapter(working_dir=tmpdir)
             ctx = PolarsDataFrameContext(adapter)
@@ -171,22 +150,13 @@ class TestPolarsResultConversion:
             assert first == (42,)
 
 
-# ---------------------------------------------------------------------------
-# External table support (LazyFrame scanning)
-# ---------------------------------------------------------------------------
-
-
 class TestPolarsExternalTableSupport:
-    """Tests for Polars external table mode (lazy scanning from files)."""
-
     def test_scan_parquet_as_external_table(self, tmp_path):
-        """Scanning a Parquet file should produce a queryable LazyFrame."""
-        # Create a real Parquet file
+
         df = pl.DataFrame({"id": [1, 2, 3], "name": ["x", "y", "z"]})
         pq_path = tmp_path / "test.parquet"
         df.write_parquet(pq_path)
 
-        # Simulate external table registration via scan
         lf = pl.scan_parquet(pq_path)
 
         adapter = PolarsAdapter(working_dir=str(tmp_path))
@@ -198,7 +168,7 @@ class TestPolarsExternalTableSupport:
         assert result.columns == ["id", "name"]
 
     def test_scan_csv_as_external_table(self, tmp_path):
-        """Scanning a CSV file should produce a queryable LazyFrame."""
+
         csv_path = tmp_path / "data.csv"
         csv_path.write_text("id,name,value\n1,a,10\n2,b,20\n3,c,30\n")
 
@@ -213,7 +183,7 @@ class TestPolarsExternalTableSupport:
         assert set(result.columns) == {"id", "name", "value"}
 
     def test_scan_tbl_pipe_delimited(self, tmp_path):
-        """Pipe-delimited TBL files can be scanned with separator='|'."""
+
         tbl_path = tmp_path / "region.tbl"
         tbl_path.write_text("0|AFRICA\n1|AMERICA\n2|ASIA\n")
 
@@ -233,15 +203,15 @@ class TestPolarsExternalTableSupport:
         assert result["r_name"].to_list() == ["AFRICA", "AMERICA", "ASIA"]
 
     def test_create_external_tables_delegates_to_load_data(self):
-        """create_external_tables should be an alias for load_data."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = PolarsAdapter(working_dir=tmpdir)
             assert adapter.supports_external_tables is True
-            # Verify the method exists and is callable
+
             assert callable(getattr(adapter, "create_external_tables", None))
 
     def test_multiple_parquet_files_concat(self, tmp_path):
-        """Multiple Parquet files in same directory should be scannable."""
+
         for i in range(3):
             df = pl.DataFrame({"id": [i * 10 + j for j in range(5)]})
             df.write_parquet(tmp_path / f"part_{i}.parquet")
@@ -256,16 +226,9 @@ class TestPolarsExternalTableSupport:
         assert len(result) == 15
 
 
-# ---------------------------------------------------------------------------
-# Adapter initialization edge cases
-# ---------------------------------------------------------------------------
-
-
 class TestPolarsAdapterInitialization:
-    """Edge cases for PolarsAdapter initialization."""
-
     def test_working_dir_created_if_missing(self, tmp_path):
-        """Adapter should create working_dir if it does not exist."""
+
         new_dir = tmp_path / "deep" / "nested" / "polars_work"
         assert not new_dir.exists()
 
@@ -296,14 +259,7 @@ class TestPolarsAdapterInitialization:
             assert adapter.rechunk is False
 
 
-# ---------------------------------------------------------------------------
-# Adapter connection and platform info
-# ---------------------------------------------------------------------------
-
-
 class TestPolarsAdapterConnectionAndInfo:
-    """Tests for connection creation and platform info retrieval."""
-
     def test_create_connection_returns_context(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = PolarsAdapter(working_dir=tmpdir)
@@ -332,14 +288,7 @@ class TestPolarsAdapterConnectionAndInfo:
             assert config["result_cache_enabled"] is False
 
 
-# ---------------------------------------------------------------------------
-# Schema creation
-# ---------------------------------------------------------------------------
-
-
 class TestPolarsSchemaCreation:
-    """Tests for schema extraction from benchmark."""
-
     def test_schema_extracted_from_benchmark(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = PolarsAdapter(working_dir=tmpdir)
@@ -386,22 +335,15 @@ class TestPolarsSchemaCreation:
             ctx = adapter.create_connection()
 
             benchmark = MagicMock(spec=[])
-            # spec=[] means no get_schema attribute at all
+
             duration = adapter.create_schema(benchmark, ctx)
             assert duration >= 0
             assert adapter._table_schemas == {}
 
 
-# ---------------------------------------------------------------------------
-# Data loading (real files)
-# ---------------------------------------------------------------------------
-
-
 class TestPolarsDataLoadingReal:
-    """Real file-based data loading tests."""
-
     def test_load_parquet_single_file(self, tmp_path):
-        """_load_parquet should return a LazyFrame for a single file."""
+
         df = pl.DataFrame({"id": [1, 2, 3], "val": [10, 20, 30]})
         pq = tmp_path / "test.parquet"
         df.write_parquet(pq)
@@ -413,7 +355,7 @@ class TestPolarsDataLoadingReal:
         assert result.columns == ["id", "val"]
 
     def test_load_csv_single_file(self, tmp_path):
-        """_load_csv should return a LazyFrame for a single CSV file."""
+
         csv = tmp_path / "data.csv"
         csv.write_text("1,Alice,100\n2,Bob,200\n")
 
@@ -428,7 +370,7 @@ class TestPolarsDataLoadingReal:
         assert result.columns == ["id", "name", "value"]
 
     def test_load_csv_pipe_delimited(self, tmp_path):
-        """_load_csv should handle pipe-delimited TBL files."""
+
         tbl = tmp_path / "region.tbl"
         tbl.write_text("0|AFRICA\n1|AMERICA\n")
 
@@ -463,14 +405,7 @@ class TestPolarsDataLoadingReal:
             assert fmt == "parquet"
 
 
-# ---------------------------------------------------------------------------
-# SQL execution guard
-# ---------------------------------------------------------------------------
-
-
 class TestPolarsSQLNotSupported:
-    """Verify SQL execution is explicitly blocked."""
-
     def test_execute_query_raises_not_implemented(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = PolarsAdapter(working_dir=tmpdir)
@@ -493,14 +428,7 @@ class TestPolarsSQLNotSupported:
                 adapter.execute_query(connection=ctx, query="SELECT 1", query_id="q1")
 
 
-# ---------------------------------------------------------------------------
-# Validation and database operations
-# ---------------------------------------------------------------------------
-
-
 class TestPolarsValidationAndDatabaseOps:
-    """Tests for validation, check_database_exists, and drop_database."""
-
     def test_get_existing_tables_from_context(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = PolarsAdapter(working_dir=tmpdir)
@@ -510,7 +438,7 @@ class TestPolarsValidationAndDatabaseOps:
             ctx.register_table("B", pl.DataFrame({"x": [2]}))
 
             tables = adapter._get_existing_tables(ctx)
-            assert set(tables) == {"a", "b"}  # lowercased
+            assert set(tables) == {"a", "b"}
 
     def test_get_existing_tables_empty_context(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -538,7 +466,6 @@ class TestPolarsValidationAndDatabaseOps:
             ctx = adapter.create_connection()
 
             ctx.register_table("t1", pl.DataFrame({"id": [1]}))
-            # t2 not registered
 
             benchmark = MagicMock()
             status, details = adapter._validate_data_integrity(benchmark, ctx, {"t1": 1, "t2": 1})

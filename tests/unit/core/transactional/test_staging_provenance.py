@@ -1,22 +1,6 @@
-"""Unit tests for the shared staging provenance manifest.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-TODO transactional-staging-reuse-ignores-provenance-20260805: before this
-manifest existed, `is_setup()` decided readiness with a bare
-`SELECT COUNT(*)` on the staging tables. A staging set left over from a
-scale-0.01 run satisfied `is_setup` for a scale-1.0 run against the SAME
-physical database: setup() was skipped, the benchmark executed against the
-wrong data volume, and the run reported a PASS with meaningless timings --
-a silent wrong-results bug, not a hygiene issue.
-
-These tests exercise the fix directly against a real (in-memory) DuckDB
-connection -- the manifest read/write path is SQL executed through
-`connection.execute`, so a mock would only prove the mock's own scripted
-behavior, not that the manifest round-trips through a real engine.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -32,11 +16,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast, pytest.mark.duckdb, pytest.mar
 
 
 def _minimal_tpch_conn() -> duckdb.DuckDBPyConnection:
-    """A tiny in-memory DuckDB database with orders/lineitem/customer populated.
-
-    Deliberately minimal (a handful of rows) -- these tests exercise
-    provenance bookkeeping, not TPC-H data-generation fidelity.
-    """
     conn = duckdb.connect(":memory:")
     conn.execute("""
         CREATE TABLE orders (
@@ -85,12 +64,6 @@ def _minimal_tpch_conn() -> duckdb.DuckDBPyConnection:
 
 
 def _grow_tpch_source(conn: duckdb.DuckDBPyConnection) -> None:
-    """Double the source tables with fresh keys, as reloading at a larger scale does.
-
-    Key-shifted rather than a plain re-insert so the staging tables' primary
-    keys still hold after a rebuild -- a duplicate-key failure would mask the
-    behavior under test.
-    """
     conn.execute("INSERT INTO orders SELECT * REPLACE (o_orderkey + 1000 AS o_orderkey) FROM orders")
     conn.execute("INSERT INTO lineitem SELECT * REPLACE (l_orderkey + 1000 AS l_orderkey) FROM lineitem")
     conn.execute("INSERT INTO customer SELECT * REPLACE (c_custkey + 1000 AS c_custkey) FROM customer")
@@ -100,11 +73,6 @@ def _rows(conn: duckdb.DuckDBPyConnection, table: str) -> int:
     return conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
 
 
-#: Every staging table the corresponding ``is_setup()`` gates on. Assertions
-#: must cover ALL of them: a rebuild that refreshes only the one or two tables
-#: a test happens to name leaves the rest stale AND certified, and the suite
-#: stays green -- the same "healed and untouched are indistinguishable" hole
-#: that let the first version of this fix ship with its headline bug intact.
 _TXN_GATED_TABLES = ("txn_orders", "txn_lineitem", "txn_customer")
 _WRITE_GATED_TABLES = (
     "update_ops_orders",
@@ -122,7 +90,6 @@ def _snapshot(conn: duckdb.DuckDBPyConnection, tables: tuple[str, ...]) -> dict[
 
 
 def _assert_all_rebuilt(conn: duckdb.DuckDBPyConnection, before: dict[str, int], tables: tuple[str, ...]) -> None:
-    """Every gated table must reflect the grown source, not just the asserted ones."""
     after = _snapshot(conn, tables)
     stale = {t: (before[t], after[t]) for t in tables if after[t] <= before[t]}
     assert not stale, f"staging tables left stale after rebuild (before, after): {stale}"
@@ -136,8 +103,6 @@ def loaded_tpch_conn():
 
 
 class TestTransactionPrimitivesStagingProvenance:
-    """TransactionPrimitivesBenchmark.is_setup() via the shared manifest."""
-
     def test_no_manifest_is_not_setup(self, tmp_path: Path, loaded_tpch_conn):
         bench = TransactionPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
         assert bench.is_setup(loaded_tpch_conn) is False
@@ -147,15 +112,10 @@ class TestTransactionPrimitivesStagingProvenance:
         bench.setup(loaded_tpch_conn, force=False)
         assert bench.is_setup(loaded_tpch_conn) is True
 
-        # A second instance at the SAME scale/spec, reusing the same physical
-        # database, must also see the manifest as current -- this is the
-        # intentional-reuse path the fix must not disable.
         same_scale_bench = TransactionPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
         assert same_scale_bench.is_setup(loaded_tpch_conn) is True
 
     def test_scale_mismatch_forces_rebuild(self, tmp_path: Path, loaded_tpch_conn):
-        """The exact bug: staging tables from a scale-0.01 run must not satisfy
-        is_setup() for a scale-1.0 run against the same physical database."""
         small = TransactionPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
         small.setup(loaded_tpch_conn, force=False)
         assert small.is_setup(loaded_tpch_conn) is True
@@ -164,38 +124,20 @@ class TestTransactionPrimitivesStagingProvenance:
         assert large.is_setup(loaded_tpch_conn) is False
 
     def test_legacy_populated_unmanifested_database_forces_rebuild(self, tmp_path: Path, loaded_tpch_conn):
-        """A database populated by pre-manifest code (staging tables present
-        and non-empty, but `benchbox_staging_manifest` never written) must be
-        treated as NOT set up -- defaulting a missing manifest to "probably
-        fine" would just reinstate the bug this manifest exists to close."""
         bench = TransactionPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
 
-        # Seeded SHORT on purpose. Seeding the full source would make a healed
-        # database and an untouched one byte-identical, so the assertion below
-        # could not tell a real rebuild from a bare manifest write -- which is
-        # how the first version of this fix shipped with its headline bug
-        # intact and this test still green.
         loaded_tpch_conn.execute("CREATE TABLE txn_orders AS SELECT * FROM orders LIMIT 1")
         loaded_tpch_conn.execute("CREATE TABLE txn_lineitem AS SELECT * FROM lineitem LIMIT 1")
         loaded_tpch_conn.execute("CREATE TABLE txn_customer AS SELECT * FROM customer LIMIT 1")
 
         assert bench.is_setup(loaded_tpch_conn) is False
 
-        # Self-heal means the staging data is actually rebuilt from source, not
-        # merely stamped with a manifest.
         bench.setup(loaded_tpch_conn, force=False)
         assert _rows(loaded_tpch_conn, "txn_orders") == _rows(loaded_tpch_conn, "orders")
         assert _rows(loaded_tpch_conn, "txn_lineitem") == _rows(loaded_tpch_conn, "lineitem")
         assert bench.is_setup(loaded_tpch_conn) is True
 
     def test_stale_scale_rebuild_repopulates_staging(self, tmp_path: Path, loaded_tpch_conn):
-        """Staging left over from a smaller scale is rebuilt, not certified.
-
-        `_prepare_operation` reacts to a False `is_setup()` by calling
-        `setup(force=False)`. If that call short-circuits on the non-empty
-        stale tables while still writing the manifest, the run benchmarks the
-        wrong data volume and the database is left asserting it did not.
-        """
         small = TransactionPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
         small.setup(loaded_tpch_conn, force=False)
         before = _snapshot(loaded_tpch_conn, _TXN_GATED_TABLES)
@@ -211,15 +153,6 @@ class TestTransactionPrimitivesStagingProvenance:
         assert large.is_setup(loaded_tpch_conn) is True
 
     def test_manifest_from_the_pre_rebuild_generation_is_not_reused(self, tmp_path: Path, loaded_tpch_conn):
-        """A manifest written by the generation that certified without rebuilding must not match.
-
-        That generation wrote its row unconditionally at the end of setup(),
-        including on the path that skipped repopulation. Those rows are
-        internally consistent -- right scale, right spec, digest of the live
-        source -- while the staging data they describe is stale. If the current
-        code read them, every database that generation mis-certified would stay
-        silently wrong forever instead of rebuilding once.
-        """
         bench = TransactionPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
         benchmark_id, scale, spec_version = bench._staging_provenance_key()
         digest = bench._staging_source_digest(loaded_tpch_conn, ["orders", "lineitem", "customer"])
@@ -241,20 +174,11 @@ class TestTransactionPrimitivesStagingProvenance:
 
         bench.setup(loaded_tpch_conn, force=False)
         assert _rows(loaded_tpch_conn, "txn_orders") == _rows(loaded_tpch_conn, "orders")
-        # The superseded generation's table is cleaned up, not left as cruft.
         for legacy in bench._LEGACY_STAGING_MANIFEST_TABLES:
             with pytest.raises(duckdb.CatalogException):
                 loaded_tpch_conn.execute(f"SELECT 1 FROM {legacy}")
 
     def test_v2_manifest_row_from_before_catalog_managed_ddl_is_not_reused(self, tmp_path: Path, loaded_tpch_conn):
-        """A v2 manifest row cannot certify pre-catalogManaged staging tables.
-
-        The v2 row is internally consistent (right scale, spec, source digest)
-        but the tables it describes predate the Databricks catalogManaged DDL
-        requirement. Reusing it would leave ``CREATE TABLE IF NOT EXISTS`` as a
-        no-op on legacy tables and keep failing transaction operations, so the
-        v3 generation must force one rebuild and drop the v2 table as cruft.
-        """
         bench = TransactionPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
         benchmark_id, scale, spec_version = bench._staging_provenance_key()
         digest = bench._staging_source_digest(loaded_tpch_conn, ["orders", "lineitem", "customer"])
@@ -281,8 +205,6 @@ class TestTransactionPrimitivesStagingProvenance:
 
 
 class TestWritePrimitivesStagingProvenance:
-    """WritePrimitivesBenchmark.is_setup() via the shared manifest."""
-
     def test_no_manifest_is_not_setup(self, tmp_path: Path, loaded_tpch_conn):
         bench = WritePrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
         assert bench.is_setup(loaded_tpch_conn) is False
@@ -306,8 +228,6 @@ class TestWritePrimitivesStagingProvenance:
     def test_legacy_populated_unmanifested_database_forces_rebuild(self, tmp_path: Path, loaded_tpch_conn):
         bench = WritePrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
 
-        # Seeded SHORT for the same reason as the transaction_primitives case:
-        # a full-source seed cannot distinguish a rebuild from a manifest write.
         loaded_tpch_conn.execute("CREATE TABLE update_ops_orders AS SELECT * FROM orders LIMIT 1")
         loaded_tpch_conn.execute("CREATE TABLE delete_ops_orders AS SELECT * FROM orders LIMIT 1")
         loaded_tpch_conn.execute("CREATE TABLE delete_ops_lineitem AS SELECT * FROM lineitem LIMIT 1")
@@ -325,7 +245,6 @@ class TestWritePrimitivesStagingProvenance:
         assert bench.is_setup(loaded_tpch_conn) is True
 
     def test_stale_scale_rebuild_repopulates_staging(self, tmp_path: Path, loaded_tpch_conn):
-        """write_primitives has the identical setup() short-circuit; pin it too."""
         small = WritePrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
         small.setup(loaded_tpch_conn, force=False)
         before = _snapshot(loaded_tpch_conn, _WRITE_GATED_TABLES)
@@ -342,8 +261,6 @@ class TestWritePrimitivesStagingProvenance:
 
 
 class TestStagingManifestHelpers:
-    """Direct coverage of the shared TransactionalBenchmarkBase manifest helpers."""
-
     def test_source_digest_reflects_row_counts(self, tmp_path: Path, loaded_tpch_conn):
         bench = TransactionPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
         digest_before = bench._staging_source_digest(loaded_tpch_conn, ["orders", "lineitem", "customer"])
@@ -375,7 +292,6 @@ class TestStagingManifestHelpers:
         ],
     )
     def test_manifest_text_type_matches_dialect(self, tmp_path: Path, dialect: str, expected: str):
-        """Databricks rejects a bare VARCHAR (verified live) and BigQuery has no VARCHAR."""
         bench = TransactionPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
         bench._setup_dialect = dialect
         assert bench._manifest_text_type() == expected
@@ -388,13 +304,6 @@ class TestStagingManifestHelpers:
         assert bench._staging_manifest_matches(loaded_tpch_conn, ["orders", "lineitem", "customer"]) is False
 
     def test_prepare_operation_seeds_setup_dialect_before_reuse_probe(self, tmp_path: Path):
-        """_prepare_operation quotes reuse probes with the platform dialect.
-
-        On a fresh benchmark object against an initialized cloud database,
-        is_setup() must quote staging probes with platform_key (backticked
-        UPPERCASE on BigQuery), not the default "standard" quoting, or a
-        healthy reused database mis-probes and reruns setup.
-        """
         from unittest.mock import MagicMock
 
         from benchbox.core.transaction_primitives.benchmark import TransactionPrimitivesBenchmark

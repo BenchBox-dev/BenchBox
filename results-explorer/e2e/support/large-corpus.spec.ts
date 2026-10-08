@@ -49,7 +49,6 @@ async function waitForServer(url: string, server: ChildProcess, output: () => st
       const response = await fetch(url);
       if (response.ok) return;
     } catch {
-      // The child is still binding its socket.
     }
     await new Promise((resolveWait) => setTimeout(resolveWait, 50));
   }
@@ -84,8 +83,6 @@ async function withLargeFixture(run: (baseUrl: string) => Promise<void>) {
 }
 
 test.describe("large corpus fixture", () => {
-  // CI can need more than the global 90 seconds to generate the 292-result fixture
-  // before the browser assertions begin.
   test.describe.configure({ timeout: 240_000 });
 
   test("large comparison rankings cap initial rows and expose the remaining platforms", async ({ browser }) => {
@@ -114,8 +111,6 @@ test.describe("large corpus fixture", () => {
         await showMore.click();
         await expect.poll(() => grid.locator("tbody tr").count()).toBeGreaterThan(225);
         await expect(showMore).toHaveCount(0);
-        // The ranking is deliberately a long table; filtering remains usable
-        // after expansion and starts from the complete corpus.
         await page.goto(`${baseUrl}/results/compare?platform=duckdb`);
         await expect(grid.locator("tbody tr")).toHaveCount(1);
         await expect(grid.locator("tbody tr").getByRole("link", { name: "DuckDB", exact: true })).toBeVisible();

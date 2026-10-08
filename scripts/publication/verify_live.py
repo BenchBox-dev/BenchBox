@@ -1,26 +1,4 @@
 #!/usr/bin/env python3
-"""Verify live publication endpoints, candidate receipts, and no-op deployment invariants.
-
-This script inspects live publication endpoints and pre-deploy candidate receipts
-(e.g. public documentation, Results Explorer, and the public DuckDB database),
-comparing live and candidate checksums and headers against a deployment receipt
-or publication baseline.
-
-Contract:
-- Pre-deploy candidate check: when --candidate-manifest or --candidate-digest is
-  provided, compares candidate checksums against --baseline-manifest / --baseline-digest.
-  If --expect-noop is set, fails immediately if the candidate mutates baseline state.
-- Live probe check: probes required publication endpoints for responsiveness (200 OK),
-  latency, and checksum equality.
-- When --require-receipt is provided, requires a valid manifest/receipt and
-  verifies that endpoint or candidate hashes match expected values.
-- Outputs structured diagnostic summary with timing and status codes.
-
-Exit codes:
-  0 - All live probes and receipt verifications passed.
-  1 - Verification failure (HTTP error, checksum mismatch, unexpected mutation).
-  2 - Configuration or usage error (unreadable manifest, invalid arguments).
-"""
 
 from __future__ import annotations
 
@@ -36,6 +14,30 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+CLI_DESCRIPTION = (
+    "Verify live publication endpoints, candidate receipts, and no-op deployment invariants.\n"
+    "\n"
+    "This script inspects live publication endpoints and pre-deploy candidate receipts\n"
+    "(e.g. public documentation, Results Explorer, and the public DuckDB database),\n"
+    "comparing live and candidate checksums and headers against a deployment receipt\n"
+    "or publication baseline.\n"
+    "\n"
+    "Contract:\n"
+    "- Pre-deploy candidate check: when --candidate-manifest or --candidate-digest is\n"
+    "  provided, compares candidate checksums against --baseline-manifest / --baseline-digest.\n"
+    "  If --expect-noop is set, fails immediately if the candidate mutates baseline state.\n"
+    "- Live probe check: probes required publication endpoints for responsiveness (200 OK),\n"
+    "  latency, and checksum equality.\n"
+    "- When --require-receipt is provided, requires a valid manifest/receipt and\n"
+    "  verifies that endpoint or candidate hashes match expected values.\n"
+    "- Outputs structured diagnostic summary with timing and status codes.\n"
+    "\n"
+    "Exit codes:\n"
+    "  0 - All live probes and receipt verifications passed.\n"
+    "  1 - Verification failure (HTTP error, checksum mismatch, unexpected mutation).\n"
+    "  2 - Configuration or usage error (unreadable manifest, invalid arguments).\n"
+)
 
 DEFAULT_BASE_URL = "https://benchbox.dev"
 DEFAULT_TIMEOUT = 30.0
@@ -61,7 +63,7 @@ STATUS_UNAVAILABLE = "unavailable"
 
 @dataclass
 class DimensionResult:
-    status: str  # "pass", "fail", "unavailable"
+    status: str
     reason: str | None = None
     details: dict[str, Any] = field(default_factory=dict)
 
@@ -129,16 +131,13 @@ class VerificationReport:
 
 
 def extract_expected_checksums(manifest_data: dict[str, Any]) -> dict[str, str]:
-    """Extract expected path -> sha256 checksums from various manifest/receipt formats."""
     expected: dict[str, str] = {}
 
-    # Format 1: Publication baseline schema (e.g. publication-baseline-2026-08-31.json)
     if "live_database" in manifest_data and isinstance(manifest_data["live_database"], dict):
         db_info = manifest_data["live_database"]
         if "sha256" in db_info and db_info["sha256"]:
             expected["/results/data/results.duckdb"] = str(db_info["sha256"]).strip()
 
-    # Format 2: Direct receipt format with checksums / files mapping
     if "checksums" in manifest_data and isinstance(manifest_data["checksums"], dict):
         for raw_path, sha in manifest_data["checksums"].items():
             norm_path = raw_path if raw_path.startswith("/") else f"/{raw_path}"
@@ -154,9 +153,6 @@ def extract_expected_checksums(manifest_data: dict[str, Any]) -> dict[str, str]:
                 norm_p = p if p.startswith("/") else f"/{p}"
                 expected[norm_p] = str(artifact["sha256"]).strip()
 
-    # Publication receipts use the canonical manifest's mapping form.  Keep
-    # route checks and byte checks separate: only entries with an explicit
-    # checksum are byte-equivalence claims.
     if "artifacts" in manifest_data and isinstance(manifest_data["artifacts"], dict):
         for artifact in manifest_data["artifacts"].values():
             if not isinstance(artifact, dict) or not artifact.get("path"):
@@ -169,7 +165,6 @@ def extract_expected_checksums(manifest_data: dict[str, Any]) -> dict[str, str]:
 
 
 def load_manifest_checksums(manifest_path: Path) -> dict[str, str]:
-    """Read a manifest JSON file and extract checksums."""
     manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
     return extract_expected_checksums(manifest_data)
 
@@ -179,14 +174,10 @@ def compare_candidate_against_baseline(
     baseline_checksums: dict[str, str],
     expect_noop: bool = False,
 ) -> tuple[dict[str, str], dict[str, dict[str, str]], list[str]]:
-    """Compare candidate checksums against baseline checksums."""
     matched: dict[str, str] = {}
     mismatched: dict[str, dict[str, str]] = {}
     errors: list[str] = []
 
-    # A frozen baseline defines the scope of a no-op assertion. Newer
-    # manifests may carry additional endpoint checksums; compare every path
-    # the baseline attests without treating those stronger claims as drift.
     comparison_paths = baseline_checksums if expect_noop else candidate_checksums
     for path in comparison_paths:
         cand_sha = candidate_checksums.get(path)
@@ -219,7 +210,6 @@ def probe_endpoint(
     timeout: float = DEFAULT_TIMEOUT,
     compute_hash: bool = True,
 ) -> EndpointProbeResult:
-    """Probe a single endpoint over HTTP/HTTPS, computing latency, status, and SHA-256."""
     norm_path = path if path.startswith("/") else f"/{path}"
     full_url = urllib.parse.urljoin(base_url.rstrip("/") + "/", norm_path.lstrip("/"))
     result = EndpointProbeResult(path=norm_path, url=full_url)
@@ -231,7 +221,7 @@ def probe_endpoint(
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as response:  # noqa: S310
+        with urllib.request.urlopen(req, timeout=timeout) as response:
             elapsed = (time.monotonic() - start_time) * 1000.0
             result.latency_ms = round(elapsed, 2)
             result.status_code = getattr(response, "status", 200)
@@ -430,7 +420,6 @@ def verify_live(
     require_complete_checksums: bool = False,
     availability_only: bool = False,
 ) -> VerificationReport:
-    """Perform comprehensive pre-deploy candidate and/or live verification."""
     report = VerificationReport(
         base_url=base_url,
         observation_origin=observation_origin,
@@ -479,20 +468,8 @@ def verify_live(
 
 
 def evaluate_certification_reports(reports_dir: Path) -> FiveDimensionCertification:
-    """Evaluate 5 operational dimensions from diagnostic reports.
-
-    Dimensions:
-    1. service_availability: probe report shows 200 OK across public routes
-    2. exact_content_identity: matched checksums across required routes
-    3. state_reconciliation: 4-way reconciliation report shows 0 drift
-    4. lane_independence: lane independence matrix shows valid transitions
-    5. operational_recovery: operational receipts report shows valid drills & capacity
-
-    A missing drill/evidence is UNAVAILABLE, never green or not-applicable.
-    """
     dimensions: dict[str, DimensionResult] = {}
 
-    # 1. Service Availability & 2. Content Identity (from availability-report.json)
     avail_file = reports_dir / "availability-report.json"
     if not avail_file.is_file():
         dimensions[DIMENSION_AVAILABILITY] = DimensionResult(
@@ -519,7 +496,6 @@ def evaluate_certification_reports(reports_dir: Path) -> FiveDimensionCertificat
                     details={"failed_probes": http_errors},
                 )
 
-            # Content identity
             matched = avail_data.get("matched_checksums", {})
             mismatched = avail_data.get("mismatched_checksums", {})
             if mismatched:
@@ -545,7 +521,6 @@ def evaluate_certification_reports(reports_dir: Path) -> FiveDimensionCertificat
                 status=STATUS_UNAVAILABLE, reason=f"Unreadable availability report: {exc}"
             )
 
-    # 3. State Reconciliation (from reconciliation-report.json)
     recon_file = reports_dir / "reconciliation-report.json"
     if not recon_file.is_file():
         dimensions[DIMENSION_RECONCILIATION] = DimensionResult(
@@ -569,7 +544,6 @@ def evaluate_certification_reports(reports_dir: Path) -> FiveDimensionCertificat
                 status=STATUS_UNAVAILABLE, reason=f"Unreadable reconciliation report: {exc}"
             )
 
-    # 4. Lane Independence (from independence-matrix-report.json)
     indep_file = reports_dir / "independence-matrix-report.json"
     if not indep_file.is_file():
         dimensions[DIMENSION_INDEPENDENCE] = DimensionResult(
@@ -601,7 +575,6 @@ def evaluate_certification_reports(reports_dir: Path) -> FiveDimensionCertificat
                 status=STATUS_UNAVAILABLE, reason=f"Unreadable independence report: {exc}"
             )
 
-    # 5. Operational Recovery (from operational-receipts-report.json)
     op_file = reports_dir / "operational-receipts-report.json"
     if not op_file.is_file():
         dimensions[DIMENSION_OPERATIONAL_RECOVERY] = DimensionResult(
@@ -641,7 +614,7 @@ def evaluate_certification_reports(reports_dir: Path) -> FiveDimensionCertificat
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description=__doc__,
+        description=CLI_DESCRIPTION,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(

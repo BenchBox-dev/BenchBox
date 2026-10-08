@@ -1,5 +1,3 @@
-"""Contract and architecture tests for publication transactions workflow."""
-
 from __future__ import annotations
 
 import re
@@ -48,13 +46,10 @@ def test_transaction_workflow_permissions_follow_least_privilege() -> None:
     wf = _load_yaml(TX_WORKFLOW_PATH)
     jobs = wf["jobs"]
 
-    # Top-level is read-only
     assert wf.get("permissions") == {"contents": "read"}
 
-    # prepare: read-only
     assert jobs["prepare"]["permissions"] == {"contents": "read", "actions": "read"}
 
-    # deploy: contents: write (for journal CAS), pages: write, id-token: write, actions: read
     assert jobs["deploy"]["permissions"] == {
         "contents": "write",
         "pages": "write",
@@ -63,24 +58,19 @@ def test_transaction_workflow_permissions_follow_least_privilege() -> None:
     }
     assert jobs["deploy"]["environment"]["name"] == "github-pages"
 
-    # verify: contents: write (for journal CAS)
     assert jobs["verify"]["permissions"] == {"contents": "write"}
     assert jobs["verify"]["environment"]["name"] == "publication-attestation"
 
-    # finalize: contents: write (for journal CAS)
     assert jobs["finalize"]["permissions"] == {"contents": "write"}
 
 
 def test_transaction_workflow_concurrency_scoped_to_deploy_job() -> None:
     wf = _load_yaml(TX_WORKFLOW_PATH)
 
-    # Top-level workflow must NOT lock pages-deploy across candidate preparation
     assert "concurrency" not in wf
 
-    # prepare job must NOT lock pages-deploy
     assert "concurrency" not in wf["jobs"]["prepare"]
 
-    # deploy job alone holds the pages-deploy lock
     assert wf["jobs"]["deploy"]["concurrency"] == {
         "group": "pages-deploy",
         "cancel-in-progress": False,
@@ -108,14 +98,6 @@ def test_transaction_workflow_pins_all_actions() -> None:
 
 
 def test_five_write_paths_inventory_and_disabled_or_journaled_invariant() -> None:
-    """Inventory the remaining Pages write paths (promotion, rollback, legacy recovery, preview, site-deploy).
-
-    Assert the invariant: every Pages write path is either:
-    1. A journaled transaction in publication-transaction.yml (promotion, rollback)
-    2. An approved legacy path with scoped concurrency (publication-deploy.yml)
-    3. Explicitly disabled in code (publication-preview-deploy.yml)
-    4. The production deployer (site-deploy.yml)
-    """
     deploy_pages_workflows: list[Path] = []
     for path in WORKFLOWS_DIR.glob("*.yml"):
         content = path.read_text(encoding="utf-8")
@@ -124,9 +106,9 @@ def test_five_write_paths_inventory_and_disabled_or_journaled_invariant() -> Non
 
     workflow_names = {p.name for p in deploy_pages_workflows}
     expected_workflow_names = {
-        "publication-transaction.yml",  # Path 1 (promotion) & Path 2 (rollback)
-        "publication-deploy.yml",  # Path 4 (legacy recovery)
-        "publication-preview-deploy.yml",  # Path 5 (preview, disabled in code)
+        "publication-transaction.yml",
+        "publication-deploy.yml",
+        "publication-preview-deploy.yml",
         "site-deploy.yml",
     }
 
@@ -134,7 +116,6 @@ def test_five_write_paths_inventory_and_disabled_or_journaled_invariant() -> Non
         f"Unexpected Pages deployment workflows found. Expected only {expected_workflow_names}, got {workflow_names}"
     )
 
-    # Verify Path 5 (preview deploy) is disabled in code
     preview_wf = _load_yaml(PREVIEW_DEPLOY_PATH)
     deploy_job = preview_wf["jobs"]["deploy"]
     assert deploy_job.get("if") is False, "Preview deploy job must be disabled in code with 'if: false'"
@@ -144,7 +125,6 @@ def test_five_write_paths_inventory_and_disabled_or_journaled_invariant() -> Non
         "Preview deploy job must contain an explicit code guard asserting permanent disablement"
     )
 
-    # Verify Path 4 (publication-deploy.yml legacy recovery) has scoped concurrency and attested restore
     deploy_wf = _load_yaml(DEPLOY_PATH)
     assert "concurrency" not in deploy_wf, "publication-deploy.yml must not lock concurrency at workflow level"
     assert deploy_wf["jobs"]["deploy"]["concurrency"]["group"] == "pages-deploy"
@@ -158,12 +138,10 @@ def test_preview_soak_caller_handles_disabled_preview_gracefully() -> None:
 
 
 def test_transaction_workflow_manifest_transfer_across_jobs_contract() -> None:
-    """Verify artifact passing and manifest materialization across deploy and verify jobs."""
     wf = _load_yaml(TX_WORKFLOW_PATH)
     deploy_steps = wf["jobs"]["deploy"]["steps"]
     verify_steps = wf["jobs"]["verify"]["steps"]
 
-    # 1. Deploy job uploads candidate receipts as retained artifact
     upload_step = next(
         (s for s in deploy_steps if s.get("name") == "Retain candidate receipts for verification and audit"), None
     )
@@ -173,14 +151,12 @@ def test_transaction_workflow_manifest_transfer_across_jobs_contract() -> None:
     assert upload_step["with"]["path"] == "candidate-receipts/"
     assert upload_step["with"]["retention-days"] == 90
 
-    # 2. Verify job downloads candidate receipts artifact
     download_step = next((s for s in verify_steps if s.get("name") == "Download candidate receipts"), None)
     assert download_step is not None, "verify job must download candidate receipts artifact"
     assert download_step.get("if") == "needs.prepare.outputs.kind == 'promotion'"
     assert "publication-candidate-receipts-" in download_step["with"]["name"]
     assert download_step["with"]["path"] == "candidate-receipts"
 
-    # 3. Verify job materializes verification manifest for both promotion and rollback
     mat_step = next((s for s in verify_steps if s.get("name") == "Materialize verification manifest"), None)
     assert mat_step is not None, "verify job must materialize verification manifest"
     run_text = mat_step.get("run", "")
@@ -189,7 +165,6 @@ def test_transaction_workflow_manifest_transfer_across_jobs_contract() -> None:
     assert "restore_source" in run_text
     assert "parent_tx.attestation" in run_text
 
-    # 4. Verify job supplies --manifest and --require-receipt to verify_live.py
     probe_step = next((s for s in verify_steps if s.get("name") == "Probe required live routes"), None)
     assert probe_step is not None, "verify job must have probe step"
     probe_run = probe_step.get("run", "")
@@ -200,7 +175,6 @@ def test_transaction_workflow_manifest_transfer_across_jobs_contract() -> None:
 
 
 def test_transaction_verify_fails_closed_without_per_route_checksums() -> None:
-    """Promotion verify must refuse manifests that would reduce probing to HTTP-only checks."""
     wf = _load_yaml(TX_WORKFLOW_PATH)
     verify_steps = wf["jobs"]["verify"]["steps"]
     mat_step = next((s for s in verify_steps if s.get("name") == "Materialize verification manifest"), None)
@@ -237,7 +211,6 @@ class _MockHTTPResponse:
 
 
 def test_isolated_job_promotion_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Isolated-job proof for promotion: missing manifest, wrong digest, partial routes, matching bytes."""
     import hashlib
     import json
     import urllib.error
@@ -245,7 +218,6 @@ def test_isolated_job_promotion_contract(tmp_path: Path, monkeypatch: pytest.Mon
 
     from scripts.publication import verify_live as verify_live_mod
 
-    # Setup isolated directories
     deploy_dir = tmp_path / "runner_deploy"
     verify_dir = tmp_path / "runner_verify"
     deploy_dir.mkdir()
@@ -256,7 +228,6 @@ def test_isolated_job_promotion_contract(tmp_path: Path, monkeypatch: pytest.Mon
     root_sha = hashlib.sha256(root_bytes).hexdigest()
     duckdb_sha = hashlib.sha256(duckdb_bytes).hexdigest()
 
-    # In deploy runner: candidate receipts generated
     cand_dir = deploy_dir / "candidate-receipts"
     cand_dir.mkdir()
     manifest_data = {
@@ -268,7 +239,6 @@ def test_isolated_job_promotion_contract(tmp_path: Path, monkeypatch: pytest.Mon
     }
     (cand_dir / "desired-manifest.json").write_text(json.dumps(manifest_data), encoding="utf-8")
 
-    # Case 1: Missing manifest fails closed in verify runner
     report_missing = verify_live_mod.verify_live(
         base_url="https://benchbox.dev",
         manifest_path=verify_dir / "missing.json",
@@ -277,14 +247,12 @@ def test_isolated_job_promotion_contract(tmp_path: Path, monkeypatch: pytest.Mon
     assert report_missing.ok is False
     assert any("not found" in e or "missing" in e for e in report_missing.errors)
 
-    # Artifact transfer: simulate actions/download-artifact into fresh verify runner
     verify_cand_dir = verify_dir / "candidate-receipts"
     verify_cand_dir.mkdir()
     (verify_cand_dir / "desired-manifest.json").write_text(
         (cand_dir / "desired-manifest.json").read_text(encoding="utf-8"), encoding="utf-8"
     )
 
-    # Materialize verification manifest in verify runner
     tx_artifacts = verify_dir / "transaction-artifacts"
     tx_artifacts.mkdir()
     verif_manifest_path = tx_artifacts / "verification-manifest.json"
@@ -292,7 +260,6 @@ def test_isolated_job_promotion_contract(tmp_path: Path, monkeypatch: pytest.Mon
         (verify_cand_dir / "desired-manifest.json").read_text(encoding="utf-8"), encoding="utf-8"
     )
 
-    # Case 2: Wrong digest fails closed
     def mock_wrong_urlopen(req: Any, timeout: float = 30) -> _MockHTTPResponse:
         url = req.full_url if hasattr(req, "full_url") else str(req)
         if url.endswith("/results/data/results.duckdb"):
@@ -308,11 +275,10 @@ def test_isolated_job_promotion_contract(tmp_path: Path, monkeypatch: pytest.Mon
     assert report_wrong.ok is False
     assert "/results/data/results.duckdb" in report_wrong.mismatched_checksums
 
-    # Case 3: Partial routes (HTTP 404 on a route) fails closed
     def mock_partial_urlopen(req: Any, timeout: float = 30) -> _MockHTTPResponse:
         url = req.full_url if hasattr(req, "full_url") else str(req)
         if url.endswith("/results/data/results.duckdb"):
-            raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)  # type: ignore[arg-type]
+            raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
         return _MockHTTPResponse(root_bytes, status=200)
 
     monkeypatch.setattr(urllib.request, "urlopen", mock_partial_urlopen)
@@ -324,7 +290,6 @@ def test_isolated_job_promotion_contract(tmp_path: Path, monkeypatch: pytest.Mon
     assert report_partial.ok is False
     assert any("404" in e for e in report_partial.errors)
 
-    # Case 4: Successful matching bytes
     def mock_matching_urlopen(req: Any, timeout: float = 30) -> _MockHTTPResponse:
         url = req.full_url if hasattr(req, "full_url") else str(req)
         if url.endswith("/results/data/results.duckdb"):
@@ -344,7 +309,6 @@ def test_isolated_job_promotion_contract(tmp_path: Path, monkeypatch: pytest.Mon
 
 
 def test_isolated_job_rollback_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Isolated-job proof for rollback: absent parent attestation, wrong digest, matching restored bytes."""
     import hashlib
     import json
     import urllib.request
@@ -360,7 +324,6 @@ def test_isolated_job_rollback_contract(tmp_path: Path, monkeypatch: pytest.Monk
     restored_root_sha = hashlib.sha256(restored_root).hexdigest()
     restored_db_sha = hashlib.sha256(restored_db).hexdigest()
 
-    # Case 1: Parent transaction lacking attestation routes fails closed
     parent_tx_bad = {
         "transaction_id": "tx-parent-bad",
         "attestation": None,
@@ -370,7 +333,6 @@ def test_isolated_job_rollback_contract(tmp_path: Path, monkeypatch: pytest.Monk
             raise SystemExit("parent transaction lacks live attestation routes for rollback verification")
     assert "lacks live attestation routes" in str(exc.value)
 
-    # Parent transaction with valid prior live-receipt attestation
     parent_tx = {
         "transaction_id": "tx-parent-good",
         "content": {"manifest_digest": "sha256:parent123"},
@@ -382,7 +344,6 @@ def test_isolated_job_rollback_contract(tmp_path: Path, monkeypatch: pytest.Monk
         },
     }
 
-    # Materialize rollback verification manifest
     rollback_manifest = {
         "manifest_digest": parent_tx["content"]["manifest_digest"],
         "checksums": {
@@ -392,7 +353,6 @@ def test_isolated_job_rollback_contract(tmp_path: Path, monkeypatch: pytest.Monk
     manifest_path = tx_artifacts / "verification-manifest.json"
     manifest_path.write_text(json.dumps(rollback_manifest), encoding="utf-8")
 
-    # Case 2: Wrong digest (e.g. still serving failed content instead of restored content)
     def mock_failed_content_urlopen(req: Any, timeout: float = 30) -> _MockHTTPResponse:
         return _MockHTTPResponse(b"corrupted-or-unrestored-content", status=200)
 
@@ -405,7 +365,6 @@ def test_isolated_job_rollback_contract(tmp_path: Path, monkeypatch: pytest.Monk
     assert report_mismatch.ok is False
     assert any("Receipt checksum mismatch" in e for e in report_mismatch.errors)
 
-    # Case 3: Matching restored bytes succeeds
     def mock_restored_urlopen(req: Any, timeout: float = 30) -> _MockHTTPResponse:
         url = req.full_url if hasattr(req, "full_url") else str(req)
         if url.endswith("/results/data/results.duckdb"):
@@ -424,7 +383,6 @@ def test_isolated_job_rollback_contract(tmp_path: Path, monkeypatch: pytest.Monk
 
 
 def test_publication_deploy_validates_generation_against_journal_next_generation() -> None:
-    """publication-deploy.yml must reject requested generations beyond journal next_generation."""
     deploy_wf = _load_yaml(DEPLOY_PATH)
     inputs_step = next(s for s in deploy_wf["jobs"]["build"]["steps"] if s.get("id") == "inputs")
     run_inputs = inputs_step.get("run", "")
@@ -438,24 +396,19 @@ def test_publication_deploy_validates_generation_against_journal_next_generation
 
 
 def test_transaction_workflow_reconciliation_wiring() -> None:
-    """Verify reconciliation path wiring: failure overrides, step inputs, and token binding."""
     wf = _load_yaml(TX_WORKFLOW_PATH)
     jobs = wf["jobs"]
 
-    # deploy job is skipped during operator reconciliation dispatch
     assert "reconcile_transaction_id" in jobs["deploy"].get("if", "")
 
-    # verify job executes on success, post-send failure, or reconciliation dispatch
     verify_if = jobs["verify"].get("if", "")
     assert "needs.deploy.result == 'success'" in verify_if
     assert "needs.deploy.result == 'failure'" in verify_if
     assert "reconcile_transaction_id" in verify_if
 
-    # finalize job strictly requires verify success
     fin_if = jobs["finalize"].get("if", "")
     assert "needs.verify.result == 'success'" in fin_if
 
-    # verify job passes github token to record-verification
     verify_steps = jobs["verify"]["steps"]
     rec_step = next((s for s in verify_steps if s.get("name") == "Record verification success in journal CAS"), None)
     assert rec_step is not None
@@ -463,13 +416,6 @@ def test_transaction_workflow_reconciliation_wiring() -> None:
 
 
 def test_transaction_validates_candidate_against_bounded_develop_ancestry() -> None:
-    """Both validations accept a candidate built from the tip or a recent ancestor.
-
-    The pre-approval check pins the resolved tip with an explicit commit
-    bound; the post-approval check re-resolves the tip after the approval
-    wait instead of reusing the permit value, so queued approvals survive
-    merge-queue landings without accepting unreachable or stale bundles.
-    """
     text = TX_WORKFLOW_PATH.read_text(encoding="utf-8")
     assert text.count("--develop-max-behind-commits 50") >= 2
 

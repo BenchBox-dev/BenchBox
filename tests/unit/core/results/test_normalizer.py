@@ -1,5 +1,3 @@
-"""Tests for benchbox.core.results.normalizer module."""
-
 import pytest
 
 from benchbox.core.results.normalizer import (
@@ -18,8 +16,6 @@ pytestmark = [
 
 
 class TestDetectSchemaVersion:
-    """Tests for detect_schema_version function."""
-
     def test_detects_v2_0(self):
         data = {"version": "2.0"}
         assert detect_schema_version(data) == "2.0"
@@ -54,8 +50,6 @@ class TestDetectSchemaVersion:
 
 
 class TestNormalizeResultDictV2:
-    """Tests for normalize_result_dict with v2.x schema."""
-
     @pytest.fixture
     def v2_result(self):
         result = make_v2_result_dict(
@@ -130,7 +124,7 @@ class TestNormalizeResultDictV2:
 
     def test_calculates_success_rate(self, v2_result):
         result = normalize_result_dict(v2_result)
-        assert result.success_rate == 0.9  # 18/20
+        assert result.success_rate == 0.9
 
     def test_extracts_cost(self, v2_result):
         result = normalize_result_dict(v2_result)
@@ -158,8 +152,6 @@ class TestNormalizeResultDictV2:
 
 
 class TestNormalizeResultDictV1:
-    """Tests for normalize_result_dict with v1.x schema."""
-
     @pytest.fixture
     def v1_result(self):
         return {
@@ -189,7 +181,7 @@ class TestNormalizeResultDictV1:
                             "status": "SUCCESS",
                         },
                         {
-                            "id": "Q2",  # Alternative key name
+                            "id": "Q2",
                             "execution_time_ms": 200.0,
                             "rows_returned": 50,
                             "status": "SUCCESS",
@@ -246,8 +238,6 @@ class TestNormalizeResultDictV1:
 
 
 class TestNormalizeResultDictEdgeCases:
-    """Edge case tests for normalize_result_dict."""
-
     def test_handles_empty_data(self):
         result = normalize_result_dict({})
         assert result.benchmark == "unknown"
@@ -289,8 +279,6 @@ class TestNormalizeResultDictEdgeCases:
 
 
 class TestGetQueryMap:
-    """Tests for get_query_map helper function."""
-
     def test_creates_map_from_queries(self):
         normalized = NormalizedResultDict(
             schema_version="2.0",

@@ -1,5 +1,3 @@
-"""The docs generators run as explicit pre-build make steps, not Sphinx hooks."""
-
 from __future__ import annotations
 
 import shutil

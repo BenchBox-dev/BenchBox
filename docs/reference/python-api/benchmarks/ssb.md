@@ -25,13 +25,10 @@ The Star Schema Benchmark (SSB) is a simplified variant of TPC-H specifically de
 from benchbox import SSB
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Create benchmark
 benchmark = SSB(scale_factor=1.0)
 
-# Generate data
 benchmark.generate_data()
 
-# Run on platform
 adapter = DuckDBAdapter()
 results = benchmark.run_with_platform(adapter)
 
@@ -119,8 +116,9 @@ At scale factor 0.01:
 ```python
 data_files = benchmark.generate_data()
 print(f"Generated {len(data_files)} table files")
-# Generated 5 table files
 ```
+
+This prints `Generated 5 table files`.
 
 ### get_query(query_id, \*, params=None)
 
@@ -157,16 +155,13 @@ Parameter names and defaults:
 | `year1`, `year2` | `1997`, `1998` | Q4.2, Q4.3 |
 
 ```python
-# Get Flight 1 query
 q1_1 = benchmark.get_query("Q1.1")
 
-# Get with custom parameters
 q2_1 = benchmark.get_query("Q2.1", params={
     "category": "MFGR#12",
     "region": "EUROPE"
 })
 
-# Get Flight 3 query
 q3_1 = benchmark.get_query("Q3.1")
 ```
 
@@ -181,10 +176,11 @@ With a `dialect`, each query is translated with SQLGlot. DuckDB output for Q1.1 
 ```python
 queries = benchmark.get_queries()
 print(f"Total queries: {len(queries)}")
-# Total queries: 13
 
 queries_ch = benchmark.get_queries(dialect="clickhouse")
 ```
+
+The first print shows `Total queries: 13`.
 
 ### get_schema()
 
@@ -196,11 +192,6 @@ queries_ch = benchmark.get_queries(dialect="clickhouse")
 schema = benchmark.get_schema()
 for name, table in schema.items():
     print(f"{table['name']}: {len(table['columns'])} columns")
-# date: 17 columns
-# customer: 8 columns
-# supplier: 7 columns
-# part: 9 columns
-# lineorder: 17 columns
 ```
 
 ### get_create_tables_sql(dialect="standard", tuning_config=None)
@@ -220,8 +211,9 @@ from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 create_sql = benchmark.get_create_tables_sql()
 create_sql_pk = benchmark.get_create_tables_sql(tuning_config=UnifiedTuningConfiguration())
 print(create_sql.count("PRIMARY KEY"), create_sql_pk.count("PRIMARY KEY"))
-# 0 5
 ```
+
+This prints `0 5`.
 
 ### Inherited members
 
@@ -276,15 +268,13 @@ SSB organizes 13 queries into 4 logical flights:
 
 ### Flight 1: Simple Aggregation (Q1.1 - Q1.3)
 
-Tests basic aggregation and filtering on the fact table.
+Tests basic aggregation and filtering on the fact table. Each flight loop below only builds the query text; run it on your connection.
 
 ```python
-# Flight 1 focuses on fact table scan performance
 flight_1_queries = ["Q1.1", "Q1.2", "Q1.3"]
 
 for query_id in flight_1_queries:
     query = benchmark.get_query(query_id)
-    # Execute query...
 ```
 
 **Query Characteristics**:
@@ -298,14 +288,12 @@ for query_id in flight_1_queries:
 Tests dimension table joins and drill-down analysis.
 
 ```python
-# Flight 2 tests star schema join performance
 flight_2_queries = ["Q2.1", "Q2.2", "Q2.3"]
 
 for query_id in flight_2_queries:
     query = benchmark.get_query(query_id, params={
         "region": "AMERICA"
     })
-    # Execute query...
 ```
 
 **Query Characteristics**:
@@ -319,12 +307,10 @@ for query_id in flight_2_queries:
 Tests complex multi-dimension analysis with customer geography.
 
 ```python
-# Flight 3 tests complex star joins
 flight_3_queries = ["Q3.1", "Q3.2", "Q3.3", "Q3.4"]
 
 for query_id in flight_3_queries:
     query = benchmark.get_query(query_id)
-    # Execute query...
 ```
 
 **Query Characteristics**:
@@ -339,12 +325,10 @@ for query_id in flight_3_queries:
 Tests complex aggregation with profit calculations.
 
 ```python
-# Flight 4 tests analytical queries with calculations
 flight_4_queries = ["Q4.1", "Q4.2", "Q4.3"]
 
 for query_id in flight_4_queries:
     query = benchmark.get_query(query_id)
-    # Execute query...
 ```
 
 **Query Characteristics**:
@@ -361,21 +345,19 @@ for query_id in flight_4_queries:
 from benchbox import SSB
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Create benchmark with scale factor 1 (about 610 MB)
 benchmark = SSB(scale_factor=1.0)
 
-# Generate data
 benchmark.generate_data()
 
-# Run on DuckDB
 adapter = DuckDBAdapter()
 results = benchmark.run_with_platform(adapter)
 
-# Print results
 print(f"Benchmark: {results.benchmark_name}")
 print(f"Total time: {results.total_execution_time:.2f}s")
 print(f"Queries: {results.successful_queries}/{results.total_queries}")
 ```
+
+Scale factor 1 is about 610 MB.
 
 ### Flight-Based Execution
 
@@ -390,11 +372,9 @@ benchmark.generate_data()
 adapter = DuckDBAdapter()
 conn = adapter.create_connection()
 
-# Load data
 adapter.create_schema(benchmark, conn)
 adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-# Run Flight 1 (Simple Aggregation)
 print("Flight 1: Simple Aggregation")
 flight_1_queries = ["Q1.1", "Q1.2", "Q1.3"]
 
@@ -419,7 +399,6 @@ from benchbox import SSB
 
 benchmark = SSB(scale_factor=1.0)
 
-# Define custom parameters
 custom_params = {
     "year": 1994,
     "year_month": 199401,
@@ -436,7 +415,6 @@ custom_params = {
     "brand": "MFGR#2221"
 }
 
-# Get queries with custom parameters
 q1_1 = benchmark.get_query("Q1.1", params=custom_params)
 q2_1 = benchmark.get_query("Q2.1", params=custom_params)
 
@@ -467,13 +445,11 @@ import time
 benchmark = SSB(scale_factor=0.1)
 adapter = DuckDBAdapter()
 
-# Setup
 benchmark.generate_data()
 conn = adapter.create_connection()
 adapter.create_schema(benchmark, conn)
 adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-# Define all flights
 flights = {
     "Flight 1": ["Q1.1", "Q1.2", "Q1.3"],
     "Flight 2": ["Q2.1", "Q2.2", "Q2.3"],
@@ -481,7 +457,6 @@ flights = {
     "Flight 4": ["Q4.1", "Q4.2", "Q4.3"]
 }
 
-# Run all flights
 all_results = {}
 
 for flight_name, query_ids in flights.items():
@@ -505,7 +480,6 @@ for flight_name, query_ids in flights.items():
 
     all_results[flight_name] = flight_results
 
-# Summary
 print("\n" + "="*60)
 print("SSB Benchmark Summary")
 print("="*60)
@@ -560,8 +534,9 @@ from benchbox import SSB
 benchmark = SSB(scale_factor=0.1)
 ddl = benchmark.get_create_tables_sql()
 print([line for line in ddl.splitlines() if line.startswith("CREATE TABLE")])
-# ['CREATE TABLE date (', 'CREATE TABLE customer (', 'CREATE TABLE supplier (', 'CREATE TABLE part (', 'CREATE TABLE lineorder (']
 ```
+
+This prints `['CREATE TABLE date (', 'CREATE TABLE customer (', 'CREATE TABLE supplier (', 'CREATE TABLE part (', 'CREATE TABLE lineorder (']`.
 
 ### Scale Factor Comparison
 

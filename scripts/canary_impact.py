@@ -1,65 +1,3 @@
-"""Select release-canary or local-medium tests that changed paths can affect.
-
-The daily release canary runs the full non-fast suite (about 644 tests in
-72 files); running all of it in the merge queue would roughly double
-merge-queue runner-minutes. This selector computes each canary test file's
-dependencies from the tree under test and selects the tests whose
-dependencies include a changed path.
-
-Dependency rules (each closes a known gap in naive import scanning):
-
-- static imports, including every parent package ``__init__.py`` (Python
-  executes them on import), expanded transitively: an imported module's
-  own imports are edges too, so re-exported names (``from pkg import X``
-  where ``X`` lives in another module) and helper modules are covered;
-- ``importlib.import_module("<literal>")`` and ``__import__("<literal>")``;
-- repo paths built from constants: ``REPO_ROOT / "a" / "b"``,
-  ``Path(__file__).with_name("x")``, and path string literals in path
-  positions. A directory path depends on every file under it;
-- imports inside a string constant that parses as Python (tests that run
-  repo code via ``sys.executable -c <script>``);
-- ``tests/conftest.py`` and every module in its ``pytest_plugins`` list,
-  with their transitive dependencies, for every test;
-- the per-directory conftest chain pytest loads for each test file
-  (``tests/a/conftest.py`` for ``tests/a/b/test_x.py``), with their
-  ``pytest_plugins`` modules;
-- a changed non-Python file under ``benchbox/`` selects every canary test
-  that imports a module in the same directory;
-- changed or added canary test files always select themselves.
-
-Fail-safe rules (when unsure, select -- the selector may over-select but
-must never under-select silently):
-
-- per test: a canary test containing a dynamic edge the selector cannot
-  resolve (an import name or path built at runtime), in its own code or its
-  conftest chain, is always selected. Unresolved imports in its test-specific
-  library closure also select it;
-- whole suite: ``pyproject.toml``, ``uv.lock``, pytest configuration,
-  ``tests/conftest.py``, ``release-canary.yml``, or the selector itself
-  changed;
-- unmapped paths: a changed path that no dependency map references and
-  that is not on the reviewed ``CANT_AFFECT_CANARY`` list runs the whole
-  suite.
-
-Stdlib-only and read-only: the selector never imports ``benchbox`` and
-never executes test code. The marker expression and collection parsing
-are imported from ``scripts/release_canary_sharding.py``, not copied.
-
-Output is JSON with the selected node IDs, the reason each was selected
-(which changed path, through which edge), whether a whole-suite fallback
-fired and why, the dynamic edges observed in library code
-(``dynamic_library_sites``, for the shadow watch), and
-the canary collection it was computed against.
-
-Known limitation: registry-style dynamic loading inside the shared fixture
-closure (``import_module(name)`` with a runtime name) is unbounded, so it is
-reported rather than propagated: propagating it would always-select
-every test. A changed file no test references
-still runs the whole suite through the unmapped-path backstop; the
-residual shape (a mapped file affecting a test only through dynamic
-loading) is pinned by known-regression replay tests.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -72,9 +10,72 @@ import sys
 from pathlib import Path
 from typing import Any, NamedTuple
 
-try:  # executed as ``python scripts/canary_impact.py`` (scripts/ on sys.path)
+CLI_DESCRIPTION = (
+    "Select release-canary or local-medium tests that changed paths can affect.\n"
+    "\n"
+    "The daily release canary runs the full non-fast suite (about 644 tests in\n"
+    "72 files); running all of it in the merge queue would roughly double\n"
+    "merge-queue runner-minutes. This selector computes each canary test file's\n"
+    "dependencies from the tree under test and selects the tests whose\n"
+    "dependencies include a changed path.\n"
+    "\n"
+    "Dependency rules (each closes a known gap in naive import scanning):\n"
+    "\n"
+    "- static imports, including every parent package ``__init__.py`` (Python\n"
+    "  executes them on import), expanded transitively: an imported module's\n"
+    "  own imports are edges too, so re-exported names (``from pkg import X``\n"
+    "  where ``X`` lives in another module) and helper modules are covered;\n"
+    '- ``importlib.import_module("<literal>")`` and ``__import__("<literal>")``;\n'
+    '- repo paths built from constants: ``REPO_ROOT / "a" / "b"``,\n'
+    '  ``Path(__file__).with_name("x")``, and path string literals in path\n'
+    "  positions. A directory path depends on every file under it;\n"
+    "- imports inside a string constant that parses as Python (tests that run\n"
+    "  repo code via ``sys.executable -c <script>``);\n"
+    "- ``tests/conftest.py`` and every module in its ``pytest_plugins`` list,\n"
+    "  with their transitive dependencies, for every test;\n"
+    "- the per-directory conftest chain pytest loads for each test file\n"
+    "  (``tests/a/conftest.py`` for ``tests/a/b/test_x.py``), with their\n"
+    "  ``pytest_plugins`` modules;\n"
+    "- a changed non-Python file under ``benchbox/`` selects every canary test\n"
+    "  that imports a module in the same directory;\n"
+    "- changed or added canary test files always select themselves.\n"
+    "\n"
+    "Fail-safe rules (when unsure, select -- the selector may over-select but\n"
+    "must never under-select silently):\n"
+    "\n"
+    "- per test: a canary test containing a dynamic edge the selector cannot\n"
+    "  resolve (an import name or path built at runtime), in its own code or its\n"
+    "  conftest chain, is always selected. Unresolved imports in its test-specific\n"
+    "  library closure also select it;\n"
+    "- whole suite: ``pyproject.toml``, ``uv.lock``, pytest configuration,\n"
+    "  ``tests/conftest.py``, ``release-canary.yml``, or the selector itself\n"
+    "  changed;\n"
+    "- unmapped paths: a changed path that no dependency map references and\n"
+    "  that is not on the reviewed ``CANT_AFFECT_CANARY`` list runs the whole\n"
+    "  suite.\n"
+    "\n"
+    "Stdlib-only and read-only: the selector never imports ``benchbox`` and\n"
+    "never executes test code. The marker expression and collection parsing\n"
+    "are imported from ``scripts/release_canary_sharding.py``, not copied.\n"
+    "\n"
+    "Output is JSON with the selected node IDs, the reason each was selected\n"
+    "(which changed path, through which edge), whether a whole-suite fallback\n"
+    "fired and why, the dynamic edges observed in library code\n"
+    "(``dynamic_library_sites``, for the shadow watch), and\n"
+    "the canary collection it was computed against.\n"
+    "\n"
+    "Known limitation: registry-style dynamic loading inside the shared fixture\n"
+    "closure (``import_module(name)`` with a runtime name) is unbounded, so it is\n"
+    "reported rather than propagated: propagating it would always-select\n"
+    "every test. A changed file no test references\n"
+    "still runs the whole suite through the unmapped-path backstop; the\n"
+    "residual shape (a mapped file affecting a test only through dynamic\n"
+    "loading) is pinned by known-regression replay tests.\n"
+)
+
+try:
     from release_canary_sharding import MARKER_EXPRESSION, parse_collection_output
-except ImportError:  # imported as ``scripts.canary_impact`` in tests
+except ImportError:
     from scripts.release_canary_sharding import MARKER_EXPRESSION, parse_collection_output
 
 
@@ -82,9 +83,6 @@ SELECTOR_REPO_PATH = "scripts/canary_impact.py"
 CANARY_WORKFLOW_PATH = ".github/workflows/release-canary.yml"
 CONFTEST_REPO_PATH = "tests/conftest.py"
 
-# Changed paths that always run the whole suite. pytest configuration covers
-# every file pytest reads at startup; the selector itself is included so a
-# change to the selection rules cannot silently narrow selection.
 WHOLE_SUITE_PATHS = frozenset(
     {
         "pyproject.toml",
@@ -98,33 +96,18 @@ WHOLE_SUITE_PATHS = frozenset(
     }
 )
 
-# Changed paths that are known not to affect the canary even though no
-# dependency edge references them. Entries ending in "/" are directory
-# prefixes. Each entry MUST keep its comment stating why it is safe;
-# adding an entry needs a stated reason in the PR.
-# Verified 2026-09-24: none of these is read by any canary test, and the
-# Sphinx docs build (tests/unit/docs/test_docs_build.py, source dir docs/)
-# does not include any of them.
 CANT_AFFECT_CANARY = frozenset(
     {
-        # Release-notes ledger: only fast changelog-guard tests read it.
         "CHANGELOG.md",
-        # Legal texts: no test asserts on their contents.
         "LICENSE",
         "DISCLAIMER.md",
         "COPYRIGHT.md",
-        # Spellcheck dictionary: consumed by codespell, not by pytest.
         ".codespell-ignore.txt",
-        # Decision and audit reports: read only by fast unit tests, never by
-        # canary tests, and outside the docs build source tree.
         "_project/audits/",
         "_project/config/fast_test_lane_policy.json",
     }
 )
 
-# Local medium preflight receives the complete PR path list. Keep product
-# roots and shared test configuration; other paths do not drive medium tests.
-# Shared configuration forces a full run because it can change collection.
 MEDIUM_PRODUCT_ROOTS = (
     "benchbox/",
     "scripts/",
@@ -152,7 +135,6 @@ MEDIUM_WHOLE_SUITE_PATHS = frozenset(
 
 
 def medium_relevant_paths(changed_paths: list[str]) -> list[str]:
-    """Keep product changes and shared test configuration for local medium tests."""
     return [
         path
         for path in changed_paths
@@ -166,24 +148,15 @@ def medium_relevant_paths(changed_paths: list[str]) -> list[str]:
 
 
 def _is_cant_affect(path: str, cant_affect: frozenset[str] = CANT_AFFECT_CANARY) -> bool:
-    """Return whether a changed path is on the reviewed safe list."""
     if path in cant_affect:
         return True
     return any(entry.endswith("/") and path.startswith(entry) for entry in cant_affect)
 
 
-# Extra roots for resolving bare (non-dotted) module names, mirroring the
-# sys.path manipulation canary-adjacent tests perform. Dotted names always
-# resolve from the repo root.
 BARE_MODULE_SEARCH_DIRS = ("", "scripts")
 
-# Roots whose joined paths are test-local scratch space, never repo files.
 TESTLOCAL_ROOTS = frozenset({"tmp_path", "tmpdir", "tmp_path_factory"})
 
-# Keyword argument names that carry a path even when the value is a bare
-# literal (e.g. open(file=...)). Positional arguments are evaluated when
-# they look like paths; other keywords are ignored to avoid flagging
-# values such as pytest.raises(match="a/b").
 PATHLIKE_KEYWORDS = frozenset(
     {
         "path",
@@ -200,7 +173,6 @@ PATHLIKE_KEYWORDS = frozenset(
     }
 )
 
-# Calls whose positional string arguments are always treated as paths.
 PATH_CONSTRUCTOR_FUNCS = frozenset(
     {
         "open",
@@ -242,15 +214,6 @@ _PRUNE_DIRS = frozenset(
 
 @functools.lru_cache(maxsize=32)
 def _repo_module_index(root_str: str) -> tuple[frozenset[str], frozenset[str]]:
-    """Return (module stems, package names) for every ``.py`` under root.
-
-    Used to tell an unresolvable import that names a repo file (a real
-    edge the selector cannot pin: fail toward selection) from one that
-    names an uninstalled third-party module (no repo file can match a
-    changed path: safely ignored). Tool and dependency directories are
-    pruned; the cache assumes the tree is stable for the process lifetime
-    (one map build per CLI run; unique fixture roots per test).
-    """
     stems: set[str] = set()
     packages: set[str] = set()
     for dirpath, dirnames, filenames in os.walk(root_str):
@@ -264,14 +227,6 @@ def _repo_module_index(root_str: str) -> tuple[frozenset[str], frozenset[str]]:
 
 
 def _could_be_repo(dotted: str, root: Path) -> bool:
-    """Return whether an unresolvable import name could name a repo file.
-
-    An unresolvable import with no same-named module file anywhere under
-    the root can never equal a changed repo path, so it carries no edge.
-    Anything else stays fail-safe (dynamic): sys.path manipulations at
-    runtime can rebind a bare name to a repo file the static search roots
-    do not cover.
-    """
     parts = [part for part in dotted.split(".") if part]
     if not parts or not all(part.isidentifier() for part in parts):
         return True
@@ -286,15 +241,12 @@ def _could_be_repo(dotted: str, root: Path) -> bool:
 
 
 class FileDeps(NamedTuple):
-    """Static dependency view of one Python file."""
-
     deps: frozenset[str]
     dynamic: bool
     dynamic_kinds: tuple[str, ...]
 
 
 def normalize_rel(path: str) -> str:
-    """Normalize a repo-relative path to posix form."""
     normalized = path.strip().replace("\\", "/")
     while normalized.startswith("./"):
         normalized = normalized[2:]
@@ -306,7 +258,6 @@ def _stdlib_names() -> frozenset[str]:
 
 
 def _exists(path: Path) -> bool:
-    """Return whether a path exists, tolerating unstatable literals."""
     try:
         return path.exists()
     except (OSError, ValueError):
@@ -314,7 +265,6 @@ def _exists(path: Path) -> bool:
 
 
 def _is_dir(path: Path) -> bool:
-    """Return whether a path is a directory, tolerating bad literals."""
     try:
         return path.is_dir()
     except (OSError, ValueError):
@@ -322,11 +272,6 @@ def _is_dir(path: Path) -> bool:
 
 
 def _looks_external(top_level: str, root: Path) -> bool:
-    """Return True when a top-level name is neither stdlib nor a repo module.
-
-    ``importlib.util.find_spec`` on a top-level name only scans ``sys.path``
-    without importing or executing anything, so it is safe to call here.
-    """
     if top_level in _stdlib_names():
         return True
     for candidate in (
@@ -345,7 +290,6 @@ def _looks_external(top_level: str, root: Path) -> bool:
 
 
 def _module_file(dotted: str, root: Path) -> Path | None:
-    """Return the file implementing a dotted module name, if it exists."""
     parts = dotted.split(".")
     module_path = root.joinpath(*parts).with_suffix(".py")
     if module_path.is_file():
@@ -353,7 +297,6 @@ def _module_file(dotted: str, root: Path) -> Path | None:
     package_init = root.joinpath(*parts, "__init__.py")
     if package_init.is_file():
         return package_init
-    # Namespace package member without __init__.py (e.g. scripts/*).
     namespace_member = root.joinpath(*parts).with_suffix(".py")
     if namespace_member.is_file():
         return namespace_member
@@ -361,7 +304,6 @@ def _module_file(dotted: str, root: Path) -> Path | None:
 
 
 def _parent_inits(module_file: Path, root: Path) -> list[Path]:
-    """Return existing parent package ``__init__.py`` files, top-down."""
     inits: list[Path] = []
     try:
         relative_parent = module_file.parent.relative_to(root)
@@ -377,7 +319,6 @@ def _parent_inits(module_file: Path, root: Path) -> list[Path]:
 
 
 def _rel(path: Path, root: Path) -> str | None:
-    """Return a repo-relative posix path, or None when outside the repo."""
     try:
         return path.relative_to(root).as_posix()
     except ValueError:
@@ -385,12 +326,6 @@ def _rel(path: Path, root: Path) -> str | None:
 
 
 def _resolve_absolute(dotted: str, root: Path) -> tuple[set[str], bool]:
-    """Resolve an absolute dotted name to repo files.
-
-    Returns ``(deps, unknown)``: repo-relative dependency paths, and whether
-    the name could not be resolved to either a repo file or an external
-    module (a dynamic edge for the importing file).
-    """
     top_level = dotted.split(".")[0]
     module_file = _module_file(dotted, root)
     if module_file is not None:
@@ -398,9 +333,6 @@ def _resolve_absolute(dotted: str, root: Path) -> tuple[set[str], bool]:
         deps.update(_rel(init, root) for init in _parent_inits(module_file, root))
         return {dep for dep in deps if dep is not None}, False
     if root.joinpath(*dotted.split(".")).is_dir():
-        # Namespace package without __init__.py (e.g. scripts/): importing
-        # it executes no file, so there is no file edge. Submodule probing
-        # by the caller adds the real target.
         return set(), False
     if _looks_external(top_level, root):
         return set(), False
@@ -408,7 +340,6 @@ def _resolve_absolute(dotted: str, root: Path) -> tuple[set[str], bool]:
 
 
 def _resolve_bare(name: str, root: Path) -> tuple[set[str], bool]:
-    """Resolve a bare module name using the extra search roots."""
     for search_dir in BARE_MODULE_SEARCH_DIRS:
         base = root if not search_dir else root / search_dir
         for candidate in (base / f"{name}.py", base / name / "__init__.py"):
@@ -421,7 +352,6 @@ def _resolve_bare(name: str, root: Path) -> tuple[set[str], bool]:
                     )
                 return deps, False
         if (base / name).is_dir():
-            # Namespace package member: no file executes on import.
             return set(), False
     if _looks_external(name, root):
         return set(), False
@@ -429,7 +359,6 @@ def _resolve_bare(name: str, root: Path) -> tuple[set[str], bool]:
 
 
 def _resolve_import(name: str, importer: Path, root: Path) -> tuple[set[str], bool]:
-    """Resolve a static import name (absolute, relative, or bare)."""
     if name.startswith("."):
         level = len(name) - len(name.lstrip("."))
         remainder = name.lstrip(".")
@@ -437,8 +366,6 @@ def _resolve_import(name: str, importer: Path, root: Path) -> tuple[set[str], bo
             package_dir = importer.parent.relative_to(root)
         except ValueError:
             return set(), True
-        # Level 1 is the importing file's own directory; each further
-        # level walks one directory up.
         for _ in range(level - 1):
             package_dir = package_dir.parent
         dotted = ".".join([*package_dir.parts, remainder] if remainder else list(package_dir.parts))
@@ -450,7 +377,6 @@ def _resolve_import(name: str, importer: Path, root: Path) -> tuple[set[str], bo
     return _resolve_bare(name, root)
 
 
-# Resolution outcomes for path expressions.
 _RESOLVED = "resolved"
 _TESTLOCAL = "testlocal"
 _EXTERNAL = "external"
@@ -458,11 +384,6 @@ _UNKNOWN = "unknown"
 
 
 def _is_environ_expr(node: ast.AST) -> bool:
-    """Return whether an expression reads the process environment.
-
-    Environment-derived values (``os.environ.get(...)``, ``os.getenv(...)``)
-    point outside the repo, so they are known-not-repo rather than unknown.
-    """
     if isinstance(node, ast.Call):
         func_name = _call_name(node.func)
         if func_name == "getenv":
@@ -483,15 +404,11 @@ class _PathResolution(NamedTuple):
 
 
 class _FileAnalyzer(ast.NodeVisitor):
-    """Collect repo dependencies and dynamic edges of one Python file."""
-
     def __init__(self, path: Path, root: Path) -> None:
         self.path = path
         self.root = root
         self.deps: set[str] = set()
         self.dynamic_kinds: list[str] = []
-        # Simple name bindings: name -> _PathResolution. Module level and
-        # one function level (functions see module bindings as fallback).
         self.module_env: dict[str, _PathResolution] = {}
         self.function_env: dict[str, _PathResolution] | None = None
         self.function_assigned: set[str] = set()
@@ -506,22 +423,12 @@ class _FileAnalyzer(ast.NodeVisitor):
         if rel is not None:
             self.deps.add(rel)
             if path.is_dir():
-                # A directory path depends on every file under it; the
-                # matcher treats directory deps as covering their subtree.
                 pass
 
     def _add_repo_path(self, path: Path) -> None:
         self._add_dep_path(path)
 
-    # -- name environments ------------------------------------------------
-
     def _is_bound(self, name: str) -> bool:
-        """Return whether a name resolves in the current scope.
-
-        Function parameters and names assigned in the body shadow module
-        level: an assigned-but-unresolved name counts as unbound (it is a
-        local like any parameter), never as its module namesake.
-        """
         if self.function_env is not None:
             if name in self.function_env:
                 return True
@@ -547,10 +454,7 @@ class _FileAnalyzer(ast.NodeVisitor):
         else:
             self.module_env[name] = resolution
 
-    # -- path expression resolution ---------------------------------------
-
     def _resolve_expr(self, node: ast.AST) -> _PathResolution:  # noqa: C901
-        """Resolve an expression to a repo path, test-local, or unknown."""
         if _is_environ_expr(node):
             return _PathResolution(_EXTERNAL)
         if isinstance(node, ast.Name):
@@ -565,23 +469,14 @@ class _FileAnalyzer(ast.NodeVisitor):
         if isinstance(node, ast.Constant):
             value = node.value
             if isinstance(value, str) and len(value) > 4096:
-                # Longer than any OS path limit: never a path, and stat
-                # calls on it raise ENAMETOOLONG instead of returning False.
                 return _PathResolution(_UNKNOWN)
             if isinstance(value, str) and _is_dir(self.root / value):
-                # Bare directory name rooted at the repo (Path("docs")).
-                # (_looks_like_path misses slash-less names; the existence
-                # check keeps tmp-relative names out.)
                 candidate = self.root / value
                 return _PathResolution(_RESOLVED, candidate)
             if isinstance(value, str) and _looks_like_path(value):
                 if value.startswith("/") or (len(value) > 2 and value[1] == ":" and value[2] in "/\\"):
-                    # Absolute filesystem path: it can never equal a
-                    # repo-relative changed path (test scratch or fixtures).
                     return _PathResolution(_EXTERNAL)
                 if any(char in value for char in "*?["):
-                    # Glob pattern: depend on the static parent directory,
-                    # which covers every file the pattern can match.
                     static_prefix = value
                     for char in "*?[":
                         static_prefix = static_prefix.split(char, 1)[0]
@@ -606,11 +501,9 @@ class _FileAnalyzer(ast.NodeVisitor):
                 and self.class_env_stack
                 and node.attr in self.class_env_stack[-1]
             ):
-                # self.REPO_ROOT / ... resolves through the class attribute.
                 return self.class_env_stack[-1][node.attr]
             return _PathResolution(_UNKNOWN)
         if isinstance(node, ast.Subscript):
-            # Only Path(__file__).parents[N] with an int index resolves.
             if (
                 isinstance(node.value, ast.Attribute)
                 and node.value.attr == "parents"
@@ -619,16 +512,10 @@ class _FileAnalyzer(ast.NodeVisitor):
             ):
                 inner = self._resolve_expr(node.value.value)
                 if inner.outcome == _RESOLVED and inner.path is not None:
-                    # parents[N] applies .parent N+1 times: parents[0] is the
-                    # immediate parent directory.
                     current = inner.path
                     for _ in range(node.slice.value + 1):
                         current = current.parent
                     return _PathResolution(_RESOLVED, current)
-            # Indexing into test-local scratch (result_files[-1]) stays
-            # test-local, and indexing a resolved directory stays inside it
-            # (result_files[0] is a file under benchmark_runs/); indexing
-            # anything else is opaque.
             base = self._resolve_expr(node.value)
             if base.outcome in (_TESTLOCAL, _EXTERNAL):
                 return base
@@ -640,8 +527,6 @@ class _FileAnalyzer(ast.NodeVisitor):
         if isinstance(node, ast.BinOp):
             left = self._resolve_expr(node.left)
             right = self._resolve_expr(node.right)
-            # Locality propagates through string and arithmetic operators:
-            # test-local joined with anything stays test-local.
             for side in (left, right):
                 if side.outcome == _TESTLOCAL:
                     return side
@@ -656,7 +541,6 @@ class _FileAnalyzer(ast.NodeVisitor):
             return _PathResolution(_UNKNOWN)
         if isinstance(node, ast.JoinedStr):
             if len(node.values) == 1 and isinstance(node.values[0], ast.FormattedValue):
-                # A lone interpolation (f"{path}") behaves like the value.
                 return self._resolve_expr(node.values[0].value)
             parts: list[str] = []
             for value in node.values:
@@ -678,20 +562,14 @@ class _FileAnalyzer(ast.NodeVisitor):
 
     def _resolve_call_expr(self, node: ast.Call) -> _PathResolution:  # noqa: C901
         func_name = _call_name(node.func)
-        # Standard-library temporary-path factories create test-local
-        # scratch space, never repo paths.
         if func_name in {"mkdtemp", "mkstemp", "TemporaryDirectory", "NamedTemporaryFile"}:
             return _PathResolution(_TESTLOCAL)
-        # Passthrough wrappers that preserve the inner path.
         if func_name in {"resolve", "absolute", "realpath", "abspath", "normpath"} and node.args:
             return self._resolve_expr(node.args[0])
         if func_name == "dirname" and node.args:
             inner = self._resolve_expr(node.args[0])
             if inner.outcome == _RESOLVED and inner.path is not None:
                 parent = inner.path.parent
-                # os.path.dirname on a file returns its directory; on a
-                # directory-looking path it also returns the parent, which
-                # is the safe (wider) reading.
                 return _PathResolution(_RESOLVED, parent)
             return inner
         if func_name in {"join", "joinpath"}:
@@ -710,13 +588,11 @@ class _FileAnalyzer(ast.NodeVisitor):
                 if current is None:
                     current = inner.path
                 else:
-                    # Absolute-looking join part resets; keep the wider one.
                     current = inner.path if inner.path.is_absolute() else current / inner.path.name
             if current is not None:
                 return _PathResolution(_RESOLVED, current)
             return _PathResolution(_UNKNOWN)
         if func_name in {"Path", "path"} and node.args:
-            # Path(x): x may itself be a path or a literal under the repo.
             inner = self._resolve_expr(node.args[0])
             if inner.outcome == _RESOLVED:
                 return inner
@@ -741,13 +617,6 @@ class _FileAnalyzer(ast.NodeVisitor):
             if base is not None and base.outcome == _RESOLVED and base.path is not None:
                 return _PathResolution(_RESOLVED, base.path)
             return _PathResolution(_UNKNOWN)
-        # Unknown function or method. Transparent containers (sorted, list,
-        # str) preserve their argument's nature; path-collecting calls
-        # (glob, find_*) depend on the directory they read. Anything else
-        # returns an opaque value: a builder object is not a path even when
-        # it was built from one (gate.build(..., tmp_path)), while a value
-        # built opaquely from a resolved path still binds UNKNOWN through
-        # _touches_known so later path uses flag a dynamic edge.
         if func_name in {"sorted", "list", "tuple", "set", "frozenset", "reversed", "str"}:
             if node.args:
                 return self._resolve_expr(node.args[0])
@@ -773,23 +642,15 @@ class _FileAnalyzer(ast.NodeVisitor):
         if isinstance(node.func, ast.Attribute):
             base = self._resolve_expr(node.func.value)
             if base.outcome == _RESOLVED and base.path is not None:
-                # Reading a resolved file depends on it
-                # (REFERENCE_CARDINALITIES.read_text()).
                 return base
             if base.outcome in (_TESTLOCAL, _EXTERNAL):
-                # Method results on scratch space stay local.
                 return base
         return _PathResolution(_UNKNOWN)
-
-    # -- statements ---------------------------------------------------------
 
     def visit_FunctionDef(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
         outer_env = self.function_env
         outer_assigned = self.function_assigned
         self.function_env = {}
-        # Parameters shadow module level from the start; so does any name
-        # assigned in the body (tracked on visit) — later lookups must not
-        # fall through to a same-named module global.
         self.function_assigned = {
             arg.arg
             for arg in (
@@ -805,7 +666,7 @@ class _FileAnalyzer(ast.NodeVisitor):
         self.function_env = outer_env
         self.function_assigned = outer_assigned
 
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:  # noqa: N802
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
         self.visit_FunctionDef(node)
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
@@ -817,7 +678,7 @@ class _FileAnalyzer(ast.NodeVisitor):
         self._mark_target_assigned(node.target)
         self.generic_visit(node)
 
-    def visit_AsyncFor(self, node: ast.AsyncFor) -> None:  # noqa: N802
+    def visit_AsyncFor(self, node: ast.AsyncFor) -> None:
         self.visit_For(node)
 
     def visit_With(self, node: ast.With | ast.AsyncWith) -> None:
@@ -826,7 +687,7 @@ class _FileAnalyzer(ast.NodeVisitor):
                 self._mark_target_assigned(item.optional_vars)
         self.generic_visit(node)
 
-    def visit_AsyncWith(self, node: ast.AsyncWith) -> None:  # noqa: N802
+    def visit_AsyncWith(self, node: ast.AsyncWith) -> None:
         self.visit_With(node)
 
     def _mark_target_assigned(self, target: ast.AST) -> None:
@@ -848,45 +709,24 @@ class _FileAnalyzer(ast.NodeVisitor):
         if not names:
             return
         if self.function_env is not None:
-            # Even when the value resolves to nothing bindable, the names
-            # become function locals and shadow the module level below.
             self.function_assigned.update(names)
         value_names = {n.id for n in ast.walk(value) if isinstance(n, ast.Name)}
         resolution = self._resolve_expr(value)
         if any(name in value_names for name in names):
-            # Self-referential assignment (``x = Path(x)``): the right-hand
-            # side sees the previous binding, so rebinding here would let the
-            # statement poison its own name. Keep the previous binding; the
-            # caller still visits the value normally.
             return
         if resolution.outcome == _RESOLVED and resolution.path is not None:
             self._add_repo_path(resolution.path)
-        if resolution.outcome in (_RESOLVED, _TESTLOCAL, _EXTERNAL):
+        if resolution.outcome in (_RESOLVED, _TESTLOCAL, _EXTERNAL) or (
+            resolution.outcome == _UNKNOWN and _touches_known(value, self)
+        ):
             for name in names:
                 self._bind(name, resolution)
-        elif resolution.outcome == _UNKNOWN and _touches_known(value, self):
-            # A name built opaquely from known things (helper(REPO_ROOT))
-            # stays suspicious in path positions; a name built from nothing
-            # known (fixture.tables["x"]) is left unbound, like a parameter.
-            for name in names:
-                self._bind(name, resolution)
-
-    # -- imports --------------------------------------------------------------
 
     def visit_Constant(self, node: ast.Constant) -> None:
         if isinstance(node.value, str) and "import" in node.value:
             self._scan_string_snippet(node.value)
 
     def _scan_string_snippet(self, snippet: str) -> None:
-        """Resolve imports inside a string that parses as Python code.
-
-        Tests that shell out to ``sys.executable -c <script>`` execute
-        repo code the static import scan cannot see. A string constant
-        that parses as Python carries the same edges as module-level
-        code, so its import statements are resolved identically. Only
-        one level is scanned: strings nested inside the snippet are
-        data, not code.
-        """
         try:
             tree = ast.parse(snippet)
         except (SyntaxError, ValueError):
@@ -896,13 +736,6 @@ class _FileAnalyzer(ast.NodeVisitor):
                 self.visit_Import(child)
             elif isinstance(child, ast.ImportFrom):
                 if child.level or child.module is None:
-                    # A relative import in an executed string cannot name
-                    # a repo file: ``python -c`` has no containing package
-                    # (it would fail loudly at runtime), and the live uses
-                    # are stub packages generated into tmp_path whose
-                    # relative imports resolve inside the stub, never the
-                    # repo. (Corner: a string exec'd in a module namespace
-                    # could rebind to the repo package; no live instance.)
                     continue
                 else:
                     self.visit_ImportFrom(child)
@@ -928,8 +761,6 @@ class _FileAnalyzer(ast.NodeVisitor):
             self.generic_visit(node)
             return
         base = ("." * node.level + (node.module or "")).rstrip(".")
-        # ``from . import x`` imports the sibling submodule x, not just the
-        # package: resolve each imported name as a candidate submodule too.
         candidates = [base] if node.module else []
         if not node.module:
             try:
@@ -947,12 +778,6 @@ class _FileAnalyzer(ast.NodeVisitor):
             deps.update(candidate_deps)
             if candidate_unknown and _could_be_repo(candidate, self.root):
                 unknown = True
-        # ``from package import submodule``: probe each name as a submodule
-        # whenever the package is a directory. The old condition also
-        # required no ``__init__.py``, which skipped regular packages
-        # precisely when the submodule edge matters: with only the
-        # initializer recorded, a changed submodule mapped by another
-        # test would silently omit this importer.
         if node.module and not node.level:
             package_dir = self.root.joinpath(*node.module.split("."))
             if _is_dir(package_dir):
@@ -973,8 +798,6 @@ class _FileAnalyzer(ast.NodeVisitor):
         if unknown:
             self._note_dynamic(f"unresolvable_import:{base or 'relative'}")
         self.generic_visit(node)
-
-    # -- calls ------------------------------------------------------------------
 
     def visit_Call(self, node: ast.Call) -> None:
         func_name = _call_name(node.func)
@@ -1008,11 +831,6 @@ class _FileAnalyzer(ast.NodeVisitor):
             self._note_dynamic("dynamic_import")
 
     def _handle_mock_patch(self, node: ast.Call) -> None:
-        # mock.patch("package.module.Attribute") patches that import path:
-        # the target module is a real dependency edge, not a dynamic one.
-        # Attribute chains are stripped to the longest resolvable module
-        # prefix (Class.method -> module). patch.object(obj, "attr") patches
-        # a runtime object, which carries no import edge either way.
         if node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
             target = node.args[0].value
             parts = target.split(".")
@@ -1035,10 +853,6 @@ class _FileAnalyzer(ast.NodeVisitor):
             if _could_be_repo(target, self.root):
                 self._note_dynamic(f"unresolvable_import:{target}")
 
-    # Calls whose arguments are never path evidence (markers, assertions on
-    # messages, warning filters). Everything else is evaluated when an
-    # argument is a strong path signal; path-consuming calls evaluate
-    # every positional argument deeply (e.g. subprocess argv lists).
     _SKIP_EVAL_FUNCS = frozenset(
         {
             "parametrize",
@@ -1055,11 +869,6 @@ class _FileAnalyzer(ast.NodeVisitor):
         }
     )
 
-    # Extra calls that always consume paths positionally (besides the
-    # constructors in PATH_CONSTRUCTOR_FUNCS). Deliberately narrow:
-    # subprocess-style argv lists and data-reader literals are still caught
-    # through strong path signals without forcing every ``run``/``load``
-    # method call in the tree to resolve.
     _PATH_CONSUMING_CALLS = frozenset(
         {
             "open",
@@ -1073,9 +882,6 @@ class _FileAnalyzer(ast.NodeVisitor):
         }
     )
 
-    # Pure string/regex methods: their arguments are patterns and messages,
-    # never repo paths. The base object is evaluated on its own when it
-    # carries a path, so skipping these calls loses no dependency edge.
     _STRING_METHODS = frozenset(
         {
             "startswith",
@@ -1114,20 +920,14 @@ class _FileAnalyzer(ast.NodeVisitor):
         }
     )
 
-    # Pure data reductions: their arguments are values being measured, not
-    # paths being read. Inner calls are still visited on their own.
     _DATA_FUNCS = frozenset({"len", "sum", "min", "max", "any", "all"})
 
     def _handle_path_call(self, node: ast.Call, func_name: str | None) -> None:
         if func_name in self._SKIP_EVAL_FUNCS or func_name in self._STRING_METHODS or func_name in self._DATA_FUNCS:
             return
         if func_name is not None and func_name.endswith(("Error", "Exception", "Warning", "Exit")):
-            # Exception constructors take messages and test-local names, not
-            # repo paths (e.g. ChecksumMismatchError(path="title.parquet")).
             return
         if func_name == "join" and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Constant):
-            # str.join (",".join(names)): message assembly, not os.path.join.
-            # Arguments still get strong-signal evaluation below.
             force = False
         else:
             force = func_name in PATH_CONSTRUCTOR_FUNCS or func_name in self._PATH_CONSUMING_CALLS
@@ -1152,8 +952,6 @@ class _FileAnalyzer(ast.NodeVisitor):
             self._handle_call_arg(arg.value, force_path=force_path, call_name=call_name)
             return
         if isinstance(arg, ast.Constant) and not (isinstance(arg.value, str) and _looks_like_path(arg.value)):
-            # Non-path constants (encoding="utf-8", parents=True, timeouts)
-            # are never path evidence, even in path-consuming calls.
             return
         if not force_path and not _is_strong_path_signal(arg, self):
             return
@@ -1173,14 +971,11 @@ def _call_name(func: ast.AST) -> str | None:
 
 
 def _looks_like_path(value: str) -> bool:
-    """Heuristic for string literals that denote repo paths."""
     if not value or value.startswith(("http://", "https://", "mailto:")):
         return False
     if "://" in value:
-        # Connection strings and URIs (invalid://connection/string).
         return False
     if "{" in value or "}" in value:
-        # Format template (PureWindowsPath("C:/.../{name}")), not a path.
         return False
     if " " in value and "/" not in value:
         return False
@@ -1189,13 +984,11 @@ def _looks_like_path(value: str) -> bool:
     suffix = Path(value).suffix
     if not suffix or len(suffix) > 6:
         return False
-    # A numeric stem is a version or measurement (``"-84.43"``), not a file.
     stem = value[: -len(suffix)]
     return any(char.isalpha() for char in stem)
 
 
 def _expr_root_name(node: ast.AST) -> str | None:
-    """Return the root Name id of an attribute/subscript/call/chain expression."""
     current = node
     while isinstance(current, (ast.Attribute, ast.Subscript, ast.Call, ast.BinOp)):
         if isinstance(current, ast.Call):
@@ -1205,21 +998,11 @@ def _expr_root_name(node: ast.AST) -> str | None:
         elif isinstance(current, ast.BinOp):
             current = current.left
         else:
-            # Subscript: the root is the value being indexed, not the slice
-            # (sys.argv[:4] is rooted at sys, not at 4).
             current = current.value
     return current.id if isinstance(current, ast.Name) else None
 
 
 def _touches_known(node: ast.AST, analyzer: _FileAnalyzer) -> bool:
-    """Return whether an expression mentions a resolved repo path.
-
-    Only resolved paths (and ``__file__``) count: a name built opaquely
-    from a resolved path (helper(REPO_ROOT)) stays suspicious, while a name
-    built from test-local values or unbound names (gate.build(..., tmp_path),
-    fixture.tables["x"]) does not. Opaque computations over nothing
-    path-like are left unbound, like parameters.
-    """
     for child in ast.walk(node):
         if isinstance(child, ast.Name):
             if child.id == "__file__":
@@ -1234,13 +1017,6 @@ def _touches_known(node: ast.AST, analyzer: _FileAnalyzer) -> bool:
 
 
 def _is_unbound_root(node: ast.AST, analyzer: _FileAnalyzer) -> bool:
-    """Return whether an expression mentions no bound name at all.
-
-    Such expressions are built from function parameters, cross-function
-    locals, and builtins, which in test code are conventionally test-local
-    values rather than repo paths. Anything touching ``__file__``, a
-    test-local root, or a tracked binding stays suspicious.
-    """
     for child in ast.walk(node):
         if not isinstance(child, ast.Name):
             continue
@@ -1252,24 +1028,11 @@ def _is_unbound_root(node: ast.AST, analyzer: _FileAnalyzer) -> bool:
 
 
 def _is_strong_path_signal(node: ast.AST, analyzer: _FileAnalyzer) -> bool:
-    """Return whether an expression is worth resolving as a repo path use.
-
-    Deliberately narrow: attribute access and opaque calls are only signals
-    when rooted at ``__file__`` or a name already bound to a path, so
-    ordinary code such as ``json.dumps(config.value)`` is never evaluated.
-    """
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
-        # Numeric division (10000.0 / 0.8) is arithmetic, never a path join.
         if isinstance(node.left, ast.Constant) and not isinstance(node.left.value, str):
             return False
         return True
     if isinstance(node, ast.JoinedStr):
-        # Only path-building f-strings: the slash must sit at the edge of a
-        # literal span touching an interpolated value that is itself pathish
-        # (f"{root}/a", f"a/{name}"). Message templates such as f"... and
-        # {n} more skip/xfail markers" or f"Passed {passed}/{total}" keep
-        # their slashes mid-span or next to plain values, and are never path
-        # evidence. A lone interpolation (f"{path}") behaves like the value.
         values = node.values
         if len(values) == 1 and isinstance(values[0], ast.FormattedValue):
             return _is_strong_path_signal(values[0].value, analyzer)
@@ -1309,11 +1072,9 @@ def _is_strong_path_signal(node: ast.AST, analyzer: _FileAnalyzer) -> bool:
 
 
 def analyze_python_file(path: Path, root: Path) -> FileDeps:
-    """Return the static dependencies and dynamic edges of one file."""
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     except (OSError, SyntaxError, ValueError):
-        # An unparseable file cannot be proven safe: fail toward selection.
         return FileDeps(deps=frozenset(), dynamic=True, dynamic_kinds=("unparseable_file",))
     analyzer = _FileAnalyzer(path, root)
     analyzer.visit(tree)
@@ -1325,13 +1086,6 @@ def analyze_python_file(path: Path, root: Path) -> FileDeps:
 
 
 def _conftest_chain(test_file: str, root: Path) -> list[str]:
-    """Return repo-relative conftest.py files pytest loads for a test file.
-
-    pytest loads every conftest.py from the root down to the test's own
-    directory, so a change to any of them can alter the test's fixtures.
-    Innermost first; the root ``tests/conftest.py`` is excluded because
-    it is already shared by every entry.
-    """
     chain: list[str] = []
     directory = (root / test_file).parent.resolve()
     while True:
@@ -1351,13 +1105,6 @@ def _conftest_chain(test_file: str, root: Path) -> list[str]:
 def _expand_closure(
     seeds: set[str], root: Path, cache: dict[str, FileDeps]
 ) -> tuple[set[str], dict[str, tuple[str, ...]]]:
-    """Expand repo ``.py`` seeds through their static dependencies.
-
-    Returns all reachable repo paths plus, per reached file, its dynamic
-    kinds. Each file is analyzed once per map build. Files that vanish
-    or fail to parse analyze as dynamic, so expansion can only
-    over-select, never silently drop an edge.
-    """
     all_deps = set(seeds)
     dynamic_files: dict[str, list[str]] = {}
     stack = sorted(seed for seed in seeds if seed.endswith(".py"))
@@ -1382,7 +1129,6 @@ def _expand_closure(
 
 
 def _read_pytest_plugins(conftest: Path) -> tuple[list[str], str | None]:
-    """Return plugin module names from a conftest.py file, or an error reason."""
     try:
         tree = ast.parse(conftest.read_text(encoding="utf-8"), filename=str(conftest))
     except (OSError, SyntaxError, ValueError):
@@ -1405,15 +1151,6 @@ def _read_pytest_plugins(conftest: Path) -> tuple[list[str], str | None]:
 
 
 def _resolve_plugin_file(plugin: str, conftest: Path, root: Path) -> str | None:
-    """Return the repo-relative file of a plugin module, or None.
-
-    Resolves the exact module file for the full dotted name. Taking an
-    arbitrary ``.py`` from the general import dependencies is wrong: that
-    set also holds the parent package ``__init__.py`` files, and set
-    iteration order varies with hash randomization, so the seed would
-    sometimes be an initializer with the plugin's own transitive
-    dependencies omitted.
-    """
     if plugin.startswith("."):
         level = len(plugin) - len(plugin.lstrip("."))
         remainder = plugin.lstrip(".")
@@ -1446,13 +1183,6 @@ def _resolve_plugin_file(plugin: str, conftest: Path, root: Path) -> str | None:
 
 
 def _seed_with_parent_inits(seeds: set[str], rel: str, root: Path) -> None:
-    """Add a repo file and its parent package initializers to seeds.
-
-    Importing a module executes every parent package ``__init__.py``, so
-    a seed that omits them misses real edges (and a change to an
-    initializer would otherwise fall through to the whole-suite backstop
-    instead of selecting precisely the affected tests).
-    """
     seeds.add(rel)
     for init in _parent_inits(root / rel, root):
         init_rel = _rel(init, root)
@@ -1461,19 +1191,6 @@ def _seed_with_parent_inits(seeds: set[str], rel: str, root: Path) -> None:
 
 
 def _build_shared_deps(root: Path, cache: dict[str, FileDeps]) -> tuple[set[str], str | None, list[str]]:
-    """Build the fixture set shared by every canary test entry.
-
-    Returns ``(shared_deps, fallback, library_sites)``. ``fallback`` is
-    set when the root conftest, its plugins, or their direct analysis
-    cannot be resolved. Dynamic edges deeper in the shared transitive
-    closure are reported as library sites instead: registry-style dynamic
-    loading inside library code is unbounded (any test importing the
-    registry would otherwise be always-selected), and a changed file no
-    test references still runs the whole suite through the unmapped-path
-    backstop, so the residual risk is a file that is mapped elsewhere
-    while affecting a test only through dynamic loading. Those shapes
-    are pinned by known-regression replay tests.
-    """
     conftest = root / CONFTEST_REPO_PATH
     if not conftest.is_file():
         return set(), "conftest_missing", []
@@ -1497,20 +1214,6 @@ def _build_shared_deps(root: Path, cache: dict[str, FileDeps]) -> tuple[set[str]
 
 
 def build_dependency_map(root: Path, test_files: list[str]) -> tuple[dict[str, FileDeps], str | None, list[str]]:
-    """Map each canary test file to its dependencies.
-
-    Every entry includes ``tests/conftest.py`` and each ``pytest_plugins``
-    module with their transitive dependencies, plus the per-directory
-    conftest chain pytest loads for that file (with their plugins) and
-    the transitive closure of the test's own edges. A dynamic edge in
-    the test file or its conftest chain selects that test always; a
-    dynamic edge in the shared fixtures falls back to the whole suite.
-    Unresolved library imports in a test-specific closure force selection
-    because a computed import can name a changed module that other tests map.
-    Returns ``(map, fallback, library_sites)`` where ``fallback`` is the
-    whole-suite reason when the shared fixtures cannot be resolved (None
-    on success).
-    """
     root = root.resolve()
     cache: dict[str, FileDeps] = {}
     shared_deps, fallback, library_sites = _build_shared_deps(root, cache)
@@ -1569,7 +1272,6 @@ def build_dependency_map(root: Path, test_files: list[str]) -> tuple[dict[str, F
 def collect_canary_node_ids(
     root: Path, timeout_seconds: int = 600, marker_expression: str = MARKER_EXPRESSION
 ) -> list[str]:
-    """Collect node IDs for the requested test marker expression."""
     completed = subprocess.run(
         [
             sys.executable,
@@ -1597,27 +1299,22 @@ def collect_canary_node_ids(
 
 
 def files_from_node_ids(node_ids: list[str]) -> list[str]:
-    """Return the sorted unique test files referenced by node IDs."""
     return sorted({node_id.split("::", 1)[0] for node_id in node_ids})
 
 
 def _change_covers(changed: str, dep: str) -> bool:
-    """Return whether a changed path can affect a dependency edge."""
     if changed == dep:
         return True
     if dep.endswith("/"):
         return changed.startswith(dep)
-    # Directory deps cover their whole subtree (every file under them).
     if changed.startswith(dep + "/"):
         return True
-    # A changed directory covers every dep beneath it.
     if dep.startswith(changed + "/"):
         return True
     return False
 
 
 def _same_directory_non_python(changed: str, test_deps: frozenset[str]) -> bool:
-    """Check the same-directory rule for a changed non-Python benchbox file."""
     if not changed.startswith("benchbox/") or changed.endswith(".py"):
         return False
     changed_dir = changed.rpartition("/")[0]
@@ -1638,11 +1335,6 @@ def compute_selection(  # noqa: C901
     cant_affect: frozenset[str] = CANT_AFFECT_CANARY,
     whole_suite_paths: frozenset[str] = WHOLE_SUITE_PATHS,
 ) -> dict[str, Any]:
-    """Select canary node IDs affected by the changed paths.
-
-    ``fallback_reason`` carries a whole-suite reason already established
-    while building the map (unresolvable fixtures, failed collection).
-    """
     changed = sorted({normalize_rel(path) for path in changed_paths if normalize_rel(path)})
     collection_info = collection_info or {}
     file_nodes: dict[str, list[str]] = {}
@@ -1664,14 +1356,8 @@ def compute_selection(  # noqa: C901
                 continue
             if any(path == test_file or path.startswith(test_file + "/") for test_file in dep_map):
                 continue
-            # The same-directory rule handles non-Python benchbox files
-            # without a direct edge; they are mapped, not unmapped.
             if any(_same_directory_non_python(path, deps.deps) for deps in dep_map.values()):
                 continue
-            # Edges win over the safe list: a reviewed safe path that a
-            # test actually references still selects that test. The safe
-            # list only suppresses the whole-suite fallback for paths
-            # nothing references.
             if _is_cant_affect(path, cant_affect):
                 ignored.append(path)
                 continue
@@ -1743,7 +1429,7 @@ def _git_changed_paths(repo_root: Path, base_ref: str) -> list[str]:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--changed-path", action="append", default=[], help="changed repo-relative path (repeatable)")
@@ -1766,7 +1452,6 @@ def _build_parser() -> argparse.ArgumentParser:
 def run_selected_tests(
     selection: dict[str, Any], root: Path, marker_expression: str, changed_json_env: str | None
 ) -> int:
-    """Run selected medium test files, keeping each file's fixtures on one worker."""
     whole_suite = selection["whole_suite"]
     target = ["tests"] if whole_suite else sorted({entry["file"] for entry in selection["selected"]})
     if not target:

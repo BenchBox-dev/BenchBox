@@ -1,11 +1,6 @@
-"""Tests for Azure Synapse Analytics platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the AzureSynapseAdapter for Azure Synapse Dedicated SQL Pool support.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import Mock, patch
 
@@ -23,13 +18,11 @@ pytestmark = [
 
 @pytest.fixture()
 def synapse_stubs(monkeypatch):
-    """Patch pyodbc objects so tests don't require the real driver."""
     mock_pyodbc = Mock()
     mock_pyodbc.connect = Mock()
 
     monkeypatch.setattr(synapse_module, "pyodbc", mock_pyodbc)
 
-    # Mock the dependency check to always pass
     monkeypatch.setattr(
         synapse_module,
         "check_platform_dependencies",
@@ -40,10 +33,7 @@ def synapse_stubs(monkeypatch):
 
 
 class TestAzureSynapseAdapter:
-    """Unit tests for Azure Synapse adapter wiring and SQL handling."""
-
     def test_initialization_defaults(self, synapse_stubs):
-        """Adapter should initialize with Azure Synapse defaults when stubs are present."""
         adapter = AzureSynapseAdapter(
             server="myworkspace.sql.azuresynapse.net",
             username="admin",
@@ -60,7 +50,6 @@ class TestAzureSynapseAdapter:
         assert adapter.auth_method == "sql"
 
     def test_initialization_with_config(self, synapse_stubs):
-        """Adapter should accept custom configuration."""
         adapter = AzureSynapseAdapter(
             server="custom.sql.azuresynapse.net",
             port=1434,
@@ -82,7 +71,6 @@ class TestAzureSynapseAdapter:
         assert adapter.resource_class == "staticrc30"
 
     def test_get_connection_string_sql_auth(self, synapse_stubs):
-        """Connection string should use SQL auth format."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             port=1433,
@@ -101,7 +89,6 @@ class TestAzureSynapseAdapter:
         assert "Encrypt=yes" in conn_str
 
     def test_get_connection_string_aad_auth(self, synapse_stubs):
-        """Connection string should use AAD auth format when specified."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="user@domain.com",
@@ -114,7 +101,6 @@ class TestAzureSynapseAdapter:
         assert "Authentication=ActiveDirectoryPassword" in conn_str
 
     def test_get_connection_string_msi_auth(self, synapse_stubs):
-        """Connection string should use MSI auth format when specified."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             auth_method="aad_msi",
@@ -125,7 +111,6 @@ class TestAzureSynapseAdapter:
         assert "Authentication=ActiveDirectoryMsi" in conn_str
 
     def test_check_server_database_exists_true(self, synapse_stubs):
-        """Database existence check returns True when database is found."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchone.return_value = ("testdb",)
@@ -142,7 +127,6 @@ class TestAzureSynapseAdapter:
         assert adapter.check_server_database_exists() is True
 
     def test_check_server_database_exists_false(self, synapse_stubs):
-        """Database existence check returns False when database not found."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchone.return_value = None
@@ -159,7 +143,6 @@ class TestAzureSynapseAdapter:
         assert adapter.check_server_database_exists() is False
 
     def test_check_server_database_exists_connection_error(self, synapse_stubs):
-        """Database existence check returns False on connection error."""
         synapse_stubs.connect.side_effect = Exception("Connection refused")
 
         adapter = AzureSynapseAdapter(
@@ -171,10 +154,9 @@ class TestAzureSynapseAdapter:
         assert adapter.check_server_database_exists() is False
 
     def test_create_connection_creates_database(self, synapse_stubs):
-        """Connection should create database if it doesn't exist."""
         mock_conn = Mock()
         mock_cursor = Mock()
-        mock_cursor.fetchone.side_effect = [None, ("version",)]  # DB doesn't exist, then version
+        mock_cursor.fetchone.side_effect = [None, ("version",)]
         mock_conn.cursor.return_value = mock_cursor
         synapse_stubs.connect.return_value = mock_conn
 
@@ -192,18 +174,16 @@ class TestAzureSynapseAdapter:
         ):
             adapter.create_connection()
 
-        # Should have called execute to create database
         executed_calls = mock_cursor.execute.call_args_list
         create_db_calls = [c for c in executed_calls if "CREATE DATABASE" in str(c)]
         assert len(create_db_calls) > 0
 
     def test_get_platform_info(self, synapse_stubs):
-        """Platform info should include Azure Synapse version and settings."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchone.side_effect = [
-            ("Microsoft SQL Azure ...",),  # version
-            (100.0,),  # database size
+            ("Microsoft SQL Azure ...",),
+            (100.0,),
         ]
         mock_conn.cursor.return_value = mock_cursor
 
@@ -228,7 +208,6 @@ class TestAzureSynapseAdapter:
         assert info["configuration"]["resource_class"] == "staticrc30"
 
     def test_execute_query_success(self, synapse_stubs):
-        """Query execution should return correct result structure."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchall.return_value = [(1, "test"), (2, "test2")]
@@ -249,7 +228,6 @@ class TestAzureSynapseAdapter:
         assert isinstance(result["execution_time_seconds"], float)
 
     def test_execute_query_failure(self, synapse_stubs):
-        """Query execution failure should return error info."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchall.side_effect = Exception("Query failed")
@@ -270,7 +248,6 @@ class TestAzureSynapseAdapter:
         assert result["error_type"] == "Exception"
 
     def test_configure_for_benchmark_olap(self, synapse_stubs):
-        """OLAP configuration should set appropriate settings."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -289,7 +266,6 @@ class TestAzureSynapseAdapter:
         assert "ANSI_NULLS ON" in executed
 
     def test_get_existing_tables(self, synapse_stubs):
-        """Should query INFORMATION_SCHEMA for tables."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchall.return_value = [("TABLE1",), ("table2",)]
@@ -307,7 +283,6 @@ class TestAzureSynapseAdapter:
         assert tables == ["table1", "table2"]
 
     def test_test_connection_success(self, synapse_stubs):
-        """Connection test should return True on success."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchone.return_value = (1,)
@@ -323,7 +298,6 @@ class TestAzureSynapseAdapter:
         assert adapter.test_connection() is True
 
     def test_test_connection_failure(self, synapse_stubs):
-        """Connection test should return False on failure."""
         synapse_stubs.connect.side_effect = Exception("Connection refused")
 
         adapter = AzureSynapseAdapter(
@@ -335,7 +309,6 @@ class TestAzureSynapseAdapter:
         assert adapter.test_connection() is False
 
     def test_from_config_generates_database_name(self, synapse_stubs):
-        """from_config should generate database name from benchmark config."""
         config = {
             "server": "test.sql.azuresynapse.net",
             "username": "admin",
@@ -349,7 +322,6 @@ class TestAzureSynapseAdapter:
         assert "tpch" in adapter.database.lower()
 
     def test_from_config_uses_provided_database(self, synapse_stubs):
-        """from_config should use explicitly provided database name."""
         config = {
             "server": "test.sql.azuresynapse.net",
             "username": "admin",
@@ -364,7 +336,6 @@ class TestAzureSynapseAdapter:
         assert adapter.database == "my_custom_db"
 
     def test_supports_tuning_type(self, synapse_stubs):
-        """Should report correct tuning type support."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -383,7 +354,6 @@ class TestAzureSynapseAdapter:
             assert adapter.supports_tuning_type(mock_tuning.SORTING) is False
 
     def test_close_connection(self, synapse_stubs):
-        """Close connection should call close on the connection."""
         mock_conn = Mock()
 
         adapter = AzureSynapseAdapter(
@@ -397,7 +367,6 @@ class TestAzureSynapseAdapter:
         mock_conn.close.assert_called_once()
 
     def test_dialect_is_tsql(self, synapse_stubs):
-        """Dialect should be 'tsql' for SQL Server/Synapse compatibility."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -408,7 +377,6 @@ class TestAzureSynapseAdapter:
         assert adapter._dialect == "tsql"
 
     def test_extract_table_name(self, synapse_stubs):
-        """Should extract table name from CREATE TABLE statement."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -420,7 +388,6 @@ class TestAzureSynapseAdapter:
         assert adapter._extract_table_name("SELECT * FROM test") is None
 
     def test_optimize_table_definition_adds_distribution(self, synapse_stubs):
-        """Should add default DISTRIBUTION clause if not present."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -434,7 +401,6 @@ class TestAzureSynapseAdapter:
         assert "DISTRIBUTION = ROUND_ROBIN" in optimized
 
     def test_missing_server_raises_error(self, synapse_stubs):
-        """Should raise error when server is missing for SQL auth."""
         from benchbox.core.exceptions import ConfigurationError
 
         with pytest.raises(ConfigurationError, match="Azure Synapse SQL authentication is incomplete"):
@@ -444,7 +410,6 @@ class TestAzureSynapseAdapter:
             )
 
     def test_missing_password_raises_error(self, synapse_stubs):
-        """Should raise error when password is missing for SQL auth."""
         from benchbox.core.exceptions import ConfigurationError
 
         with pytest.raises(ConfigurationError, match="Azure Synapse SQL authentication is incomplete"):
@@ -455,16 +420,12 @@ class TestAzureSynapseAdapter:
 
 
 class TestAzureSynapseDataLoading:
-    """Tests for Azure Synapse data loading methods."""
-
     def test_load_data_direct_fallback(self, synapse_stubs, tmp_path):
-        """Should use direct INSERT when no storage configured."""
         mock_conn = Mock()
         mock_cursor = Mock()
-        mock_cursor.fetchone.return_value = (3,)  # Row count
+        mock_cursor.fetchone.return_value = (3,)
         mock_conn.cursor.return_value = mock_cursor
 
-        # Create test CSV file
         csv_file = tmp_path / "test_table.csv"
         csv_file.write_text("1,alice\n2,bob\n3,charlie\n")
 
@@ -476,22 +437,18 @@ class TestAzureSynapseDataLoading:
             schema="dbo",
             username="admin",
             password="secret",
-            # No storage_account configured
         )
 
         stats, load_time, _ = adapter.load_data(Benchmark(), mock_conn, tmp_path)
 
-        # Should have loaded some data
         assert "test_table" in stats
         assert load_time >= 0
 
     def test_load_data_skips_empty_files(self, synapse_stubs, tmp_path):
-        """Should skip empty data files."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
 
-        # Create empty file
         empty_file = tmp_path / "empty.csv"
         empty_file.write_text("")
 
@@ -510,7 +467,6 @@ class TestAzureSynapseDataLoading:
         assert stats.get("empty_table", 0) == 0
 
     def test_external_table_mode_requires_storage_config(self, synapse_stubs):
-        """External mode should require storage account/container configuration."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -522,7 +478,6 @@ class TestAzureSynapseDataLoading:
             adapter.validate_external_table_requirements()
 
     def test_create_external_tables_generates_polybase_sql(self, synapse_stubs, tmp_path):
-        """External mode should create data source/file format/external table SQL."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -569,7 +524,6 @@ class TestAzureSynapseDataLoading:
         assert "LOCATION = '/benchbox-data/testdb_external/orders/'" in execute_sql
 
     def test_load_data_native_path_not_routed_to_external(self, synapse_stubs, tmp_path):
-        """Native load_data should keep blob/COPY flow and not call external registration."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -619,11 +573,9 @@ class TestAzureSynapseDataLoading:
         ],
     )
     def test_map_external_column_type(self, column_type, expected, synapse_stubs):
-        """External-column type mapping should normalize supported Synapse types and safely fall back."""
         assert AzureSynapseAdapter._map_external_column_type(column_type) == expected
 
     def test_build_external_column_definitions_resolves_table_name_variants(self, synapse_stubs):
-        """Schema lookup should work across table-name casing variants."""
         benchmark = Mock()
         benchmark.get_schema.return_value = {
             "ORDERS": {
@@ -645,7 +597,6 @@ class TestAzureSynapseDataLoading:
         assert column_defs == "[o_orderkey] BIGINT, [o_orderdate] DATETIME2"
 
     def test_build_external_column_definitions_rejects_missing_columns(self, synapse_stubs):
-        """Invalid schema metadata should raise a clear error for external mode."""
         benchmark = Mock()
         benchmark.get_schema.return_value = {"orders": {"columns": []}}
         adapter = AzureSynapseAdapter(
@@ -658,7 +609,6 @@ class TestAzureSynapseDataLoading:
             adapter._build_external_column_definitions(benchmark, "orders")
 
     def test_resolve_external_credential_name_prefers_existing_name(self, synapse_stubs):
-        """Explicit storage credential name should be used as-is."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -669,7 +619,6 @@ class TestAzureSynapseDataLoading:
         assert adapter._resolve_external_credential_name(Mock()) == "BENCHBOX_PRECREATED_CRED"
 
     def test_resolve_external_credential_name_creates_sas_credential(self, synapse_stubs):
-        """SAS tokens should produce a shared-access-signature scoped credential."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -689,7 +638,6 @@ class TestAzureSynapseDataLoading:
         assert "sv=2025-01-01&sig=abc''123" in executed_sql
 
     def test_resolve_external_credential_name_creates_key_credential(self, synapse_stubs):
-        """Storage account keys should produce a key-backed scoped credential."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -709,7 +657,6 @@ class TestAzureSynapseDataLoading:
         assert "SECRET = 'account-key-123'" in executed_sql
 
     def test_setup_external_table_primitives_builds_data_source_with_credential(self, synapse_stubs):
-        """PolyBase primitives should create the external data source and parquet file format."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -734,7 +681,6 @@ class TestAzureSynapseDataLoading:
         assert any("CREATE EXTERNAL FILE FORMAT [BENCHBOX_PARQUET_FORMAT]" in sql for sql in execute_calls)
 
     def test_load_data_via_blob_uses_sas_credential_clause(self, synapse_stubs, tmp_path):
-        """Blob-backed native loads should emit COPY INTO with inline SAS credentials."""
         mock_cursor = Mock()
         mock_cursor.fetchone.return_value = (2,)
         csv_file = tmp_path / "orders.csv"
@@ -766,7 +712,6 @@ class TestAzureSynapseDataLoading:
         assert execute_sql[-1] == "SELECT COUNT(*) FROM [dbo].[orders]"
 
     def test_load_data_via_blob_uses_named_storage_credential(self, synapse_stubs, tmp_path):
-        """Blob-backed native loads should support named database-scoped credentials."""
         mock_cursor = Mock()
         mock_cursor.fetchone.return_value = (1,)
         csv_file = tmp_path / "orders.csv"
@@ -794,7 +739,6 @@ class TestAzureSynapseDataLoading:
         assert "CREDENTIAL = 'BENCHBOX_SHARED_CRED'" in copy_sql
 
     def test_generate_tuning_clause_with_distribution_and_partitioning(self, synapse_stubs):
-        """Synapse tuning SQL should combine HASH distribution, partitioning, and columnstore defaults."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -835,10 +779,7 @@ class TestAzureSynapseDataLoading:
 
 
 class TestSynapseUncoveredMethods:
-    """Tests for methods with low coverage in AzureSynapseAdapter."""
-
     def test_extract_storage_account_from_abfss_url(self, synapse_stubs):
-        """Should extract account name from abfss:// URL."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -849,7 +790,6 @@ class TestSynapseUncoveredMethods:
         assert account == "mystorageaccount"
 
     def test_extract_storage_account_returns_none_for_invalid_url(self, synapse_stubs):
-        """Should return None when URL doesn't match expected pattern."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -858,7 +798,6 @@ class TestSynapseUncoveredMethods:
         assert adapter._extract_storage_account("https://example.com/path") is None
 
     def test_build_ctas_sort_sql_off_mode_returns_none(self, synapse_stubs):
-        """_build_ctas_sort_sql should return None when sorted ingestion is off."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -870,7 +809,6 @@ class TestSynapseUncoveredMethods:
         assert result is None
 
     def test_build_ctas_sort_sql_ctas_mode(self, synapse_stubs):
-        """_build_ctas_sort_sql should generate CTAS SQL when mode is on."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -890,7 +828,6 @@ class TestSynapseUncoveredMethods:
         assert "ORDER BY l_shipdate" in result
 
     def test_analyze_table_updates_statistics(self, synapse_stubs):
-        """analyze_table should execute UPDATE STATISTICS."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -908,10 +845,6 @@ class TestSynapseUncoveredMethods:
         assert "orders" in executed
 
     def test_analyze_table_raises_on_failure(self, synapse_stubs):
-        """analyze_table must raise (not swallow) when UPDATE STATISTICS fails, so
-        the opt-in statistics phase's gather_statistics() caller can detect and
-        record a real failure as status=FAILED instead of reporting COMPLETED
-        with no statistics actually built."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -924,12 +857,9 @@ class TestSynapseUncoveredMethods:
 
         with pytest.raises(Exception, match="Statistics update failed"):
             adapter.analyze_table(mock_conn, "orders")
-        mock_cursor.close.assert_called_once()  # cursor still closed via finally
+        mock_cursor.close.assert_called_once()
 
     def test_apply_table_tunings_swallows_analyze_table_failure(self, synapse_stubs):
-        """apply_table_tunings' post-tuning stats refresh stays best-effort even
-        though analyze_table itself now raises: a stats-refresh failure must not
-        abort table setup."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -943,11 +873,9 @@ class TestSynapseUncoveredMethods:
         table_tuning.has_any_tuning.return_value = True
         table_tuning.table_name = "orders"
 
-        # Should not raise despite analyze_table failing internally.
         adapter.apply_table_tunings(table_tuning, mock_conn)
 
     def test_close_connection_calls_close(self, synapse_stubs):
-        """close_connection should call close() on the connection."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -959,17 +887,14 @@ class TestSynapseUncoveredMethods:
         mock_conn.close.assert_called_once()
 
     def test_close_connection_handles_none(self, synapse_stubs):
-        """close_connection should not fail when connection is None."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
             password="secret",
         )
-        # Should not raise
         adapter.close_connection(None)
 
     def test_get_platform_info_with_connection(self, synapse_stubs):
-        """get_platform_info should include version when connection provided."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -979,8 +904,8 @@ class TestSynapseUncoveredMethods:
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchone.side_effect = [
-            ("Microsoft Azure SQL Data Warehouse - 15.0.9999.1",),  # @@VERSION
-            None,  # db size query
+            ("Microsoft Azure SQL Data Warehouse - 15.0.9999.1",),
+            None,
         ]
         mock_conn.cursor.return_value = mock_cursor
 
@@ -991,7 +916,6 @@ class TestSynapseUncoveredMethods:
         assert info["configuration"]["database"] == "testdb"
 
     def test_create_schema_executes_table_creation(self, synapse_stubs):
-        """create_schema should execute CREATE TABLE statements."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -1013,7 +937,6 @@ class TestSynapseUncoveredMethods:
         assert duration >= 0
 
     def test_generate_tuning_clause_returns_empty_for_none(self, synapse_stubs):
-        """generate_tuning_clause should return empty string for None."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -1022,7 +945,6 @@ class TestSynapseUncoveredMethods:
         assert adapter.generate_tuning_clause(None) == ""
 
     def test_generate_tuning_clause_uses_default_distribution_when_no_dist_col(self, synapse_stubs):
-        """generate_tuning_clause should use distribution_default when no dist column."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -1041,7 +963,6 @@ class TestSynapseUncoveredMethods:
         assert "CLUSTERED COLUMNSTORE INDEX" in result
 
     def test_apply_table_tunings_no_op_when_no_tuning(self, synapse_stubs):
-        """apply_table_tunings should be a no-op when no tuning is configured."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -1051,16 +972,12 @@ class TestSynapseUncoveredMethods:
         table_tuning = Mock()
         table_tuning.has_any_tuning.return_value = False
 
-        # Should not raise and should not call any connection methods
         adapter.apply_table_tunings(table_tuning, mock_conn)
         mock_conn.cursor.assert_not_called()
 
 
 class TestSynapseMasterKeyPassword:
-    """Verify master key password is not hardcoded."""
-
     def test_setup_external_data_source_uses_random_password(self, synapse_stubs):
-        """Master key password should be randomly generated per call."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             database="testdb",
@@ -1075,29 +992,18 @@ class TestSynapseMasterKeyPassword:
         adapter._setup_external_data_source(cursor1)
         adapter._setup_external_data_source(cursor2)
 
-        # Extract the SQL from both calls
         sql1 = cursor1.execute.call_args[0][0]
         sql2 = cursor2.execute.call_args[0][0]
 
-        # Both should contain CREATE MASTER KEY but with different passwords
         assert "CREATE MASTER KEY" in sql1
         assert "CREATE MASTER KEY" in sql2
 
-        # The hardcoded password must NOT appear
         assert "BenchBox#Temp123!" not in sql1
         assert "BenchBox#Temp123!" not in sql2
 
 
-# ---------------------------------------------------------------------------
-# Data loading - _resolve_data_files and load_data delegation
-# ---------------------------------------------------------------------------
-
-
 class TestAzureSynapseDataLoading:
-    """Tests for _resolve_data_files and load_data DataSourceResolver delegation."""
-
     def test_resolve_data_files_returns_tables_from_resolver(self, tmp_path, synapse_stubs):
-        """_resolve_data_files delegates to DataSourceResolver and returns the DataSource."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="u",
@@ -1117,7 +1023,6 @@ class TestAzureSynapseDataLoading:
         assert mock_cls.call_args.kwargs.get("platform_name") == adapter.platform_name
 
     def test_resolve_data_files_raises_when_resolver_returns_none(self, tmp_path, synapse_stubs):
-        """_resolve_data_files raises ValueError when DataSourceResolver returns None."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="u",
@@ -1133,7 +1038,6 @@ class TestAzureSynapseDataLoading:
                 adapter._resolve_data_files(Mock(), tmp_path)
 
     def test_resolve_data_files_raises_when_tables_empty(self, tmp_path, synapse_stubs):
-        """_resolve_data_files raises ValueError when resolver returns empty tables."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="u",
@@ -1149,7 +1053,6 @@ class TestAzureSynapseDataLoading:
                 adapter._resolve_data_files(Mock(), tmp_path)
 
     def test_load_data_delegates_to_resolve_data_files(self, tmp_path, synapse_stubs):
-        """load_data calls self._resolve_data_files instead of duplicating resolution logic."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="u",
@@ -1168,7 +1071,6 @@ class TestAzureSynapseDataLoading:
         mock_resolve.assert_called_once()
 
     def test_load_data_propagates_resolve_error(self, tmp_path, synapse_stubs):
-        """load_data propagates ValueError raised by _resolve_data_files."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="u",
@@ -1183,12 +1085,6 @@ class TestAzureSynapseDataLoading:
 
 
 class TestSynapseStagingRootAcceptsEveryAzureSpelling:
-    """The gate keys off the provider family, not a literal list of spellings.
-
-    The old literal accepted a provider string ("abfs") the classifier never
-    produced, while rejecting the documented `azure://` form outright.
-    """
-
     @pytest.mark.parametrize(
         ("staging_root", "storage_account"),
         [
@@ -1230,7 +1126,6 @@ class TestSynapseStagingRootAcceptsEveryAzureSpelling:
 
     @pytest.mark.parametrize("staging_root", ["s3://bucket/benchbox", "gs://bucket/benchbox"])
     def test_non_azure_staging_roots_are_still_rejected(self, synapse_stubs, staging_root):
-        """Widening the accepted spellings must not accept another cloud."""
         with pytest.raises(ValueError, match="requires Azure storage"):
             AzureSynapseAdapter(
                 server="myworkspace.sql.azuresynapse.net",

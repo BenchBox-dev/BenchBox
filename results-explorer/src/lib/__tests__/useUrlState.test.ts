@@ -1,21 +1,6 @@
-/**
- * Tests for useUrlState hook.
- *
- * Cases:
- *   (a) Initial value from URL beats the `initial` argument
- *   (b) Invalid/absent URL value falls back to `initial`
- *   (c) setValue writes ?key=... without pushing history (replaceState)
- *   (d) popstate re-hydrates state from the updated URL
- *   (e) SSR no-op: hook returns initial when window is undefined
- */
-
 import { renderHook, act } from "@testing-library/preact";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useUrlState, arraySerde, numberSerde } from "@/lib/useUrlState";
-
-// ---------------------------------------------------------------------------
-// URL helpers
-// ---------------------------------------------------------------------------
 
 function setSearch(params: Record<string, string>) {
   const search = new URLSearchParams(params).toString();
@@ -25,10 +10,6 @@ function setSearch(params: Record<string, string>) {
 function clearSearch() {
   window.history.replaceState(null, "", "/");
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe("useUrlState", () => {
   beforeEach(() => {
@@ -79,7 +60,6 @@ describe("useUrlState", () => {
   it("(d) popstate re-hydrates state from the updated URL", () => {
     const { result } = renderHook(() => useUrlState("phase", "power"));
 
-    // Simulate navigation that changes the URL externally
     act(() => {
       window.history.replaceState(null, "", "/?phase=throughput");
       window.dispatchEvent(new PopStateEvent("popstate"));

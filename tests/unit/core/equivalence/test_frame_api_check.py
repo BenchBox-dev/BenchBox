@@ -1,13 +1,3 @@
-"""Static frame-API check over registered DataFrame query modules.
-
-Every method a ``*_expression_impl`` calls on a frame-typed value must exist on
-:class:`UnifiedLazyFrame`: value-level gates only execute queries, so a call to
-a missing method (the ``rename_columns``/``with_column`` class) fails only when
-that query runs. The sweep below parses every ``dataframe_queries`` module
-without importing it and fails on any violation, with synthetic negative
-controls proving the checker sees the bug class.
-"""
-
 from __future__ import annotations
 
 import ast

@@ -3,18 +3,8 @@ name: Cross-Platform Validation
 env:
   BENCHBOX_TEST_LOCK_WAIT_SECONDS: "0"
 
-# Nightly matrix: DuckDB × {DataFusion, Polars-DF, ClickHouse-local} at TPC-H SF=0.01.
-#
-# Purpose: detect silent cross-platform divergences before they land on release.
-# Scope:   credential-free tier only.  Snowflake/Databricks join when the
-#          nightly lane gains secrets (separate follow-up TODO).
-#
-# On failure: structured JSON diff artifacts are uploaded per (benchmark, platform-pair)
-# cell so that triage can identify the divergent query without re-running the suite.
-
 on:
   schedule:
-    # 03:00 UTC every day - after nightly build artifacts are available.
     - cron: "0 3 * * *"
   workflow_dispatch:
     inputs:
@@ -37,15 +27,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.12"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: |
@@ -54,9 +44,6 @@ jobs:
       - name: Run cross-platform validation tests
         id: run_tests
         run: |
-          # Map matrix.comparison to the pytest class name filter.
-          # Each matrix leg installs only the relevant extra so the other
-          # platform classes are automatically skipped via importorskip.
           case "${{ matrix.comparison }}" in
             datafusion)      CLASS_FILTER="TestDuckDBDataFusion" ;;
             polars-df)       CLASS_FILTER="TestDuckDBPolarsDF" ;;
@@ -64,8 +51,6 @@ jobs:
             *) CLASS_FILTER="TestDuckDB" ;;
           esac
 
-          # Build optional query subset filter from workflow_dispatch input.
-          # "Q1,Q6" → CLASS_FILTER becomes "TestDuckDBDataFusion and (Q1 or Q6)".
           QUERY_SUBSET="${{ inputs.query_subset }}"
           if [ -n "${QUERY_SUBSET}" ]; then
             QUERY_EXPR=$(echo "${QUERY_SUBSET}" | tr ',' '\n' | paste -sd ' or ' -)
@@ -123,7 +108,7 @@ jobs:
 
       - name: Upload diff artifact
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: "cross-platform-diff-tpch-${{ matrix.comparison }}"
           path: |

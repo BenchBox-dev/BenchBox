@@ -1,5 +1,3 @@
-"""Shared observability and cache-policy acceptance coverage."""
-
 from __future__ import annotations
 
 from pathlib import Path

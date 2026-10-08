@@ -1,5 +1,3 @@
-"""Variant registries for TPC-Havoc queries."""
-
 from __future__ import annotations
 
 from . import (

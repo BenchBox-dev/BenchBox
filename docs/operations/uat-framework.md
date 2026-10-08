@@ -87,12 +87,11 @@ but never delete or move artifacts.
   root remains audited even when the launch directory is outside Git.
 
   ```bash
-  # Audit the current worktree (also a no-op outside a Git worktree with no
-  # external root configured):
   make uat-artifact-hygiene
-  # Or target an explicit root / raise the byte budget:
   make uat-artifact-hygiene OUTPUT=<checkout-parent>/benchmark_runs THRESHOLD_BYTES=0
   ```
+
+  The first command audits the current worktree. It is also a no-op outside a Git worktree with no external root configured. The second targets an explicit root and sets the byte budget.
 
 ### Compact audit commands
 
@@ -100,16 +99,19 @@ If a sweep is configured for an external root, confirm nothing leaked into the
 worktree-local tree:
 
 ```bash
-# Total size of the local tree (should be ~empty under an external root):
 du -sh benchmark_runs 2>/dev/null || echo "no local benchmark_runs"
 du -sh benchmark_runs/datagen 2>/dev/null
 
-# Files written under the local tree in the last day (recent leak detector):
 find benchmark_runs -type f -mtime -1 2>/dev/null
 
-# Largest local artifacts, top 20 (find the heavy offenders):
 find benchmark_runs -type f -printf '%s\t%p\n' 2>/dev/null | sort -rn | head -20
 ```
+
+In order, these commands show:
+
+- The total size of the local tree, which should be nearly empty under an external root.
+- Files written under the local tree in the last day, which detects a recent leak.
+- The 20 largest local artifacts, which finds the heaviest offenders.
 
 ## Docker storage cleanup
 
@@ -123,19 +125,21 @@ cleanup:
   preserve_datagen: true
   prune_databases: true
   docker_manage_platforms: true
-  docker_platform_switch: "volumes"   # down -v --remove-orphans at platform switch
+  docker_platform_switch: "volumes"
   docker_project_prefix: "benchbox-uat"
   docker_start_timeout_s: 300
-  docker_settle_s: 10                 # settle before the one-shot post-`up --wait`
-                                      # readiness check; catches immediate crashes
-                                      # only, see below
+  docker_settle_s: 10
   docker_fixed_container_name_policy: "fail"
 
 execute:
-  liveness_probe_timeout_s: 2.0       # per-cell liveness probe; 0 disables.
-                                      # This is what catches a stack dying
-                                      # LATER, see below
+  liveness_probe_timeout_s: 2.0
 ```
+
+Three settings in this block need explanation:
+
+- `docker_platform_switch: "volumes"` runs `down -v --remove-orphans` at each platform switch.
+- `docker_settle_s: 10` is the wait before the one-shot readiness check after `up --wait`. It catches immediate crashes only; see below.
+- `liveness_probe_timeout_s: 2.0` is the per-cell liveness probe timeout, and 0 disables the probe. It catches a stack dying later; see below.
 
 `preserve_datagen: false` is deliberately rejected by the config
 validator; UAT may prune loaded databases at safe reuse boundaries, but
@@ -702,8 +706,9 @@ New sweeps clone a template:
 
 ```bash
 cp tests/uat/configs/stress-default.yaml tests/uat/configs/uat-<new>.yaml
-# edit `name:`, then run `make uat-sweep CONFIG=tests/uat/configs/uat-<new>.yaml`
 ```
+
+Edit `name:` in the copy, then run `make uat-sweep CONFIG=tests/uat/configs/uat-<new>.yaml`.
 
 ## Sequential platform execution
 

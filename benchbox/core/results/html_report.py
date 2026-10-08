@@ -1,16 +1,5 @@
-"""HTML report generation with XSS-safe escaping.
-
-Single owner for the ``_generate_html_report`` logic previously duplicated
-between ``benchbox.mcp.tools.results`` (dict-based, used by the MCP
-``get_results(..., format='html')`` surface) and
-``benchbox.core.results.exporter.ResultExporter._export_html_detailed``
-(object-based).  The dict variant is the convergence point for the MCP
-export path; the exporter variant stays for object-based CLI publishing but
-now delegates its per-row escaping to the same ``html.escape`` contract.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -19,22 +8,6 @@ from typing import Any
 
 
 def generate_html_report(results: dict[str, Any]) -> str:
-    """Generate an XSS-safe HTML report from a result dict.
-
-    Mirrors the previous ``benchbox.mcp.tools.results._generate_html_report``
-    output shape so that MCP response schemas and the exporter convergence
-    stay stable.  All interpolated values are ``html.escape``-ed.
-
-    Args:
-        results: Result dict as loaded from a benchmark JSON file (or the
-            in-memory ``build_result_payload`` dict).  Keys consulted:
-            ``benchmark.{name,id,scale_factor}``, ``platform.{name}``,
-            ``run.{id}``, ``summary.{queries.total,timing.total_ms}``,
-            ``queries[].{id,ms,status}``.
-
-    Returns:
-        A complete HTML document string.
-    """
     esc = html.escape
     benchmark = results.get("benchmark", {})
     platform_type = esc(str(results.get("platform", {}).get("name", "Unknown")))
@@ -95,18 +68,6 @@ def generate_html_report(results: dict[str, Any]) -> str:
 
 
 def generate_summary_content(results: dict[str, Any], format: str) -> dict[str, Any]:
-    """Generate a formatted summary (markdown or text) from a result dict.
-
-    Core-owned equivalent of the previous
-    ``benchbox.mcp.tools.results._export_summary_impl``.
-
-    Args:
-        results: Result dict as loaded from a benchmark JSON file.
-        format: ``"markdown"`` or ``"text"`` (any other value yields text).
-
-    Returns:
-        ``{"format": str, "content": str}``
-    """
     lines: list[str] = []
 
     if format == "markdown":

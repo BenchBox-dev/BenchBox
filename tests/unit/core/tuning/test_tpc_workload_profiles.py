@@ -1,5 +1,3 @@
-"""Tests for platform-neutral TPC workload tuning profiles."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -119,8 +117,7 @@ def test_tpc_profile_ssb_extension() -> None:
     assert ssb[("LINEORDER", "LO_SUPPKEY")].query_count == 10
     assert ssb[("LINEORDER", "LO_CUSTKEY")].query_count == 7
     assert ssb[("LINEORDER", "LO_PARTKEY")].query_count == 6
-    # LO_ORDERKEY is never referenced by any SSB query (LINEORDER is
-    # denormalized; there is no ORDERS join), so it must not be a candidate.
+
     assert ("LINEORDER", "LO_ORDERKEY") not in ssb
     required = {(candidate.table, candidate.column) for candidate in profile.required_candidates("ssb")}
     assert ("LINEORDER", "LO_ORDERDATE") in required

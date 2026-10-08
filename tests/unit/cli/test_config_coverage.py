@@ -1,5 +1,3 @@
-"""Coverage additions for cli/config.py."""
-
 from __future__ import annotations
 
 import importlib
@@ -73,7 +71,6 @@ def test_load_config_raises_when_validation_fails(tmp_path: Path, monkeypatch: p
 
 
 def test_directory_manager_honors_output_dir_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """``DirectoryManager()`` (no base_dir) should resolve via BENCHBOX_OUTPUT_DIR."""
     custom_root = tmp_path / "custom_runs"
     monkeypatch.setenv("BENCHBOX_OUTPUT_DIR", str(custom_root))
     dm = cfg.DirectoryManager()
@@ -96,7 +93,7 @@ def test_directory_manager_paths_and_cleanup(tmp_path: Path) -> None:
 
     old_file = dm.results_dir / "old.json"
     old_file.write_text("{}", encoding="utf-8")
-    # Set the file's mtime to a very old timestamp so it's always older than cutoff
+
     import os as _os
 
     _os.utime(old_file, (0, 0))
@@ -133,11 +130,9 @@ tpch:
     mgr.save_tuning_config(tunings, out_path, format="yaml")
     assert out_path.exists()
 
-    # cover parse validation failure path
     with pytest.raises(ValueError):
         mgr._parse_table_tuning("orders", {"partitioning": "not-a-list"})
 
-    # unified tuning save/load
     u = cfg.UnifiedTuningConfiguration()
     u.primary_keys.enabled = True
     u.foreign_keys.enabled = True

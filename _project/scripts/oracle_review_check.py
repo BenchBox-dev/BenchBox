@@ -21,9 +21,6 @@ ORACLE = "oracle"
 SIGNALS = {CONNECTOR: (CONNECTOR_LOGIN, "Codex connector"), ORACLE: (ORACLE_LOGIN, "oracle")}
 ORACLE_CONTEXT = "oracle-review-shadow"
 _ORACLE_VERDICT = re.compile(rf"### {ORACLE_CONTEXT}: (?P<state>[a-z]+) for `(?P<sha>[0-9a-f]{{40}})`")
-# Accounts whose stand-in attestation substitutes for the Codex connector when it
-# cannot review (for example at its usage limit). The attestation must name the
-# exact head commit, so it records who vouched for which reviewed code.
 STANDIN_ATTESTERS = frozenset({"joeharris76"})
 _STANDIN_MARKER = re.compile(r"Stand-in oracle review: APPROVE ([0-9a-f]{40})")
 
@@ -34,8 +31,6 @@ def _attested_shas(comment: dict[str, Any]) -> list[str]:
 
 
 def _is_standin(comment: dict[str, Any], head_sha: str, not_before: datetime | None) -> bool:
-    # Exact login and a human account: a "[bot]" suffix is not stripped here. An
-    # edited comment does not count, because its text may not be the author's.
     return (
         comment.get("login") in STANDIN_ATTESTERS
         and comment.get("user_type") == "User"

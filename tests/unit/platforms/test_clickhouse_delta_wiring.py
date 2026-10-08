@@ -1,13 +1,6 @@
-"""Unit tests for ClickHouse Delta read-path wiring.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Server-free: stub connections stand in for ``clickhouse_driver`` clients so
-the probe/decision flow is pinned without a server. Live execution against
-the Docker-gated server is covered by the native suite.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -22,8 +15,6 @@ pytestmark = [
 
 
 class StubConnection:
-    """Minimal ``execute()`` stand-in returning canned system-table rows."""
-
     def __init__(self, functions: list[str], engines: list[str]) -> None:
         self._functions = functions
         self._engines = engines
@@ -94,8 +85,6 @@ class TestDeltaReaderFor:
 
 
 class RecordingConnection(StubConnection):
-    """Stub connection that also records DML and answers row counts."""
-
     def __init__(
         self,
         functions: list[str],
@@ -117,7 +106,7 @@ class RecordingConnection(StubConnection):
 
 
 def _write_delta_dir(path) -> None:
-    """Write a minimal local Delta Lake table directory."""
+
     import pyarrow as pa
     from deltalake.writer import write_deltalake
 
@@ -173,7 +162,7 @@ class TestClickHouseDeltaHandlerLoad:
 
         delta_dir = tmp_path / "orders"
         _write_delta_dir(delta_dir)
-        # Base registration only: local resolves to the executable snapshot.
+
         connection = RecordingConnection(["deltaLake"], ["DeltaLake"], counts=[0, 3])
         handler = ClickHouseDeltaHandler(mixin, None)
 

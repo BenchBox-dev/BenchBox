@@ -1,12 +1,3 @@
-"""Tests for MotherDuck query plan capture DML double-execution guard.
-
-MotherDuck captures plans via EXPLAIN (ANALYZE, FORMAT JSON), which physically
-re-executes the statement. For DML (INSERT/UPDATE/DELETE/MERGE/COPY) this would
-mutate data twice, so get_query_plan() must downgrade to FORMAT JSON without
-ANALYZE. These tests pass a mock connection, so no MotherDuck network access is
-required.
-"""
-
 from unittest.mock import MagicMock
 
 import pytest
@@ -60,7 +51,7 @@ class TestMotherDuckDMLPlanGuard:
         ],
     )
     def test_ctas_query_does_not_use_analyze(self, adapter, write_ddl):
-        """CTAS/CMV/SELECT-INTO materialize rows; EXPLAIN ANALYZE would write them twice."""
+
         conn = _mock_conn()
 
         adapter.get_query_plan(conn, write_ddl)
@@ -88,13 +79,6 @@ class TestMotherDuckDMLPlanGuard:
 
 
 class TestMotherDuckStrictPlanCapture:
-    """strict_plan_capture must propagate PlanCaptureError from execute_query.
-
-    The capture call sits OUTSIDE execute_query's broad except: a capture
-    failure on a successful query must surface as PlanCaptureError in strict
-    mode, not mislabel the query status=FAILED.
-    """
-
     @staticmethod
     def _break_plan_capture(adapter, monkeypatch):
         def boom(connection, query):
@@ -123,7 +107,7 @@ class TestMotherDuckStrictPlanCapture:
         assert "query_plan" not in result
 
     def test_strict_mode_does_not_mask_real_query_failure(self):
-        """A genuine SQL error must still return status=FAILED, not raise."""
+
         adapter = MotherDuckAdapter(token="test-token", capture_plans=True, strict_plan_capture=True)
         conn = MagicMock()
         conn.execute.side_effect = RuntimeError("no such table: t")

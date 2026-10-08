@@ -1,5 +1,3 @@
-"""Collect and deterministically partition release-canary pytest node IDs."""
-
 from __future__ import annotations
 
 import argparse
@@ -10,6 +8,8 @@ from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Any
 
+CLI_DESCRIPTION = "Collect and deterministically partition release-canary pytest node IDs."
+
 MARKER_EXPRESSION = "(slow or resource_heavy) and not (stress or live_integration)"
 MEDIUM_MARKER_EXPRESSION = "medium and not (slow or stress or resource_heavy or live_integration)"
 DEFAULT_SHARD_COUNT = 6
@@ -17,7 +17,6 @@ MEDIUM_SHARD_COUNT = 4
 
 
 def _canonical_node_ids(node_ids: Iterable[str]) -> list[str]:
-    """Validate node IDs and return them in a stable order."""
     values = list(node_ids)
     if not values:
         raise ValueError("node-id input is empty")
@@ -29,7 +28,6 @@ def _canonical_node_ids(node_ids: Iterable[str]) -> list[str]:
 
 
 def parse_collection_output(output: str) -> list[str]:
-    """Extract pytest node IDs from ``--collect-only -q`` output."""
     node_ids = []
     for line in output.splitlines():
         candidate = line.strip()
@@ -39,17 +37,10 @@ def parse_collection_output(output: str) -> list[str]:
 
 
 def read_node_ids(path: Path) -> list[str]:
-    """Read and validate a newline-delimited node-id file."""
     return _canonical_node_ids(path.read_text(encoding="utf-8").splitlines())
 
 
 def partition_node_ids(node_ids: Sequence[str], shard_index: int, shard_count: int) -> list[str]:
-    """Return one deterministic, disjoint shard of ``node_ids``.
-
-    Sorting before round-robin assignment makes the result independent of
-    pytest's collection order while spreading adjacent test modules across
-    shards. Invalid parameters and duplicate input fail closed.
-    """
     if isinstance(shard_count, bool) or not isinstance(shard_count, int) or shard_count < 1:
         raise ValueError("shard_count must be a positive integer")
     if isinstance(shard_index, bool) or not isinstance(shard_index, int) or not 0 <= shard_index < shard_count:
@@ -88,7 +79,6 @@ def collect_node_ids(
     job: str = "collect-credential-free-non-fast",
     marker_expression: str = MARKER_EXPRESSION,
 ) -> int:
-    """Create the canonical node-id artifact and collection manifest."""
     if expected_count < 1:
         raise ValueError("expected_count must be a positive integer")
     if isinstance(shard_count, bool) or not isinstance(shard_count, int) or shard_count < 1:
@@ -136,7 +126,6 @@ def write_shard(
     collection_summary: Path | None = None,
     checked_sha: str | None = None,
 ) -> int:
-    """Write one shard file and its manifest from the collection artifact."""
     node_ids = read_node_ids(input_path)
     if collection_summary is not None or checked_sha is not None:
         if collection_summary is None or not checked_sha:
@@ -174,7 +163,6 @@ def write_shard(
 
 
 def _validate_node_outcomes(outcomes: object, assigned: list[str]) -> None:
-    """Check actual report correspondence without requiring optional tests to pass."""
     if not isinstance(outcomes, list) or any(not isinstance(item, dict) for item in outcomes):
         raise ValueError("medium outcome evidence is missing or malformed")
     if [item.get("node_id") for item in outcomes] != assigned:
@@ -239,7 +227,6 @@ def verify_required_cases(evidence_path: Path, checked_sha: str, nodeids_path: P
 
 
 def verify_medium_shards(artifact_root: Path, checked_sha: str) -> None:
-    """Prove every medium shard executed the exact collected set once."""
     collection_root = artifact_root / f"t2-medium-nodeids-{checked_sha}"
     node_ids = read_node_ids(collection_root / "medium-nodeids.txt")
     collection = json.loads((collection_root / "medium-collection.json").read_text(encoding="utf-8"))
@@ -281,7 +268,7 @@ def verify_medium_shards(artifact_root: Path, checked_sha: str) -> None:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     collect_parser = subparsers.add_parser("collect", help="create the canonical node-id artifact")

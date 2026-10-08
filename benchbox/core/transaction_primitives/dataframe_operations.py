@@ -1,38 +1,6 @@
-"""DataFrame operations for Transaction Primitives benchmark.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides DataFrame implementations of Transaction Primitives operations,
-enabling benchmarking of ACID transaction semantics on DataFrame platforms that
-support Delta Lake, Iceberg, or other table formats with transaction support.
-
-Transaction Primitives tests fundamental database transaction semantics:
-- COMMIT: Atomic commit of changes
-- ROLLBACK: Rollback to previous state (via RESTORE for Delta Lake)
-- Isolation: Snapshot isolation verification
-- Concurrency: Parallel write conflict handling
-- Time Travel: Query and restore historical versions
-
-Platform Support:
-    - PySpark + Delta Lake: Full ACID support
-        - Atomic writes (each operation is a transaction)
-        - RESTORE TO VERSION/TIMESTAMP for rollback
-        - Snapshot isolation
-        - Time travel queries
-    - PySpark + Iceberg: Full ACID support
-        - Snapshot-based isolation
-        - Time travel via snapshots
-    - Polars/Pandas: NOT SUPPORTED
-        - No transaction semantics
-        - Users directed to use Delta Lake or Iceberg
-
-Note:
-    Unlike traditional SQL databases with BEGIN/COMMIT/ROLLBACK, Delta Lake and
-    Iceberg use atomic operations where each write is automatically committed.
-    "Rollback" is achieved via RESTORE (Delta) or rollback_to_snapshot (Iceberg).
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -55,54 +23,26 @@ logger = logging.getLogger(__name__)
 
 
 class TransactionOperationType(Enum):
-    """Types of transaction operations supported by the benchmark.
-
-    These operations test ACID transaction semantics on DataFrame platforms
-    that support table formats like Delta Lake or Iceberg.
-    """
-
-    # Atomic write operations (tests implicit commit)
     ATOMIC_INSERT = "atomic_insert"
     ATOMIC_UPDATE = "atomic_update"
     ATOMIC_DELETE = "atomic_delete"
     ATOMIC_MERGE = "atomic_merge"
 
-    # Rollback operations (Delta Lake RESTORE, Iceberg rollback)
     ROLLBACK_TO_VERSION = "rollback_to_version"
     ROLLBACK_TO_TIMESTAMP = "rollback_to_timestamp"
 
-    # Time travel operations
     TIME_TRAVEL_QUERY = "time_travel_query"
     VERSION_COMPARE = "version_compare"
 
-    # Concurrency tests
     CONCURRENT_WRITE = "concurrent_write"
     CONFLICT_RESOLUTION = "conflict_resolution"
 
-    # Isolation verification
     SNAPSHOT_ISOLATION = "snapshot_isolation"
     READ_YOUR_WRITES = "read_your_writes"
 
 
 @dataclass
 class DataFrameTransactionCapabilities:
-    """Platform capabilities for DataFrame transaction operations.
-
-    Declares what transaction-related operations a DataFrame platform supports.
-    This is used to validate configurations and provide helpful error messages
-    when users attempt to run transaction benchmarks on unsupported platforms.
-
-    Attributes:
-        platform_name: Name of the platform
-        supports_transactions: Has atomic transaction support
-        supports_rollback: Can rollback to previous versions
-        supports_time_travel: Can query historical versions
-        supports_concurrent_writes: Has concurrency control
-        transaction_isolation: Isolation level supported
-        table_format: Underlying table format (delta, iceberg, parquet, none)
-        notes: Platform-specific notes
-    """
-
     platform_name: str
     supports_transactions: bool = False
     supports_rollback: bool = False
@@ -113,41 +53,23 @@ class DataFrameTransactionCapabilities:
     notes: str = ""
 
     def supports_operation(self, operation: TransactionOperationType) -> bool:
-        """Check if an operation type is supported.
-
-        Args:
-            operation: The operation type to check
-
-        Returns:
-            True if the operation is supported
-        """
         mapping = {
-            # Atomic writes require transaction support
             TransactionOperationType.ATOMIC_INSERT: self.supports_transactions,
             TransactionOperationType.ATOMIC_UPDATE: self.supports_transactions,
             TransactionOperationType.ATOMIC_DELETE: self.supports_transactions,
             TransactionOperationType.ATOMIC_MERGE: self.supports_transactions,
-            # Rollback requires RESTORE or equivalent
             TransactionOperationType.ROLLBACK_TO_VERSION: self.supports_rollback,
             TransactionOperationType.ROLLBACK_TO_TIMESTAMP: self.supports_rollback,
-            # Time travel queries
             TransactionOperationType.TIME_TRAVEL_QUERY: self.supports_time_travel,
             TransactionOperationType.VERSION_COMPARE: self.supports_time_travel,
-            # Concurrency tests
             TransactionOperationType.CONCURRENT_WRITE: self.supports_concurrent_writes,
             TransactionOperationType.CONFLICT_RESOLUTION: self.supports_concurrent_writes,
-            # Isolation tests
             TransactionOperationType.SNAPSHOT_ISOLATION: (self.transaction_isolation == TransactionIsolation.SNAPSHOT),
             TransactionOperationType.READ_YOUR_WRITES: self.supports_transactions,
         }
         return mapping.get(operation, False)
 
     def get_unsupported_operations(self) -> list[TransactionOperationType]:
-        """Get list of operations not supported by this platform.
-
-        Returns:
-            List of unsupported TransactionOperationType values
-        """
         return [op for op in TransactionOperationType if not self.supports_operation(op)]
 
 
@@ -194,26 +116,6 @@ PANDAS_TRANSACTION_CAPABILITIES = _transaction_capabilities(
 
 @dataclass
 class DataFrameTransactionResult:
-    """Result of a DataFrame transaction operation.
-
-    Standardized result container for transaction operations, capturing
-    timing, success status, and operation-specific metrics.
-
-    Attributes:
-        operation_type: Type of transaction operation
-        success: Whether the operation completed successfully
-        start_time: Operation start timestamp (Unix time)
-        end_time: Operation end timestamp (Unix time)
-        duration_ms: Operation duration in milliseconds
-        rows_affected: Number of rows affected
-        version_before: Table version before operation (if applicable)
-        version_after: Table version after operation (if applicable)
-        error_message: Error description if operation failed
-        validation_passed: Whether validation checks passed
-        validation_results: Details of validation checks
-        metrics: Additional operation-specific metrics
-    """
-
     operation_type: TransactionOperationType
     success: bool
     start_time: float
@@ -234,16 +136,6 @@ class DataFrameTransactionResult:
         error_message: str,
         start_time: float | None = None,
     ) -> DataFrameTransactionResult:
-        """Create a failure result.
-
-        Args:
-            operation_type: The operation that failed
-            error_message: Description of the failure
-            start_time: Optional start time (defaults to now)
-
-        Returns:
-            DataFrameTransactionResult indicating failure
-        """
         now = time.time()
         return cls(
             operation_type=operation_type,
@@ -258,72 +150,16 @@ class DataFrameTransactionResult:
 
 
 class DataFrameTransactionOperationsManager:
-    """Manager for DataFrame transaction operations.
-
-    Provides transaction-specific operations for DataFrame platforms that support
-    ACID semantics via Delta Lake, Iceberg, or similar table formats.
-
-    This manager wraps the maintenance operations interface with transaction-specific
-    functionality including:
-    - Atomic write operations with version tracking
-    - Rollback via RESTORE (Delta Lake) or snapshot rollback (Iceberg)
-    - Time travel queries
-    - Concurrency and isolation testing
-
-    Example:
-        # With PySpark + Delta Lake
-        manager = DataFrameTransactionOperationsManager(
-            "pyspark-df", spark_session=spark
-        )
-
-        # Check capabilities before running
-        if not manager.supports_transactions():
-            raise RuntimeError(manager.get_unsupported_message())
-
-        # Execute atomic insert
-        result = manager.execute_atomic_insert(
-            table_path="/data/orders",
-            dataframe=new_orders_df
-        )
-        emit(f"Version: {result.version_before} -> {result.version_after}")
-
-        # Rollback to previous version
-        result = manager.execute_rollback_to_version(
-            table_path="/data/orders",
-            version=result.version_before
-        )
-
-    Note:
-        For non-ACID platforms (Polars, Pandas), this manager will raise
-        clear errors directing users to use Delta Lake or Iceberg.
-    """
-
     def __init__(self, platform_name: str, spark_session: Any = None) -> None:
-        """Initialize the transaction operations manager.
-
-        Args:
-            platform_name: Platform name (e.g., "pyspark-df", "delta-lake")
-            spark_session: SparkSession instance (required for pyspark-df)
-
-        Raises:
-            ValueError: If platform is not recognized
-        """
         self.platform_name = platform_name.lower()
         self.spark_session = spark_session
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
-        # Get maintenance operations handler (for atomic writes)
         self._maintenance_ops = self._get_maintenance_ops()
 
-        # Build transaction capabilities
         self._capabilities = self._build_capabilities()
 
     def _get_maintenance_ops(self) -> Any:
-        """Get the appropriate maintenance operations handler.
-
-        Returns:
-            Maintenance operations handler or None
-        """
         if "pyspark" in self.platform_name or "spark" in self.platform_name:
             if self.spark_session is not None:
                 try:
@@ -345,26 +181,16 @@ class DataFrameTransactionOperationsManager:
         return get_maintenance_operations_for_platform(self.platform_name)
 
     def _build_capabilities(self) -> DataFrameTransactionCapabilities:
-        """Build platform transaction capabilities.
-
-        Returns:
-            DataFrameTransactionCapabilities for this platform
-        """
-        # Get maintenance capabilities if available
         maintenance_caps: DataFrameMaintenanceCapabilities | None = None
         if self._maintenance_ops is not None:
             maintenance_caps = self._maintenance_ops.get_capabilities()
 
-        # Platform-specific capability profiles
         if "delta" in self.platform_name:
-            # Standalone Delta Lake (delta-rs)
             return DELTA_LAKE_TRANSACTION_CAPABILITIES
 
         if "pyspark" in self.platform_name or "spark" in self.platform_name:
-            # PySpark - check if Delta Lake is available
             if maintenance_caps and maintenance_caps.supports_transactions:
                 return PYSPARK_DELTA_TRANSACTION_CAPABILITIES
-            # PySpark without Delta Lake - limited support
             return DataFrameTransactionCapabilities(
                 platform_name=self.platform_name,
                 supports_transactions=False,
@@ -381,7 +207,6 @@ class DataFrameTransactionOperationsManager:
         if "pandas" in self.platform_name:
             return PANDAS_TRANSACTION_CAPABILITIES
 
-        # Unknown platform - check maintenance capabilities
         if maintenance_caps and maintenance_caps.supports_transactions:
             return DataFrameTransactionCapabilities(
                 platform_name=self.platform_name,
@@ -393,7 +218,6 @@ class DataFrameTransactionOperationsManager:
                 table_format="unknown",
             )
 
-        # Default: no transaction support
         return DataFrameTransactionCapabilities(
             platform_name=self.platform_name,
             supports_transactions=False,
@@ -401,38 +225,15 @@ class DataFrameTransactionOperationsManager:
         )
 
     def get_capabilities(self) -> DataFrameTransactionCapabilities:
-        """Get platform transaction capabilities.
-
-        Returns:
-            DataFrameTransactionCapabilities for this platform
-        """
         return self._capabilities
 
     def supports_transactions(self) -> bool:
-        """Check if the platform supports ACID transactions.
-
-        Returns:
-            True if the platform supports transactions
-        """
         return self._capabilities.supports_transactions
 
     def supports_operation(self, operation: TransactionOperationType) -> bool:
-        """Check if an operation type is supported.
-
-        Args:
-            operation: The operation to check
-
-        Returns:
-            True if supported
-        """
         return self._capabilities.supports_operation(operation)
 
     def get_unsupported_message(self) -> str:
-        """Get error message when transactions are not supported.
-
-        Returns:
-            Helpful error message with alternatives
-        """
         return (
             f"Transaction Primitives benchmark requires ACID transaction support.\n"
             f"Platform '{self.platform_name}' does not support transactions.\n"
@@ -450,20 +251,10 @@ class DataFrameTransactionOperationsManager:
         )
 
     def _validate_path_safe(self, table_path: Path | str) -> tuple[Path | None, str]:
-        """Validate that a path is safe to use (no path traversal).
-
-        Args:
-            table_path: Path to validate
-
-        Returns:
-            Tuple of (resolved_path, error_message). resolved_path is None if invalid.
-        """
         try:
             path = Path(table_path)
-            # Resolve to absolute path to detect traversal
             resolved = path.resolve()
 
-            # Check for path traversal attempts (.. in the original path)
             path_str = str(table_path)
             if ".." in path_str:
                 return None, f"Path traversal detected in '{table_path}'. Use absolute paths."
@@ -473,33 +264,18 @@ class DataFrameTransactionOperationsManager:
             return None, f"Invalid path '{table_path}': {e}"
 
     def validate_table_format(self, table_path: Path | str) -> tuple[bool, str]:
-        """Validate that a table path is a supported transactional table.
-
-        Checks if the table at the given path is a Delta Lake or Iceberg table
-        that supports transaction operations.
-
-        Args:
-            table_path: Path to the table directory
-
-        Returns:
-            Tuple of (is_valid, error_message)
-        """
-        # Validate path safety first
         resolved_path, error_msg = self._validate_path_safe(table_path)
         if resolved_path is None:
             return False, error_msg
         table_path = resolved_path
 
-        # Check for Delta Lake table
         delta_log = table_path / "_delta_log"
         if delta_log.exists() and delta_log.is_dir():
             return True, ""
 
-        # Check for Iceberg table (metadata directory)
         if is_iceberg_directory(table_path):
             return True, ""
 
-        # Table exists but is not transactional
         if table_path.exists():
             return False, (
                 f"Table at '{table_path}' is not a Delta Lake or Iceberg table.\n"
@@ -515,17 +291,8 @@ class DataFrameTransactionOperationsManager:
         return False, f"Table path '{table_path}' does not exist."
 
     def get_table_version(self, table_path: Path | str) -> int | None:
-        """Get the current version of a transactional table.
-
-        Args:
-            table_path: Path to the table directory
-
-        Returns:
-            Current version number, or None if not available
-        """
         table_path = str(table_path)
 
-        # Delta Lake version
         if self._capabilities.table_format == "delta":
             try:
                 if "pyspark" in self.platform_name and self.spark_session:
@@ -536,7 +303,6 @@ class DataFrameTransactionOperationsManager:
                     if history:
                         return history[0]["version"]
                 else:
-                    # delta-rs
                     from deltalake import DeltaTable
 
                     dt = DeltaTable(table_path)
@@ -545,9 +311,7 @@ class DataFrameTransactionOperationsManager:
                 self.logger.warning(f"Could not get table version: {e}")
                 return None
 
-        # Iceberg snapshot ID (not numeric version, but serves similar purpose)
         if self._capabilities.table_format == "iceberg":
-            # Would need pyiceberg catalog API
             self.logger.debug("Iceberg version tracking not yet implemented")
             return None
 
@@ -608,7 +372,6 @@ class DataFrameTransactionOperationsManager:
         dataframe: Any,
         partition_columns: list[str] | None = None,
     ) -> DataFrameTransactionResult:
-        """Execute an atomic INSERT operation."""
 
         def metrics(result: Any, total_duration_ms: float) -> dict[str, float]:
             write_duration_ms = result.duration * 1000
@@ -636,7 +399,6 @@ class DataFrameTransactionOperationsManager:
         condition: str,
         updates: dict[str, Any],
     ) -> DataFrameTransactionResult:
-        """Execute an atomic UPDATE operation."""
         return self._execute_atomic_operation(
             TransactionOperationType.ATOMIC_UPDATE,
             table_path,
@@ -653,7 +415,6 @@ class DataFrameTransactionOperationsManager:
         table_path: Path | str,
         condition: str,
     ) -> DataFrameTransactionResult:
-        """Execute an atomic DELETE operation."""
         return self._execute_atomic_operation(
             TransactionOperationType.ATOMIC_DELETE,
             table_path,
@@ -672,7 +433,6 @@ class DataFrameTransactionOperationsManager:
         when_matched: dict[str, Any] | None = None,
         when_not_matched: dict[str, Any] | None = None,
     ) -> DataFrameTransactionResult:
-        """Execute an atomic MERGE (upsert) operation."""
         return self._execute_atomic_operation(
             TransactionOperationType.ATOMIC_MERGE,
             table_path,
@@ -858,7 +618,6 @@ class DataFrameTransactionOperationsManager:
         table_path: Path | str,
         version: int,
     ) -> DataFrameTransactionResult:
-        """Rollback a table to a previous version."""
         return self._execute_rollback(
             TransactionOperationType.ROLLBACK_TO_VERSION,
             table_path,
@@ -874,7 +633,6 @@ class DataFrameTransactionOperationsManager:
         table_path: Path | str,
         timestamp: str,
     ) -> DataFrameTransactionResult:
-        """Rollback a table to a previous timestamp."""
         return self._execute_rollback(
             TransactionOperationType.ROLLBACK_TO_TIMESTAMP,
             table_path,
@@ -890,7 +648,6 @@ class DataFrameTransactionOperationsManager:
         version: int | None = None,
         timestamp: str | None = None,
     ) -> DataFrameTransactionResult:
-        """Query a table at a historical version or timestamp."""
         start_time = time.time()
         operation = TransactionOperationType.TIME_TRAVEL_QUERY
 
@@ -948,7 +705,6 @@ class DataFrameTransactionOperationsManager:
         version1: int,
         version2: int,
     ) -> DataFrameTransactionResult:
-        """Compare two versions of a table and return difference metrics."""
         start_time = time.time()
         operation = TransactionOperationType.VERSION_COMPARE
 
@@ -1009,7 +765,6 @@ class DataFrameTransactionOperationsManager:
         table_path: Path | str,
         dataframes: list[Any],
     ) -> DataFrameTransactionResult:
-        """Execute concurrent write operations and measure conflict resolution."""
         start_time = time.time()
         operation = TransactionOperationType.CONCURRENT_WRITE
 
@@ -1063,7 +818,6 @@ class DataFrameTransactionOperationsManager:
         dataframe: Any,
         resolution_strategy: str = "retry",
     ) -> DataFrameTransactionResult:
-        """Execute a write that may conflict and apply a resolution strategy."""
         start_time = time.time()
         operation = TransactionOperationType.CONFLICT_RESOLUTION
 
@@ -1128,7 +882,6 @@ class DataFrameTransactionOperationsManager:
         table_path: Path | str,
         query_fn: Any | None = None,
     ) -> DataFrameTransactionResult:
-        """Verify snapshot isolation semantics by reading a stable table snapshot."""
         start_time = time.time()
         operation = TransactionOperationType.SNAPSHOT_ISOLATION
 
@@ -1170,7 +923,6 @@ class DataFrameTransactionOperationsManager:
         table_path: Path | str,
         dataframe: Any,
     ) -> DataFrameTransactionResult:
-        """Verify read-your-writes consistency after an atomic write."""
         start_time = time.time()
         operation = TransactionOperationType.READ_YOUR_WRITES
 
@@ -1190,12 +942,10 @@ class DataFrameTransactionOperationsManager:
             if rows_written is None:
                 raise RuntimeError("Unable to determine rows written for read-your-writes validation")
 
-            # Read back immediately
             version_after = self.get_table_version(table_path_str)
             rows_read_back = self._read_transaction_table_count(table_path_str)
 
             end_time = time.time()
-            # Read-your-writes is satisfied if the table grew by at least rows_written
             reads_own_writes = rows_read_back >= rows_written
 
             return self._success_result(
@@ -1221,16 +971,6 @@ def get_dataframe_transaction_manager(
     platform_name: str,
     spark_session: Any = None,
 ) -> DataFrameTransactionOperationsManager | None:
-    """Get a DataFrame transaction operations manager for a platform.
-
-    Args:
-        platform_name: Platform name (e.g., "pyspark-df", "delta-lake")
-        spark_session: SparkSession instance (required for pyspark-df)
-
-    Returns:
-        DataFrameTransactionOperationsManager if platform is recognized,
-        None if platform is not a DataFrame platform.
-    """
     return get_dataframe_manager(
         platform_name,
         manager_class=DataFrameTransactionOperationsManager,
@@ -1252,26 +992,13 @@ def get_dataframe_transaction_manager(
 
 
 def validate_transaction_primitives_platform(platform_name: str) -> tuple[bool, str]:
-    """Validate that a platform can run Transaction Primitives benchmark.
-
-    This is called during benchmark configuration to provide early feedback
-    when users attempt to run Transaction Primitives on unsupported platforms.
-
-    Args:
-        platform_name: Platform name to validate
-
-    Returns:
-        Tuple of (is_valid, error_message)
-    """
     platform_lower = platform_name.lower()
 
-    # Platforms that definitely support transactions
     supported_patterns = ("delta", "iceberg", "pyspark")
 
     if any(p in platform_lower for p in supported_patterns):
         return True, ""
 
-    # Platforms that definitely don't support transactions
     unsupported_patterns = ("polars", "pandas", "duckdb", "sqlite", "datafusion")
 
     if any(p in platform_lower for p in unsupported_patterns):
@@ -1288,7 +1015,6 @@ def validate_transaction_primitives_platform(platform_name: str) -> tuple[bool, 
             f"  benchbox run --platform pyspark-df --benchmark transaction_primitives\n"
         )
 
-    # Unknown platform - allow but warn
     return True, ""
 
 

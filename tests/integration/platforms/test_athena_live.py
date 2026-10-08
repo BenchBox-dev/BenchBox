@@ -1,23 +1,6 @@
-"""Live integration tests for Amazon Athena (SQL).
+# Copyright 2026 Joe Harris / BenchBox Project
 
-These tests are SKIPPED by default and only run when credentials are available.
-They execute real queries against live Athena workgroups.
-
-Setup:
-1. Set environment variables:
-   - ATHENA_REGION: AWS region (e.g., us-east-1)
-   - ATHENA_S3_OUTPUT: S3 path for query results (e.g., s3://my-bucket/athena-results/)
-   - ATHENA_WORKGROUP: Athena workgroup name (default: primary)
-2. Ensure AWS credentials are configured (via env vars, ~/.aws/credentials, or IAM role)
-3. Run: make test-live-athena
-
-Cost: All tests use simple metadata queries for minimal cost.
-Estimated cost per test run: <$0.01
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import os
 
@@ -38,7 +21,7 @@ pytestmark = [
 
 @pytest.fixture
 def athena_adapter():
-    """Create an Athena adapter with live credentials."""
+
     from benchbox.platforms.athena import AthenaAdapter
 
     region = get_env_or_skip("ATHENA_REGION", "Athena")
@@ -56,10 +39,8 @@ def athena_adapter():
 
 
 class TestLiveAthenaConnection:
-    """Test basic Athena connectivity."""
-
     def test_connection(self, athena_adapter):
-        """Verify Athena connection works."""
+
         connection = athena_adapter.create_connection()
         try:
             result = athena_adapter.execute_query(connection, "SELECT 1 AS value", query_id="Q0", benchmark_type="tpch")
@@ -68,7 +49,7 @@ class TestLiveAthenaConnection:
             athena_adapter.close_connection(connection)
 
     def test_platform_info(self, athena_adapter):
-        """Verify Athena platform info."""
+
         connection = athena_adapter.create_connection()
         try:
             info = athena_adapter.get_platform_info(connection)
@@ -78,10 +59,8 @@ class TestLiveAthenaConnection:
 
 
 class TestLiveAthenaQueryExecution:
-    """Test Athena query execution capabilities."""
-
     def test_show_databases(self, athena_adapter):
-        """Test listing databases via Athena."""
+
         connection = athena_adapter.create_connection()
         try:
             result = athena_adapter.execute_query(
@@ -96,7 +75,7 @@ class TestLiveAthenaQueryExecution:
             athena_adapter.close_connection(connection)
 
     def test_query_with_cost_tracking(self, athena_adapter):
-        """Test query execution with Athena cost tracking."""
+
         connection = athena_adapter.create_connection()
         try:
             result = athena_adapter.execute_query(

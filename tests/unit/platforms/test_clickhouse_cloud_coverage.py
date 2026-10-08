@@ -1,5 +1,3 @@
-"""Coverage-focused tests for clickhouse_cloud adapter helpers."""
-
 from __future__ import annotations
 
 import argparse
@@ -22,7 +20,7 @@ pytestmark = [
 
 
 def _make_gcs_mocks():
-    """Build a (mock_blob, mock_gcs_bucket, mock_gcs_storage, mock_google_cloud, sys_modules_patch) tuple."""
+
     mock_blob = MagicMock()
     mock_gcs_bucket = MagicMock()
     mock_gcs_bucket.blob.return_value = mock_blob
@@ -76,7 +74,7 @@ def test_from_config_maps_cloud_and_optional_fields() -> None:
 
 
 def test_from_config_maps_oauth_token() -> None:
-    """from_config should pass through oauth_token when present."""
+
     captured = {}
 
     def _fake_init(self, **kwargs):
@@ -96,7 +94,7 @@ def test_from_config_maps_oauth_token() -> None:
 
 
 def test_from_config_maps_cloud_storage_staging() -> None:
-    """from_config should pass through S3/GCS staging options."""
+
     captured = {}
 
     def _fake_init(self, **kwargs):
@@ -136,7 +134,7 @@ def test_get_platform_info_adds_cloud_metadata() -> None:
 
 
 def test_get_platform_info_oauth_auth_method() -> None:
-    """Platform info should report 'oauth' auth_method when token is set."""
+
     adapter = ClickHouseCloudAdapter(host="h", oauth_token="tok")
 
     with patch(
@@ -148,7 +146,7 @@ def test_get_platform_info_oauth_auth_method() -> None:
 
 
 def test_get_platform_info_includes_staging_urls() -> None:
-    """Platform info should include staging URLs when configured."""
+
     adapter = ClickHouseCloudAdapter(
         host="h",
         password="p",
@@ -234,14 +232,14 @@ def test_build_clickhouse_cloud_config_merges_saved_options(monkeypatch: pytest.
         )
 
     assert config.type == "clickhouse-cloud"
-    # saved_creds win over options (defaults < saved_creds < explicit_options < overrides)
+
     assert config.host == "saved"
     assert config.password == "option-pass"
     assert config.options["username"] == "saved_user"
 
 
 def test_build_config_includes_oauth_and_staging() -> None:
-    """_build_clickhouse_cloud_config should include oauth_token and staging fields."""
+
     cred_manager = MagicMock()
     cred_manager.get_platform_credentials.return_value = {}
     info = type("Info", (), {"display_name": "CH Cloud", "driver_package": "clickhouse-connect"})
@@ -277,18 +275,15 @@ def test_build_config_includes_oauth_and_staging() -> None:
     assert config.options["gcs_staging_url"] == "gs://b/"
 
 
-# ---- OAuth token authentication tests ----
-
-
 def test_adapter_init_with_oauth_token_instead_of_password() -> None:
-    """Adapter should accept oauth_token without password."""
+
     adapter = ClickHouseCloudAdapter(host="h", oauth_token="my-token")
     assert adapter.oauth_token == "my-token"
     assert adapter.host == "h"
 
 
 def test_adapter_init_with_oauth_token_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Adapter should read CLICKHOUSE_CLOUD_OAUTH_TOKEN from env."""
+
     monkeypatch.setenv("CLICKHOUSE_CLOUD_HOST", "cloud-host")
     monkeypatch.setenv("CLICKHOUSE_CLOUD_OAUTH_TOKEN", "env-token")
     adapter = ClickHouseCloudAdapter()
@@ -297,7 +292,7 @@ def test_adapter_init_with_oauth_token_env(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 def test_apply_cloud_defaults_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
-    """_apply_cloud_defaults should read all expected env vars."""
+
     monkeypatch.setenv("CLICKHOUSE_CLOUD_HOST", "env-host")
     monkeypatch.setenv("CLICKHOUSE_CLOUD_PASSWORD", "env-pass")
     monkeypatch.setenv("CLICKHOUSE_CLOUD_OAUTH_TOKEN", "env-oauth")
@@ -307,7 +302,7 @@ def test_apply_cloud_defaults_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CLICKHOUSE_CLOUD_GCS_STAGING_URL", "gs://env-bucket/")
 
     config: dict = {}
-    # Use a temporary instance method via class
+
     ClickHouseCloudAdapter._apply_cloud_defaults(None, config)
 
     assert config["host"] == "env-host"
@@ -319,17 +314,13 @@ def test_apply_cloud_defaults_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     assert config["gcs_staging_url"] == "gs://env-bucket/"
 
 
-# ---- CLI arguments tests ----
-
-
 def test_add_cli_arguments_includes_new_options() -> None:
-    """add_cli_arguments should register OAuth and staging arguments."""
+
     parser = argparse.ArgumentParser()
     ClickHouseCloudAdapter.add_cli_arguments(parser)
 
-    # Parse empty args to check defaults
     args = parser.parse_args([])
-    # These optional args should be None when not provided
+
     assert getattr(args, "clickhouse_cloud_oauth_token", "MISSING") is None
     assert getattr(args, "clickhouse_cloud_s3_staging_url", "MISSING") is None
     assert getattr(args, "clickhouse_cloud_s3_region", "MISSING") is None
@@ -337,7 +328,7 @@ def test_add_cli_arguments_includes_new_options() -> None:
 
 
 def test_add_cli_arguments_parses_values() -> None:
-    """add_cli_arguments should parse provided values."""
+
     parser = argparse.ArgumentParser()
     ClickHouseCloudAdapter.add_cli_arguments(parser)
 
@@ -359,9 +350,6 @@ def test_add_cli_arguments_parses_values() -> None:
     assert args.clickhouse_cloud_gcs_staging_url == "gs://b/p/"
 
 
-# ---- URL parsing tests ----
-
-
 def test_parse_s3_url() -> None:
     assert ClickHouseCloudAdapter._parse_s3_url("s3://my-bucket/staging/") == ("my-bucket", "staging/")
     assert ClickHouseCloudAdapter._parse_s3_url("s3://my-bucket/") == ("my-bucket", "")
@@ -374,11 +362,8 @@ def test_parse_gcs_url() -> None:
     assert ClickHouseCloudAdapter._parse_gcs_url("gs://bucket") == ("bucket", "")
 
 
-# ---- S3 URL validation tests ----
-
-
 def test_invalid_s3_url_raises_error() -> None:
-    """Invalid S3 URL should raise ConfigurationError."""
+
     from benchbox.core.exceptions import ConfigurationError
 
     with pytest.raises(ConfigurationError, match="Invalid S3 staging URL"):
@@ -386,7 +371,7 @@ def test_invalid_s3_url_raises_error() -> None:
 
 
 def test_invalid_gcs_url_raises_error() -> None:
-    """Invalid GCS URL should raise ConfigurationError."""
+
     from benchbox.core.exceptions import ConfigurationError
 
     with pytest.raises(ConfigurationError, match="Invalid GCS staging URL"):
@@ -394,22 +379,19 @@ def test_invalid_gcs_url_raises_error() -> None:
 
 
 def test_s3_url_gets_trailing_slash() -> None:
-    """S3 URL without trailing slash should get one added."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/prefix")
     assert adapter.s3_staging_url == "s3://bucket/prefix/"
 
 
 def test_gcs_url_gets_trailing_slash() -> None:
-    """GCS URL without trailing slash should get one added."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://bucket/prefix")
     assert adapter.gcs_staging_url == "gs://bucket/prefix/"
 
 
-# ---- load_data dispatch tests ----
-
-
 def test_load_data_dispatches_to_s3_when_configured() -> None:
-    """load_data should call _load_data_via_s3 when s3_staging_url is set."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://b/p/")
     mock_result = ({"t": 10}, 1.0, {"loading_method": "s3_staging"})
 
@@ -422,7 +404,7 @@ def test_load_data_dispatches_to_s3_when_configured() -> None:
 
 
 def test_load_data_dispatches_to_gcs_when_configured() -> None:
-    """load_data should call _load_data_via_gcs when gcs_staging_url is set."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://b/p/")
     mock_result = ({"t": 10}, 1.0, {"loading_method": "gcs_staging"})
 
@@ -435,7 +417,7 @@ def test_load_data_dispatches_to_gcs_when_configured() -> None:
 
 
 def test_load_data_falls_back_to_default_when_no_staging() -> None:
-    """load_data should use inherited path when no staging URL configured."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p")
     mock_result = ({"t": 10}, 1.0, None)
 
@@ -451,7 +433,7 @@ def test_load_data_falls_back_to_default_when_no_staging() -> None:
 
 
 def test_external_mode_requires_staging_url() -> None:
-    """External mode should require S3 or GCS staging URL."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p")
     assert adapter.supports_external_tables is True
 
@@ -460,7 +442,7 @@ def test_external_mode_requires_staging_url() -> None:
 
 
 def test_create_external_tables_dispatches_to_s3() -> None:
-    """create_external_tables should dispatch to S3 helper when configured."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")
     mock_result = ({"orders": 100}, 1.0, {"loading_method": "s3_external_views"})
 
@@ -473,7 +455,7 @@ def test_create_external_tables_dispatches_to_s3() -> None:
 
 
 def test_create_external_tables_via_s3_builds_view_sql(tmp_path: Path) -> None:
-    """S3 external mode should upload Parquet files and register view SQL."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")
 
     parquet_file = tmp_path / "orders.parquet"
@@ -510,7 +492,7 @@ def test_create_external_tables_via_s3_builds_view_sql(tmp_path: Path) -> None:
 
 
 def test_create_external_tables_via_s3_builds_iceberg_view_sql(tmp_path: Path) -> None:
-    """S3 external mode should register iceberg() views for Iceberg directories."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")
     iceberg_dir = tmp_path / "orders"
     (iceberg_dir / "metadata").mkdir(parents=True)
@@ -540,11 +522,8 @@ def test_create_external_tables_via_s3_builds_iceberg_view_sql(tmp_path: Path) -
     assert "CREATE OR REPLACE VIEW orders AS SELECT * FROM iceberg(" in executed_sql
 
 
-# ---- S3 staging data loading tests ----
-
-
 def test_load_data_via_s3_boto3_import_error() -> None:
-    """_load_data_via_s3 should raise ImportError when boto3 is not available."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://b/p/")
 
     with patch.dict("sys.modules", {"boto3": None}):
@@ -553,22 +532,18 @@ def test_load_data_via_s3_boto3_import_error() -> None:
 
 
 def test_load_data_via_s3_uploads_and_ingests(tmp_path: Path) -> None:
-    """_load_data_via_s3 should upload files and execute INSERT FROM s3()."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")
 
-    # Create test data file
     data_file = tmp_path / "test_table.csv"
     data_file.write_text("col1,col2\n1,a\n2,b\n")
 
-    # Mock benchmark with tables attribute
     benchmark = MagicMock()
     benchmark.tables = {"test_table": [str(data_file)]}
 
-    # Mock connection
     connection = MagicMock()
     connection.execute.return_value = [(100,)]
 
-    # Mock boto3
     mock_s3_client = MagicMock()
     mock_boto3 = MagicMock()
     mock_boto3.client.return_value = mock_s3_client
@@ -579,17 +554,17 @@ def test_load_data_via_s3_uploads_and_ingests(tmp_path: Path) -> None:
     assert "test_table" in table_stats
     assert metadata["loading_method"] == "s3_staging"
     assert metadata["s3_staging_url"] == "s3://bucket/staging/"
-    # Verify S3 upload was called with the data file
+
     assert mock_s3_client.upload_file.called, "upload_file should have been called"
     uploaded_path = mock_s3_client.upload_file.call_args[0][0]
     assert uploaded_path == str(data_file), f"Upload should include {data_file}"
-    # Verify INSERT FROM s3() was executed
+
     execute_calls = [str(c) for c in connection.execute.call_args_list]
     assert any("s3(" in str(c) for c in execute_calls)
 
 
 def test_load_data_via_s3_uses_single_glob_insert_for_many_files(tmp_path: Path) -> None:
-    """Sharded tables upload every file, then ingest once through an s3() glob."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")
 
     chunk_a = tmp_path / "lineitem_0.csv"
@@ -626,7 +601,7 @@ def test_load_data_via_s3_uses_single_glob_insert_for_many_files(tmp_path: Path)
 
 
 def test_load_data_via_s3_glob_tokens_differ_between_loads(tmp_path: Path) -> None:
-    """A rerun must glob a fresh prefix so stale objects from earlier runs are never read."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")
 
     first = tmp_path / "lineitem_0.csv"
@@ -654,7 +629,7 @@ def test_load_data_via_s3_glob_tokens_differ_between_loads(tmp_path: Path) -> No
 
 
 def test_load_data_via_s3_falls_back_per_file_on_glob_syntax(tmp_path: Path) -> None:
-    """A glob metacharacter in a staged name keeps the per-file loop."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")
 
     odd_file = tmp_path / "line*item.csv"
@@ -681,7 +656,7 @@ def test_load_data_via_s3_falls_back_per_file_on_glob_syntax(tmp_path: Path) -> 
 
 
 def test_load_data_via_gcs_uses_single_glob_insert(tmp_path: Path) -> None:
-    """GCS tables ingest once through a gcs() glob after uploading all files."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://bucket/staging/")
 
     chunk_a = tmp_path / "orders_0.csv"
@@ -713,11 +688,8 @@ def test_load_data_via_gcs_uses_single_glob_insert(tmp_path: Path) -> None:
     assert f"gcs('https://storage.googleapis.com/bucket/staging/orders/{token}/*'" in inserts[0]
 
 
-# ---- GCS staging data loading tests ----
-
-
 def test_load_data_via_gcs_import_error() -> None:
-    """_load_data_via_gcs should raise ImportError when google-cloud-storage is not available."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://b/p/")
 
     with patch.dict("sys.modules", {"google.cloud": None, "google.cloud.storage": None, "google": None}):
@@ -725,11 +697,8 @@ def test_load_data_via_gcs_import_error() -> None:
             adapter._load_data_via_gcs(MagicMock(), MagicMock(), Path("/tmp"))
 
 
-# ---- ClickHouseCloudClient OAuth tests ----
-
-
 def test_cloud_client_uses_access_token() -> None:
-    """ClickHouseCloudClient should pass access_token to clickhouse-connect when provided."""
+
     mock_cc = MagicMock()
     mock_client = MagicMock()
     mock_cc.get_client.return_value = mock_client
@@ -742,7 +711,6 @@ def test_cloud_client_uses_access_token() -> None:
             access_token="my-token",
         )
 
-    # Verify access_token was passed and password was NOT
     call_kwargs = mock_cc.get_client.call_args[1]
     assert call_kwargs["access_token"] == "my-token"
     assert "password" not in call_kwargs
@@ -750,7 +718,7 @@ def test_cloud_client_uses_access_token() -> None:
 
 
 def test_cloud_client_uses_password_when_no_token() -> None:
-    """ClickHouseCloudClient should use username/password when no access_token."""
+
     mock_cc = MagicMock()
     mock_client = MagicMock()
     mock_cc.get_client.return_value = mock_client
@@ -770,24 +738,21 @@ def test_cloud_client_uses_password_when_no_token() -> None:
     assert "access_token" not in call_kwargs
 
 
-# ---- Setup mixin cloud mode tests ----
-
-
 def test_setup_cloud_mode_requires_auth() -> None:
-    """Cloud mode should fail if neither password nor oauth_token is provided."""
+
     with pytest.raises(ValueError, match="requires authentication"):
         ClickHouseCloudAdapter(host="h")
 
 
 def test_setup_cloud_mode_with_oauth_only() -> None:
-    """Cloud mode should accept oauth_token without password."""
+
     adapter = ClickHouseCloudAdapter(host="h", oauth_token="tok")
     assert adapter.oauth_token == "tok"
     assert adapter.password is None or adapter.password == ""
 
 
 def test_create_cloud_connection_passes_oauth_token() -> None:
-    """_create_cloud_connection should pass access_token to ClickHouseCloudClient."""
+
     adapter = ClickHouseCloudAdapter(host="h", oauth_token="tok")
 
     mock_client = MagicMock()
@@ -800,11 +765,8 @@ def test_create_cloud_connection_passes_oauth_token() -> None:
     assert call_kwargs["access_token"] == "tok"
 
 
-# ---- _resolve_cloud_data_files tests ----
-
-
 def test_resolve_cloud_data_files_from_benchmark_tables(tmp_path: Path) -> None:
-    """_resolve_cloud_data_files should use benchmark.tables if available."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p")
     benchmark = MagicMock()
     benchmark.tables = {"orders": [str(tmp_path / "orders.csv")]}
@@ -815,7 +777,7 @@ def test_resolve_cloud_data_files_from_benchmark_tables(tmp_path: Path) -> None:
 
 
 def test_resolve_cloud_data_files_from_manifest(tmp_path: Path) -> None:
-    """_resolve_cloud_data_files should fall back to manifest."""
+
     import json
 
     manifest = {
@@ -826,23 +788,23 @@ def test_resolve_cloud_data_files_from_manifest(tmp_path: Path) -> None:
     (tmp_path / "_datagen_manifest.json").write_text(json.dumps(manifest))
 
     adapter = ClickHouseCloudAdapter(host="h", password="p")
-    benchmark = MagicMock(spec=[])  # No .tables attribute
+    benchmark = MagicMock(spec=[])
 
     result = adapter._resolve_cloud_data_files(benchmark, tmp_path)
     assert "lineitem" in result
 
 
 def test_resolve_cloud_data_files_raises_when_no_data(tmp_path: Path) -> None:
-    """_resolve_cloud_data_files should raise ValueError when no data found."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p")
-    benchmark = MagicMock(spec=[])  # No .tables attribute
+    benchmark = MagicMock(spec=[])
 
     with pytest.raises(ValueError, match="No data files found"):
         adapter._resolve_cloud_data_files(benchmark, tmp_path)
 
 
 def test_normalize_external_file_inputs_splits_cloud_and_local(tmp_path: Path) -> None:
-    """Verify _normalize_external_file_inputs correctly separates local and cloud URIs."""
+
     local_file = tmp_path / "data.parquet"
     local_file.write_bytes(b"\x00" * 10)
     inputs = [str(local_file), "s3://bucket/data.parquet", "gs://bucket/data.parquet"]
@@ -853,7 +815,7 @@ def test_normalize_external_file_inputs_splits_cloud_and_local(tmp_path: Path) -
 
 
 def test_s3_external_credential_warning_logged(tmp_path: Path, caplog) -> None:
-    """Credential embedding in VIEW SQL should produce a warning log."""
+
     import sys
 
     adapter = ClickHouseCloudAdapter(
@@ -888,13 +850,8 @@ def test_s3_external_credential_warning_logged(tmp_path: Path, caplog) -> None:
     assert any("credentials will be embedded" in r.message.lower() for r in caplog.records)
 
 
-# ---------------------------------------------------------------------------
-# ClickHouseDiagnosticsMixin - coverage tests
-# ---------------------------------------------------------------------------
-
-
 def _make_ch_adapter(**kwargs):
-    """Create a ClickHouseAdapter in server mode with mocked clickhouse_driver."""
+
     mock_driver = MagicMock()
     mock_driver.__version__ = "22.8.0"
     with patch.dict("sys.modules", {"clickhouse_driver": mock_driver}):
@@ -904,7 +861,7 @@ def _make_ch_adapter(**kwargs):
 
 
 def test_diagnostics_get_platform_info_server_mode() -> None:
-    """get_platform_info in server mode includes host, port, and version."""
+
     mock_driver = MagicMock()
     mock_driver.__version__ = "22.8.0"
     with patch.dict("sys.modules", {"clickhouse_driver": mock_driver}):
@@ -912,7 +869,6 @@ def test_diagnostics_get_platform_info_server_mode() -> None:
 
         adapter = ClickHouseAdapter(deployment_mode="server", host="localhost", password="pass")
 
-    # metadata.py uses connection.cursor(); simulate cursor pattern
     mock_cursor = MagicMock()
     mock_cursor.fetchone.return_value = ("22.8.5.29",)
     mock_cursor.fetchall.return_value = []
@@ -929,7 +885,7 @@ def test_diagnostics_get_platform_info_server_mode() -> None:
 
 
 def test_diagnostics_get_platform_info_server_mode_no_connection() -> None:
-    """get_platform_info with no connection omits platform_version."""
+
     mock_driver = MagicMock()
     mock_driver.__version__ = "22.8.0"
     with patch.dict("sys.modules", {"clickhouse_driver": mock_driver}):
@@ -945,7 +901,7 @@ def test_diagnostics_get_platform_info_server_mode_no_connection() -> None:
 
 
 def test_diagnostics_get_platform_info_server_version_error_silenced() -> None:
-    """Version probe failure does not propagate."""
+
     mock_driver = MagicMock()
     mock_driver.__version__ = "22.8.0"
     with patch.dict("sys.modules", {"clickhouse_driver": mock_driver}):
@@ -961,12 +917,11 @@ def test_diagnostics_get_platform_info_server_version_error_silenced() -> None:
     with patch.dict("sys.modules", {"clickhouse_driver": mock_driver}):
         info = adapter.get_platform_info(connection=mock_conn)
 
-    # Should not raise; platform_version defaults to None on error
     assert info["platform_type"] == "clickhouse"
 
 
 def test_diagnostics_get_platform_metadata_captures_settings() -> None:
-    """_get_platform_metadata returns version and current_settings from system queries."""
+
     mock_driver = MagicMock()
     mock_driver.__version__ = "22.8.0"
     with patch.dict("sys.modules", {"clickhouse_driver": mock_driver}):
@@ -976,9 +931,9 @@ def test_diagnostics_get_platform_metadata_captures_settings() -> None:
 
     mock_conn = MagicMock()
     mock_conn.execute.side_effect = [
-        [("22.8.5",)],  # SELECT version()
-        [("max_memory_usage", "10000000000"), ("max_threads", "8")],  # settings
-        [("benchbox", 1024 * 1024, 5)],  # database size
+        [("22.8.5",)],
+        [("max_memory_usage", "10000000000"), ("max_threads", "8")],
+        [("benchbox", 1024 * 1024, 5)],
     ]
 
     metadata = adapter._get_platform_metadata(mock_conn)
@@ -989,7 +944,7 @@ def test_diagnostics_get_platform_metadata_captures_settings() -> None:
 
 
 def test_diagnostics_get_platform_metadata_error_captured() -> None:
-    """_get_platform_metadata captures exception message rather than raising."""
+
     mock_driver = MagicMock()
     mock_driver.__version__ = "22.8.0"
     with patch.dict("sys.modules", {"clickhouse_driver": mock_driver}):
@@ -1006,7 +961,7 @@ def test_diagnostics_get_platform_metadata_error_captured() -> None:
 
 
 def test_diagnostics_check_server_database_exists_true() -> None:
-    """check_server_database_exists returns True when database found in SHOW DATABASES."""
+
     mock_driver = MagicMock()
     with patch.dict("sys.modules", {"clickhouse_driver": mock_driver}):
         from benchbox.platforms.clickhouse.adapter import ClickHouseAdapter
@@ -1024,7 +979,7 @@ def test_diagnostics_check_server_database_exists_true() -> None:
 
 
 def test_diagnostics_check_server_database_exists_false() -> None:
-    """check_server_database_exists returns False when database not in SHOW DATABASES."""
+
     mock_driver = MagicMock()
     with patch.dict("sys.modules", {"clickhouse_driver": mock_driver}):
         from benchbox.platforms.clickhouse.adapter import ClickHouseAdapter
@@ -1042,7 +997,7 @@ def test_diagnostics_check_server_database_exists_false() -> None:
 
 
 def test_diagnostics_check_server_database_exists_exception_returns_false() -> None:
-    """check_server_database_exists returns False when connection fails."""
+
     mock_driver = MagicMock()
     with patch.dict("sys.modules", {"clickhouse_driver": mock_driver}):
         from benchbox.platforms.clickhouse.adapter import ClickHouseAdapter
@@ -1087,7 +1042,7 @@ def _make_ch_local_adapter():
 
 
 def test_diagnostics_drop_database_server_mode() -> None:
-    """drop_database calls DROP DATABASE IF EXISTS via admin client."""
+
     adapter = _make_ch_server_adapter()
     mock_client = MagicMock()
     adapter.database = "bench"
@@ -1097,7 +1052,7 @@ def test_diagnostics_drop_database_server_mode() -> None:
 
 
 def test_diagnostics_drop_database_local_is_noop() -> None:
-    """drop_database is a no-op in local mode."""
+
     if importlib.util.find_spec("chdb") is None:
         pytest.skip("chDB not installed")
     adapter = _make_ch_local_adapter()
@@ -1108,7 +1063,7 @@ def test_diagnostics_drop_database_local_is_noop() -> None:
 
 
 def test_diagnostics_drop_database_exception_raises_runtime() -> None:
-    """drop_database wraps exception in RuntimeError."""
+
     adapter = _make_ch_server_adapter()
     with patch.object(adapter, "_create_admin_client", side_effect=RuntimeError("refused")):
         with pytest.raises(RuntimeError, match="Failed to drop ClickHouse database"):
@@ -1116,12 +1071,12 @@ def test_diagnostics_drop_database_exception_raises_runtime() -> None:
 
 
 def test_diagnostics_get_table_info_returns_schema_and_stats() -> None:
-    """get_table_info returns columns and statistics from system tables."""
+
     adapter = _make_ch_server_adapter()
     mock_conn = MagicMock()
     mock_conn.execute.side_effect = [
-        [("id", "UInt64"), ("name", "String")],  # system.columns
-        [(1000, 512000, 128000)],  # system.parts stats
+        [("id", "UInt64"), ("name", "String")],
+        [(1000, 512000, 128000)],
     ]
 
     result = adapter.get_table_info(mock_conn, "lineitem")
@@ -1132,7 +1087,7 @@ def test_diagnostics_get_table_info_returns_schema_and_stats() -> None:
 
 
 def test_diagnostics_get_table_info_error_returns_dict() -> None:
-    """get_table_info returns error dict when query fails."""
+
     adapter = _make_ch_server_adapter()
     mock_conn = MagicMock()
     mock_conn.execute.side_effect = RuntimeError("table missing")
@@ -1143,7 +1098,7 @@ def test_diagnostics_get_table_info_error_returns_dict() -> None:
 
 
 def test_diagnostics_optimize_table_calls_final() -> None:
-    """optimize_table runs OPTIMIZE TABLE FINAL."""
+
     adapter = _make_ch_server_adapter()
     mock_conn = MagicMock()
     adapter.optimize_table(mock_conn, "lineitem")
@@ -1151,18 +1106,15 @@ def test_diagnostics_optimize_table_calls_final() -> None:
 
 
 def test_diagnostics_optimize_table_exception_silenced() -> None:
-    """optimize_table silences exceptions via logger.warning."""
+
     adapter = _make_ch_server_adapter()
     mock_conn = MagicMock()
     mock_conn.execute.side_effect = RuntimeError("optimize failed")
-    adapter.optimize_table(mock_conn, "lineitem")  # Should not raise
-
-
-# ---- _build_ctas_sort_sql tests ----
+    adapter.optimize_table(mock_conn, "lineitem")
 
 
 def test_build_ctas_sort_sql_returns_none_when_mode_off() -> None:
-    """_build_ctas_sort_sql should return None when sorted ingestion mode is off."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p")
     with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("off", "auto")):
         result = adapter._build_ctas_sort_sql("orders", [])
@@ -1170,7 +1122,7 @@ def test_build_ctas_sort_sql_returns_none_when_mode_off() -> None:
 
 
 def test_build_ctas_sort_sql_raises_when_mode_on() -> None:
-    """_build_ctas_sort_sql should raise ValueError when sorted ingestion is requested."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p")
     with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("force", "ctas")):
         with pytest.raises(ValueError, match="does not support post-load sorted ingestion"):
@@ -1178,18 +1130,15 @@ def test_build_ctas_sort_sql_raises_when_mode_on() -> None:
 
 
 def test_build_ctas_sort_sql_raises_on_resolve_error() -> None:
-    """_build_ctas_sort_sql should wrap ValueError from resolve_sorted_ingestion_strategy."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p")
     with patch.object(adapter, "resolve_sorted_ingestion_strategy", side_effect=ValueError("unsupported")):
         with pytest.raises(ValueError, match="does not support post-load sorted ingestion"):
             adapter._build_ctas_sort_sql("orders", [])
 
 
-# ---- create_external_tables GCS dispatch ----
-
-
 def test_create_external_tables_dispatches_to_gcs() -> None:
-    """create_external_tables should dispatch to GCS helper when only gcs_staging_url is set."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://bucket/staging/")
     mock_result = ({"orders": 50}, 0.5, {"loading_method": "gcs_external_views"})
 
@@ -1201,11 +1150,8 @@ def test_create_external_tables_dispatches_to_gcs() -> None:
     assert result[2]["loading_method"] == "gcs_external_views"
 
 
-# ---- _create_external_tables_via_gcs tests ----
-
-
 def test_create_external_tables_via_gcs_import_error() -> None:
-    """_create_external_tables_via_gcs should raise ImportError when google-cloud-storage is missing."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://b/p/")
 
     with patch.dict(
@@ -1217,7 +1163,7 @@ def test_create_external_tables_via_gcs_import_error() -> None:
 
 
 def test_create_external_tables_via_gcs_parquet_locals(tmp_path: Path) -> None:
-    """GCS external mode should upload local Parquet and register gcs() VIEW."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://gcs-bucket/staging/")
 
     parquet_file = tmp_path / "lineitem.parquet"
@@ -1251,7 +1197,7 @@ def test_create_external_tables_via_gcs_parquet_locals(tmp_path: Path) -> None:
 
 
 def test_create_external_tables_via_gcs_iceberg_local(tmp_path: Path) -> None:
-    """GCS external mode should upload Iceberg dirs and register iceberg() VIEWs."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://gcs-bucket/staging/")
 
     iceberg_dir = tmp_path / "orders"
@@ -1276,11 +1222,7 @@ def test_create_external_tables_via_gcs_iceberg_local(tmp_path: Path) -> None:
 
 
 def test_create_external_tables_via_gcs_parquet_cloud_uris(tmp_path: Path) -> None:
-    """GCS external mode should build gcs() VIEW from gs:// cloud URIs.
 
-    _resolve_cloud_data_files is mocked to supply raw URI strings because Path()
-    collapses gs:// to gs:/ which breaks the scheme check in _normalize_external_file_inputs.
-    """
     adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://gcs-bucket/staging/")
 
     connection = MagicMock()
@@ -1305,7 +1247,7 @@ def test_create_external_tables_via_gcs_parquet_cloud_uris(tmp_path: Path) -> No
 
 
 def test_create_external_tables_via_gcs_iceberg_cloud_uris(tmp_path: Path) -> None:
-    """GCS external mode should build iceberg() VIEW from gs://…/metadata cloud URIs."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://gcs-bucket/staging/")
 
     connection = MagicMock()
@@ -1329,13 +1271,13 @@ def test_create_external_tables_via_gcs_iceberg_cloud_uris(tmp_path: Path) -> No
 
 
 def test_create_external_tables_via_gcs_no_sources_raises(tmp_path: Path) -> None:
-    """GCS external mode should raise ValueError when no supported file sources are found."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://gcs-bucket/staging/")
 
     connection = MagicMock()
 
     _, _, _, _, sys_modules = _make_gcs_mocks()
-    # Provide an s3:// URI - wrong scheme, not valid for GCS mode
+
     with (
         patch.object(
             adapter,
@@ -1349,7 +1291,7 @@ def test_create_external_tables_via_gcs_no_sources_raises(tmp_path: Path) -> Non
 
 
 def test_create_external_tables_via_gcs_credential_warning(tmp_path: Path, caplog) -> None:
-    """GCS credential embedding should produce a warning log."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://gcs-bucket/staging/")
 
     parquet_file = tmp_path / "lineitem.parquet"
@@ -1374,11 +1316,8 @@ def test_create_external_tables_via_gcs_credential_warning(tmp_path: Path, caplo
     assert any("credentials will be embedded" in r.message.lower() for r in caplog.records)
 
 
-# ---- _load_data_via_gcs tests ----
-
-
 def test_load_data_via_gcs_uploads_and_ingests(tmp_path: Path) -> None:
-    """_load_data_via_gcs should upload CSV files to GCS and execute INSERT FROM gcs()."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://gcs-bucket/staging/")
 
     data_file = tmp_path / "orders.csv"
@@ -1406,7 +1345,7 @@ def test_load_data_via_gcs_uploads_and_ingests(tmp_path: Path) -> None:
 
 
 def test_load_data_via_gcs_skips_empty_files(tmp_path: Path) -> None:
-    """_load_data_via_gcs should skip tables with no valid files."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://gcs-bucket/staging/")
 
     benchmark = MagicMock()
@@ -1422,16 +1361,8 @@ def test_load_data_via_gcs_skips_empty_files(tmp_path: Path) -> None:
     connection.execute.assert_not_called()
 
 
-# ---- _create_external_tables_via_s3 cloud URI branches ----
-
-
 def test_create_external_tables_via_s3_parquet_cloud_uris(tmp_path: Path) -> None:
-    """S3 external mode should build s3() VIEW from s3:// cloud URIs.
 
-    Note: _resolve_cloud_data_files returns Path objects, so cloud URIs must be provided
-    as strings via _normalize_external_file_inputs directly to avoid Path normalization
-    breaking the s3:// scheme. We mock _resolve_cloud_data_files to bypass this.
-    """
     adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")
 
     connection = MagicMock()
@@ -1456,12 +1387,12 @@ def test_create_external_tables_via_s3_parquet_cloud_uris(tmp_path: Path) -> Non
     view_sql = next(s for s in executed_sqls if "CREATE OR REPLACE VIEW" in s)
     assert "s3(" in view_sql
     assert "'Parquet'" in view_sql
-    # No upload should happen for cloud URIs
+
     mock_s3_client.upload_file.assert_not_called()
 
 
 def test_create_external_tables_via_s3_parquet_cloud_uris_multiple_dirs(tmp_path: Path) -> None:
-    """S3 external mode with cloud URIs from multiple dirs should use common prefix glob."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")
 
     connection = MagicMock()
@@ -1492,7 +1423,7 @@ def test_create_external_tables_via_s3_parquet_cloud_uris_multiple_dirs(tmp_path
 
 
 def test_create_external_tables_via_s3_iceberg_cloud_uris(tmp_path: Path) -> None:
-    """S3 external mode should build iceberg() VIEW from s3://…/metadata cloud URIs."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")
 
     connection = MagicMock()
@@ -1518,14 +1449,13 @@ def test_create_external_tables_via_s3_iceberg_cloud_uris(tmp_path: Path) -> Non
 
 
 def test_create_external_tables_via_s3_no_sources_raises(tmp_path: Path) -> None:
-    """S3 external mode should raise ValueError when no supported sources are found."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")
 
     connection = MagicMock()
     mock_boto3 = MagicMock()
     mock_boto3.client.return_value = MagicMock()
 
-    # Mock to return a GCS URI - not valid for S3 mode
     with (
         patch.object(
             adapter,
@@ -1538,11 +1468,8 @@ def test_create_external_tables_via_s3_no_sources_raises(tmp_path: Path) -> None
             adapter._create_external_tables_via_s3(MagicMock(), connection, tmp_path)
 
 
-# ---- _load_data_via_s3 no-valid-files and credential warning ----
-
-
 def test_load_data_via_s3_skips_empty_files(tmp_path: Path) -> None:
-    """_load_data_via_s3 should skip tables with no valid files."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")
 
     benchmark = MagicMock()
@@ -1562,7 +1489,7 @@ def test_load_data_via_s3_skips_empty_files(tmp_path: Path) -> None:
 
 
 def test_load_data_via_s3_with_s3_region(tmp_path: Path) -> None:
-    """_load_data_via_s3 should pass region_name to boto3.client when s3_region is set."""
+
     adapter = ClickHouseCloudAdapter(
         host="h", password="p", s3_staging_url="s3://bucket/staging/", s3_region="eu-central-1"
     )
@@ -1587,20 +1514,14 @@ def test_load_data_via_s3_with_s3_region(tmp_path: Path) -> None:
     assert boto3_call_kwargs.get("region_name") == "eu-central-1"
 
 
-# ---- platform_name property ----
-
-
 def test_platform_name_returns_clickhouse_cloud() -> None:
-    """platform_name property should return 'ClickHouse Cloud'."""
+
     adapter = ClickHouseCloudAdapter(host="h", password="p")
     assert adapter.platform_name == "ClickHouse Cloud"
 
 
-# ---- _build_clickhouse_cloud_config edge cases ----
-
-
 def test_build_config_with_none_info() -> None:
-    """_build_clickhouse_cloud_config should handle None info gracefully."""
+
     cred_manager = MagicMock()
     cred_manager.get_platform_credentials.return_value = {}
     with patch("benchbox.security.credentials.CredentialManager", return_value=cred_manager):
@@ -1617,7 +1538,7 @@ def test_build_config_with_none_info() -> None:
 
 
 def test_build_config_driver_version_from_overrides() -> None:
-    """_build_clickhouse_cloud_config should prefer driver_version from overrides."""
+
     cred_manager = MagicMock()
     cred_manager.get_platform_credentials.return_value = {}
     info = type("Info", (), {"display_name": "CH Cloud", "driver_package": "clickhouse-connect"})
@@ -1632,16 +1553,9 @@ def test_build_config_driver_version_from_overrides() -> None:
     assert config.driver_version == "0.8.0"
 
 
-# ---------------------------------------------------------------------------
-# _resolve_cloud_data_files - DataSourceResolver delegation, no fallback
-# ---------------------------------------------------------------------------
-
-
 class TestResolveCloudDataFiles:
-    """Tests for _resolve_cloud_data_files after duplicate fallback removal."""
-
     def test_raises_when_resolver_returns_none(self, tmp_path) -> None:
-        """When DataSourceResolver returns None, ValueError is raised (no fallback path)."""
+
         adapter = ClickHouseCloudAdapter(host="h", password="p")
 
         with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_cls:
@@ -1653,7 +1567,7 @@ class TestResolveCloudDataFiles:
                 adapter._resolve_cloud_data_files(MagicMock(), tmp_path)
 
     def test_raises_when_tables_empty(self, tmp_path) -> None:
-        """When DataSourceResolver returns empty tables, ValueError is raised."""
+
         adapter = ClickHouseCloudAdapter(host="h", password="p")
 
         with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_cls:
@@ -1665,7 +1579,7 @@ class TestResolveCloudDataFiles:
                 adapter._resolve_cloud_data_files(MagicMock(), tmp_path)
 
     def test_returns_path_mapping_from_resolver(self, tmp_path) -> None:
-        """Returns dict[str, list[Path]] built from resolver's tables."""
+
         adapter = ClickHouseCloudAdapter(host="h", password="p")
         raw_tables = {"hits": [str(tmp_path / "hits.csv")]}
 
@@ -1680,7 +1594,7 @@ class TestResolveCloudDataFiles:
         assert all(isinstance(p, Path) for p in result["hits"])
 
     def test_passes_platform_name_and_table_mode_to_resolver(self, tmp_path) -> None:
-        """DataSourceResolver receives platform_name and table_mode from the adapter."""
+
         adapter = ClickHouseCloudAdapter(host="h", password="p")
 
         with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_cls:

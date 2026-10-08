@@ -47,7 +47,6 @@ This guide helps you choose the optimal database platform for your BenchBox benc
 - See [DataFrame Platforms Guide](dataframe.md) for details
 
 ```bash
-# DataFrame platform examples
 benchbox run --platform polars-df --benchmark tpch --scale 0.1
 benchbox run --platform pandas-df --benchmark tpch --scale 0.1
 ```
@@ -93,7 +92,6 @@ Choose SQL platforms (DuckDB, BigQuery, Snowflake, etc.) when:
 - **Your team thinks in SQL** - Familiar with SQL query patterns and optimization
 
 ```bash
-# SQL platforms execute queries as SQL strings
 benchbox run --platform duckdb --benchmark tpch --scale 1
 benchbox run --platform snowflake --benchmark tpch --scale 100
 ```
@@ -108,7 +106,6 @@ Choose DataFrame platforms (Polars-df, Pandas-df, PySpark-df, etc.) when:
 - **You need lazy evaluation control** - Fine-grained control over execution plans
 
 ```bash
-# DataFrame platforms execute using native APIs
 benchbox run --platform polars-df --benchmark tpch --scale 1
 benchbox run --platform pandas-df --benchmark tpch --scale 1
 ```
@@ -146,21 +143,19 @@ Two native-code engines speak the Spark SQL / DataFrame API without running Spar
 | **Apache Gluten + Velox** | `velox` | Plugin - Spark keeps its scheduler; Velox runs the physical plan in C++ | **Linux only** (Docker on macOS/Windows) | You want to accelerate an existing Spark deployment without changing client code; unsupported operators fall back to JVM. |
 
 ```bash
-# LakeSail (SQL)
 benchbox run --platform lakesail --benchmark tpch --scale 1.0
 
-# LakeSail (DataFrame)
 benchbox run --platform lakesail-df --benchmark tpch --scale 1.0
 
-# Velox - local (Linux) with a Gluten bundle jar
 benchbox run --platform velox --benchmark tpch --scale 0.1 \
     --platform-option gluten_jar_path=/opt/gluten-velox-bundle-spark4.0_2.13-linux_amd64-1.6.0.jar
 
-# Velox - remote (connect to a Gluten-enabled Spark Connect server, e.g. via Docker)
 benchbox run --platform velox --platform-option deployment=remote \
     --platform-option endpoint=sc://localhost:50051 \
     --benchmark tpch --scale 0.1
 ```
+
+The first command runs LakeSail with SQL and the second with the DataFrame API. The first Velox command runs locally on Linux with a Gluten bundle jar. The second connects to a Gluten-enabled Spark Connect server, for example one running in Docker.
 
 See [LakeSail Platform Guide](lakesail.md), [Velox Platform Guide](velox.md), and the [Comparison Matrix](comparison-matrix.md#spark-compatible-engines) for deeper architectural and deployment detail.
 
@@ -174,15 +169,13 @@ See [LakeSail Platform Guide](lakesail.md), [Velox Platform Guide](velox.md), an
 **Platform Options**: DuckDB, DataFusion, SQLite
 
 ```python
-# Commonly used for development and testing
 from benchbox import TPCH
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-benchmark = TPCH(scale_factor=0.1)  # ~100MB
-adapter = DuckDBAdapter()  # In-memory processing
+benchmark = TPCH(scale_factor=0.1)
+adapter = DuckDBAdapter()
 results = adapter.run_benchmark(benchmark)
 
-# Or use DataFusion for PyArrow-based workflows
 from benchbox.platforms.datafusion import DataFusionAdapter
 adapter = DataFusionAdapter(
     memory_limit="4G",
@@ -190,6 +183,8 @@ adapter = DataFusionAdapter(
 )
 results = adapter.run_benchmark(benchmark)
 ```
+
+Scale factor 0.1 is about 100MB of data. `DuckDBAdapter()` processes data in memory.
 
 **Characteristics**:
 - No additional setup or configuration required
@@ -202,13 +197,11 @@ results = adapter.run_benchmark(benchmark)
 **Platform Options**: BigQuery, ClickHouse, DataFusion, DuckDB
 
 ```python
-# DuckDB with persistent storage
 adapter = DuckDBAdapter(
     database_path="analytics.duckdb",
     memory_limit="16GB"
 )
 
-# Or ClickHouse for distributed processing
 from benchbox.platforms.clickhouse import ClickHouseAdapter
 adapter = ClickHouseAdapter(
     host="clickhouse-cluster",
@@ -226,14 +219,12 @@ adapter = ClickHouseAdapter(
 **Platform Options**: BigQuery, Databricks SQL, Redshift, Snowflake
 
 ```python
-# Cloud platform examples (choose based on your cloud environment)
 from benchbox.platforms.snowflake import SnowflakeAdapter
 adapter = SnowflakeAdapter(
     warehouse_size="LARGE",
     database="analytics_benchmarks"
 )
 
-# Or using BigQuery
 from benchbox.platforms.bigquery import BigQueryAdapter
 adapter = BigQueryAdapter(
     project_id="analytics-project",
@@ -259,19 +250,19 @@ adapter = BigQueryAdapter(
 
 **Example Setup**:
 ```python
-# Completely free solution with DuckDB
 adapter = DuckDBAdapter(
     database_path="cost_effective.duckdb",
-    memory_limit="8GB"  # Use available RAM efficiently
+    memory_limit="8GB"
 )
 
-# Or DataFusion for in-memory analytics
 from benchbox.platforms.datafusion import DataFusionAdapter
 adapter = DataFusionAdapter(
     memory_limit="8G",
-    data_format="parquet"  # Faster than CSV
+    data_format="parquet"
 )
 ```
+
+The DuckDB example sets a memory limit so it uses available RAM efficiently, and the DataFusion example reads Parquet, which is faster than CSV.
 
 #### Pay-per-Use Cloud Solutions
 
@@ -282,13 +273,14 @@ adapter = DataFusionAdapter(
 
 **Cost-Optimized Configuration**:
 ```python
-# BigQuery with cost controls
 adapter = BigQueryAdapter(
-    maximum_bytes_billed=1000000000,  # 1GB limit per query
-    job_priority="BATCH",  # Lower cost
-    query_cache=True  # Reuse results
+    maximum_bytes_billed=1000000000,
+    job_priority="BATCH",
+    query_cache=True
 )
 ```
+
+`maximum_bytes_billed=1000000000` caps each query at 1GB billed. `job_priority="BATCH"` lowers cost. `query_cache=True` reuses earlier results.
 
 #### Provisioned Cloud Solutions
 
@@ -299,13 +291,14 @@ adapter = BigQueryAdapter(
 
 **Cost-Optimized Configuration**:
 ```python
-# Snowflake with aggressive auto-suspend
 adapter = SnowflakeAdapter(
     warehouse_size="MEDIUM",
-    auto_suspend=60,  # 1 minute
+    auto_suspend=60,
     auto_resume=True
 )
 ```
+
+`auto_suspend=60` suspends the warehouse after one minute of inactivity.
 
 ### 3. Performance Requirements
 
@@ -314,19 +307,19 @@ adapter = SnowflakeAdapter(
 **Platform Options**: ClickHouse, DuckDB
 
 ```python
-# DuckDB: In-process query execution
 adapter = DuckDBAdapter(
-    memory_limit="32GB",  # Keep data in memory
-    thread_limit=None     # Use all CPU cores
+    memory_limit="32GB",
+    thread_limit=None
 )
 
-# ClickHouse: Column-oriented analytical database
 adapter = ClickHouseAdapter(
     max_threads=32,
     max_memory_usage="64GB",
-    compression=True  # Reduce network I/O
+    compression=True
 )
 ```
+
+The DuckDB example keeps data in memory and uses all CPU cores (`thread_limit=None`). The ClickHouse example enables compression to reduce network I/O.
 
 **Characteristics**:
 - In-process or local execution reduces network overhead
@@ -338,20 +331,20 @@ adapter = ClickHouseAdapter(
 **Platform Options**: BigQuery, Databricks SQL, Snowflake
 
 ```python
-# BigQuery: Serverless auto-scaling
 adapter = BigQueryAdapter(
     job_priority="INTERACTIVE",
-    query_cache=False,  # Always compute fresh results
-    location="US"       # Multi-region deployment
+    query_cache=False,
+    location="US"
 )
 
-# Snowflake: Multi-cluster scaling
 adapter = SnowflakeAdapter(
     warehouse_size="X-LARGE",
     multi_cluster_warehouse=True,
-    auto_suspend=600  # 10 minutes for sustained workloads
+    auto_suspend=600
 )
 ```
+
+BigQuery is serverless and scales automatically. Here `query_cache=False` forces fresh results on every run, and `location="US"` selects a multi-region deployment. The Snowflake example uses multi-cluster scaling and a 10-minute auto-suspend, which suits sustained workloads.
 
 **Performance Characteristics**:
 - Concurrent user support: Hundreds to thousands of users
@@ -365,13 +358,10 @@ adapter = SnowflakeAdapter(
 **Platform Options**: BigQuery, Snowflake
 
 ```python
-# Fully managed serverless architecture
-adapter = BigQueryAdapter(
-    # No infrastructure to manage
-    # Automatic optimization
-    # Built-in monitoring
-)
+adapter = BigQueryAdapter()
 ```
+
+BigQuery is a fully managed serverless service with no infrastructure to manage, automatic optimization, and built-in monitoring.
 
 **Characteristics**:
 - No database administration required
@@ -384,13 +374,14 @@ adapter = BigQueryAdapter(
 **Platform Options**: ClickHouse (managed), Databricks SQL, Redshift
 
 ```python
-# Managed service with configuration options
 adapter = DatabricksAdapter(
     cluster_size="large",
-    auto_terminate_minutes=30,  # Cost control
-    runtime_engine="PHOTON"     # Vectorized query engine
+    auto_terminate_minutes=30,
+    runtime_engine="PHOTON"
 )
 ```
+
+`auto_terminate_minutes=30` controls cost by stopping idle clusters, and `PHOTON` is the vectorized query engine.
 
 **Characteristics**:
 - Managed infrastructure with user control
@@ -403,14 +394,12 @@ adapter = DatabricksAdapter(
 **Platform Options**: ClickHouse (self-hosted), DuckDB
 
 ```python
-# Self-managed deployment
 adapter = ClickHouseAdapter(
     host="your-optimized-cluster.company.com",
-    # Custom cluster configuration
-    # User-managed monitoring and alerting
-    # Complete data control
 )
 ```
+
+A self-managed deployment gives you custom cluster configuration, your own monitoring and alerting, and complete control of the data.
 
 **Characteristics**:
 - Complete infrastructure control
@@ -425,11 +414,9 @@ adapter = ClickHouseAdapter(
 **Platform Options**: DuckDB
 
 ```python
-# No additional setup or configuration required
 adapter = DuckDBAdapter()
 benchmark = TPCH(scale_factor=1)
 results = adapter.run_benchmark(benchmark)
-# Included by default with BenchBox
 ```
 
 **Characteristics**:
@@ -443,15 +430,13 @@ results = adapter.run_benchmark(benchmark)
 **Platform Options**: BigQuery, ClickHouse, or DuckDB
 
 ```python
-# Shared cloud project access
 adapter = BigQueryAdapter(
     project_id="team-analytics-project",
     dataset_id="shared_benchmarks",
-    # Shared Google Cloud project
-    # Collaboration features available
-    # Cost visibility and controls
 )
 ```
+
+A shared Google Cloud project provides collaboration features and cost visibility and controls.
 
 **Characteristics**:
 - Shared access and collaboration capabilities
@@ -464,14 +449,10 @@ adapter = BigQueryAdapter(
 **Platform Options**: Databricks SQL, Snowflake
 
 ```python
-# Enterprise features for growing teams
-adapter = SnowflakeAdapter(
-    # Role-based access control
-    # Multiple warehouses for different workloads
-    # Query result sharing
-    # Usage monitoring and governance
-)
+adapter = SnowflakeAdapter()
 ```
+
+Snowflake offers role-based access control, multiple warehouses for different workloads, query result sharing, and usage monitoring and governance.
 
 **Characteristics**:
 - Advanced security and governance
@@ -484,14 +465,10 @@ adapter = SnowflakeAdapter(
 **Platform Options**: Databricks SQL, Redshift, Snowflake
 
 ```python
-# Enterprise deployment
-adapter = DatabricksAdapter(
-    # Unity Catalog for governance
-    # Multiple workspaces
-    # Advanced security features
-    # Enterprise support and SLAs
-)
+adapter = DatabricksAdapter()
 ```
+
+Databricks provides Unity Catalog for governance, multiple workspaces, advanced security features, and enterprise support with SLAs.
 
 **Characteristics**:
 - Enterprise security and compliance features
@@ -506,46 +483,34 @@ adapter = DatabricksAdapter(
 **All platforms supported**. DuckDB and Databricks SQL offer native Python integration:
 
 ```python
-# DuckDB: Native Python integration
 import duckdb
 import pandas as pd
 
-# Direct DataFrame integration
 df = pd.read_csv("data.csv")
 result = duckdb.query("SELECT * FROM df WHERE value > 100").to_df()
 
-# Databricks SQL: Spark/Python integration
 from pyspark.sql import SparkSession
 spark = SparkSession.builder.appName("BenchBox").getOrCreate()
 ```
+
+The first half shows DuckDB reading a pandas DataFrame directly. The second half shows the Spark and Python integration that Databricks SQL uses.
 
 #### SQL-Heavy Teams
 
 **Platform Options**: BigQuery, Redshift, Snowflake
 
 ```python
-# ANSI SQL support with platform-specific extensions
 adapter = BigQueryAdapter()
-# ANSI SQL dialect support
-# Platform-managed optimization
-# Standard SQL interface
 ```
+
+BigQuery, Redshift, and Snowflake support ANSI SQL with platform-specific extensions, platform-managed optimization, and a standard SQL interface.
 
 #### Multi-Language Requirements
 
 **Platform Options**: ClickHouse, Databricks SQL
 
-```python
-# ClickHouse: Multiple client libraries available
-# - Python, Java, Go, C++, JavaScript
-# - HTTP API for any language
-# - JDBC/ODBC drivers
-
-# Databricks SQL: Spark ecosystem language support
-# - Scala, Python, Java, R, SQL
-# - REST APIs
-# - Notebook interface
-```
+- ClickHouse has client libraries for Python, Java, Go, C++, and JavaScript, an HTTP API usable from any language, and JDBC/ODBC drivers.
+- Databricks SQL supports the Spark ecosystem languages (Scala, Python, Java, R, and SQL), REST APIs, and a notebook interface.
 
 ### 7. Cloud Strategy
 
@@ -555,15 +520,10 @@ adapter = BigQueryAdapter()
 **Other options**: ClickHouse (EKS), Databricks SQL, DuckDB, Snowflake
 
 ```python
-# AWS integration example
-adapter = RedshiftAdapter(
-    # Integration with:
-    # - S3 for data loading
-    # - IAM for security
-    # - CloudWatch for monitoring
-    # - Lambda for automation
-)
+adapter = RedshiftAdapter()
 ```
+
+Redshift integrates with S3 for data loading, IAM for security, CloudWatch for monitoring, and Lambda for automation.
 
 #### Google Cloud Platform
 
@@ -571,17 +531,13 @@ adapter = RedshiftAdapter(
 **Other options**: ClickHouse (GKE), Databricks SQL, DuckDB, Snowflake
 
 ```python
-# GCP integration example
 adapter = BigQueryAdapter(
     project_id="gcp-project",
-    location="US",  # Or EU for data residency
-    # Integration with:
-    # - Cloud Storage
-    # - Cloud Functions
-    # - Dataflow
-    # - AI/ML services
+    location="US",
 )
 ```
+
+Use `location="EU"` instead of `"US"` for data residency in Europe. BigQuery integrates with Cloud Storage, Cloud Functions, Dataflow, and AI/ML services.
 
 #### Microsoft Azure
 
@@ -590,26 +546,19 @@ adapter = BigQueryAdapter(
 **Other options**: DuckDB
 
 ```python
-# Azure Synapse Analytics
 from benchbox.platforms.azure_synapse import AzureSynapseAdapter
-adapter = AzureSynapseAdapter(
-    # Dedicated or serverless SQL pools
-    # PolyBase staging
-    # Azure AD authentication
-)
+adapter = AzureSynapseAdapter()
 
-# Microsoft Fabric Warehouse
 from benchbox.platforms.fabric_warehouse import FabricWarehouseAdapter
-adapter = FabricWarehouseAdapter(
-    # T-SQL interface via pyodbc
-    # Entra ID authentication
-    # OneLake staging support
-)
+adapter = FabricWarehouseAdapter()
 
-# Multi-cloud platforms on Azure
-adapter = DatabricksAdapter(...)  # Available on all three clouds
-adapter = SnowflakeAdapter(...)  # Available on Azure infrastructure
+adapter = DatabricksAdapter(...)
+adapter = SnowflakeAdapter(...)
 ```
+
+- Azure Synapse Analytics supports dedicated or serverless SQL pools, PolyBase staging, and Azure AD authentication.
+- Microsoft Fabric Warehouse uses a T-SQL interface through pyodbc, Entra ID authentication, and OneLake staging.
+- Databricks and Snowflake are multi-cloud platforms, available on Azure infrastructure as on the other two clouds.
 
 See the [Azure Platforms](azure-platforms.md) page for details on all Azure integrations including Spark adapters (`fabric-spark`, `synapse-spark`).
 
@@ -619,13 +568,10 @@ See the [Azure Platforms](azure-platforms.md) page for details on all Azure inte
 **Cloud-agnostic options**: ClickHouse, DuckDB
 
 ```python
-# Multi-cloud deployment example
-adapter = DatabricksAdapter(
-    # Available on AWS, Azure, GCP
-    # Consistent interface across clouds
-    # Reduced cloud vendor lock-in
-)
+adapter = DatabricksAdapter()
 ```
+
+Databricks is available on AWS, Azure, and GCP with a consistent interface across clouds, which reduces cloud vendor lock-in.
 
 #### On-Premises or Hybrid
 
@@ -633,14 +579,12 @@ adapter = DatabricksAdapter(
 **Hybrid options**: Databricks SQL (private cloud)
 
 ```python
-# On-premises deployment example
 adapter = ClickHouseAdapter(
     host="on-prem-cluster.company.com",
-    # Complete data control
-    # No cloud dependencies
-    # Custom security policies
 )
 ```
+
+An on-premises deployment gives complete data control, no cloud dependencies, and custom security policies.
 
 ## Selection Criteria Summary
 
@@ -702,27 +646,24 @@ Performance Benchmarking
 ### Development to Production Pipeline
 
 ```python
-# Development: Fast, local, free
 dev_adapter = DuckDBAdapter()
 
-# Testing: Automated, reproducible
 test_adapter = DuckDBAdapter(database_path="test.duckdb")
 
-# Production: Scalable, managed
 prod_adapter = SnowflakeAdapter(
     warehouse_size="LARGE",
     database="PRODUCTION"
 )
 
-# Use same benchmark code across all environments
-benchmark = TPCH(scale_factor=0.1)  # Small for dev/test
-prod_benchmark = TPCH(scale_factor=100)  # Large for prod
+benchmark = TPCH(scale_factor=0.1)
+prod_benchmark = TPCH(scale_factor=100)
 ```
+
+Development is fast, local, and free. Testing is automated and reproducible. Production is scalable and managed. The same benchmark code runs in every environment, with a small scale factor for development and testing and a large one for production.
 
 ### Multi-Platform Validation
 
 ```python
-# Validate results across platforms (alphabetical order)
 platforms = [
     ("ClickHouse", ClickHouseAdapter(host="test-cluster")),
     ("DuckDB", DuckDBAdapter()),
@@ -736,62 +677,56 @@ for name, adapter in platforms:
     results[name] = adapter.run_benchmark(benchmark)
     print(f"{name}: {results[name].total_time:.2f}s")
 
-# Compare query results for consistency
 ```
+
+Platforms are listed in alphabetical order. After the loop, compare the query results across platforms for consistency.
 
 ### Cost-Performance Optimization
 
 ```python
-# Start with cost-effective option
 adapter = DuckDBAdapter(memory_limit="16GB")
 results = adapter.run_benchmark(benchmark)
 
 if results.total_time > target_sla:
-    # Upgrade to cloud platform
     adapter = SnowflakeAdapter(warehouse_size="LARGE")
     results = adapter.run_benchmark(benchmark)
 
-# Monitor costs and performance over time
 ```
+
+Start with the cost-effective option and upgrade to a cloud platform only when the SLA is missed. Keep monitoring costs and performance over time.
 
 ## Migration Strategies
 
 ### From SQLite to Production
 
 ```python
-# Phase 1: Validate on SQLite (testing only)
 sqlite_adapter = SQLiteAdapter()
 small_benchmark = ReadPrimitivesBenchmark(scale_factor=0.001)
 sqlite_results = sqlite_adapter.run_benchmark(small_benchmark)
 
-# Phase 2: Scale testing with DuckDB
 duckdb_adapter = DuckDBAdapter()
 medium_benchmark = TPCH(scale_factor=1)
 duckdb_results = duckdb_adapter.run_benchmark(medium_benchmark)
 
-# Phase 3: Production deployment (choose your cloud platform)
 prod_adapter = SnowflakeAdapter(warehouse_size="LARGE")
-# Or: prod_adapter = BigQueryAdapter(project_id="production")
-# Or: prod_adapter = RedshiftAdapter(cluster_identifier="prod-cluster")
 prod_benchmark = TPCH(scale_factor=100)
 prod_results = prod_adapter.run_benchmark(prod_benchmark)
 ```
 
+Phase 1 validates on SQLite, which is suitable for testing only. Phase 2 tests scale with DuckDB. Phase 3 deploys to production on your chosen cloud platform: Snowflake as shown, `BigQueryAdapter(project_id="production")`, or `RedshiftAdapter(cluster_identifier="prod-cluster")`.
+
 ### From DuckDB to Cloud
 
 ```python
-# Development on DuckDB
 dev_config = {"scale_factor": 0.1}
 dev_adapter = DuckDBAdapter()
 
-# Migration validation (use any cloud platform)
 migration_config = {"scale_factor": 1}
 cloud_adapter = DatabricksAdapter(
     cluster_size="medium",
-    auto_terminate_minutes=30  # Cost protection
+    auto_terminate_minutes=30
 )
 
-# Production deployment
 prod_config = {"scale_factor": 100}
 prod_adapter = DatabricksAdapter(
     cluster_size="large",
@@ -799,36 +734,36 @@ prod_adapter = DatabricksAdapter(
 )
 ```
 
+Develop on DuckDB, validate the migration on any cloud platform (`auto_terminate_minutes=30` protects against idle cost), then deploy to production.
+
 ## Common Anti-Patterns
 
 ### ❌ Wrong Platform Choices
 
 1. **Using SQLite for large datasets**
    ```python
-   # DON'T: SQLite with TPC-H SF=10
    adapter = SQLiteAdapter()
-   benchmark = TPCH(scale_factor=10)  # Will be extremely slow
+   benchmark = TPCH(scale_factor=10)
    ```
+   SQLite with TPC-H at scale factor 10 will be extremely slow.
 
 2. **Using expensive platforms for development**
    ```python
-   # DON'T: Snowflake X-Large for development
-   adapter = SnowflakeAdapter(warehouse_size="4X-LARGE")  # $$$
-   benchmark = TPCH(scale_factor=0.01)  # Tiny dataset
+   adapter = SnowflakeAdapter(warehouse_size="4X-LARGE")
+   benchmark = TPCH(scale_factor=0.01)
    ```
+   A 4X-Large Snowflake warehouse is expensive and wasted on a tiny dataset.
 
 3. **Ignoring cost controls**
    ```python
-   # DON'T: No cost limits on pay-per-query platforms
-   adapter = BigQueryAdapter()  # No maximum_bytes_billed
-   # Risk: Unexpected large bills
+   adapter = BigQueryAdapter()
    ```
+   This sets no `maximum_bytes_billed`, so pay-per-query platforms risk unexpectedly large bills.
 
 ### ✅ Better Alternatives
 
 1. **Progressive scaling approach**
    ```python
-   # Start small, scale up as needed
    if dataset_size < 1_000_000:
        adapter = DuckDBAdapter()
    elif dataset_size < 100_000_000:
@@ -836,15 +771,16 @@ prod_adapter = DatabricksAdapter(
    else:
        adapter = BigQueryAdapter()
    ```
+   Start small and scale up as needed.
 
 2. **Cost-aware cloud usage**
    ```python
-   # Always set cost controls
    adapter = BigQueryAdapter(
-       maximum_bytes_billed=5_000_000_000,  # 5GB limit
-       job_priority="BATCH"  # Lower cost
+       maximum_bytes_billed=5_000_000_000,
+       job_priority="BATCH"
    )
    ```
+   Always set cost controls: here a 5GB billing limit and the lower-cost batch priority.
 
 3. **Environment-specific configurations**
    ```python
@@ -854,7 +790,7 @@ prod_adapter = DatabricksAdapter(
        adapter = DuckDBAdapter()
    elif os.getenv("ENVIRONMENT") == "testing":
        adapter = DuckDBAdapter(database_path="test.duckdb")
-   else:  # production
+   else:
        adapter = SnowflakeAdapter(warehouse_size="LARGE")
    ```
 

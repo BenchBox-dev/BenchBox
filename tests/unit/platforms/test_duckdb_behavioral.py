@@ -1,10 +1,3 @@
-"""Behavioral tests for the DuckDB platform adapter.
-
-Uses real in-memory DuckDB connections (no mocking of the connection path).
-Targets EXPLAIN ANALYZE parsing, external table mode, extension loading,
-version detection, and sorted loading helpers.
-"""
-
 from __future__ import annotations
 
 import json
@@ -16,11 +9,6 @@ import pyarrow.parquet as pq
 import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture()
@@ -43,11 +31,6 @@ def conn(adapter):
 def _write_parquet(path: Path, table: pa.Table) -> Path:
     pq.write_table(table, str(path))
     return path
-
-
-# ---------------------------------------------------------------------------
-# _normalize_duckdb_version
-# ---------------------------------------------------------------------------
 
 
 class TestNormalizeDuckdbVersion:
@@ -79,18 +62,12 @@ class TestNormalizeDuckdbVersion:
     def test_v_only_no_digit_keeps_string(self):
         from benchbox.platforms.duckdb import _normalize_duckdb_version
 
-        # "vX" where X is not a digit should preserve the string
         assert _normalize_duckdb_version("vbeta") == "vbeta"
 
     def test_integer_input(self):
         from benchbox.platforms.duckdb import _normalize_duckdb_version
 
         assert _normalize_duckdb_version(123) == "123"
-
-
-# ---------------------------------------------------------------------------
-# _build_duckdb_ctas_sort_sql
-# ---------------------------------------------------------------------------
 
 
 class TestBuildDuckdbCtasSortSql:
@@ -112,11 +89,6 @@ class TestBuildDuckdbCtasSortSql:
         assert "ORDER BY l_shipdate, l_orderkey" in result
 
 
-# ---------------------------------------------------------------------------
-# EXPLAIN output parsing (via get_query_plan)
-# ---------------------------------------------------------------------------
-
-
 class TestExplainOutput:
     def test_explain_returns_json_string(self, adapter, conn):
         conn.execute("CREATE TABLE test_explain (pk INT, val VARCHAR)")
@@ -124,7 +96,7 @@ class TestExplainOutput:
 
         plan = adapter.get_query_plan(conn, "SELECT * FROM test_explain WHERE pk = 1")
         assert plan is not None
-        # The plan should be valid JSON
+
         parsed = json.loads(plan)
         assert isinstance(parsed, (dict, list))
 
@@ -142,14 +114,9 @@ class TestExplainOutput:
         assert plan is None
 
 
-# ---------------------------------------------------------------------------
-# External table mode (Parquet views)
-# ---------------------------------------------------------------------------
-
-
 class TestExternalTableMode:
     def test_parquet_view_creation(self, conn, tmp_path):
-        """Manually create a view over a Parquet file, simulating external table mode."""
+
         table = pa.table({"region_key": [0, 1, 2], "region_name": ["AFRICA", "AMERICA", "ASIA"]})
         parquet_path = _write_parquet(tmp_path / "region.parquet", table)
 
@@ -176,36 +143,30 @@ class TestExternalTableMode:
         assert row == (4,)
 
 
-# ---------------------------------------------------------------------------
-# Extensions loading and version detection
-# ---------------------------------------------------------------------------
-
-
 class TestExtensionsAndVersion:
     def test_version_detection(self, adapter, conn):
-        """Adapter should detect the live DuckDB version from the connection."""
+
         version = adapter._detect_connection_version(conn)
         assert version is not None
-        assert "." in version  # e.g., "1.2.0"
+        assert "." in version
 
     def test_version_detection_none_connection(self, adapter):
         assert adapter._detect_connection_version(None) is None
 
     def test_httpfs_extension_loads(self, conn):
-        """DuckDB httpfs extension should be installable and loadable."""
+
         try:
             conn.execute("INSTALL httpfs")
             conn.execute("LOAD httpfs")
         except Exception:
             pytest.skip("httpfs extension not available in this DuckDB build")
 
-        # Verify the extension is loaded
         rows = conn.execute("SELECT extension_name FROM duckdb_extensions() WHERE loaded = true").fetchall()
         extension_names = [row[0] for row in rows]
         assert "httpfs" in extension_names
 
     def test_json_extension_loads(self, conn):
-        """DuckDB json extension should be installable and loadable."""
+
         try:
             conn.execute("INSTALL json")
             conn.execute("LOAD json")
@@ -217,18 +178,12 @@ class TestExtensionsAndVersion:
         assert "json" in extension_names
 
 
-# ---------------------------------------------------------------------------
-# Sorted loading with ORDER BY (CTAS pattern)
-# ---------------------------------------------------------------------------
-
-
 class TestSortedLoading:
     def test_ctas_sort_reorders_data(self, conn):
-        """Verify that CTAS with ORDER BY actually reorders the table."""
+
         conn.execute("CREATE TABLE unsorted (pk INT, val VARCHAR)")
         conn.execute("INSERT INTO unsorted VALUES (3, 'c'), (1, 'a'), (2, 'b')")
 
-        # Apply CTAS sort (what _build_duckdb_ctas_sort_sql generates)
         conn.execute("CREATE OR REPLACE TABLE unsorted AS SELECT * FROM unsorted ORDER BY pk")
 
         rows = conn.execute("SELECT pk, val FROM unsorted").fetchall()
@@ -243,11 +198,6 @@ class TestSortedLoading:
 
         rows = conn.execute("SELECT category, priority FROM multi_sort").fetchall()
         assert rows == [("a", 1), ("a", 2), ("b", 1), ("b", 2)]
-
-
-# ---------------------------------------------------------------------------
-# DuckDBConnectionWrapper dry-run mode
-# ---------------------------------------------------------------------------
 
 
 class TestDuckDBConnectionWrapper:
@@ -271,7 +221,7 @@ class TestDuckDBConnectionWrapper:
         adapter.enable_dry_run()
         real_conn = adapter._duckdb_module.connect(":memory:")
         wrapper = DuckDBConnectionWrapper(real_conn, adapter)
-        # Should not raise
+
         wrapper.commit()
         real_conn.close()
 
@@ -283,15 +233,10 @@ class TestDuckDBConnectionWrapper:
         real_conn = adapter._duckdb_module.connect(":memory:")
         wrapper = DuckDBConnectionWrapper(real_conn, adapter)
         wrapper.close()
-        # The real connection should still be usable since close is a no-op in dry-run
+
         result = real_conn.execute("SELECT 1").fetchone()
         assert result == (1,)
         real_conn.close()
-
-
-# ---------------------------------------------------------------------------
-# DuckDBCursorWrapper
-# ---------------------------------------------------------------------------
 
 
 class TestDuckDBCursorWrapper:
@@ -331,11 +276,6 @@ class TestDuckDBCursorWrapper:
         assert cursor.fetchmany() == [(1,), (2,)]
 
 
-# ---------------------------------------------------------------------------
-# get_database_path priority chain
-# ---------------------------------------------------------------------------
-
-
 class TestGetDatabasePath:
     def test_connection_config_takes_priority(self, adapter):
         assert adapter.get_database_path(database_path="/tmp/override.db") == "/tmp/override.db"
@@ -349,11 +289,6 @@ class TestGetDatabasePath:
         adapter = DuckDBAdapter()
         adapter.database_path = None
         assert adapter.get_database_path() == ":memory:"
-
-
-# ---------------------------------------------------------------------------
-# execute_query dry-run mode
-# ---------------------------------------------------------------------------
 
 
 class TestExecuteQueryDryRun:

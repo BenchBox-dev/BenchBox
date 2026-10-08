@@ -1,5 +1,4 @@
 #!/bin/sh
-# Select an exact develop commit for a new cut, or resume its uncommitted branch.
 set -eu
 
 version=${1:?Usage: release_cut_start.sh X.Y.Z}
@@ -24,8 +23,6 @@ if [ "$git_dir" -ef "$common_dir" ]; then
   exit 1
 fi
 
-# Fetch before comparing heads. This also refreshes origin/release for the
-# changelog and alignment merge later in release-cut.
 git fetch origin
 remote_branch=$(git ls-remote --heads origin "refs/heads/$branch")
 remote_tag=$(git ls-remote --tags origin "refs/tags/$branch")

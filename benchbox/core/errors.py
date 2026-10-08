@@ -1,5 +1,3 @@
-"""Core exception types for BenchBox."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -7,8 +5,6 @@ from dataclasses import dataclass, field
 
 @dataclass
 class PlanCaptureError(Exception):
-    """Raised when query plan capture fails."""
-
     reason: str
     platform: str
     query_id: str
@@ -22,13 +18,11 @@ class PlanCaptureError(Exception):
 
 
 class SerializationError(Exception):
-    """Raised when plan serialization fails or exceeds limits."""
+    pass
 
 
 @dataclass
 class PlanValidationError(Exception):
-    """Raised when plan tree structure validation fails."""
-
     query_id: str
     validation_errors: list[str] = field(default_factory=list)
     plan_structure: str = ""
@@ -43,15 +37,13 @@ class PlanValidationError(Exception):
 
 @dataclass
 class PlanParseError(Exception):
-    """Raised when parsing EXPLAIN output fails."""
-
     query_id: str
     platform: str
     error_message: str
     line_number: int | None = None
     explain_sample: str | None = None
     platform_version: str | None = None
-    detected_format: str | None = None  # "json", "text", "unknown"
+    detected_format: str | None = None
     recovery_hint: str | None = None
 
     def __str__(self) -> str:
@@ -64,8 +56,7 @@ class PlanParseError(Exception):
             msg.append(f"  Detected format: {self.detected_format}")
 
         if self.explain_sample:
-            # Indent the sample for readability
-            sample_lines = self.explain_sample.split("\n")[:5]  # First 5 lines
+            sample_lines = self.explain_sample.split("\n")[:5]
             indented = "\n    ".join(sample_lines)
             msg.append(f"  EXPLAIN output sample:\n    {indented}")
 
@@ -79,7 +70,6 @@ class PlanParseError(Exception):
 
     @property
     def diagnostic_info(self) -> dict:
-        """Get structured diagnostic information."""
         return {
             "query_id": self.query_id,
             "platform": self.platform,
@@ -93,20 +83,12 @@ class PlanParseError(Exception):
 
 
 class FingerprintIntegrityError(Exception):
-    """Raised when plan fingerprint verification fails."""
-
     def __init__(self, query_id: str, message: str = "Fingerprint mismatch"):
         self.query_id = query_id
         super().__init__(f"{message} for {query_id}. Plan may have been corrupted or modified.")
 
 
 class ScaleFactorNotSupportedError(ValueError):
-    """Raised when scale_factor is not in the benchmark's declared scale_options.
-
-    Subclasses ValueError so existing call sites that catch ValueError keep
-    working; new code can catch ScaleFactorNotSupportedError specifically.
-    """
-
     def __init__(self, benchmark_id: str, scale_factor: float, scale_options: list[float]):
         self.benchmark_id = benchmark_id
         self.scale_factor = scale_factor

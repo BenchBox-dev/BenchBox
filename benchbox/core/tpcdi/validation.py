@@ -1,14 +1,9 @@
-"""TPC-DI data validation framework.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides data quality validation for TPC-DI benchmarks, including primary key integrity, foreign key constraints, and business logic validation.
+# TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-DI specification.
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DI specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import logging
 from dataclasses import dataclass, field
@@ -23,20 +18,16 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ValidationRule:
-    """Definition of a single validation rule."""
-
     name: str
     sql: str
     expected: Union[int, float, str]
     description: str
     category: str = "integrity"
-    severity: str = "error"  # error, warning, info
+    severity: str = "error"
 
 
 @dataclass
 class ValidationResult:
-    """Result of running a single validation."""
-
     name: str
     description: str
     sql: str
@@ -51,8 +42,6 @@ class ValidationResult:
 
 @dataclass
 class DataQualityResult:
-    """Overall data quality assessment results."""
-
     validations: list[ValidationResult] = field(default_factory=list)
     total_validations: int = 0
     passed_validations: int = 0
@@ -64,17 +53,13 @@ class DataQualityResult:
 
 
 class TPCDIValidator:
-    """TPC-DI data validation system with quality checks."""
-
     def __init__(self, connection: Any, dialect: str = "duckdb"):
         self.connection = connection
         self.dialect = dialect
         self.validation_rules = self._get_default_validation_rules()
 
     def _get_default_validation_rules(self) -> list[ValidationRule]:
-        """Get standard TPC-DI validation rules."""
         return [
-            # Primary Key Integrity Checks
             ValidationRule(
                 name="Customer Primary Key Integrity",
                 sql="""SELECT COUNT(*) as violations
@@ -108,7 +93,6 @@ class TPCDIValidator:
                 description="No duplicate security surrogate keys",
                 category="primary_key",
             ),
-            # Foreign Key Integrity Checks
             ValidationRule(
                 name="Customer Foreign Key Integrity",
                 sql="""SELECT COUNT(*) as violations
@@ -159,7 +143,6 @@ class TPCDIValidator:
                 description="All trades reference valid create times",
                 category="foreign_key",
             ),
-            # Business Logic Validations
             ValidationRule(
                 name="Trade Price Reasonableness",
                 sql="SELECT COUNT(*) as violations FROM FactTrade WHERE TradePrice <= 0 OR TradePrice > 10000",
@@ -188,7 +171,6 @@ class TPCDIValidator:
                 description="Account status values are valid",
                 category="business_logic",
             ),
-            # Data Completeness Checks
             ValidationRule(
                 name="Customer Data Completeness",
                 sql="SELECT COUNT(*) as violations FROM DimCustomer WHERE LastName IS NULL OR FirstName IS NULL OR Status IS NULL",
@@ -203,7 +185,6 @@ class TPCDIValidator:
                 description="Required trade fields are not null",
                 category="completeness",
             ),
-            # SCD Type 2 Validation
             ValidationRule(
                 name="Customer SCD Type 2 Integrity",
                 sql="""SELECT COUNT(*) as violations
@@ -235,11 +216,9 @@ class TPCDIValidator:
         ]
 
     def add_validation_rule(self, rule: ValidationRule) -> None:
-        """Add a custom validation rule."""
         self.validation_rules.append(rule)
 
     def run_validation(self, rule: ValidationRule) -> ValidationResult:
-        """Run a single validation rule."""
         result = ValidationResult(
             name=rule.name,
             description=rule.description,
@@ -250,7 +229,6 @@ class TPCDIValidator:
         )
 
         try:
-            # Translate SQL if needed
             sql = rule.sql
             if self.dialect != "standard":
                 try:
@@ -258,7 +236,6 @@ class TPCDIValidator:
                 except Exception as e:
                     logger.warning(f"SQL translation failed for {rule.name}: {e}")
 
-            # Execute validation query
             if hasattr(self.connection, "execute"):
                 cursor_result = self.connection.execute(sql).fetchone()
             elif hasattr(self.connection, "query"):
@@ -269,7 +246,6 @@ class TPCDIValidator:
             violations = cursor_result[0] if cursor_result else -1
             result.violations = violations
 
-            # Determine if validation passed
             if isinstance(rule.expected, (int, float)):
                 result.passed = violations == rule.expected
             else:
@@ -287,7 +263,6 @@ class TPCDIValidator:
         return result
 
     def run_all_validations(self) -> DataQualityResult:
-        """Run all validation rules and return comprehensive results."""
         logger.info(f"Running {len(self.validation_rules)} TPC-DI validation rules")
 
         quality_result = DataQualityResult()
@@ -299,7 +274,6 @@ class TPCDIValidator:
             validation_result = self.run_validation(rule)
             quality_result.validations.append(validation_result)
 
-            # Configure counters
             if validation_result.passed:
                 quality_result.passed_validations += 1
             else:
@@ -310,7 +284,6 @@ class TPCDIValidator:
                 elif validation_result.severity == "warning":
                     quality_result.warning_count += 1
 
-            # Track by category
             category = validation_result.category
             if category not in category_stats:
                 category_stats[category] = {"total": 0, "passed": 0, "failed": 0}
@@ -323,7 +296,6 @@ class TPCDIValidator:
 
         quality_result.categories = category_stats
 
-        # Calculate quality score
         if quality_result.total_validations > 0:
             quality_result.quality_score = quality_result.passed_validations / quality_result.total_validations
 
@@ -335,7 +307,6 @@ class TPCDIValidator:
         return quality_result
 
     def run_category_validations(self, category: str) -> DataQualityResult:
-        """Run validations for a specific category."""
         category_rules = [rule for rule in self.validation_rules if rule.category == category]
 
         if not category_rules:
@@ -352,7 +323,6 @@ class TPCDIValidator:
             self.validation_rules = original_rules
 
     def validate_foreign_keys(self) -> list[ValidationResult]:
-        """Run only foreign key validation checks."""
         fk_results = []
         for rule in self.validation_rules:
             if rule.category == "foreign_key":
@@ -361,7 +331,6 @@ class TPCDIValidator:
         return fk_results
 
     def print_validation_summary(self, result: DataQualityResult) -> None:
-        """Print a formatted summary of validation results."""
         emit("\n" + "=" * 60)
         emit("TPC-DI DATA QUALITY VALIDATION RESULTS")
         emit("=" * 60)

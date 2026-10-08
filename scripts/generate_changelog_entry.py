@@ -1,38 +1,4 @@
 #!/usr/bin/env python3
-"""Generate a CHANGELOG.md entry from conventional commits since a release boundary.
-
-Standalone CLI extracted from scripts/automate_release.py for the version-branch
-release flow. Run on the develop branch to draft a `## [VERSION] - DATE` section
-ahead of cutting the release branch with `make release-prepare`.
-
-Behaviour mirrors the legacy automate_release.py:_build_raw_changelog,
-_summarize_changelog_with_claude, and generate_changelog_entry helpers:
-- Parses commits since an explicit lower-bound ref, or since the most recent
-  v* tag when no lower-bound ref is supplied.
-- For explicit refs, derives commit subjects from the actual tree patch so a
-  squash-merged release on `main` does not re-list already released commits.
-- Categorises conventional commits into Added (feat), Fixed (fix), and
-  Changed (perf). Skips test/docs/chore/ci/build/refactor/style and
-  non-conventional commits.
-- If the Claude CLI is available, summarises the raw bullets into a
-  compact, themed section (10-25 user-facing bullets). Falls back to
-  raw commit messages otherwise. Summarization is skipped inside a
-  Claude Code session unless BENCHBOX_CHANGELOG_SUMMARIZE=1, because the
-  nested CLI call blocks (see the 2026-07-09 amendment of
-  _project/decisions/single-repo-migration.md).
-- Inserts the new section into CHANGELOG.md before the first existing
-  `## [` entry, or leaves an existing section for that version alone so
-  an interrupted `make release-cut` can be re-run.
-
-Usage:
-    uv run python scripts/generate_changelog_entry.py --version 0.3.0
-    uv run python scripts/generate_changelog_entry.py --version 0.3.0 \
-        --release-date 2026-04-30 --since-tag v0.2.1
-    uv run python scripts/generate_changelog_entry.py --version 0.3.1 \
-        --since-ref origin/release
-    uv run python scripts/generate_changelog_entry.py --version 0.3.1 \
-        --check-curation
-"""
 
 from __future__ import annotations
 
@@ -51,43 +17,23 @@ from pathlib import Path
 
 CLAUDE_TIMEOUT_SECONDS = 120
 
-# Set by the Claude Code CLI in every session it spawns. Shelling out to a
-# nested `claude` from inside one stalls (the v0.3.1 cut hung here twice), so
-# summarization defaults off when any of these are present.
 _NESTED_CLAUDE_ENV_VARS = ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SESSION_ID")
 
 _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 _FALSE_VALUES = frozenset({"0", "false", "no", "off"})
 
-# Curation gate. `_build_raw_changelog` emits verbatim commit subjects, which
-# keep their squash-merge PR suffix (e.g. "... (#1086)"); the Claude summary
-# and any hand-curated section do not. That suffix is the precise signal; the
-# bullet and line ceilings are backstops for drafts written by other means.
-#
-# The ceilings are set from evidence: the largest genuinely hand-curated
-# section shipped so far is 0.2.1 at 39 bullets and 139 lines, while the
-# contributor-level 0.4.2 draft that reached the v0.4.2 tag ran 53 bullets
-# and 255 lines. 45 bullets and 160 lines keep every shipped section green
-# with room to spare and reject a draft of that size on both axes.
 MAX_CURATED_BULLETS = 45
 MAX_CURATED_LINES = 160
 RAW_PLACEHOLDER = "(no user-facing changes detected -- please edit manually)"
 _PR_SUFFIX_RE = re.compile(r"\(#\d+\)\s*$")
 _BULLET_RE = re.compile(r"^\s*- \S")
 
-# Matches a dated released-version CHANGELOG.md header, e.g. "## [0.3.0] - 2026-05-16".
-# Deliberately does not match "## [Unreleased]" (no version number) or an
-# undated "## [X.Y.Z]" header, since a dated header is this repo's convention
-# for a section that claims to be released (see CHANGELOG.md's own entries).
 _CHANGELOG_VERSION_HEADER_RE = re.compile(r"^## \[(?P<version>\d+\.\d+\.\d+)\] - ", re.MULTILINE)
 
 _PYPROJECT_VERSION_RE = re.compile(r'^version\s*=\s*["\'](?P<version>[^"\']+)["\']', re.MULTILINE)
 _STABLE_VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 _PYPI_RELEASE_URL = "https://pypi.org/pypi/benchbox/json"
 
-# Matches a release-cut branch name, e.g. "v0.3.1" or "v0.3.1-rc1". Mirrors
-# the HEAD_REF regex in .github/workflows/validate-release-pr.yml so the two
-# checks agree on what counts as an in-progress release branch.
 _RELEASE_BRANCH_RE = re.compile(r"^v(?P<version>\d+\.\d+\.\d+)(-[A-Za-z0-9.+-]+)?$")
 
 
@@ -104,7 +50,6 @@ def _run_git(source: Path, *args: str, check: bool = False) -> subprocess.Comple
 def _build_raw_changelog(
     version: str, release_date: str, added: list[str], fixed: list[str], changed: list[str]
 ) -> str:
-    """Build a raw changelog section from commit message lists (fallback)."""
     lines = [f"## [{version}] - {release_date}", ""]
     if added:
         lines.append("### Added")
@@ -133,13 +78,6 @@ def _build_raw_changelog(
 
 
 def summarize_skip_reason(env: dict[str, str] | None = None) -> str | None:
-    """Return why Claude summarization is skipped, or None to run it.
-
-    `BENCHBOX_CHANGELOG_SUMMARIZE` decides explicitly in both directions. With
-    it unset, summarization runs only outside a Claude Code session: a nested
-    `claude --print` blocks until the timeout, which is how `make release-cut`
-    stalled during the v0.3.1 cut.
-    """
     env = os.environ if env is None else env
     flag = env.get("BENCHBOX_CHANGELOG_SUMMARIZE", "").strip().lower()
     if flag in _FALSE_VALUES:
@@ -153,26 +91,16 @@ def summarize_skip_reason(env: dict[str, str] | None = None) -> str | None:
 
 
 def _kill_process_tree(proc: subprocess.Popen[str]) -> None:
-    """SIGKILL the child's whole process group, falling back to the child alone."""
     try:
         if hasattr(os, "killpg"):
             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-        else:  # pragma: no cover - Windows
+        else:  # pragma: no cover
             proc.kill()
-    except (ProcessLookupError, PermissionError):  # pragma: no cover - already reaped
+    except (ProcessLookupError, PermissionError):  # pragma: no cover
         proc.kill()
 
 
 def _run_claude_cli(prompt: str) -> subprocess.CompletedProcess[str]:
-    """Run `claude --print` under a timeout that reaps the entire child tree.
-
-    `subprocess.run(timeout=...)` kills only the direct child, then re-waits on
-    the captured pipes; a surviving grandchild holding stdout open blocks that
-    wait forever, which is what left an orphaned `claude` tree behind the
-    stalled v0.3.1 cut. Running the child in its own process group lets the
-    timeout path kill every pipe holder. stdin is closed so the CLI can never
-    block waiting for input it will not get.
-    """
     with subprocess.Popen(
         ["claude", "--print", "--model", "sonnet", "-p", prompt],
         stdin=subprocess.DEVNULL,
@@ -193,11 +121,6 @@ def _run_claude_cli(prompt: str) -> subprocess.CompletedProcess[str]:
 def _summarize_changelog_with_claude(
     version: str, release_date: str, added: list[str], fixed: list[str], changed: list[str]
 ) -> str | None:
-    """Use Claude Code CLI to summarize raw commits into a compact changelog.
-
-    Returns the summarized changelog section, or None if summarization is
-    skipped, claude is unavailable, or the summarization fails.
-    """
     if not added and not fixed and not changed:
         return None
 
@@ -271,7 +194,6 @@ Now summarize the following raw commits:
 
 
 def _resolve_log_range(source: Path, since_ref: str | None, since_tag: str | None) -> str | None:
-    """Return the git log range for changelog generation."""
     if since_ref is not None:
         print(f"  Since ref: {since_ref}")
         return f"{since_ref}..HEAD"
@@ -295,15 +217,10 @@ def _resolve_log_range(source: Path, since_ref: str | None, since_tag: str | Non
 
 
 def released_versions_in_changelog(changelog_text: str) -> list[str]:
-    """Return the X.Y.Z versions of every dated '## [X.Y.Z] - <date>' header.
-
-    Excludes '## [Unreleased]', which is not a released-version claim.
-    """
     return [m.group("version") for m in _CHANGELOG_VERSION_HEADER_RE.finditer(changelog_text)]
 
 
 def section_body(changelog_text: str, version: str) -> str | None:
-    """Return the body of `## [version] - <date>`, or None when absent."""
     header = re.search(rf"^## \[{re.escape(version)}\] - .*$", changelog_text, re.MULTILINE)
     if header is None:
         return None
@@ -313,7 +230,6 @@ def section_body(changelog_text: str, version: str) -> str | None:
 
 
 def has_changelog_section(source: Path, version: str) -> bool:
-    """True when CHANGELOG.md carries a dated section for `version`."""
     changelog = source / "CHANGELOG.md"
     if not changelog.exists():
         return False
@@ -321,12 +237,6 @@ def has_changelog_section(source: Path, version: str) -> bool:
 
 
 def curated_section_from_file(path: Path, version: str, release_date: str) -> tuple[str | None, str | None]:
-    """Return (section, error) for a hand-curated section body read from ``path``.
-
-    The file holds the body only: the ``###`` groups and their bullets. The
-    ``## [version] - date`` header is added here so the version and date always
-    match the cut. The curation gate checks the result like any other section.
-    """
     try:
         body = path.read_text(encoding="utf-8").strip()
     except OSError as exc:
@@ -339,7 +249,6 @@ def curated_section_from_file(path: Path, version: str, release_date: str) -> tu
 
 
 def _insert_section(content: str, new_section: str) -> str:
-    """Insert a release section above the newest released one, below ``## [Unreleased]``."""
     first_release = re.search(r"^## \[\d", content, re.MULTILINE)
     if first_release is None:
         return content.rstrip() + "\n\n" + new_section
@@ -371,14 +280,6 @@ def _write_curated_section(changelog: Path, version: str, release_date: str, sec
 
 
 def check_changelog_curation(source: Path, version: str) -> tuple[bool, list[str]]:
-    """Return (ok, problems) for the drafted `version` section.
-
-    `release-cut` generates a section from every conventional commit in the
-    `origin/release..HEAD` patch delta, which for a `release` branch that lags `develop` is
-    a raw dump of hundreds of commit subjects. The old gate only refused to
-    skip curation when `EDITOR` was unset *and* stdin was not a TTY, so
-    `EDITOR=true` waved the raw dump through. This checks the text instead.
-    """
     changelog = source / "CHANGELOG.md"
     if not changelog.exists():
         return False, [f"{changelog} not found"]
@@ -408,7 +309,6 @@ def check_changelog_curation(source: Path, version: str) -> tuple[bool, list[str
 
 
 def curated_section_body(source: Path, version: str) -> tuple[str | None, list[str]]:
-    """Return a validated, non-empty release-note body for ``version``."""
     ok, problems = check_changelog_curation(source, version)
     if not ok:
         return None, problems
@@ -419,13 +319,6 @@ def curated_section_body(source: Path, version: str) -> tuple[str | None, list[s
 
 
 def existing_tags(source: Path) -> set[str]:
-    """Return ``v*`` tags available locally or from ``origin``.
-
-    Complete local checkouts avoid a network dependency. Shallow or tag-less
-    checkouts query ``origin`` and union its tags with any local subset so the
-    fast-suite repository guards work after the default shallow Actions
-    checkout. Discovery failures raise instead of silently passing.
-    """
     local = _run_git(source, "tag", "-l", "v*")
     if local.returncode != 0:
         raise RuntimeError(f"could not inspect local release tags: {local.stderr.strip() or 'git tag failed'}")
@@ -458,23 +351,6 @@ def find_untagged_changelog_versions(
     *,
     current_branch: str | None = None,
 ) -> list[str]:
-    """Return dated CHANGELOG.md versions with no matching vX.Y.Z git tag.
-
-    `make release-cut` legitimately drafts a dated section for the version
-    being cut before its tag exists (the tag is pushed later, by
-    `release-finalize`, after squash-merge to main). So when
-    `current_branch` matches the release-branch shape recognised by
-    `.github/workflows/validate-release-pr.yml` (`vX.Y.Z[-suffix]`), the one
-    untagged version matching that branch's own version number is exempt.
-
-    Every other untagged dated section is flagged - in particular, any
-    untagged section found while on `develop`/`main` (current_branch does
-    not match the release-branch shape at all) is always flagged
-    regardless of version number. This is what would have caught the
-    `[0.3.1] - 2026-05-30` accounting drift: that section was committed to
-    `develop` directly, never on a `v0.3.1` release branch, and no
-    `v0.3.1` tag was ever pushed.
-    """
     untagged = [v for v in released_versions_in_changelog(changelog_text) if f"v{v}" not in tags]
     if not untagged:
         return []
@@ -490,14 +366,11 @@ def _current_branch(source: Path) -> str | None:
     branch = result.stdout.strip()
     if result.returncode == 0 and branch and branch != "HEAD":
         return branch
-    # PR CI checks out a detached merge ref; fall back to the PR head ref so
-    # the release-branch exemption in the tag-claim guard still applies.
     env_branch = os.environ.get("GITHUB_HEAD_REF", "").strip()
     return env_branch or None
 
 
 def check_tag_claims(source: Path) -> tuple[bool, list[str]]:
-    """Return (ok, untagged_versions) for CHANGELOG.md's tag-claim guard."""
     changelog_path = source / "CHANGELOG.md"
     text = changelog_path.read_text(encoding="utf-8")
     tags = existing_tags(source)
@@ -507,7 +380,6 @@ def check_tag_claims(source: Path) -> tuple[bool, list[str]]:
 
 
 def latest_published_version() -> str:
-    """Return PyPI's current published BenchBox version."""
     try:
         with urllib.request.urlopen(_PYPI_RELEASE_URL, timeout=15) as response:
             payload = json.load(response)
@@ -528,14 +400,6 @@ def find_release_accounting_errors(
     pyproject_version: str | None,
     current_branch: str | None = None,
 ) -> list[str]:
-    """Return repository accounting drift relative to the published release.
-
-    PyPI is authoritative for publication state. The published version must
-    have a visible git tag, a dated changelog section, and the ``[Unreleased]``
-    comparison anchor. A newer tag that has not reached PyPI does not advance
-    these expectations. Release-cut branches may advance only to their own
-    candidate version.
-    """
     if not _STABLE_VERSION_RE.fullmatch(published_version):
         return [f"published version {published_version!r} is not a stable X.Y.Z version"]
     tag = f"v{published_version}"
@@ -561,7 +425,6 @@ def find_release_accounting_errors(
 
 
 def check_release_accounting(source: Path, published_version: str) -> tuple[bool, list[str]]:
-    """Return whether repository accounting matches ``published_version``."""
     changelog_text = (source / "CHANGELOG.md").read_text(encoding="utf-8")
     pyproject_text = (source / "pyproject.toml").read_text(encoding="utf-8")
     version_match = _PYPROJECT_VERSION_RE.search(pyproject_text)
@@ -577,7 +440,6 @@ def check_release_accounting(source: Path, published_version: str) -> tuple[bool
 
 
 def update_github_release_notes(source: Path, version: str, body: str) -> None:
-    """Idempotently replace the existing GitHub Release notes for ``version``."""
     tag = f"v{version}"
     notes_path: Path | None = None
     try:
@@ -695,13 +557,6 @@ def _commits_since_ref(source: Path, since_ref: str) -> list[tuple[str, str]] | 
 
 
 def _patch_delta_commit_subjects(source: Path, since_ref: str) -> list[str] | None:
-    """Return subjects for commits that contribute to the current patch delta.
-
-    `since_ref..HEAD` is ancestry-based. After a squash release to `main`, old
-    develop commits are not ancestors of `main`, so ancestry would re-list them.
-    Filtering through the actual tree diff keeps the changelog tied to the
-    unreleased patch instead.
-    """
     commits = _commits_since_ref(source, since_ref)
     if commits is None:
         return None
@@ -769,25 +624,6 @@ def generate_changelog_entry(
     since_ref: str | None = None,
     section_file: Path | None = None,
 ) -> bool:
-    """Generate a changelog entry from conventional commits.
-
-    Args:
-        source: Source repository path.
-        version: New version string (without leading 'v').
-        release_date: Release date in YYYY-MM-DD format.
-        since_tag: Tag to use as the lower bound (e.g. 'v0.2.1'). Ignored
-            when since_ref is set. If neither is set, the latest matching v*
-            tag is auto-detected.
-        since_ref: Ref to use as the lower bound (e.g. 'origin/release'). This is
-            the release-branch flow default because `develop` is intentionally
-            not tagged after releases.
-        section_file: A hand-curated section body to write instead of a
-            generated draft. It replaces an existing section for ``version``,
-            so a cut resumed after a raw first pass takes the curated text.
-
-    Returns:
-        True if changelog was updated, False otherwise.
-    """
     print(f"\n  Auto-generating changelog entry for v{version}...")
 
     changelog = source / "CHANGELOG.md"
@@ -798,9 +634,6 @@ def generate_changelog_entry(
     if section_file is not None:
         return _write_curated_section(changelog, version, release_date, section_file)
 
-    # An interrupted `make release-cut` leaves the drafted section in place.
-    # Re-running the cut must not append a second one, and must not discard a
-    # hand-curated section the operator wrote between the two runs.
     if section_body(changelog.read_text(encoding="utf-8"), version) is not None:
         print(f"  CHANGELOG.md already has a [{version}] section; leaving it untouched")
         return True
@@ -980,8 +813,6 @@ def main() -> int:
         print(f"  CHANGELOG.md section [{args.version}] does not look hand-curated:")
         for problem in problems:
             print(f"    - {problem}")
-        # The override forgives an uncurated section, not a missing one: with no
-        # section at all there is nothing to accept, and the cut would fail later.
         if has_changelog_section(args.source, args.version) and (
             os.environ.get("RELEASE_ALLOW_RAW_CHANGELOG", "").strip().lower() in _TRUE_VALUES
         ):

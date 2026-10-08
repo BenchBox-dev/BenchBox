@@ -1,9 +1,6 @@
-"""Tests for core config data structures.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from datetime import datetime
 
@@ -27,10 +24,8 @@ pytestmark = [
 
 
 class TestQueryResult:
-    """Test QueryResult dataclass."""
-
     def test_query_result_creation(self):
-        """Test creating QueryResult with all fields."""
+
         result = QueryResult(
             query_id="q1",
             query_name="Query 1",
@@ -52,7 +47,7 @@ class TestQueryResult:
         assert result.resource_usage == {"cpu": "50%"}
 
     def test_query_result_with_error(self):
-        """Test QueryResult with error status."""
+
         result = QueryResult(
             query_id="q2",
             query_name="Query 2",
@@ -69,10 +64,8 @@ class TestQueryResult:
 
 
 class TestBenchmarkConfig:
-    """Test BenchmarkConfig dataclass."""
-
     def test_benchmark_config_defaults(self):
-        """Test BenchmarkConfig with default values."""
+
         config = BenchmarkConfig(name="tpch", display_name="TPC-H Benchmark")
 
         assert config.name == "tpch"
@@ -84,7 +77,7 @@ class TestBenchmarkConfig:
         assert config.options == {}
 
     def test_benchmark_config_with_compression(self):
-        """Test BenchmarkConfig with compression settings."""
+
         config = BenchmarkConfig(
             name="tpcds",
             display_name="TPC-DS Benchmark",
@@ -99,10 +92,8 @@ class TestBenchmarkConfig:
 
 
 class TestDatabaseConfig:
-    """Test DatabaseConfig dataclass."""
-
     def test_database_config_creation(self):
-        """Test creating DatabaseConfig."""
+
         config = DatabaseConfig(type="duckdb", name="test.db")
 
         assert config.type == "duckdb"
@@ -111,7 +102,7 @@ class TestDatabaseConfig:
         assert config.options == {}
 
     def test_database_config_with_options(self):
-        """Test DatabaseConfig with connection options."""
+
         config = DatabaseConfig(
             type="postgresql",
             name="benchdb",
@@ -125,10 +116,8 @@ class TestDatabaseConfig:
 
 
 class TestSystemProfile:
-    """Test SystemProfile dataclass."""
-
     def test_system_profile_creation(self):
-        """Test creating SystemProfile."""
+
         now = datetime.now()
         profile = SystemProfile(
             os_name="Linux",
@@ -154,10 +143,8 @@ class TestSystemProfile:
 
 
 class TestRunConfig:
-    """Test RunConfig dataclass."""
-
     def test_run_config_defaults(self):
-        """Test RunConfig with default values."""
+
         config = RunConfig()
 
         assert config.query_subset is None
@@ -170,7 +157,7 @@ class TestRunConfig:
         assert config.link_probe is True
 
     def test_run_config_power_test(self):
-        """Test RunConfig for power test."""
+
         config = RunConfig(test_execution_type="power", scale_factor=1.0, seed=42)
 
         assert config.test_execution_type == "power"
@@ -178,7 +165,7 @@ class TestRunConfig:
         assert config.seed == 42
 
     def test_run_config_client_link_fields(self):
-        """Test RunConfig client link locality fields."""
+
         config = RunConfig(
             client_region="us-east-1",
             client_cloud="aws",
@@ -191,10 +178,8 @@ class TestRunConfig:
 
 
 class TestLibraryInfo:
-    """Test LibraryInfo dataclass."""
-
     def test_library_info_available(self):
-        """Test LibraryInfo for available library."""
+
         info = LibraryInfo(name="duckdb", version="0.9.0", installed=True)
 
         assert info.name == "duckdb"
@@ -203,7 +188,7 @@ class TestLibraryInfo:
         assert info.import_error is None
 
     def test_library_info_unavailable(self):
-        """Test LibraryInfo for unavailable library."""
+
         info = LibraryInfo(
             name="missing_lib",
             version=None,
@@ -216,10 +201,8 @@ class TestLibraryInfo:
 
 
 class TestPlatformInfo:
-    """Test PlatformInfo dataclass."""
-
     def test_platform_info_creation(self):
-        """Test creating PlatformInfo."""
+
         libraries = [
             LibraryInfo(name="duckdb", version="0.9.0", installed=True),
             LibraryInfo(name="psycopg", version=None, installed=False),
@@ -244,10 +227,8 @@ class TestPlatformInfo:
 
 
 class TestDryRunResult:
-    """Test DryRunResult dataclass."""
-
     def test_dry_run_result_creation(self):
-        """Test creating DryRunResult."""
+
         benchmark_config = BenchmarkConfig(name="tpch", display_name="TPC-H")
         database_config = DatabaseConfig(type="duckdb", name="test.db")
         system_profile = SystemProfile(

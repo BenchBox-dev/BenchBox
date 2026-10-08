@@ -1,9 +1,6 @@
-"""Tests for Amazon Athena for Apache Spark platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock, patch
 
@@ -18,10 +15,8 @@ pytestmark = [
 
 
 class TestAthenaSparkAdapterInitialization:
-    """Test AthenaSparkAdapter initialization."""
-
     def test_missing_workgroup_raises_error(self):
-        """Test error when workgroup is not provided."""
+
         with (
             patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True),
             patch("benchbox.platforms.aws.athena_spark_adapter.boto3", MagicMock()),
@@ -34,7 +29,7 @@ class TestAthenaSparkAdapterInitialization:
                 )
 
     def test_missing_s3_staging_dir_raises_error(self):
-        """Test error when s3_staging_dir is not provided."""
+
         with (
             patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True),
             patch("benchbox.platforms.aws.athena_spark_adapter.boto3", MagicMock()),
@@ -47,7 +42,7 @@ class TestAthenaSparkAdapterInitialization:
                 )
 
     def test_invalid_s3_path_raises_error(self):
-        """Test error when s3_staging_dir has invalid format."""
+
         with (
             patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True),
             patch("benchbox.platforms.aws.athena_spark_adapter.boto3", MagicMock()),
@@ -61,7 +56,7 @@ class TestAthenaSparkAdapterInitialization:
                 )
 
     def test_valid_configuration(self):
-        """Test valid configuration initializes correctly."""
+
         with (
             patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True),
             patch("benchbox.platforms.aws.athena_spark_adapter.boto3", MagicMock()),
@@ -85,7 +80,7 @@ class TestAthenaSparkAdapterInitialization:
             assert adapter.database == "my_benchmark_db"
 
     def test_default_values(self):
-        """Test default configuration values."""
+
         with (
             patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True),
             patch("benchbox.platforms.aws.athena_spark_adapter.boto3", MagicMock()),
@@ -109,7 +104,7 @@ class TestAthenaSparkAdapterInitialization:
             assert adapter.timeout_minutes == 60
 
     def test_optional_session_configuration(self):
-        """Test optional session configuration."""
+
         with (
             patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True),
             patch("benchbox.platforms.aws.athena_spark_adapter.boto3", MagicMock()),
@@ -133,10 +128,8 @@ class TestAthenaSparkAdapterInitialization:
 
 
 class TestAthenaSparkTableFormat:
-    """Test table_format parameter configuration."""
-
     def test_table_format_default_parquet(self):
-        """Test table_format defaults to parquet."""
+
         with (
             patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True),
             patch("benchbox.platforms.aws.athena_spark_adapter.boto3", MagicMock()),
@@ -152,7 +145,7 @@ class TestAthenaSparkTableFormat:
             assert adapter.table_format == "parquet"
 
     def test_table_format_delta(self):
-        """Test table_format can be set to delta."""
+
         with (
             patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True),
             patch("benchbox.platforms.aws.athena_spark_adapter.boto3", MagicMock()),
@@ -169,7 +162,7 @@ class TestAthenaSparkTableFormat:
             assert adapter.table_format == "delta"
 
     def test_table_format_from_config(self):
-        """Test table_format is passed through from_config."""
+
         with (
             patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True),
             patch("benchbox.platforms.aws.athena_spark_adapter.boto3", MagicMock()),
@@ -189,10 +182,8 @@ class TestAthenaSparkTableFormat:
 
 
 class TestAthenaSparkAdapterPlatformInfo:
-    """Test platform info methods."""
-
     def test_get_platform_info(self):
-        """Test get_platform_info returns correct metadata."""
+
         with (
             patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True),
             patch("benchbox.platforms.aws.athena_spark_adapter.boto3", MagicMock()),
@@ -221,7 +212,7 @@ class TestAthenaSparkAdapterPlatformInfo:
             assert info["billing_model"] == "DPU-hour"
 
     def test_get_dialect(self):
-        """Test get_target_dialect returns spark."""
+
         with (
             patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True),
             patch("benchbox.platforms.aws.athena_spark_adapter.boto3", MagicMock()),
@@ -240,10 +231,8 @@ class TestAthenaSparkAdapterPlatformInfo:
 
 
 class TestAthenaSparkAdapterConnection:
-    """Test connection functionality."""
-
     def test_create_connection_starts_session(self):
-        """Test create_connection starts a new Spark session."""
+
         with (
             patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True),
             patch("benchbox.platforms.aws.athena_spark_adapter.boto3") as mock_boto3,
@@ -251,7 +240,6 @@ class TestAthenaSparkAdapterConnection:
         ):
             mock_staging.from_uri.return_value = MagicMock()
 
-            # Setup mock Athena client
             mock_athena_client = MagicMock()
             mock_athena_client.start_session.return_value = {
                 "SessionId": "session-123",
@@ -274,7 +262,7 @@ class TestAthenaSparkAdapterConnection:
             mock_athena_client.start_session.assert_called_once()
 
     def test_create_connection_handles_error(self):
-        """Test create_connection handles session creation errors."""
+
         with (
             patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True),
             patch("benchbox.platforms.aws.athena_spark_adapter.boto3") as mock_boto3,
@@ -283,7 +271,6 @@ class TestAthenaSparkAdapterConnection:
         ):
             mock_staging.from_uri.return_value = MagicMock()
 
-            # Setup mock to raise error
             mock_athena_client = MagicMock()
             error_response = {"Error": {"Code": "InvalidRequestException", "Message": "Not a Spark workgroup"}}
             mock_athena_client.start_session.side_effect = Exception("Invalid workgroup")
@@ -302,10 +289,8 @@ class TestAthenaSparkAdapterConnection:
 
 
 class TestAthenaSparkSessionState:
-    """Test session state constants."""
-
     def test_session_state_values(self):
-        """Test AthenaSparkSessionState constants are correct."""
+
         from benchbox.platforms.aws.athena_spark_adapter import AthenaSparkSessionState
 
         assert AthenaSparkSessionState.CREATING == "CREATING"
@@ -315,7 +300,7 @@ class TestAthenaSparkSessionState:
         assert AthenaSparkSessionState.FAILED == "FAILED"
 
     def test_ready_states(self):
-        """Test ready states are correctly defined."""
+
         from benchbox.platforms.aws.athena_spark_adapter import AthenaSparkSessionState
 
         assert AthenaSparkSessionState.IDLE in AthenaSparkSessionState.READY_STATES
@@ -323,7 +308,7 @@ class TestAthenaSparkSessionState:
         assert AthenaSparkSessionState.BUSY not in AthenaSparkSessionState.READY_STATES
 
     def test_terminal_states(self):
-        """Test terminal states are correctly defined."""
+
         from benchbox.platforms.aws.athena_spark_adapter import AthenaSparkSessionState
 
         assert AthenaSparkSessionState.TERMINATED in AthenaSparkSessionState.TERMINAL_STATES
@@ -332,10 +317,8 @@ class TestAthenaSparkSessionState:
 
 
 class TestAthenaSparkCalculationState:
-    """Test calculation state constants."""
-
     def test_calculation_state_values(self):
-        """Test AthenaSparkCalculationState constants are correct."""
+
         from benchbox.platforms.aws.athena_spark_adapter import AthenaSparkCalculationState
 
         assert AthenaSparkCalculationState.CREATING == "CREATING"
@@ -345,7 +328,7 @@ class TestAthenaSparkCalculationState:
         assert AthenaSparkCalculationState.CANCELED == "CANCELED"
 
     def test_terminal_states(self):
-        """Test terminal states are correctly defined."""
+
         from benchbox.platforms.aws.athena_spark_adapter import AthenaSparkCalculationState
 
         assert AthenaSparkCalculationState.COMPLETED in AthenaSparkCalculationState.TERMINAL_STATES
@@ -355,17 +338,15 @@ class TestAthenaSparkCalculationState:
 
 
 class TestAthenaSparkAdapterRegistry:
-    """Test platform registry integration."""
-
     def test_platform_metadata_exists(self):
-        """Test Athena Spark metadata exists in platform registry."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         all_metadata = PlatformRegistry.get_all_platform_metadata()
         assert "athena-spark" in all_metadata
 
     def test_platform_metadata_content(self):
-        """Test Athena Spark metadata content is correct."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         all_metadata = PlatformRegistry.get_all_platform_metadata()
@@ -380,10 +361,8 @@ class TestAthenaSparkAdapterRegistry:
 
 
 class TestAthenaSparkAdapterTuning:
-    """Test tuning interface implementation."""
-
     def test_apply_platform_optimizations(self):
-        """Test apply_platform_optimizations returns empty list."""
+
         with (
             patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True),
             patch("benchbox.platforms.aws.athena_spark_adapter.boto3", MagicMock()),
@@ -402,7 +381,7 @@ class TestAthenaSparkAdapterTuning:
             assert result == []
 
     def test_apply_primary_keys(self):
-        """Test apply_primary_keys returns empty list."""
+
         with (
             patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True),
             patch("benchbox.platforms.aws.athena_spark_adapter.boto3", MagicMock()),
@@ -423,12 +402,11 @@ class TestAthenaSparkAdapterTuning:
             assert result == []
 
     def test_configure_for_benchmark(self):
-        """Test configure_for_benchmark sets benchmark type."""
+
         with (
             patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True),
             patch("benchbox.platforms.aws.athena_spark_adapter.boto3", MagicMock()),
             patch("benchbox.platforms.aws.athena_spark_adapter.CloudSparkStaging") as mock_staging,
-            # SparkConfigOptimizer is now used from the mixin module
             patch("benchbox.platforms.base.cloud_spark.mixins.SparkConfigOptimizer") as mock_optimizer,
         ):
             mock_staging.from_uri.return_value = MagicMock()
@@ -450,10 +428,8 @@ class TestAthenaSparkAdapterTuning:
 
 
 class TestAthenaSparkAdapterCLI:
-    """Test CLI argument handling."""
-
     def test_add_cli_arguments(self):
-        """Test add_cli_arguments adds expected arguments."""
+
         from benchbox.platforms.aws import AthenaSparkAdapter
 
         parser = MagicMock()
@@ -465,10 +441,8 @@ class TestAthenaSparkAdapterCLI:
 
 
 class TestAthenaSparkAdapterFromConfig:
-    """Test from_config factory method."""
-
     def test_from_config_basic(self):
-        """Test from_config creates adapter with basic config."""
+
         with (
             patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True),
             patch("benchbox.platforms.aws.athena_spark_adapter.boto3", MagicMock()),
@@ -495,10 +469,8 @@ class TestAthenaSparkAdapterFromConfig:
 
 
 class TestAthenaSparkAdapterClose:
-    """Test cleanup functionality."""
-
     def test_close_terminates_session(self):
-        """Test close terminates the active session."""
+
         with (
             patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True),
             patch("benchbox.platforms.aws.athena_spark_adapter.boto3") as mock_boto3,

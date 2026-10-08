@@ -1,9 +1,6 @@
-"""Tests for CoffeeShopBenchmark - generate, load, and query cycle with DuckDB.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -129,12 +126,6 @@ class TestCoffeeShopBenchmarkLoadAndRun:
 
 
 class TestCoffeeShopBenchmarkTableLoadingOrder:
-    """Regression coverage for tuning-fk-load-ordering-fix-20260716: before
-    this fix, CoffeeShopBenchmark had no get_table_loading_order, so
-    benchbox/platforms/base/data_loading.py::DataLoader fell back to
-    alphabetical order for whatever table set was actually discovered.
-    """
-
     def test_orders_a_shuffled_available_subset_fk_safely(self, coffeeshop):
         available = ["order_lines", "dim_products", "dim_locations"]
         order = coffeeshop.get_table_loading_order(available)

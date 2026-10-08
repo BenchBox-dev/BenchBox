@@ -16,11 +16,10 @@ MERGE_GROUP_EVENT = "merge_group"
 
 
 class HeavyTierError(RuntimeError):
-    """The lookup could not complete; the caller must fail closed."""
+    pass
 
 
 def _load_predicate_copy(name: str, sources: dict[str, str], paths: list[str]) -> bool:
-    """Evaluate one complete policy snapshot in an isolated interpreter."""
     if set(sources) != set(POLICY_PATHS):
         raise HeavyTierError(f"predicate copy {name!r} has an invalid file set")
     if any("\n" in path or "\r" in path for path in paths):
@@ -53,7 +52,6 @@ def _load_predicate_copy(name: str, sources: dict[str, str], paths: list[str]) -
 
 
 def _read_base_copy(base_ref: str, repo_root: Path) -> dict[str, str]:
-    """Read every present policy file from one pinned base commit."""
     try:
         commit = subprocess.check_output(
             ["git", "--no-replace-objects", "-C", str(repo_root), "rev-parse", "--verify", f"{base_ref}^{{commit}}"],
@@ -108,7 +106,6 @@ def soundness_touched(
     read_base: Callable[[str, Path], dict[str, str]] | None = None,
     read_pr: Callable[[Path], dict[str, str]] | None = None,
 ) -> tuple[bool, str]:
-    """Return ``(touched, reason)`` over the union of both predicate copies."""
     paths = [str(path) for path in changed_paths]
     base_source = (read_base or _read_base_copy)(base_ref, repo_root)
     pr_source = (read_pr or _read_pr_copy)(repo_root)
@@ -128,7 +125,6 @@ def heavy_needed(
     read_base: Callable[[str, Path], dict[str, str]] | None = None,
     read_pr: Callable[[Path], dict[str, str]] | None = None,
 ) -> dict[str, Any]:
-    """Return ``{heavy_needed, reason}``; lookup failure fails closed to true."""
     try:
         for flag in ("needs_code_ci", "packaging_needed"):
             if not isinstance(decision.get(flag), bool):
@@ -159,7 +155,7 @@ def _write_github_output(path: Path, needed: bool) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser()
     parser.add_argument("--decision-in", type=Path, default=None)
     parser.add_argument("--event", default=os.environ.get("GITHUB_EVENT_NAME", ""))
     parser.add_argument("--base-ref", default=os.environ.get("GITHUB_BASE_REF", "origin/develop"))

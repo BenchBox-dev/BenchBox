@@ -1,5 +1,3 @@
-"""Unit tests for DuckDBSnapshotBuilder."""
-
 from __future__ import annotations
 
 import copy
@@ -173,7 +171,6 @@ class TestDuckDBSnapshotBuilder:
         assert row[1] is None
 
     def test_extended_fields_round_trip(self, tmp_path: Path) -> None:
-        """Extended columns store and retrieve correct values (not just schema-present)."""
         entry = _make_entry(
             geomean_ms=5656.85,
             platform_version="v3",
@@ -250,8 +247,7 @@ class TestDuckDBSnapshotBuilder:
         assert row[24] == "s3-standard"
 
     def test_extended_fields_null_when_absent(self, tmp_path: Path) -> None:
-        """All extended columns store NULL when the entry has no value."""
-        entry = _make_entry()  # all extended fields default to None
+        entry = _make_entry()
         builder = DuckDBSnapshotBuilder()
         out = tmp_path / "results.duckdb"
         builder.build([entry], out)
@@ -265,7 +261,6 @@ class TestDuckDBSnapshotBuilder:
         assert row is not None and all(v is None for v in row)
 
     def test_normalized_cost_columns_default_to_unavailable(self, tmp_path: Path) -> None:
-        """Entries without normalized cost still carry explicit unavailable metadata."""
         entry = _make_entry()
         builder = DuckDBSnapshotBuilder()
         out = tmp_path / "results.duckdb"
@@ -306,13 +301,6 @@ class TestDuckDBSnapshotBuilder:
         value: str,
         message: str,
     ) -> None:
-        """The legacy ``build()`` entry point re-validates typed-cost structure.
-
-        A hand-built ``NormalizedCost`` bypasses transformer ingest (the
-        dataclass accepts out-of-vocabulary statuses and empty provenance
-        strings), so the builder must reject those rows instead of writing
-        the invalid values into ``results.duckdb``.
-        """
         cost = NormalizedCost(
             normalized_cost_usd="0.42",
             cost_model_version="2026.05.0",
@@ -333,12 +321,6 @@ class TestDuckDBSnapshotBuilder:
         self,
         tmp_path: Path,
     ) -> None:
-        """A hand-built entry carrying non-finite cost still fails the build.
-
-        Finiteness of the numeric payload cannot be checked at ingest time,
-        so it stays a builder-side check alongside the structural validation
-        above.
-        """
         cost = NormalizedCost(
             normalized_cost_usd="0.42",
             cost_model_version="2026.05.0",
@@ -357,7 +339,6 @@ class TestDuckDBSnapshotBuilder:
             builder.build([entry], tmp_path / "results.duckdb")
 
     def test_results_schema_json_not_emitted(self, tmp_path: Path) -> None:
-        """The browser reads schema from DuckDB introspection, not a JSON sidecar."""
         builder = DuckDBSnapshotBuilder()
         out = tmp_path / "results.duckdb"
         builder.build([_make_entry()], out)

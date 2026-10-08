@@ -1,14 +1,4 @@
-"""Empty-aggregate NULL sweep for Data Vault Q6/Q14/Q19 DataFrame implementations.
-
-SQL SUM() over an empty set is NULL (not 0.0); a ratio over empty sums is NULL
-(not NaN, and it must not raise). Each test builds the real vault schema in
-DuckDB with zero rows, loads the same empty tables into production Polars and
-Pandas contexts, and asserts both backends return the single NULL row the SQL
-reference returns. A non-empty regression case per query pins the fixed
-implementations against the reference with real values.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -47,7 +37,6 @@ def _empty_vault_connection():
 
 
 def _empty_contexts(conn):
-    """Production contexts over the same empty tables the SQL reference sees."""
     polars_ctx = PolarsDataFrameAdapter().create_context()
     pandas_ctx = PandasDataFrameAdapter().create_context()
     for table in _EMPTY_TABLES:
@@ -107,7 +96,6 @@ def _sat_lineitem_row(link: str, shipdate: str) -> str:
 
 
 def _sat_lineitem_zero_revenue_row(link: str, shipdate: str) -> str:
-    # Same shape with l_extendedprice = 0: rows exist but carry no revenue.
     return (
         "INSERT INTO sat_lineitem VALUES "
         f"('{link}', now(), NULL, 'test', 'h', 10, 0.0, 0.06, 0.0, "
@@ -123,8 +111,6 @@ def _assert_single_value(rows, expected):
 
 
 class TestEmptyAggregateNull:
-    """Empty input must yield one NULL row on both backends, like SQL."""
-
     @pytest.mark.parametrize("query_id", [6, 14, 19])
     def test_sql_reference_returns_single_null_row(self, query_id):
         bench = DataVaultBenchmark(scale_factor=0.01)
@@ -154,10 +140,7 @@ class TestEmptyAggregateNull:
 
 
 class TestNonEmptyRegression:
-    """Fixed implementations must still match the reference with real values."""
-
     def test_q6_revenue(self):
-        # Two rows at 100.0 x 0.06 discount: revenue 12.0.
         seed = "; ".join(
             [
                 _HUB_SEED,
@@ -179,7 +162,6 @@ class TestNonEmptyRegression:
             conn.close()
 
     def test_q14_promo_percentage(self):
-        # One PROMO row and one standard row at 100.0 x (1 - 0.06): 50.0%.
         seed = "; ".join(
             [
                 _HUB_SEED,
@@ -203,10 +185,6 @@ class TestNonEmptyRegression:
             conn.close()
 
     def test_q14_zero_revenue_yields_nan_not_error(self):
-        # Rows exist in the Q14 period but every row has zero revenue: the
-        # ratio is 0/0, which the SQL reference and expression backend yield
-        # as NaN. The pandas backend must match instead of raising
-        # ZeroDivisionError.
         import math
 
         seed = "; ".join(
@@ -234,8 +212,6 @@ class TestNonEmptyRegression:
             conn.close()
 
     def test_q19_revenue(self):
-        # Brand#12 / SM CASE / qty 10 in [1, 11] / size 3 / AIR / DELIVER IN
-        # PERSON matches cond1: revenue 100.0 x (1 - 0.06) = 94.0.
         seed = "; ".join(
             [
                 _HUB_SEED,

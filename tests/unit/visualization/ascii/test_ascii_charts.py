@@ -1,9 +1,3 @@
-"""Tests for BenchBox ASCII chart integration (ResultPlotter, exporters, templates).
-
-Pure rendering tests have been migrated to the textcharts library.
-This file retains integration tests that depend on BenchBox-specific modules.
-"""
-
 from __future__ import annotations
 
 from unittest.mock import patch
@@ -45,10 +39,7 @@ pytestmark = [
 
 
 class TestComparisonTemplateIntegration:
-    """Integration tests for comparison template composing all three chart types."""
-
     def test_exporters_render_comparison_bar(self):
-        """render_ascii_chart handles comparison_bar type."""
         from benchbox.core.visualization.ascii.comparison_bar import ComparisonBarData
         from benchbox.core.visualization.exporters import render_ascii_chart
 
@@ -57,7 +48,6 @@ class TestComparisonTemplateIntegration:
         assert "Q1" in result
 
     def test_exporters_render_diverging_bar(self):
-        """render_ascii_chart handles diverging_bar type."""
         from benchbox.core.visualization.ascii.diverging_bar import DivergingBarData
         from benchbox.core.visualization.exporters import render_ascii_chart
 
@@ -66,7 +56,6 @@ class TestComparisonTemplateIntegration:
         assert "Q1" in result
 
     def test_exporters_render_summary_box(self):
-        """render_ascii_chart handles summary_box type."""
         from benchbox.core.visualization.ascii.summary_box import SummaryStats
         from benchbox.core.visualization.exporters import render_ascii_chart
 
@@ -82,7 +71,6 @@ class TestComparisonTemplateIntegration:
         assert "Test Summary" in result
 
     def test_exporters_render_summary_box_from_dict(self):
-        """render_ascii_chart handles summary_box from dict data."""
         from benchbox.core.visualization.exporters import render_ascii_chart
 
         data = {
@@ -98,7 +86,6 @@ class TestComparisonTemplateIntegration:
         assert "Dict Summary" in result
 
     def test_comparison_template_exists(self):
-        """comparison template is registered and accessible."""
         from benchbox.core.visualization.templates import get_template
 
         template = get_template("comparison")
@@ -108,7 +95,6 @@ class TestComparisonTemplateIntegration:
         assert "summary_box" in template.chart_types
 
     def test_new_classes_importable_from_module(self):
-        """New classes are importable from the ascii module."""
         from benchbox.core.visualization.ascii import ComparisonBar, DivergingBar, SummaryBox
 
         assert ComparisonBar is not None
@@ -116,14 +102,8 @@ class TestComparisonTemplateIntegration:
         assert SummaryBox is not None
 
 
-# ── Edge Case Tests for New Chart Types ──────────────────────────
-
-
 class TestSeriesNamingSymmetry:
-    """Tests for symmetric mode/version naming in ResultPlotter via unified disambiguator."""
-
     def test_disambiguate_modes_both_get_suffix(self):
-        """When same platform has SQL and DataFrame modes, both get suffixed."""
         from benchbox.core.visualization.result_plotter import ResultPlotter
 
         results = [
@@ -137,7 +117,6 @@ class TestSeriesNamingSymmetry:
         assert "DataFusion (df)" in platforms
 
     def test_single_result_no_suffix(self):
-        """Single result gets no disambiguation suffix."""
         from benchbox.core.visualization.result_plotter import ResultPlotter
 
         results = [make_normalized_result(platform="DuckDB", execution_mode="sql")]
@@ -146,7 +125,6 @@ class TestSeriesNamingSymmetry:
         assert plotter.results[0].platform == "DuckDB"
 
     def test_same_mode_no_suffix(self):
-        """Two results with different platforms and same mode are not suffixed."""
         from benchbox.core.visualization.result_plotter import ResultPlotter
 
         results = [
@@ -160,7 +138,6 @@ class TestSeriesNamingSymmetry:
         assert "Polars" in platforms
 
     def test_mode_abbreviation_dataframe_to_df(self):
-        """'dataframe' mode is abbreviated to 'df' in labels."""
         from benchbox.core.labels import _MODE_ABBREV
 
         assert _MODE_ABBREV["dataframe"] == "df"
@@ -168,10 +145,7 @@ class TestSeriesNamingSymmetry:
 
 
 class TestDisambiguateVersions:
-    """Tests for version-based label disambiguation in ResultPlotter."""
-
     def test_different_versions_appended_to_label(self):
-        """When same platform has different driver versions, both labels get version appended."""
         from benchbox.core.visualization.result_plotter import ResultPlotter
 
         results = [
@@ -185,7 +159,6 @@ class TestDisambiguateVersions:
         assert "DuckDB v1.4.3" in platforms
 
     def test_same_version_labels_unchanged(self):
-        """When both runs share the same version, labels are not modified."""
         from benchbox.core.visualization.result_plotter import ResultPlotter
 
         results = [
@@ -198,7 +171,6 @@ class TestDisambiguateVersions:
             assert r.platform == "DuckDB"
 
     def test_different_platforms_unaffected(self):
-        """Different platforms with no version collision are not modified."""
         from benchbox.core.visualization.result_plotter import ResultPlotter
 
         results = [
@@ -212,7 +184,6 @@ class TestDisambiguateVersions:
         assert "Polars" in platforms
 
     def test_no_version_in_raw_skipped(self):
-        """Results without version info in raw data are not modified."""
         from benchbox.core.visualization.result_plotter import ResultPlotter
 
         results = [
@@ -226,10 +197,7 @@ class TestDisambiguateVersions:
 
 
 class TestSortResultsByVersion:
-    """Tests for _sort_results_by_version in ResultPlotter."""
-
     def test_versions_sorted_ascending(self):
-        """Results with version labels are sorted from oldest to newest."""
         from benchbox.core.visualization.result_plotter import ResultPlotter
 
         results = [
@@ -246,7 +214,6 @@ class TestSortResultsByVersion:
         assert ordered == ["DuckDB 1.0.0", "DuckDB 1.1.3", "DuckDB 1.2.2", "DuckDB 1.3.2"]
 
     def test_prerelease_sorts_after_stable(self):
-        """Pre-release (dev) versions sort after the corresponding stable release."""
         from benchbox.core.visualization.result_plotter import ResultPlotter
 
         results = [
@@ -261,7 +228,6 @@ class TestSortResultsByVersion:
         assert ordered == ["DuckDB 1.4.4", "DuckDB 1.5.0-dev7404"]
 
     def test_six_versions_full_order(self):
-        """Full six-version scenario from the user's test case sorts correctly."""
         from benchbox.core.visualization.result_plotter import ResultPlotter
 
         insert_order = [
@@ -287,7 +253,6 @@ class TestSortResultsByVersion:
         assert [r.platform for r in plotter.results] == expected
 
     def test_non_versioned_labels_sort_last(self):
-        """Labels without a version number sort after versioned ones."""
         from benchbox.core.visualization.result_plotter import ResultPlotter
 
         results = [
@@ -302,7 +267,6 @@ class TestSortResultsByVersion:
         assert plotter.results[1].platform == "Polars"
 
     def test_single_result_unchanged(self):
-        """Single result is unaffected."""
         from benchbox.core.visualization.result_plotter import ResultPlotter
 
         results = [make_normalized_result(platform="DuckDB 1.0.0")]
@@ -314,10 +278,7 @@ class TestSortResultsByVersion:
 
 
 class TestNewChartsModuleImports:
-    """Tests that all new chart types are importable from the ascii module."""
-
     def test_import_all_new_charts(self):
-        """All new chart classes are importable from the ascii module."""
         from benchbox.core.visualization.ascii import (
             CDFChart,
             NormalizedSpeedup,
@@ -333,17 +294,8 @@ class TestNewChartsModuleImports:
         assert StackedBar is not None
 
 
-# ---------------------------------------------------------------------------
-# Session regression tests: heatmap ordering, bar colors, outlier markers,
-# box-plot scale capping, stats table, and centralized severity markers
-# ---------------------------------------------------------------------------
-
-
 class TestHeatmapQueryOrdering:
-    """Verify _build_query_matrix sorts query IDs naturally."""
-
     def test_query_ids_sorted_numerically(self):
-        """Query IDs like '14','2','9' should be sorted as 2, 9, 14."""
         from types import SimpleNamespace
 
         from benchbox.core.visualization.ascii_runtime import _build_query_matrix
@@ -358,7 +310,6 @@ class TestHeatmapQueryOrdering:
         assert query_ids == ["2", "9", "14"]
 
     def test_query_ids_with_prefix_sorted(self):
-        """Query IDs like 'Q2','Q10','Q1' should sort naturally."""
         from types import SimpleNamespace
 
         from benchbox.core.visualization.ascii_runtime import _build_query_matrix
@@ -374,10 +325,7 @@ class TestHeatmapQueryOrdering:
 
 
 class TestPowerBarRenderer:
-    """Tests for _render_power_bar in ascii_runtime."""
-
     def test_renders_with_valid_power_data(self):
-        """power_bar renders a bar per platform when power_at_size is present."""
         from benchbox.core.visualization.ascii.base import ChartOptions
         from benchbox.core.visualization.ascii_runtime import render_ascii_chart_from_results
 
@@ -393,7 +341,6 @@ class TestPowerBarRenderer:
         assert "Power@Size" in output
 
     def test_returns_none_when_no_power_data(self):
-        """power_bar returns None when no results carry power_at_size."""
         from benchbox.core.visualization.ascii.base import ChartOptions
         from benchbox.core.visualization.ascii_runtime import render_ascii_chart_from_results
 
@@ -406,7 +353,6 @@ class TestPowerBarRenderer:
         assert output is None
 
     def test_best_is_highest_value(self):
-        """The result with the highest Power@Size is marked is_best."""
         from benchbox.core.visualization.ascii.bar_chart import BarData
         from benchbox.core.visualization.ascii.base import ChartOptions
         from benchbox.core.visualization.ascii_runtime import _render_power_bar
@@ -423,7 +369,7 @@ class TestPowerBarRenderer:
         import benchbox.core.visualization.ascii_runtime as runtime
 
         original = runtime.BarChart
-        runtime.BarChart = _CapturingBarChart  # type: ignore[assignment]
+        runtime.BarChart = _CapturingBarChart
         try:
             results = [
                 make_normalized_result(platform="Slow", benchmark="tpcds", scale_factor=10, power_at_size=100.0),
@@ -432,7 +378,7 @@ class TestPowerBarRenderer:
             ]
             _render_power_bar(results, ChartOptions(use_color=False), {})
         finally:
-            runtime.BarChart = original  # type: ignore[assignment]
+            runtime.BarChart = original
 
         best = [d for d in captured if d.is_best]
         worst = [d for d in captured if d.is_worst]
@@ -440,7 +386,6 @@ class TestPowerBarRenderer:
         assert len(worst) == 1 and worst[0].label == "Slow"
 
     def test_single_result_no_worst(self):
-        """With a single result, is_worst is not set (nothing to compare against)."""
         from benchbox.core.visualization.ascii.bar_chart import BarData
         from benchbox.core.visualization.ascii.base import ChartOptions
         from benchbox.core.visualization.ascii_runtime import _render_power_bar
@@ -457,7 +402,7 @@ class TestPowerBarRenderer:
         import benchbox.core.visualization.ascii_runtime as runtime
 
         original = runtime.BarChart
-        runtime.BarChart = _CapturingBarChart  # type: ignore[assignment]
+        runtime.BarChart = _CapturingBarChart
         try:
             _render_power_bar(
                 [make_normalized_result(platform="Only", benchmark="tpcds", scale_factor=10, power_at_size=500.0)],
@@ -465,13 +410,12 @@ class TestPowerBarRenderer:
                 {},
             )
         finally:
-            runtime.BarChart = original  # type: ignore[assignment]
+            runtime.BarChart = original
 
         assert captured[0].is_best is True
         assert not any(d.is_worst for d in captured)
 
     def test_mixed_results_only_power_data_rendered(self):
-        """Results without power_at_size are silently excluded from the chart."""
         from benchbox.core.visualization.ascii.base import ChartOptions
         from benchbox.core.visualization.ascii_runtime import render_ascii_chart_from_results
 
@@ -487,8 +431,6 @@ class TestPowerBarRenderer:
 
 
 class TestNormalizeDictPowerAtSize:
-    """Tests for power_at_size extraction in ResultPlotter._normalize_dict."""
-
     @staticmethod
     def _make_payload(power_at_size=None):
         payload = {
@@ -501,21 +443,18 @@ class TestNormalizeDictPowerAtSize:
         return payload
 
     def test_extracts_power_at_size_from_tpc_metrics(self):
-        """_normalize_dict populates power_at_size from summary.tpc_metrics."""
         from benchbox.core.visualization.result_plotter import ResultPlotter
 
         result = ResultPlotter._normalize_dict(self._make_payload(power_at_size=385807.0), source_path=None)
         assert result.power_at_size == pytest.approx(385807.0)
 
     def test_power_at_size_none_when_absent(self):
-        """_normalize_dict sets power_at_size to None when the field is missing."""
         from benchbox.core.visualization.result_plotter import ResultPlotter
 
         result = ResultPlotter._normalize_dict(self._make_payload(), source_path=None)
         assert result.power_at_size is None
 
     def test_power_at_size_coerced_to_float(self):
-        """Integer power_at_size values in JSON are coerced to float."""
         from benchbox.core.visualization.result_plotter import ResultPlotter
 
         result = ResultPlotter._normalize_dict(self._make_payload(power_at_size=385807), source_path=None)
@@ -523,8 +462,6 @@ class TestNormalizeDictPowerAtSize:
 
 
 class TestSuggestChartTypesPowerBar:
-    """Tests for power_bar inclusion in _suggest_chart_types."""
-
     @staticmethod
     def _make_plotter(power_values: list[float | None]):
         from benchbox.core.visualization.result_plotter import NormalizedResult, ResultPlotter
@@ -557,19 +494,12 @@ class TestSuggestChartTypesPowerBar:
         assert "power_bar" not in plotter._suggest_chart_types()
 
     def test_power_bar_suggested_when_at_least_one_has_power(self):
-        """Partial power data is enough to suggest the chart."""
         plotter = self._make_plotter([None, 500.0])
         assert "power_bar" in plotter._suggest_chart_types()
 
 
 class TestExporterChartTypeDispatch:
-    """Integration tests: exporters correctly dispatch to chart-type renderers.
-
-    Consolidated from split classes during test migration to textcharts.
-    """
-
     def test_exporters_render_percentile_ladder(self):
-        """render_ascii_chart handles percentile_ladder type."""
         from benchbox.core.visualization.exporters import render_ascii_chart
 
         data = [PercentileData("DuckDB", 12, 45, 78, 120)]
@@ -577,35 +507,25 @@ class TestExporterChartTypeDispatch:
         assert "DuckDB" in result
 
     def test_percentile_ladder_importable_from_module(self):
-        """PercentileLadder is importable from the ascii module."""
         from benchbox.core.visualization.ascii import PercentileLadder
 
         assert callable(PercentileLadder)
 
-    # ── Normalized Speedup Chart Tests ────────────────────────────────
-
     def test_exporters_render_normalized_speedup(self):
-        """render_ascii_chart handles normalized_speedup type."""
         from benchbox.core.visualization.exporters import render_ascii_chart
 
         data = [SpeedupData("Test", 2.0, False)]
         result = render_ascii_chart("normalized_speedup", data, title="Test")
         assert "Test" in result
 
-    # ── Stacked Bar Chart Tests ────────────────────────────────
-
     def test_exporters_render_stacked_phase(self):
-        """render_ascii_chart handles stacked_phase type."""
         from benchbox.core.visualization.exporters import render_ascii_chart
 
         data = [StackedBarData("Test", [StackedBarSegment("Power", 5000)])]
         result = render_ascii_chart("stacked_phase", data, title="Test")
         assert "Test" in result
 
-    # ── Sparkline Table Tests ────────────────────────────────
-
     def test_exporters_render_sparkline_table(self):
-        """render_ascii_chart handles sparkline_table type."""
         from benchbox.core.visualization.exporters import render_ascii_chart
 
         cols = [SparklineColumn("Test", {"A": 1}, False)]
@@ -613,20 +533,14 @@ class TestExporterChartTypeDispatch:
         result = render_ascii_chart("sparkline_table", data, title="Test")
         assert "A" in result
 
-    # ── CDF Chart Tests ────────────────────────────────
-
     def test_exporters_render_cdf_chart(self):
-        """render_ascii_chart handles cdf_chart type."""
         from benchbox.core.visualization.exporters import render_ascii_chart
 
         data = [CDFSeriesData("Test", [10, 20, 30])]
         result = render_ascii_chart("cdf_chart", data, title="Test")
         assert "Test" in result
 
-    # ── Rank Table Tests ────────────────────────────────
-
     def test_exporters_render_rank_table(self):
-        """render_ascii_chart handles rank_table type."""
         from benchbox.core.visualization.exporters import render_ascii_chart
 
         data = RankTableData(
@@ -638,14 +552,8 @@ class TestExporterChartTypeDispatch:
         assert "A" in result
 
 
-# ── All New Charts Module Import Tests ────────────────────────────────
-
-
 class TestSubtitleIntegration:
-    """BenchBox-specific subtitle tests using build_chart_subtitle."""
-
     def test_subtitle_renders_scale_factor(self):
-        """Subtitle renders scale factor via build_chart_subtitle."""
         from benchbox.core.visualization.utils import build_chart_subtitle
 
         data = [BarData(label="Q1", value=100)]
@@ -656,18 +564,15 @@ class TestSubtitleIntegration:
         assert "SF=sf1" in result
 
     def test_subtitle_in_all_chart_types(self):
-        """Subtitle works in histogram, box plot, and heatmap."""
         from benchbox.core.visualization.utils import build_chart_subtitle
 
         subtitle = build_chart_subtitle(scale_factor=0.01)
         opts = ChartOptions(use_color=False)
 
-        # Histogram
         hist_data = [HistogramBar(label="Q1", value=100)]
         h = Histogram(data=hist_data, y_label="Execution Time (ms)", options=opts, subtitle=subtitle)
         assert "SF=sf001" in h.render()
 
-        # BoxPlot
         bp = BoxPlot(
             series=[BoxPlotSeries(name="X", values=[1, 2, 3])],
             options=opts,
@@ -675,7 +580,6 @@ class TestSubtitleIntegration:
         )
         assert "SF=sf001" in bp.render()
 
-        # Heatmap
         hm = Heatmap(
             matrix=[[1, 2], [3, 4]],
             row_labels=["Q1", "Q2"],
@@ -688,10 +592,7 @@ class TestSubtitleIntegration:
 
 
 class TestPercentileLadderSubtitleIntegration:
-    """BenchBox-specific percentile ladder subtitle test."""
-
     def test_subtitle_renders(self):
-        """Subtitle renders when provided."""
         from benchbox.core.visualization.utils import build_chart_subtitle
 
         data = [PercentileData("Test", 10, 20, 30, 40)]
@@ -703,8 +604,6 @@ class TestPercentileLadderSubtitleIntegration:
 
 
 class TestShimImports:
-    """Verify BenchBox compatibility shims re-export textcharts correctly."""
-
     def test_bar_chart_importable(self):
         from benchbox.core.visualization.ascii.bar_chart import BarChart, BarData
 

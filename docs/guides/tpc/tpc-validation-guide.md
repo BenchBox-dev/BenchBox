@@ -53,10 +53,8 @@ from benchbox.core.tpc_validation import TPCResultValidator, ValidationLevel
 ```python
 from benchbox.core.tpc_validation import TPCResultValidator, ValidationLevel
 
-# Create validator
 validator = TPCResultValidator()
 
-# Prepare test results (see Test Results Format section)
 test_results = {
     "benchmark_name": "TPC-H",
     "scale_factor": 1.0,
@@ -80,10 +78,8 @@ test_results = {
     }
 }
 
-# Validate results
 report = validator.validate(test_results, ValidationLevel.STANDARD)
 
-# Check results
 print(f"Overall Result: {report.overall_result.value}")
 print(f"Validation Score: {report.metrics.get('validation_score', 0):.1f}%")
 print(f"Issues Found: {len(report.issues)}")
@@ -118,41 +114,43 @@ validator = TPCResultValidator(config)
 
 ## Test Results Format
 
-The validation system expects test results in the following format:
+The validation system expects test results in the following format. The fields are:
+
+- Required: `benchmark_name` (TPC-H, TPC-DS, or TPC-DI), `scale_factor` (the scale factor used), and `test_start_time` and `test_end_time` (ISO format timestamps).
+- Query execution results: `query_results` maps each query ID to its `status` (`success`, `failed`, or `timeout`), `execution_time` (seconds), and `row_count` (rows returned). `results` (the actual query results) and `error` (the error message if the query failed) are optional.
+- Data generation information: `data_generation` holds `generation_time` (seconds to generate data) and `generated_tables`.
+- Calculated metrics: `metrics`.
+- Optional: `maintenance_operations` (for TPC-DS and TPC-DI) and `etl_operations` (for TPC-DI).
+- Reproducibility information: `reproducibility`. Test isolation: `test_isolation`. Documentation: `documentation`.
 
 ```python
 test_results = {
-    # Required fields
-    "benchmark_name": "TPC-H",  # Benchmark name (TPC-H, TPC-DS, TPC-DI)
-    "scale_factor": 1.0,        # Scale factor used
-    "test_start_time": "2023-01-01T10:00:00Z",  # ISO format timestamp
-    "test_end_time": "2023-01-01T11:00:00Z",    # ISO format timestamp
+    "benchmark_name": "TPC-H",
+    "scale_factor": 1.0,
+    "test_start_time": "2023-01-01T10:00:00Z",
+    "test_end_time": "2023-01-01T11:00:00Z",
 
-    # Query execution results
     "query_results": {
         "1": {
-            "status": "success",      # success, failed, timeout
-            "execution_time": 5.2,    # Execution time in seconds
-            "row_count": 100,         # Number of rows returned
-            "results": [...],         # Optional: actual query results
-            "error": "..."           # Optional: error message if failed
+            "status": "success",
+            "execution_time": 5.2,
+            "row_count": 100,
+            "results": [...],
+            "error": "..."
         }
     },
 
-    # Data generation information
     "data_generation": {
-        "generation_time": 120.5,   # Time to generate data in seconds
+        "generation_time": 120.5,
         "generated_tables": ["customer", "orders", "lineitem"]
     },
 
-    # Calculated metrics
     "metrics": {
         "avg_query_time": 5.2,
         "total_query_time": 5.2,
         "queries_per_second": 0.19
     },
 
-    # Optional: Maintenance operations (for TPC-DS, TPC-DI)
     "maintenance_operations": {
         "insert_operation": {
             "status": "success",
@@ -162,7 +160,6 @@ test_results = {
         }
     },
 
-    # Optional: ETL operations (for TPC-DI)
     "etl_operations": {
         "extract_customers": {
             "status": "success",
@@ -172,19 +169,16 @@ test_results = {
         }
     },
 
-    # Reproducibility information
     "reproducibility": {
         "seed": 12345,
         "timestamp": "2023-01-01T10:00:00Z",
         "environment": "test_env"
     },
 
-    # Test isolation
     "test_isolation": {
         "isolated": True
     },
 
-    # Documentation
     "documentation": {
         "test_report": "path/to/test_report.pdf",
         "environment_spec": "path/to/env_spec.json"
@@ -293,30 +287,26 @@ The validation system integrates smoothly with existing TPC benchmarks:
 from benchbox import TPCH
 from benchbox.core.tpc_validation import TPCResultValidator
 
-# Create benchmark
 benchmark = TPCH(scale_factor=1.0)
 
-# Run benchmark (collect results)
 test_results = run_benchmark_and_collect_results(benchmark)
 
-# Validate results
 validator = TPCResultValidator()
 report = validator.validate(test_results, ValidationLevel.STANDARD)
 ```
 
 ### TPC-DS Integration
 
+The example validates results with a TPC-DS specific configuration:
+
 ```python
 from benchbox.tpcds import TPCDSBenchmark
 from benchbox.core.tpc_validation import TPCResultValidator
 
-# Create benchmark
 benchmark = TPCDSBenchmark(scale_factor=1.0)
 
-# Run benchmark (collect results)
 test_results = run_benchmark_and_collect_results(benchmark)
 
-# Validate results with TPC-DS specific config
 config = {
     "validators": {
         "completeness": {
@@ -339,7 +329,6 @@ from benchbox.core.tpc_validation import BaseValidator, ValidationResult
 
 class CustomBusinessRuleValidator(BaseValidator):
     def validate(self, test_results, report):
-        # Custom validation logic
         query_results = test_results.get("query_results", {})
 
         if len(query_results) < 5:
@@ -353,7 +342,6 @@ class CustomBusinessRuleValidator(BaseValidator):
 
         return ValidationResult.PASSED
 
-# Use custom validator
 validator = TPCResultValidator()
 validator.validators.append(CustomBusinessRuleValidator("custom_business_rules"))
 ```
@@ -365,10 +353,8 @@ validator.validators.append(CustomBusinessRuleValidator("custom_business_rules")
 ```python
 from pathlib import Path
 
-# Save validation report
 validator.save_report(report, Path("validation_report.json"))
 
-# Save to specific directory
 report_dir = Path("validation_reports")
 report_dir.mkdir(exist_ok=True)
 validator.save_report(report, report_dir / "tpch_validation.json")
@@ -377,10 +363,8 @@ validator.save_report(report, report_dir / "tpch_validation.json")
 ### Loading Reports
 
 ```python
-# Load validation report
 loaded_report = validator.load_report(Path("validation_report.json"))
 
-# Access report data
 print(f"Report ID: {loaded_report.validation_id}")
 print(f"Overall Result: {loaded_report.overall_result.value}")
 ```
@@ -388,15 +372,12 @@ print(f"Overall Result: {loaded_report.overall_result.value}")
 ### Report Analysis
 
 ```python
-# Get issues by level
 errors = report.get_issues_by_level("ERROR")
 warnings = report.get_issues_by_level("WARNING")
 
-# Get issues by validator
 timing_issues = report.get_issues_by_validator("timing")
 compliance_issues = report.get_issues_by_validator("compliance")
 
-# Access metrics
 validation_score = report.metrics.get("validation_score", 0)
 total_queries = report.execution_summary.get("total_queries", 0)
 success_rate = report.execution_summary.get("success_rate", 0)
@@ -409,14 +390,11 @@ success_rate = report.execution_summary.get("success_rate", 0)
 ```python
 from benchbox.core.tpc_validation import create_sample_test_results, TPCResultValidator
 
-# Create sample test results
 test_results = create_sample_test_results()
 
-# Validate
 validator = TPCResultValidator()
 report = validator.validate(test_results)
 
-# Print results
 print(f"Result: {report.overall_result.value}")
 print(f"Issues: {len(report.issues)}")
 ```
@@ -424,7 +402,6 @@ print(f"Issues: {len(report.issues)}")
 ### Certification Example
 
 ```python
-# Configure for certification
 config = {
     "validators": {
         "certification": {
@@ -445,7 +422,6 @@ print(f"Certification Status: {report.certification_status}")
 ### Multi-Benchmark Suite
 
 ```python
-# Run validation suite across multiple benchmarks
 benchmarks = ["TPC-H", "TPC-DS", "TPC-DI"]
 suite_results = {}
 
@@ -454,7 +430,6 @@ for benchmark in benchmarks:
     report = validator.validate(test_results)
     suite_results[benchmark] = report
 
-# Generate compliance summary
 compliance_summary = {
     benchmark: {
         "compliant": len(report.get_issues_by_level("ERROR")) == 0,

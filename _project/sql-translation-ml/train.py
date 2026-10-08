@@ -1,5 +1,3 @@
-"""Sequential, bounded CodeT5 full fine-tuning with resumable local checkpoints."""
-
 from __future__ import annotations
 
 import argparse

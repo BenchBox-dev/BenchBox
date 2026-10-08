@@ -1,5 +1,3 @@
-"""Maintainer entry point for publishing the Results Explorer read model."""
-
 from __future__ import annotations
 
 import json
@@ -8,12 +6,6 @@ from pathlib import Path
 
 import click
 
-# `_project/` is a PEP 420 implicit namespace package (no `__init__.py`) and is
-# excluded from the wheel build (see `tool.setuptools.packages.find` in
-# `pyproject.toml`). When this script is invoked as
-# `python _project/scripts/explorer_publish.py`, only the script's own directory
-# lands on sys.path, so `_project.scripts.explorer_pipeline.*` imports below
-# would fail. Insert the repo root so the namespace package resolves.
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -21,13 +13,44 @@ if str(REPO_ROOT) not in sys.path:
 from _project.scripts.explorer_pipeline.contract import EXPLORER_BUILD_CONTRACT
 from benchbox.cli.shared import console
 
+EXPLORER_PUBLISH_HELP = "Manage the Results Explorer static build pipeline."
 
-@click.group()
+
+EXPLORER_BUILD_HELP = (
+    "Build the results explorer static dataset from schema-v2 bundles.\n"
+    "\n"
+    "Scans DATA_DIR/bundles/ for result JSON files, transforms them into the\n"
+    "explorer read model, and writes the output to OUTPUT_DIR:\n"
+    "\n"
+    "\x08\n"
+    "- results.duckdb          DuckDB-WASM queryable snapshot\n"
+    "- bundles/{id}.json       copied source bundles for download/audit links\n"
+    "\n"
+    "Examples:\n"
+    "\n"
+    "\x08\n"
+    "  uv run -- python _project/scripts/explorer_publish.py build \\\n"
+    "    --data-dir results-data/ \\\n"
+    "    --output results-explorer/public/data/\n"
+    "\n"
+    "\x08\n"
+    "  uv run -- python _project/scripts/explorer_publish.py build \\\n"
+    "    --data-dir results-data/ \\\n"
+    "    --output results-explorer/public/data/ \\\n"
+    "    --trust-label community-submission \\\n"
+    "    --visibility public-self-reported"
+)
+
+
+EXPLORER_BUILD_CONTRACT_HELP = "Emit the stable contract metadata for explorer-build integrations."
+
+
+@click.group(help=EXPLORER_PUBLISH_HELP)
 def explorer_publish() -> None:
-    """Manage the Results Explorer static build pipeline."""
+    pass
 
 
-@explorer_publish.command("build")
+@explorer_publish.command("build", help=EXPLORER_BUILD_HELP)
 @click.option(
     "--data-dir",
     required=True,
@@ -59,29 +82,6 @@ def explorer_build(
     trust_label: str,
     visibility: str,
 ) -> None:
-    """Build the results explorer static dataset from schema-v2 bundles.
-
-    Scans DATA_DIR/bundles/ for result JSON files, transforms them into the
-    explorer read model, and writes the output to OUTPUT_DIR:
-
-    \b
-    - results.duckdb          DuckDB-WASM queryable snapshot
-    - bundles/{id}.json       copied source bundles for download/audit links
-
-    Examples:
-
-    \b
-      uv run -- python _project/scripts/explorer_publish.py build \\
-        --data-dir results-data/ \\
-        --output results-explorer/public/data/
-
-    \b
-      uv run -- python _project/scripts/explorer_publish.py build \\
-        --data-dir results-data/ \\
-        --output results-explorer/public/data/ \\
-        --trust-label community-submission \\
-        --visibility public-self-reported
-    """
     from _project.scripts.explorer_pipeline.pipeline import ExplorerPipeline
 
     console.print("[bold]Explorer build[/bold]")
@@ -109,15 +109,13 @@ def explorer_build(
         raise SystemExit(1) from exc
 
 
-@explorer_publish.command("build-contract", hidden=True)
+@explorer_publish.command("build-contract", hidden=True, help=EXPLORER_BUILD_CONTRACT_HELP)
 def explorer_build_contract() -> None:
-    """Emit the stable contract metadata for explorer-build integrations."""
 
     click.echo(json.dumps(EXPLORER_BUILD_CONTRACT))
 
 
 def main() -> None:
-    """Script entry point."""
     explorer_publish()
 
 

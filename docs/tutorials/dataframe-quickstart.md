@@ -31,15 +31,14 @@ This runs all 22 TPC-H queries using Polars' DataFrame API.
 ## SQL vs DataFrame Comparison
 
 ```bash
-# SQL execution (DuckDB)
 benchbox run --platform duckdb --benchmark tpch --scale 0.1 --output sql.json
 
-# DataFrame execution (Polars)
 benchbox run --platform polars-df --benchmark tpch --scale 0.1 --output polars.json
 
-# Compare
 benchbox compare sql.json polars.json
 ```
+
+The first command runs SQL execution on DuckDB. The second runs DataFrame execution on Polars. The third compares the two result files.
 
 ## How It Works
 
@@ -80,33 +79,32 @@ benchbox run --platform polars-df --benchmark tpch --tuning auto
 Or use a custom configuration:
 
 ```bash
-# View available settings
 benchbox tuning defaults --platform polars
 
-# Use custom tuning
 benchbox run --platform polars-df --benchmark tpch --tuning tuning.yaml
 ```
+
+The first command shows the available settings. The second runs with a custom tuning file.
 
 ## Pandas Example
 
 ```bash
-# Run with Pandas
 benchbox run --platform pandas-df --benchmark tpch --scale 0.01
-
-# Note: Pandas is slower than Polars for large datasets
-# Use scale 0.01-0.1 for Pandas benchmarks
 ```
+
+Pandas is slower than Polars for large datasets. Use scale factors of 0.01 to 0.1 for Pandas benchmarks.
 
 ## Cross-Platform DataFrame Comparison
 
 ```bash
-# Compare DataFrame platforms
 benchbox run --platform polars-df --benchmark tpch --output polars.json
 benchbox run --platform pandas-df --benchmark tpch --output pandas.json
 benchbox run --platform datafusion-df --benchmark tpch --output datafusion.json
 
 benchbox compare polars.json pandas.json datafusion.json
 ```
+
+The three runs and the final comparison cover the DataFrame platforms.
 
 ## TPC-DS Support
 
@@ -128,13 +126,13 @@ from benchbox import TPCH
 adapter = PolarsDataFrameAdapter()
 benchmark = TPCH(scale_factor=0.1)
 
-# Run benchmark
 results = benchmark.run_dataframe(adapter)
 
-# Access results
 for query_result in results.query_results:
     print(f"{query_result.query_id}: {query_result.execution_time_ms:.1f}ms")
 ```
+
+`run_dataframe` runs the benchmark. The loop then reads each query result.
 
 ## Next Steps
 

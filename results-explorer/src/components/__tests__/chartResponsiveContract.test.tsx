@@ -1,20 +1,3 @@
-/**
- * The Explorer's SVG charts share one sizing contract: draw in a coordinate
- * system as wide as the measured container, publish it as `width="100%"` plus a
- * matching viewBox, and keep every mark inside it.
- *
- * These are regression tests for a defect that shipped: charts authored at a
- * fixed 400-unit floor with no viewBox were reduced to the column width by
- * `.bb-chart-svg { max-width: 100% }` without their coordinate system moving
- * with them. On a 293px phone column that silently discarded the right-hand
- * quarter of the drawing and the bottom quarter of the rows - the slowest runs,
- * the axis, and the caption naming the scale. The wrapping `overflow-x-auto`
- * could not scroll to them either, because the box now fitted its parent.
- *
- * e2e/responsive.spec.ts deliberately exempts elements inside `svg[role="img"]`
- * from its overflow audit, so nothing else in the suite would catch a return.
- */
-
 import { render, waitFor } from "@testing-library/preact";
 import { describe, it, expect, afterEach } from "vitest";
 import type { BenchmarkSummary, PlatformRow } from "@/types";
@@ -32,15 +15,7 @@ import { DivergingBarChart } from "@/components/DivergingBarChart";
 
 const NARROW_COLUMN = 240;
 const PHONE_COLUMN = 293;
-/**
- * jsdom lays out no text, so a label's width has to be estimated. 0.6em per
- * character is a conservative bound for the proportional faces these charts
- * use, and it is what the assertion below compares against - not the constant
- * the production helper works to, which would make the check circular.
- */
 function visibleLabel(text: Element): string {
-  // `textContent` swallows the <title> child these charts attach for tooltips,
-  // which is the full untruncated run identity and is never painted.
   return Array.from(text.childNodes)
     .filter((node) => node.nodeType === 3)
     .map((node) => node.textContent ?? "")
@@ -113,11 +88,6 @@ function makePlatform(overrides: Partial<PlatformRow> = {}): PlatformRow {
   };
 }
 
-/**
- * Two runs whose per-query gap is far past either chart's clamp, so the value
- * label sits at the very end of the plot - the case that used to draw it
- * outside the drawing.
- */
 function clampedCompare() {
   return {
     queries: ["Q1", "Q2", "Q3"].map((queryId, index) => ({
@@ -131,7 +101,6 @@ function clampedCompare() {
   };
 }
 
-/** The same cohort with normalized cost recorded, so the scatter has points. */
 function costCohort(): BenchmarkSummary {
   const base = wideCohort();
   return {
@@ -144,7 +113,6 @@ function costCohort(): BenchmarkSummary {
   };
 }
 
-/** A cohort wide enough that a fixed label gutter cannot fit a phone column. */
 function wideCohort(): BenchmarkSummary {
   const names = [
     "DuckDB",
@@ -183,14 +151,6 @@ interface MarkExtent {
   readonly y: number;
 }
 
-/**
- * Every point a chart actually draws, in user units.
- *
- * Covers rects, lines, circles, path and polyline geometry, and text origins.
- * An earlier version looked only at rects, line endpoints and text x, which
- * left the CDF's plotted curves - its entire data layer - unexamined, and
- * checked no vertical extent at all.
- */
 function drawnPoints(root: ParentNode): MarkExtent[] {
   const points: MarkExtent[] = [];
   const push = (what: string, x: number, y: number) => {
@@ -213,8 +173,6 @@ function drawnPoints(root: ParentNode): MarkExtent[] {
     push("circle", num(circle, "cx") - r, num(circle, "cy") - r);
     push("circle", num(circle, "cx") + r, num(circle, "cy") + r);
   }
-  // Curves carry their geometry in an attribute, so read the coordinate pairs
-  // straight out of it: jsdom lays out no SVG and has no getBBox.
   for (const el of Array.from(root.querySelectorAll("path, polyline"))) {
     const raw = el.getAttribute("d") ?? el.getAttribute("points") ?? "";
     const numbers = (raw.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
@@ -228,12 +186,6 @@ function drawnPoints(root: ParentNode): MarkExtent[] {
   return points;
 }
 
-/**
- * `minWidth` is the drawing floor a chart declares for itself. Below it the
- * frame scales down rather than cropping, which is a deliberate trade and not
- * the defect these tests guard. Omitted means the chart follows its container
- * exactly.
- */
 const CHARTS: { name: string; render: () => { container: Element }; minWidth?: number }[] = [
   { name: "PowerBar", render: () => render(<PowerBar summary={wideCohort()} />) },
   { name: "DistributionBox", render: () => render(<DistributionBox summary={wideCohort()} />) },
@@ -248,8 +200,6 @@ const CHARTS: { name: string; render: () => { container: Element }; minWidth?: n
             ...platform,
             colorIdx: index,
             displayLabel: platform.platform,
-            // p50 close to p99 puts the value label at the very end of the
-            // plot, where a trailing label used to be drawn outside it.
             percentile_stats: {
               p50: 88 + index,
               p90: 89 + index,
@@ -281,7 +231,6 @@ const CHARTS: { name: string; render: () => { container: Element }; minWidth?: n
       render(
         <TimeSeries
           entries={wideCohort().platforms.flatMap((platform) =>
-            // A trend needs at least two runs per platform.
             ["2026-03-01", "2026-06-01", "2026-09-01"].map((run_date, run) => ({
               result_id: `${platform.result_id}-${run}`,
               platform_id: platform.platform_id,
@@ -320,10 +269,6 @@ describe("chart responsive contract", () => {
       it.each([NARROW_COLUMN, PHONE_COLUMN, DESKTOP_COLUMN])(
         "anchors labels so they cannot run off an edge at %spx",
         async (width) => {
-          // jsdom lays out no text, so its extent cannot be measured here. What
-          // can be checked is the rule that governs it: a label anchored at its
-          // start, placed hard against the right edge, has nowhere to go but
-          // outside the drawing. The same applies mirrored on the left.
           setContainerWidth(width);
           const { container } = chart.render();
           const expected = Math.max(width, chart.minWidth ?? 0);
@@ -335,8 +280,6 @@ describe("chart responsive contract", () => {
           const offenders: string[] = [];
           for (const svg of Array.from(container.querySelectorAll("svg"))) {
             for (const text of Array.from(svg.querySelectorAll("text"))) {
-              // A rotated label's x is expressed in its own rotated frame, so a
-              // flat comparison against the drawing width says nothing useful.
               if (text.getAttribute("transform") !== null) continue;
               const x = Number(text.getAttribute("x") ?? NaN);
               if (!Number.isFinite(x)) continue;

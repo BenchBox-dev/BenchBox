@@ -1,25 +1,3 @@
-"""Static guard: no hardcoded ``Path.cwd()/"benchmark_runs"`` datagen defaults.
-
-Work item w3 of the ``benchmark-output-root-regression-guard`` task.
-
-PR #759 made the BaseBenchmark datagen default env-aware: constructors must
-resolve their output root through ``get_benchmark_runs_datagen_path`` (which
-honors ``BENCHBOX_OUTPUT_DIR``) instead of hardcoding a cwd-local
-``benchmark_runs`` path. A new benchmark that reintroduces the hardcoded
-pattern silently brings back the original bug — generated data lands under the
-worktree instead of the configured shared root — and nothing else catches it.
-
-This guard scans the source files of every *registered* benchmark (class
-module plus adjacent generator/downloader modules) for the pattern and fails
-with fix guidance when it appears outside the documented exception list.
-
-Scan targets are derived from the registered classes' ``__module__`` via the
-benchmark loader, NOT from a ``benchbox/core/**/benchmark.py`` glob, so
-benchmarks living in non-standard files (e.g. TPCDSBenchmark in
-``benchbox/core/tpcds/benchmark/runner.py``) and future additions are covered
-automatically.
-"""
-
 from __future__ import annotations
 
 import inspect
@@ -38,16 +16,10 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-# Matches e.g. ``Path.cwd() / "benchmark_runs"``, ``Path.cwd()/'benchmark_runs'``,
-# and prefixed string literals like ``Path.cwd() / r"benchmark_runs"``.
+
 _HARDCODED_PATTERN = re.compile(r"""Path\.cwd\(\)\s*/\s*[rRbBuUfF]{0,2}["']benchmark_runs["']""")
 
-#: Documented exceptions, keyed by repo-relative POSIX path. Each occurrence is
-#: an intentional non-default use (a fallback or probe), not a constructor
-#: datagen default, so it cannot cause BENCHBOX_OUTPUT_DIR to be ignored at
-#: benchmark construction. Additions to this list require the same scrutiny:
-#: if the occurrence is a constructor/generator *default*, fix it to use
-#: ``get_benchmark_runs_datagen_path`` instead of excepting it here.
+
 _ALLOWED_OCCURRENCES: dict[str, str] = {
     "benchbox/core/write_primitives/benchmark.py": (
         "Multi-root probe list used to LOCATE existing TPC-H .tbl fixtures; "
@@ -68,7 +40,7 @@ _ALLOWED_OCCURRENCES: dict[str, str] = {
 
 
 def _is_allowed(rel_path: str) -> bool:
-    # Normalize separators so the POSIX-style keys match on every OS.
+
     return rel_path.replace("\\", "/") in _ALLOWED_OCCURRENCES
 
 
@@ -79,7 +51,6 @@ class _ScanTarget(NamedTuple):
 
 
 def _collect_scan_targets() -> list[_ScanTarget]:
-    """Resolve scan targets from the registry: class modules + generator modules."""
     repo_root = Path(__file__).resolve().parents[3]
     seen: set[Path] = set()
     targets: list[_ScanTarget] = []
@@ -100,8 +71,6 @@ def _collect_scan_targets() -> list[_ScanTarget]:
         class_file = Path(inspect.getfile(benchmark_class))
         _add(class_file, benchmark_id)
 
-        # Hardcoded defaults frequently live in the generator/downloader the
-        # constructor builds, not the benchmark class itself — scan those too.
         package_dir = repo_root / "benchbox" / "core" / benchmark_id
         for directory in {class_file.parent, package_dir}:
             if not directory.is_dir():
@@ -121,14 +90,12 @@ _SCAN_TARGETS = _collect_scan_targets()
 
 
 def test_scan_targets_cover_every_registered_benchmark() -> None:
-    """Every registry id contributes at least one scanned source file."""
     covered = {target.benchmark_id for target in _SCAN_TARGETS}
     missing = sorted(set(get_all_benchmarks()) - covered)
     assert not missing, f"No scan targets resolved for: {missing}"
 
 
 def test_no_hardcoded_cwd_benchmark_runs_defaults() -> None:
-    """Benchmark sources must not hardcode cwd-local benchmark_runs defaults."""
     violations: list[str] = []
 
     for target in _SCAN_TARGETS:
@@ -161,7 +128,6 @@ def test_no_hardcoded_cwd_benchmark_runs_defaults() -> None:
 
 
 def test_guard_pattern_catches_the_regression_shape() -> None:
-    """The regex matches the realistic spellings of the regression."""
     for snippet in (
         'self.output_dir = Path.cwd() / "benchmark_runs" / "datagen" / name',
         "output_dir = Path.cwd()/'benchmark_runs'/'datagen'",

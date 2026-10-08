@@ -1,5 +1,3 @@
-"""Fast regression checks for the checked-in tuned-template coverage matrix."""
-
 from __future__ import annotations
 
 from pathlib import Path

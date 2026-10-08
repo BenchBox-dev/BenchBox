@@ -22,50 +22,48 @@ SingleStore is deployed as both a fully managed cloud service (Helios) and as a 
 
 ## Quick Start
 
+The commands install the `singlestoredb` dependency (or the SingleStore extra), configure the connection (SingleStore
+must be running), and run the TPC-H benchmark.
+
 ```bash
-# Install singlestoredb dependency
 uv add singlestoredb
 
-# Or install via the SingleStore extra
 uv add benchbox --extra singlestore
 
-# Configure connection (SingleStore must be running)
 export SINGLESTORE_HOST=localhost
 export SINGLESTORE_PORT=3306
 export SINGLESTORE_USER=root
 export SINGLESTORE_PASSWORD=your_password
 
-# Run TPC-H benchmark
 benchbox run --platform singlestore --benchmark tpch --scale 0.01
 ```
 
 ### Docker Quick Start (Self-Managed)
 
+The commands start SingleStore with Docker, verify connectivity, and run the benchmark.
+
 ```bash
-# Start SingleStore with Docker
 docker run -d --name singlestoredb \
     -e ROOT_PASSWORD="your_password" \
     -p 3306:3306 \
     ghcr.io/singlestore-labs/singlestoredb-dev:latest
 
-# Verify connectivity
 mysql -h 127.0.0.1 -P 3306 -u root -p -e "SELECT @@memsql_version"
 
-# Run TPC-H benchmark
 benchbox run --platform singlestore --benchmark tpch --scale 0.01
 ```
 
 ### Helios (Cloud) Connection
 
+Set the Helios endpoint from your workspace connection string.
+
 ```bash
-# Set Helios endpoint from your workspace connection string
 export SINGLESTORE_HOST=xyz123.singlestore.com
 export SINGLESTORE_PORT=3306
 export SINGLESTORE_USER=admin
 export SINGLESTORE_PASSWORD=your_helios_password
 export SINGLESTORE_DATABASE=benchbox
 
-# Run TPC-H benchmark
 benchbox run --platform singlestore --benchmark tpch --scale 1
 ```
 
@@ -78,6 +76,17 @@ benchbox run --platform singlestore --benchmark tpch --scale 1
 | Username | `SINGLESTORE_USER` or `SINGLESTORE_USERNAME` | `root` | Database user |
 | Password | `SINGLESTORE_PASSWORD` | *(empty)* | Database password |
 | Database | `SINGLESTORE_DATABASE` | *(auto-generated)* | Target database |
+
+## Credential Validation
+
+`benchbox setup --platform singlestore` saves the entered connection settings
+even when validation fails. BenchBox marks those credentials invalid and reports
+the validation error so that you can correct the server or network problem and
+then retry without entering every value again:
+
+```bash
+benchbox setup --platform singlestore --validate-only
+```
 
 ## Columnstore Tables
 

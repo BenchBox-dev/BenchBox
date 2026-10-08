@@ -1,15 +1,6 @@
-"""Unit tests for QuestDB end-to-end TPC-H DDL enhancement.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Pins the composed _apply_questdb_schema_enhancements output for the two
-time-series tables: symbol mapping on low-cardinality columns, DATE to
-TIMESTAMP mapping, designated timestamp() marker, and PARTITION BY MONTH.
-Fixtures use representative column subsets rather than the full shipped
-TPC-H DDL; unit-level stages are covered elsewhere.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -26,7 +17,7 @@ pytestmark = [
 
 @pytest.fixture()
 def questdb_stubs(monkeypatch):
-    """Patch psycopg so tests don't require the real driver."""
+
     from unittest.mock import Mock
 
     mock_psycopg = Mock()

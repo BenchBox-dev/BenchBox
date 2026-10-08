@@ -1,18 +1,3 @@
-"""Characterization and cross-surface equivalence for BenchBox timing statistics.
-
-Before the `one-engine-unify-statistics` migration there were three
-implementations of the same summary statistics:
-
-- ``benchbox/core/results/metrics.py``     nearest-rank percentiles
-- ``benchbox/mcp/tools/analytics.py``      linear-interpolated percentiles
-- ``benchbox/cli/commands/aggregate.py``   median + ``statistics.quantiles``
-
-Geometric mean and standard deviation already agreed for the inputs each surface
-actually produces. Percentiles did not. The pre-migration values are pinned in
-:data:`SUPERSEDED_PERCENTILES` so the exact size of the change stays legible,
-and the surviving definition is pinned by the rest of this module.
-"""
-
 from __future__ import annotations
 
 import math
@@ -34,8 +19,7 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-# Shared fixtures. "tpch22" matters most: 22 queries is the real TPC-H shape and
-# the size at which the three implementations disagreed the hardest.
+
 FIXTURES: dict[str, list[float]] = {
     "tpch22": [12, 45, 8, 120, 33, 5, 67, 89, 15, 200, 42, 7, 310, 55, 23, 98, 140, 11, 76, 29, 64, 180],
     "even4": [10.0, 20.0, 30.0, 40.0],
@@ -44,7 +28,7 @@ FIXTURES: dict[str, list[float]] = {
     "uniform100": [float(i) for i in range(1, 101)],
 }
 
-# The canonical (nearest-rank) values this repository now reports everywhere.
+
 CANONICAL_PERCENTILES: dict[str, dict[str, float]] = {
     "tpch22": {"p50": 45.0, "p95": 200.0, "p99": 310.0},
     "even4": {"p50": 20.0, "p95": 40.0, "p99": 40.0},
@@ -53,8 +37,7 @@ CANONICAL_PERCENTILES: dict[str, dict[str, float]] = {
     "uniform100": {"p50": 50.0, "p95": 95.0, "p99": 99.0},
 }
 
-# What the two surface-local implementations reported before the migration.
-# Kept as documentation of the delta, not as a behavior anyone should restore.
+
 SUPERSEDED_PERCENTILES: dict[str, dict[str, dict[str, float]]] = {
     "tpch22": {
         "mcp": {"p50": 50.0, "p95": 199.0, "p99": 286.9},
@@ -80,7 +63,6 @@ SUPERSEDED_PERCENTILES: dict[str, dict[str, dict[str, float]]] = {
 
 
 def _superseded_mcp_percentile(data: list[float], p: float) -> float:
-    """The deleted MCP ``_percentile``: linear interpolation over ``(n-1) * p``."""
     if not data:
         return 0
     sorted_data = sorted(data)
@@ -93,7 +75,6 @@ def _superseded_mcp_percentile(data: list[float], p: float) -> float:
 
 
 def _superseded_cli_percentiles(times: list[float]) -> dict[str, float]:
-    """The deleted CLI ``_compute_query_statistics`` percentile choices."""
     return {
         "p50": statistics.median(times),
         "p95": statistics.quantiles(times, n=20)[18] if len(times) >= 20 else max(times),
@@ -102,8 +83,6 @@ def _superseded_cli_percentiles(times: list[float]) -> dict[str, float]:
 
 
 class TestSupersededImplementationsAreCharacterized:
-    """The recorded deltas must describe the code that was actually deleted."""
-
     @pytest.mark.parametrize("name", sorted(FIXTURES))
     def test_recorded_mcp_values_match_the_deleted_implementation(self, name: str):
         times = FIXTURES[name]
@@ -120,7 +99,6 @@ class TestSupersededImplementationsAreCharacterized:
         assert _superseded_cli_percentiles(times) == pytest.approx(recorded)
 
     def test_the_migration_actually_changed_something(self):
-        """A no-op delta table would make the rest of this module vacuous."""
         changed = [
             (name, surface, key)
             for name, surfaces in SUPERSEDED_PERCENTILES.items()
@@ -132,8 +110,6 @@ class TestSupersededImplementationsAreCharacterized:
 
 
 class TestCanonicalPercentile:
-    """One nearest-rank definition, used by every surface."""
-
     @pytest.mark.parametrize("name", sorted(FIXTURES))
     def test_matches_the_pinned_canonical_values(self, name: str):
         times = FIXTURES[name]
@@ -145,7 +121,6 @@ class TestCanonicalPercentile:
 
     @pytest.mark.parametrize("name", sorted(FIXTURES))
     def test_always_returns_an_observed_measurement(self, name: str):
-        """Nearest-rank never invents a duration no query took."""
         times = FIXTURES[name]
 
         for p in (0.0, 0.5, 0.9, 0.95, 0.99, 1.0):
@@ -162,17 +137,10 @@ class TestCanonicalPercentile:
 
     @pytest.mark.parametrize("p", [95, 50, 99, 100, 1.01, -0.01, -1])
     def test_out_of_range_percentile_is_rejected_not_clamped(self, p: float):
-        """The deleted implementations took p on a 0-100 scale.
-
-        Clamping `percentile_ms(times, 95)` would silently return max(times)
-        and label it a p95, which is the exact porting mistake this migration
-        makes easy to write.
-        """
         with pytest.raises(ValueError, match=r"\[0, 1\]"):
             percentile_ms([10.0, 20.0, 30.0], p)
 
     def test_the_range_guard_runs_before_the_empty_shortcut(self):
-        """An empty sequence must not mask a bad percentile argument."""
         with pytest.raises(ValueError):
             percentile_ms([], 95)
 
@@ -194,7 +162,6 @@ class TestCanonicalGeometricMean:
         assert geometric_mean_ms(times) == pytest.approx(statistics.geometric_mean(times))
 
     def test_non_positive_values_are_excluded_not_fatal(self):
-        """The deleted MCP copy divided by len(all) and the CLI copy returned 0."""
         times = [0.0, 10.0, 40.0]
         superseded_mcp = math.exp(sum(math.log(t) for t in times if t > 0) / len(times))
 
@@ -238,7 +205,6 @@ class TestNamedMetricVocabulary:
         assert calculate_named_metric(times, "total_time") == sum(times)
 
     def test_unknown_metric_falls_back_to_the_arithmetic_mean(self):
-        """Preserved from the deleted MCP ``_calculate_metric`` else-branch."""
         times = FIXTURES["tpch22"]
 
         assert calculate_named_metric(times, "not_a_metric") == pytest.approx(statistics.mean(times))
@@ -248,8 +214,6 @@ class TestNamedMetricVocabulary:
 
 
 class TestResultBundleStatisticsAreUnchanged:
-    """TimingStatsCalculator feeds published bundles and must not drift."""
-
     @pytest.mark.parametrize("name", sorted(FIXTURES))
     def test_bundle_percentiles_still_use_the_canonical_definition(self, name: str):
         times = FIXTURES[name]

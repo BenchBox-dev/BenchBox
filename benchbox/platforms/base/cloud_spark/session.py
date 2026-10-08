@@ -1,34 +1,6 @@
-"""Cloud Spark session management for managed Spark platforms.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides unified session lifecycle management across cloud Spark platforms:
-- AWS EMR, EMR Serverless, Glue
-- GCP Dataproc, Dataproc Serverless
-- Azure Synapse Spark, Fabric Spark
-- Databricks (uses Databricks Connect)
-
-Session Protocols:
-- Livy REST API (EMR, Dataproc, Synapse)
-- Spark Connect (newer platforms, Databricks)
-- Native SDK (Glue, Serverless platforms)
-
-Usage:
-    from benchbox.platforms.base.cloud_spark import CloudSparkSessionManager
-
-    # Create session manager for EMR
-    manager = CloudSparkSessionManager.for_emr(
-        cluster_id="j-XXXXXXXXXXXXX",
-        region="us-east-1",
-    )
-
-    # Create session and run query
-    with manager.session() as spark:
-        result = spark.sql("SELECT * FROM lineitem LIMIT 10")
-        emit(result.collect())
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -51,17 +23,13 @@ logger = logging.getLogger(__name__)
 
 
 class SessionProtocol(Enum):
-    """Supported session protocols for remote Spark."""
-
-    LIVY = "livy"  # Livy REST API (EMR, Dataproc, Synapse)
-    SPARK_CONNECT = "spark_connect"  # Spark Connect protocol
-    DATABRICKS_CONNECT = "databricks_connect"  # Databricks Connect
-    NATIVE_SDK = "native_sdk"  # Platform-native SDK (Glue, Serverless)
+    LIVY = "livy"
+    SPARK_CONNECT = "spark_connect"
+    DATABRICKS_CONNECT = "databricks_connect"
+    NATIVE_SDK = "native_sdk"
 
 
 class SessionState(Enum):
-    """Session lifecycle states."""
-
     NOT_STARTED = "not_started"
     STARTING = "starting"
     IDLE = "idle"
@@ -73,41 +41,31 @@ class SessionState(Enum):
 
 @dataclass
 class SessionConfig:
-    """Configuration for cloud Spark sessions."""
-
-    # Connection settings
     protocol: SessionProtocol
-    endpoint: str  # API endpoint or cluster address
+    endpoint: str
     port: int = 443
 
-    # Authentication
     credentials: dict[str, Any] = field(default_factory=dict)
 
-    # Session settings
     session_name: str = "benchbox-session"
     spark_version: str | None = None
     driver_memory: str = "4g"
     executor_memory: str = "4g"
     executor_cores: int = 2
-    num_executors: int | None = None  # None = auto-scale
+    num_executors: int | None = None
 
-    # Spark configuration
     spark_conf: dict[str, str] = field(default_factory=dict)
 
-    # Timeouts
-    session_start_timeout: int = 300  # seconds
-    statement_timeout: int = 3600  # 1 hour default
-    idle_timeout: int = 600  # 10 minutes
+    session_start_timeout: int = 300
+    statement_timeout: int = 3600
+    idle_timeout: int = 600
 
-    # Cost tracking
     track_cost: bool = True
-    cost_unit: str = "DBU"  # DBU, CU, slot-hours, etc.
+    cost_unit: str = "DBU"
 
 
 @dataclass
 class SessionMetrics:
-    """Metrics collected during session lifecycle."""
-
     session_id: str | None = None
     start_time: float | None = None
     end_time: float | None = None
@@ -118,31 +76,18 @@ class SessionMetrics:
 
     @property
     def duration_seconds(self) -> float:
-        """Calculate session duration in seconds."""
         if self.start_time is None:
             return 0.0
         end = self.end_time or mono_time()
         elapsed = elapsed_seconds(self.start_time, end)
         if elapsed >= 0:
             return elapsed
-        # Backward-compatible fallback for legacy wall-clock start/end values.
         wall_end = self.end_time or time.time()
         return max(0.0, wall_end - self.start_time)
 
 
 class CloudSparkSessionManager(ABC):
-    """Abstract base class for cloud Spark session management.
-
-    Provides a unified interface for creating and managing Spark sessions
-    across different cloud platforms and protocols.
-    """
-
     def __init__(self, config: SessionConfig) -> None:
-        """Initialize session manager.
-
-        Args:
-            config: Session configuration
-        """
         self.config = config
         self._session: Any = None
         self._state = SessionState.NOT_STARTED
@@ -156,16 +101,6 @@ class CloudSparkSessionManager(ABC):
         region: str = "us-east-1",
         **kwargs: Any,
     ) -> CloudSparkSessionManager:
-        """Create session manager for AWS EMR.
-
-        Args:
-            cluster_id: EMR cluster ID (j-XXXXXXXXXXXXX)
-            region: AWS region
-            **kwargs: Additional configuration
-
-        Returns:
-            EMR session manager
-        """
         config = SessionConfig(
             protocol=SessionProtocol.LIVY,
             endpoint=f"https://{cluster_id}.emr.{region}.amazonaws.com",
@@ -182,17 +117,6 @@ class CloudSparkSessionManager(ABC):
         cluster_name: str,
         **kwargs: Any,
     ) -> CloudSparkSessionManager:
-        """Create session manager for GCP Dataproc.
-
-        Args:
-            project_id: GCP project ID
-            region: GCP region
-            cluster_name: Dataproc cluster name
-            **kwargs: Additional configuration
-
-        Returns:
-            Dataproc session manager
-        """
         config = SessionConfig(
             protocol=SessionProtocol.LIVY,
             endpoint=f"https://{cluster_name}-m.{region}.c.{project_id}.internal:8998",
@@ -208,16 +132,6 @@ class CloudSparkSessionManager(ABC):
         spark_pool_name: str,
         **kwargs: Any,
     ) -> CloudSparkSessionManager:
-        """Create session manager for Azure Synapse Spark.
-
-        Args:
-            workspace_name: Synapse workspace name
-            spark_pool_name: Spark pool name
-            **kwargs: Additional configuration
-
-        Returns:
-            Synapse session manager
-        """
         config = SessionConfig(
             protocol=SessionProtocol.LIVY,
             endpoint=f"https://{workspace_name}.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/{spark_pool_name}",
@@ -233,17 +147,6 @@ class CloudSparkSessionManager(ABC):
         token: str,
         **kwargs: Any,
     ) -> CloudSparkSessionManager:
-        """Create session manager for Databricks Connect.
-
-        Args:
-            host: Databricks workspace URL
-            cluster_id: Cluster ID
-            token: Access token
-            **kwargs: Additional configuration
-
-        Returns:
-            Databricks Connect session manager
-        """
         config = SessionConfig(
             protocol=SessionProtocol.DATABRICKS_CONNECT,
             endpoint=host,
@@ -254,69 +157,38 @@ class CloudSparkSessionManager(ABC):
 
     @property
     def state(self) -> SessionState:
-        """Get current session state."""
         return self._state
 
     @property
     def metrics(self) -> SessionMetrics:
-        """Get session metrics."""
         return self._metrics
 
     @property
     def is_active(self) -> bool:
-        """Check if session is active and usable."""
         return self._state in (SessionState.IDLE, SessionState.BUSY)
 
     @abstractmethod
     def create_session(self) -> Any:
-        """Create a new Spark session.
-
-        Returns:
-            SparkSession or equivalent object
-        """
+        pass
 
     @abstractmethod
     def get_session(self) -> Any:
-        """Get or create the Spark session.
-
-        Returns:
-            SparkSession or equivalent object
-        """
+        pass
 
     @abstractmethod
     def close_session(self) -> None:
-        """Close the Spark session and release resources."""
+        pass
 
     @abstractmethod
     def execute_statement(self, code: str) -> dict[str, Any]:
-        """Execute a code statement in the session.
-
-        Args:
-            code: Python or SQL code to execute
-
-        Returns:
-            Execution result with output and status
-        """
+        pass
 
     @abstractmethod
     def get_session_info(self) -> dict[str, Any]:
-        """Get session information and status.
-
-        Returns:
-            Session info including state, resources, etc.
-        """
+        pass
 
     @contextmanager
     def session(self) -> Iterator[Any]:
-        """Context manager for session lifecycle.
-
-        Yields:
-            SparkSession or equivalent object
-
-        Example:
-            with manager.session() as spark:
-                result = spark.sql("SELECT * FROM table")
-        """
         try:
             spark = self.get_session()
             self._metrics.start_time = mono_time()
@@ -327,15 +199,12 @@ class CloudSparkSessionManager(ABC):
 
 
 class LivySessionManager(CloudSparkSessionManager):
-    """Livy REST API session manager for EMR, Dataproc, Synapse."""
-
     def __init__(self, config: SessionConfig) -> None:
         super().__init__(config)
         self._session_id: int | None = None
         self._http_client: Any = None
 
     def _get_http_client(self) -> Any:
-        """Get or create HTTP client for Livy API."""
         if self._http_client is None:
             try:
                 import requests
@@ -350,16 +219,6 @@ class LivySessionManager(CloudSparkSessionManager):
         path: str,
         json: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Make a request to Livy API.
-
-        Args:
-            method: HTTP method
-            path: API path
-            json: Request body
-
-        Returns:
-            Response JSON
-        """
         client = self._get_http_client()
         url = f"{self.config.endpoint}{path}"
 
@@ -371,11 +230,9 @@ class LivySessionManager(CloudSparkSessionManager):
         return response.json()
 
     def create_session(self) -> Any:
-        """Create a new Livy session."""
         self._state = SessionState.STARTING
         self._logger.info("Creating Livy session...")
 
-        # Build session config
         session_conf = {
             "kind": "pyspark",
             "name": self.config.session_name,
@@ -390,12 +247,10 @@ class LivySessionManager(CloudSparkSessionManager):
         if self.config.spark_conf:
             session_conf["conf"] = self.config.spark_conf
 
-        # Create session
         response = self._livy_request("POST", "/sessions", json=session_conf)
         self._session_id = response["id"]
         self._metrics.session_id = str(self._session_id)
 
-        # Wait for session to be ready
         self._wait_for_session_ready()
 
         self._state = SessionState.IDLE
@@ -404,7 +259,6 @@ class LivySessionManager(CloudSparkSessionManager):
         return self._session_id
 
     def _wait_for_session_ready(self) -> None:
-        """Wait for Livy session to reach idle state."""
         start = mono_time()
         timeout = self.config.session_start_timeout
 
@@ -422,13 +276,11 @@ class LivySessionManager(CloudSparkSessionManager):
         raise TimeoutError(f"Session start timeout after {timeout}s")
 
     def get_session(self) -> Any:
-        """Get or create Livy session."""
         if self._session_id is None:
             self.create_session()
         return self._session_id
 
     def close_session(self) -> None:
-        """Close Livy session."""
         if self._session_id is not None:
             self._state = SessionState.SHUTTING_DOWN
             try:
@@ -441,13 +293,11 @@ class LivySessionManager(CloudSparkSessionManager):
                 self._state = SessionState.DEAD
 
     def execute_statement(self, code: str) -> dict[str, Any]:
-        """Execute code in Livy session."""
         if self._session_id is None:
             raise RuntimeError("No active session")
 
         self._state = SessionState.BUSY
 
-        # Submit statement
         response = self._livy_request(
             "POST",
             f"/sessions/{self._session_id}/statements",
@@ -455,7 +305,6 @@ class LivySessionManager(CloudSparkSessionManager):
         )
         statement_id = response["id"]
 
-        # Wait for completion
         result = self._wait_for_statement(statement_id)
 
         self._metrics.statements_executed += 1
@@ -464,7 +313,6 @@ class LivySessionManager(CloudSparkSessionManager):
         return result
 
     def _wait_for_statement(self, statement_id: int) -> dict[str, Any]:
-        """Wait for statement execution to complete."""
         start = mono_time()
         timeout = self.config.statement_timeout
 
@@ -485,21 +333,17 @@ class LivySessionManager(CloudSparkSessionManager):
         raise TimeoutError(f"Statement timeout after {timeout}s")
 
     def get_session_info(self) -> dict[str, Any]:
-        """Get Livy session information."""
         if self._session_id is None:
             return {"state": "not_started"}
         return self._livy_request("GET", f"/sessions/{self._session_id}")
 
 
 class DatabricksConnectSessionManager(CloudSparkSessionManager):
-    """Databricks Connect session manager."""
-
     def __init__(self, config: SessionConfig) -> None:
         super().__init__(config)
         self._spark: Any = None
 
     def create_session(self) -> SparkSession:
-        """Create Databricks Connect session."""
         try:
             from databricks.connect import DatabricksSession
         except ImportError as e:
@@ -525,13 +369,11 @@ class DatabricksConnectSessionManager(CloudSparkSessionManager):
         return self._spark
 
     def get_session(self) -> SparkSession:
-        """Get or create Databricks Connect session."""
         if self._spark is None:
             self.create_session()
         return self._spark
 
     def close_session(self) -> None:
-        """Close Databricks Connect session."""
         if self._spark is not None:
             self._state = SessionState.SHUTTING_DOWN
             try:
@@ -545,27 +387,11 @@ class DatabricksConnectSessionManager(CloudSparkSessionManager):
                 self._metrics.end_time = mono_time()
 
     def execute_statement(self, code: str) -> dict[str, Any]:
-        """Execute SQL code in Databricks Connect session.
-
-        Args:
-            code: SQL statement to execute (SELECT, CREATE, INSERT, DROP, ALTER, USE, SHOW, DESCRIBE).
-
-        Returns:
-            Dict with execution results.
-
-        Raises:
-            RuntimeError: If no active session or if code is not valid SQL.
-
-        Note:
-            Only SQL execution is supported for security reasons.
-            Arbitrary Python code execution is not permitted.
-        """
         if self._spark is None:
             raise RuntimeError("No active session")
 
         self._state = SessionState.BUSY
 
-        # Only allow SQL execution for security - no arbitrary code execution
         sql_prefixes = (
             "SELECT",
             "CREATE",
@@ -599,7 +425,6 @@ class DatabricksConnectSessionManager(CloudSparkSessionManager):
         return output
 
     def get_session_info(self) -> dict[str, Any]:
-        """Get Databricks Connect session information."""
         if self._spark is None:
             return {"state": "not_started"}
 

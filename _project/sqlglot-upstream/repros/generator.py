@@ -1,5 +1,3 @@
-"""Deterministic, bounded SQLGlot translation-fuzzing pilot."""
-
 from __future__ import annotations
 
 import argparse
@@ -12,14 +10,14 @@ from typing import Any, cast
 try:
     from benchbox.utils.clock import elapsed_seconds, mono_time
     from benchbox.utils.dialect_utils import SQLTranslationError, translate_sql_query
-except Exception as import_error:  # pragma: no cover - exercised by isolated CLI smoke checks
+except Exception as import_error:  # pragma: no cover
     print(f"generator infrastructure import error: {type(import_error).__name__}: {import_error}", file=sys.stderr)
     raise SystemExit(2) from import_error
 
 try:
     import sqlglot as _sqlglot
     from sqlglot.errors import ParseError
-except Exception as import_error:  # pragma: no cover - exercised by isolated CLI smoke checks
+except Exception as import_error:  # pragma: no cover
     print(f"generator SQLGlot import error: {type(import_error).__name__}: {import_error}", file=sys.stderr)
     raise SystemExit(2) from import_error
 else:
@@ -36,8 +34,10 @@ REPLAY_COMMAND_TEMPLATE = (
 )
 
 
+CLI_DESCRIPTION = "Deterministic, bounded SQLGlot translation-fuzzing pilot."
+
+
 def _case_sql(rng: random.Random) -> str:
-    """Produce a diverse query from a portable, deterministic grammar."""
     table = rng.choice(("orders", "customers", "events", "lineitem", "products", "accounts"))
     column = rng.choice(("id", "amount", "created_at", "quantity", "status", "name"))
     projection = rng.choice(
@@ -68,7 +68,6 @@ def _case_sql(rng: random.Random) -> str:
 
 
 def generate_case(seed: int, index: int) -> tuple[int, str]:
-    """Return the deterministic per-case seed and SQL for a campaign seed."""
     case_seed = seed + index
     return case_seed, _case_sql(random.Random(case_seed))
 
@@ -78,7 +77,6 @@ def _error(exc: BaseException) -> str:
 
 
 def run_shape(sql: str, source: str, target: str) -> dict[str, Any]:
-    """Translate and parse one shape, retaining a replayable failure signature."""
     result: dict[str, Any] = {
         "source_dialect": source,
         "target_dialect": target,
@@ -100,7 +98,6 @@ def run_shape(sql: str, source: str, target: str) -> dict[str, Any]:
 
 
 def evaluate(sql: str, source: str, target: str) -> dict[str, dict[str, Any]]:
-    """Always exercise both wrapper call shapes, even if the first one fails."""
     return {SHAPES[0]: run_shape(sql, target, target), SHAPES[1]: run_shape(sql, "postgres", target)}
 
 
@@ -138,7 +135,6 @@ def shrink(
     deadline_started: float | None = None,
     deadline_seconds: float | None = None,
 ) -> str:
-    """Minimize while preserving the exact two-shape outcome and bounded runtime."""
     baseline = evaluate(sql, source, target)
     if failing_shapes != {name for name in SHAPES if baseline[name]["status"] == "fail"}:
         raise ValueError("failing_shapes disagrees with the baseline outcome")
@@ -260,7 +256,6 @@ def _validate_failure_payload(data: object, args: argparse.Namespace) -> tuple[l
 
 
 def _validate_advisory_evidence(failure_path: Path, summary_path: Path, args: argparse.Namespace) -> None:
-    """Ensure nightly may safely downgrade only a fully recorded discovery."""
     failure = json.loads(failure_path.read_text(encoding="utf-8"))
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     _validate_failure_payload(failure, args)
@@ -316,7 +311,7 @@ def _load_replay(path: Path, args: argparse.Namespace) -> tuple[int, dict[str, A
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--source-dialect", required=True)
     parser.add_argument("--target-dialect", required=True)

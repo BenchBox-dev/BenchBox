@@ -23,34 +23,32 @@ QuestDB is designed for time-series and event-driven workloads, with features li
 
 ## Quick Start
 
+The commands install the `psycopg2` dependency (or the QuestDB extra), configure the connection (QuestDB must be
+running), and run the TPC-H benchmark.
+
 ```bash
-# Install psycopg2 dependency
 uv add psycopg2-binary
 
-# Or install via the QuestDB extra
 uv add benchbox --extra questdb
 
-# Configure connection (QuestDB must be running)
 export QUESTDB_HOST=localhost
 
-# Run TPC-H benchmark
 benchbox run --platform questdb --benchmark tpch --scale 0.01
 ```
 
 ### Docker Quick Start
 
+The commands start QuestDB with Docker (all ports exposed), verify PG wire protocol connectivity, verify the REST
+API, and run the benchmark.
+
 ```bash
-# Start QuestDB with Docker (all ports exposed)
 docker run -p 9000:9000 -p 8812:8812 -p 9009:9009 -p 9003:9003 \
     questdb/questdb:latest
 
-# Verify PG wire protocol connectivity
 psql -h 127.0.0.1 -p 8812 -U admin -d qdb -c "SELECT 1"
 
-# Verify REST API
 curl http://localhost:9000/exec?query=SELECT%201
 
-# Run benchmark
 benchbox run --platform questdb --benchmark tpch --scale 0.01
 ```
 
@@ -121,14 +119,13 @@ QuestDB also supports the InfluxDB Line Protocol on port 9009 for high-throughpu
 
 ### Basic Benchmarks
 
+The commands run TPC-H at scale factor 0.01 (a quick test), at scale factor 1, and for specific queries only.
+
 ```bash
-# TPC-H at scale factor 0.01 (quick test)
 benchbox run --platform questdb --benchmark tpch --scale 0.01
 
-# TPC-H at scale factor 1
 benchbox run --platform questdb --benchmark tpch --scale 1.0
 
-# Run specific queries only
 benchbox run --platform questdb --benchmark tpch --queries Q1,Q6,Q17
 ```
 
@@ -163,8 +160,9 @@ benchbox run --platform questdb --benchmark tpch --scale 1.0 \
 
 ### Dry Run (Preview)
 
+This previews the execution plan without running it.
+
 ```bash
-# Preview execution plan without running
 benchbox run --platform questdb --benchmark tpch --scale 1.0 --dry-run ./preview
 ```
 

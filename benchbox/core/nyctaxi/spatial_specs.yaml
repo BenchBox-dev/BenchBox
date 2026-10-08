@@ -189,7 +189,7 @@ spatial_queries:
       requires:
       - spatial
       sql: "\n            WITH airport_zones AS (\n                SELECT location_id, zone, centroid_lon, centroid_lat\n                FROM\
-        \ taxi_zones_spatial\n                WHERE location_id IN (1, 132, 138)  -- EWR, JFK, LGA\n            )\n            SELECT\n      \
+        \ taxi_zones_spatial\n                WHERE location_id IN (1, 132, 138)\n            )\n            SELECT\n      \
         \          a.zone as airport,\n                z.borough as origin_borough,\n                COUNT(*) as trip_count,\n               \
         \ AVG(t.trip_distance) as avg_trip_miles,\n                AVG(ST_Distance(\n                    ST_Point(z.centroid_lon, z.centroid_lat),\n\
         \                    ST_Point(a.centroid_lon, a.centroid_lat)\n                ) * 111.32) as avg_straight_line_km,\n                AVG(t.total_amount)\

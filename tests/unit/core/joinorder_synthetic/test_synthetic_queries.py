@@ -1,9 +1,3 @@
-"""Tests for the synthetic JoinOrder query manager's merged 113-query surface.
-
-Covers the embedded/canonical merge, custom-directory replacement semantics,
-and classification of the full exposed query set.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -85,8 +79,6 @@ class TestCustomDirectoryReplacement:
 
 
 class TestCanonicalIdentity:
-    """The synthetic surface is the canonical JOB set, verbatim (F2)."""
-
     def test_default_surface_matches_canonical_text(self):
         from benchbox.core.joinorder.queries import JoinOrderQueryManager as CanonicalManager
 
@@ -95,7 +87,6 @@ class TestCanonicalIdentity:
         assert manager.get_all_queries() == canonical.get_all_queries()
 
     def test_historical_10a_collision_is_gone(self):
-        """10a is the canonical Russian-actor variant, not a copy of 10c."""
         manager = JoinOrderQueryManager()
         sql_10a = manager.get_query("10a")
         sql_10c = manager.get_query("10c")
@@ -122,8 +113,6 @@ class TestCanonicalIdentity:
 
 
 class TestScalarVacuityGuard:
-    """All-NULL scalar rows count as vacuous, never as coverage (F1)."""
-
     def test_report_fails_on_unclassified_vacuous_query(self):
         from benchbox.core.equivalence.cross_surface import _report
 

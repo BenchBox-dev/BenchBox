@@ -75,7 +75,6 @@ describe("CompareSummary", () => {
     const summaryRegion = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
     expect(summaryRegion).not.toBeNull();
     expect(summaryRegion).toHaveTextContent("In these selected runs, DuckDB's power score was 10.00x better than the lowest selected run.");
-    // The card label names the run and the question; the value is the count.
     expect(summaryRegion).toHaveTextContent("Where DuckDB wins");
     expect(summaryRegion).toHaveTextContent("2 of 2 queries");
     expect(summaryRegion).toHaveTextContent("p50");
@@ -111,15 +110,6 @@ describe("CompareSummary", () => {
     expect(summaryRegion).toHaveTextContent("Review the individual query measurements below");
   });
 
-  // -----------------------------------------------------------------------
-  // Live reproduction: DuckDB (validated) vs Pandas (validation_status
-  // "not_run") at H2ODB SF0.01. The headline used to claim a confident
-  // winner off an unvalidated candidate with no visible caveat. It must now
-  // carry the caveat in the headline itself, plus a distinct warning badge
-  // and callout - a reader who only sees the headline must not conclude the
-  // comparison rests on validated data.
-  // -----------------------------------------------------------------------
-
   it("caveats the winner claim when one selected candidate is unvalidated (not_run)", () => {
     const summary = buildCompareDecisionSummary(
       [
@@ -139,10 +129,8 @@ describe("CompareSummary", () => {
       "power_score",
     );
 
-    // The winner claim is not suppressed by this gap alone...
     expect(summary.claimSuppressed).toBe(false);
     expect(summary.winner?.platform).toBe("DuckDB");
-    // ...but the headline itself must not read as a clean, confident claim.
     expect(summary.headline).toContain("DuckDB's power score was");
     expect(summary.headline).toContain("Validation caution");
     expect(summary.headline).toContain("Pandas is no validation");

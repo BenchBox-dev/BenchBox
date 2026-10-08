@@ -1,23 +1,12 @@
 #!/usr/bin/env python3
-"""
-Pandas DataFrame TPC-H Benchmark Example
-
-Demonstrates running TPC-H queries using Pandas' native DataFrame API.
-This uses the Pandas family implementation with eager evaluation.
-
-Copyright 2026 Joe Harris / BenchBox Project.
-Licensed under the MIT License.
-
-Usage:
-    python examples/dataframe/pandas_tpch.py
-"""
+# Copyright 2026 Joe Harris / BenchBox Project.
+# Licensed under the MIT License.
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
-# Ensure pandas is available
 try:
     import pandas as pd
 
@@ -28,7 +17,6 @@ except ImportError:
 
 
 def main() -> int:
-    """Run Pandas DataFrame TPC-H benchmark demonstration."""
     from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES, get_query
     from benchbox.platforms import get_dataframe_adapter
 
@@ -36,14 +24,12 @@ def main() -> int:
     print("Pandas DataFrame TPC-H Benchmark")
     print("=" * 60)
 
-    # Show registered queries
     print("\nRegistered TPC-H queries:")
     for qid in TPCH_DATAFRAME_QUERIES.get_query_ids()[:5]:
         query = TPCH_DATAFRAME_QUERIES.get(qid)
         print(f"  {qid}: {query.query_name}")
     print(f"  ... and {len(TPCH_DATAFRAME_QUERIES) - 5} more")
 
-    # Check data availability
     data_dir = Path("benchmark_runs/tpch/sf0.01/data")
     if not data_dir.exists():
         print(f"\nWarning: Data directory not found: {data_dir}")
@@ -52,11 +38,9 @@ def main() -> int:
         print("\nSkipping query execution, showing structure only.")
         return 0
 
-    # Create context with Pandas DataFrame
     print("\nCreating Pandas DataFrame context...")
     ctx = get_dataframe_adapter("pandas-df", working_dir=str(data_dir)).create_context()
 
-    # Load tables from Parquet
     parquet_dir = data_dir / "parquet"
     if parquet_dir.exists():
         print(f"Loading tables from {parquet_dir}...")
@@ -64,7 +48,6 @@ def main() -> int:
         for table in tables:
             table_path = parquet_dir / f"{table}.parquet"
             if table_path.exists():
-                # Load eagerly into memory
                 df = pd.read_parquet(str(table_path))
                 ctx.register_table(table, df)
                 print(f"  Loaded {table}: {len(df):,} rows")
@@ -72,7 +55,6 @@ def main() -> int:
         print(f"Parquet directory not found: {parquet_dir}")
         return 1
 
-    # Execute sample queries
     print("\n" + "-" * 60)
     print("Executing Sample Queries")
     print("-" * 60)
@@ -89,7 +71,6 @@ def main() -> int:
         print(f"  Description: {query.description}")
 
         try:
-            # Execute pandas family implementation
             result = query.execute(ctx, "pandas")
 
             print(f"  Result shape: {result.shape}")

@@ -131,25 +131,15 @@ def test_execute_version_compare_not_implemented_branch(monkeypatch, tmp_path):
     assert "not implemented for table format" in (result.error_message or "")
 
 
-# ---------------------------------------------------------------------------
-# TransactionOperationType enum iteration
-# ---------------------------------------------------------------------------
-
-
 def test_all_transaction_operation_types_enumerable():
     from benchbox.core.transaction_primitives.dataframe_operations import TransactionOperationType
 
     ops = list(TransactionOperationType)
     assert len(ops) == 12
-    # Spot-check a few values
+
     assert TransactionOperationType.ATOMIC_INSERT in ops
     assert TransactionOperationType.ROLLBACK_TO_VERSION in ops
     assert TransactionOperationType.SNAPSHOT_ISOLATION in ops
-
-
-# ---------------------------------------------------------------------------
-# DataFrameTransactionCapabilities.supports_operation
-# ---------------------------------------------------------------------------
 
 
 def _full_caps(**overrides):
@@ -212,21 +202,14 @@ def test_supports_operation_snapshot_isolation_requires_snapshot():
 def test_get_unsupported_operations_returns_complement():
     from benchbox.core.transaction_primitives.dataframe_operations import TransactionOperationType
 
-    # All supported → unsupported list should be empty
     full_caps = _full_caps()
     unsupported = full_caps.get_unsupported_operations()
     assert unsupported == []
 
-    # None supported → all ops unsupported
     no_caps = DataFrameTransactionCapabilities(platform_name="none")
     unsupported_all = no_caps.get_unsupported_operations()
     all_ops = set(TransactionOperationType)
     assert set(unsupported_all) == all_ops
-
-
-# ---------------------------------------------------------------------------
-# DataFrameTransactionResult.failure factory
-# ---------------------------------------------------------------------------
 
 
 def test_transaction_result_failure_factory():
@@ -256,7 +239,7 @@ def test_transaction_result_failure_with_start_time():
         TransactionOperationType,
     )
 
-    start = _time.time() - 1.0  # 1 second ago
+    start = _time.time() - 1.0
     result = DataFrameTransactionResult.failure(
         TransactionOperationType.CONCURRENT_WRITE,
         "conflict",
@@ -265,11 +248,6 @@ def test_transaction_result_failure_with_start_time():
 
     assert result.duration_ms > 0
     assert result.start_time == start
-
-
-# ---------------------------------------------------------------------------
-# _build_capabilities branch coverage
-# ---------------------------------------------------------------------------
 
 
 def test_build_capabilities_pyspark_without_delta(monkeypatch):
@@ -317,11 +295,6 @@ def test_build_capabilities_unknown_no_maintenance(monkeypatch):
     assert manager.get_capabilities().supports_transactions is False
 
 
-# ---------------------------------------------------------------------------
-# supports_transactions, supports_operation, get_unsupported_message
-# ---------------------------------------------------------------------------
-
-
 def test_manager_supports_transactions(monkeypatch):
     caps = SimpleNamespace(
         supports_transactions=True, supports_time_travel=True, transaction_isolation=TransactionIsolation.SNAPSHOT
@@ -345,11 +318,6 @@ def test_manager_get_unsupported_message(monkeypatch):
     assert "Transaction Primitives" in msg
 
 
-# ---------------------------------------------------------------------------
-# _validate_path_safe path traversal
-# ---------------------------------------------------------------------------
-
-
 def test_validate_path_safe_rejects_traversal():
     manager = DataFrameTransactionOperationsManager("delta-lake")
     resolved, err = manager._validate_path_safe("/data/../etc/passwd")
@@ -364,13 +332,7 @@ def test_validate_path_safe_accepts_normal_path():
     assert err == ""
 
 
-# ---------------------------------------------------------------------------
-# Helper fixture for delta-capable manager
-# ---------------------------------------------------------------------------
-
-
 def _delta_manager(monkeypatch=None) -> DataFrameTransactionOperationsManager:
-    """Manager with full Delta Lake capabilities and fake maintenance ops."""
     manager = DataFrameTransactionOperationsManager("delta-lake")
     manager._capabilities = DELTA_LAKE_TRANSACTION_CAPABILITIES
     caps = SimpleNamespace(
@@ -382,13 +344,7 @@ def _delta_manager(monkeypatch=None) -> DataFrameTransactionOperationsManager:
     return manager
 
 
-# ---------------------------------------------------------------------------
-# _get_maintenance_ops - pyspark branch (lines 344-355)
-# ---------------------------------------------------------------------------
-
-
 def test_get_maintenance_ops_pyspark_with_spark_session(monkeypatch):
-    """pyspark platform with spark_session triggers local import (lines 344-355)."""
     mock_get = MagicMock(return_value=None)
     monkeypatch.setattr(
         "benchbox.core.transaction_primitives.dataframe_operations.get_maintenance_operations_for_platform",
@@ -399,23 +355,16 @@ def test_get_maintenance_ops_pyspark_with_spark_session(monkeypatch):
     mock_pyspark_module.get_pyspark_maintenance_operations.return_value = MagicMock()
 
     manager = DataFrameTransactionOperationsManager("pyspark-df", spark_session=MagicMock())
-    # Just verify it didn't blow up - local import path was exercised
+
     assert manager is not None
 
 
 def test_get_maintenance_ops_pyspark_no_spark_session():
-    """pyspark platform without spark_session returns None."""
     manager = DataFrameTransactionOperationsManager("pyspark-df", spark_session=None)
     assert manager._maintenance_ops is None
 
 
-# ---------------------------------------------------------------------------
-# validate_table_format - additional branches
-# ---------------------------------------------------------------------------
-
-
 def test_validate_table_format_delta_lake(tmp_path):
-    """Delta table (has _delta_log dir) returns True."""
     table = tmp_path / "delta_tbl"
     (table / "_delta_log").mkdir(parents=True)
     manager = DataFrameTransactionOperationsManager("delta-lake")
@@ -425,7 +374,6 @@ def test_validate_table_format_delta_lake(tmp_path):
 
 
 def test_validate_table_format_existing_non_transactional(tmp_path):
-    """Directory exists but has no delta/iceberg markers → returns False with message (lines 518+)."""
     table = tmp_path / "plain_dir"
     table.mkdir()
     manager = DataFrameTransactionOperationsManager("delta-lake")
@@ -435,20 +383,13 @@ def test_validate_table_format_existing_non_transactional(tmp_path):
 
 
 def test_validate_table_format_nonexistent_path():
-    """Non-existent path returns False with 'does not exist' message."""
     manager = DataFrameTransactionOperationsManager("delta-lake")
     is_valid, msg = manager.validate_table_format("/tmp/nonexistent_benchbox_xyz123")
     assert is_valid is False
     assert "does not exist" in msg
 
 
-# ---------------------------------------------------------------------------
-# get_table_version - delta-rs branch (lines 551-562)
-# ---------------------------------------------------------------------------
-
-
 def test_get_table_version_delta_rs(tmp_path):
-    """delta-rs path: DeltaTable(path).version() called."""
     manager = DataFrameTransactionOperationsManager("delta-lake")
     manager._capabilities = DELTA_LAKE_TRANSACTION_CAPABILITIES
 
@@ -464,7 +405,6 @@ def test_get_table_version_delta_rs(tmp_path):
 
 
 def test_get_table_version_exception_returns_none(tmp_path):
-    """Exception in version retrieval returns None (warning logged)."""
     manager = DataFrameTransactionOperationsManager("delta-lake")
     manager._capabilities = DELTA_LAKE_TRANSACTION_CAPABILITIES
 
@@ -478,15 +418,9 @@ def test_get_table_version_exception_returns_none(tmp_path):
 
 
 def test_get_table_version_iceberg_returns_none(tmp_path):
-    """Iceberg format returns None (not yet implemented)."""
     manager = DataFrameTransactionOperationsManager("iceberg")
     version = manager.get_table_version(tmp_path)
     assert version is None
-
-
-# ---------------------------------------------------------------------------
-# execute_atomic_update success path (lines 651-718)
-# ---------------------------------------------------------------------------
 
 
 def test_execute_atomic_update_success(monkeypatch, tmp_path):
@@ -519,11 +453,6 @@ def test_execute_atomic_update_exception_returns_failure(monkeypatch, tmp_path):
     assert "lock timeout" in (result.error_message or "")
 
 
-# ---------------------------------------------------------------------------
-# execute_atomic_delete success path (lines 734-780)
-# ---------------------------------------------------------------------------
-
-
 def test_execute_atomic_delete_success(monkeypatch, tmp_path):
     manager = _delta_manager()
     table = tmp_path / "delta_table"
@@ -546,11 +475,6 @@ def test_execute_atomic_delete_no_maintenance_ops(tmp_path):
 
     result = manager.execute_atomic_delete(table_path=table, condition="id=1")
     assert result.success is False
-
-
-# ---------------------------------------------------------------------------
-# execute_atomic_merge success path (lines 802-851)
-# ---------------------------------------------------------------------------
 
 
 def test_execute_atomic_merge_success(monkeypatch, tmp_path):
@@ -589,11 +513,6 @@ def test_execute_atomic_merge_exception_returns_failure(monkeypatch, tmp_path):
     assert result.success is False
 
 
-# ---------------------------------------------------------------------------
-# execute_rollback_to_version delta-rs path (lines 881-926)
-# ---------------------------------------------------------------------------
-
-
 def test_execute_rollback_to_version_success(monkeypatch, tmp_path):
     manager = _delta_manager()
     table = tmp_path / "delta_table"
@@ -628,11 +547,6 @@ def test_execute_rollback_to_version_exception_returns_failure(monkeypatch, tmp_
     assert result.success is False
 
 
-# ---------------------------------------------------------------------------
-# execute_rollback_to_timestamp delta-rs path (lines 944-1006)
-# ---------------------------------------------------------------------------
-
-
 def test_execute_rollback_to_timestamp_success(monkeypatch, tmp_path):
     manager = _delta_manager()
     table = tmp_path / "delta_table"
@@ -648,11 +562,6 @@ def test_execute_rollback_to_timestamp_success(monkeypatch, tmp_path):
         result = manager.execute_rollback_to_timestamp(table_path=table, timestamp="2024-01-15T10:00:00Z")
 
     assert result.success is True
-
-
-# ---------------------------------------------------------------------------
-# execute_time_travel_query delta-rs path (lines 1041-1101)
-# ---------------------------------------------------------------------------
 
 
 def test_execute_time_travel_query_by_version(monkeypatch, tmp_path):
@@ -697,11 +606,6 @@ def test_execute_time_travel_query_by_timestamp(monkeypatch, tmp_path):
 
     assert result.success is True
     assert result.rows_affected == 99
-
-
-# ---------------------------------------------------------------------------
-# execute_version_compare delta-rs path (lines 1142-1171)
-# ---------------------------------------------------------------------------
 
 
 def test_execute_version_compare_success(monkeypatch, tmp_path):

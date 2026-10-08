@@ -1,43 +1,6 @@
 #!/usr/bin/env python3
-"""Check for unsafe patch() string paths in test files.
-
-Detects:
-  patch("benchbox.cli.commands.<module>.<attr>")
-
-…where <module> is re-exported by benchbox/cli/commands/__init__.py under the
-SAME name (e.g. ``from .run import run``).  On Python 3.10 this silently breaks:
-mock's _dot_lookup calls getattr(benchbox.cli.commands, "run") and gets back the
-re-exported Click Command object instead of the run submodule, so subsequent
-attribute access raises AttributeError.  On Python 3.12+ the tests pass only
-because conftest.py or another test has already imported the submodule, seeding
-sys.modules before mock's _dot_lookup fires - a fragile, order-dependent
-coincidence.
-
-Fix pattern (already applied to the 5 originally-failing files):
-
-    import sys as _sys
-    __import__("benchbox.cli.commands.run")
-    _run_module = _sys.modules["benchbox.cli.commands.run"]
-
-    # Then replace:
-    patch("benchbox.cli.commands.run.SystemProfiler")
-    # With:
-    patch.object(_run_module, "SystemProfiler")
-
-Safe modules (exported name differs from submodule name, no shadowing):
-  - checks       (exports check_dependencies)
-  - config       (exports validate)
-  - df_tuning    (exports df_tuning_group)
-  - metrics      (exports metrics_group)
-  - setup        (exports setup_credentials)
-  - tuning       (exports create_sample_tuning)
-
-Unsafe modules (exported name == submodule name, creates shadowing):
-  See SHADOWED_MODULES below.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License.
 
 from __future__ import annotations
 
@@ -45,9 +8,6 @@ import re
 import sys
 from pathlib import Path
 
-# Every module in benchbox/cli/commands/ where the __init__.py re-exports a
-# name that exactly matches the submodule filename (e.g. `from .run import run`
-# shadows the `run` attribute on the commands package with the Click Command).
 SHADOWED_MODULES: frozenset[str] = frozenset(
     [
         "aggregate",
@@ -73,10 +33,6 @@ SHADOWED_MODULES: frozenset[str] = frozenset(
     ]
 )
 
-# Regex: match patch("benchbox.cli.commands.<shadowed>.<anything>")
-# Handles both ' and " quoting, with or without extra arguments after the string
-# (e.g. patch("...run.X", return_value=mock)).
-# Also catches fully-qualified mock.patch() and unittest.mock.patch() forms.
 _MODULE_PATTERN = "|".join(re.escape(m) for m in sorted(SHADOWED_MODULES))
 UNSAFE_RE = re.compile(
     r"""(?:unittest\.)?(?:mock\.)?patch\(["']benchbox\.cli\.commands\.(?:""" + _MODULE_PATTERN + r""")\.[^"']+["']"""
@@ -84,7 +40,6 @@ UNSAFE_RE = re.compile(
 
 
 def check_file(path: Path) -> list[tuple[int, str]]:
-    """Return (line_number, stripped_line) for every unsafe patch call in *path*."""
     violations: list[tuple[int, str]] = []
     try:
         text = path.read_text(encoding="utf-8")

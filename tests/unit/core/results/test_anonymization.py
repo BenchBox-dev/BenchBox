@@ -1,11 +1,5 @@
-"""Tests for benchbox.core.results.anonymization module.
-
-Tests the anonymization system with focus on stable machine ID generation
-across different operating systems and configurations.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import dataclasses
 import inspect
@@ -34,19 +28,15 @@ pytestmark = [
 
 
 class TestAnonymizationMachineID:
-    """Test suite for machine ID generation and stability."""
-
     def test_machine_id_is_string(self):
-        """Test that machine ID is returned as a string."""
         manager = AnonymizationManager()
         machine_id = manager.get_anonymous_machine_id()
 
         assert isinstance(machine_id, str)
         assert machine_id.startswith("machine_")
-        assert len(machine_id) == 24  # "machine_" + 16 hex chars
+        assert len(machine_id) == 24
 
     def test_machine_id_stability_within_instance(self):
-        """Test that machine ID is stable across multiple calls on same instance."""
         manager = AnonymizationManager()
 
         id1 = manager.get_anonymous_machine_id()
@@ -56,10 +46,6 @@ class TestAnonymizationMachineID:
         assert id1 == id2 == id3
 
     def test_machine_id_stability_across_instances(self):
-        """Test that machine ID is stable across different AnonymizationManager instances.
-
-        This is the key test that was failing before the OS-level ID implementation.
-        """
         manager1 = AnonymizationManager()
         manager2 = AnonymizationManager()
         manager3 = AnonymizationManager()
@@ -71,20 +57,16 @@ class TestAnonymizationMachineID:
         assert id1 == id2 == id3, "Machine IDs should be identical across instances"
 
     def test_machine_id_uses_cache(self):
-        """Test that machine ID is properly cached after first generation."""
         manager = AnonymizationManager()
 
-        # First call should generate and cache
         assert manager._machine_id_cache is None
         id1 = manager.get_anonymous_machine_id()
         assert manager._machine_id_cache == id1
 
-        # Subsequent calls should use cache
         id2 = manager.get_anonymous_machine_id()
         assert id2 == id1
 
     def test_machine_id_with_salt(self):
-        """Test that machine ID changes with different salt values."""
         config1 = AnonymizationConfig(machine_id_salt="salt1")
         config2 = AnonymizationConfig(machine_id_salt="salt2")
         config3 = AnonymizationConfig(machine_id_salt=None)
@@ -97,13 +79,11 @@ class TestAnonymizationMachineID:
         id2 = manager2.get_anonymous_machine_id()
         id3 = manager3.get_anonymous_machine_id()
 
-        # Different salts should produce different IDs
         assert id1 != id2
         assert id1 != id3
         assert id2 != id3
 
     def test_machine_id_deterministic_with_same_salt(self):
-        """Test that same salt produces same ID across instances."""
         config1 = AnonymizationConfig(machine_id_salt="test_salt")
         config2 = AnonymizationConfig(machine_id_salt="test_salt")
 
@@ -114,12 +94,9 @@ class TestAnonymizationMachineID:
 
 
 class TestMacOSPlatformUUID:
-    """Test macOS IOPlatformUUID extraction."""
-
     @patch("platform.system")
     @patch("subprocess.run")
     def test_macos_platform_uuid_success(self, mock_run, mock_system):
-        """Test successful extraction of macOS IOPlatformUUID."""
         mock_system.return_value = "Darwin"
         mock_run.return_value = Mock(
             returncode=0,
@@ -146,7 +123,6 @@ class TestMacOSPlatformUUID:
     @patch("platform.system")
     @patch("subprocess.run")
     def test_macos_platform_uuid_command_failure(self, mock_run, mock_system):
-        """Test handling of ioreg command failure."""
         mock_system.return_value = "Darwin"
         mock_run.return_value = Mock(returncode=1, stdout="")
 
@@ -158,7 +134,6 @@ class TestMacOSPlatformUUID:
     @patch("platform.system")
     @patch("subprocess.run")
     def test_macos_platform_uuid_timeout(self, mock_run, mock_system):
-        """Test handling of ioreg command timeout."""
         mock_system.return_value = "Darwin"
         mock_run.side_effect = subprocess.TimeoutExpired("ioreg", 5)
 
@@ -170,7 +145,6 @@ class TestMacOSPlatformUUID:
     @patch("platform.system")
     @patch("subprocess.run")
     def test_macos_platform_uuid_missing_from_output(self, mock_run, mock_system):
-        """Test handling when IOPlatformUUID is not in output."""
         mock_system.return_value = "Darwin"
         mock_run.return_value = Mock(returncode=0, stdout="Some other output without UUID")
 
@@ -181,13 +155,10 @@ class TestMacOSPlatformUUID:
 
 
 class TestLinuxMachineID:
-    """Test Linux machine-id extraction."""
-
     @patch("platform.system")
     @patch("os.path.exists")
     @patch("builtins.open", new_callable=mock_open, read_data="abc123def456ghi789\n")
     def test_linux_machine_id_from_etc(self, mock_file, mock_exists, mock_system):
-        """Test successful extraction of Linux machine-id from /etc/machine-id."""
         mock_system.return_value = "Linux"
         mock_exists.side_effect = lambda path: path == "/etc/machine-id"
 
@@ -201,7 +172,6 @@ class TestLinuxMachineID:
     @patch("os.path.exists")
     @patch("builtins.open", new_callable=mock_open, read_data="xyz789abc123def456\n")
     def test_linux_machine_id_from_dbus(self, mock_file, mock_exists, mock_system):
-        """Test fallback to /var/lib/dbus/machine-id."""
         mock_system.return_value = "Linux"
         mock_exists.side_effect = lambda path: path == "/var/lib/dbus/machine-id"
 
@@ -214,7 +184,6 @@ class TestLinuxMachineID:
     @patch("platform.system")
     @patch("os.path.exists")
     def test_linux_machine_id_not_found(self, mock_exists, mock_system):
-        """Test handling when no machine-id file exists."""
         mock_system.return_value = "Linux"
         mock_exists.return_value = False
 
@@ -227,7 +196,6 @@ class TestLinuxMachineID:
     @patch("os.path.exists")
     @patch("builtins.open")
     def test_linux_machine_id_permission_error(self, mock_file, mock_exists, mock_system):
-        """Test handling of permission errors when reading machine-id."""
         mock_system.return_value = "Linux"
         mock_exists.return_value = True
         mock_file.side_effect = PermissionError("Access denied")
@@ -239,14 +207,10 @@ class TestLinuxMachineID:
 
 
 class TestWindowsMachineGUID:
-    """Test Windows MachineGuid extraction."""
-
     @patch("platform.system")
     def test_windows_machine_guid_success(self, mock_system):
-        """Test successful extraction of Windows MachineGuid."""
         mock_system.return_value = "Windows"
 
-        # Mock the winreg module
         mock_winreg = MagicMock()
         mock_key = MagicMock()
         mock_winreg.OpenKey.return_value = mock_key
@@ -263,22 +227,17 @@ class TestWindowsMachineGUID:
     @pytest.mark.skipif(sys.platform == "win32", reason="winreg always available on Windows")
     @patch("platform.system")
     def test_windows_machine_guid_not_on_windows(self, mock_system):
-        """Test that Windows MachineGuid returns None on non-Windows systems."""
         mock_system.return_value = "Darwin"
 
         manager = AnonymizationManager()
         guid = manager._get_windows_machine_guid()
 
-        # Should return None because winreg module won't be available
         assert guid is None
 
 
 class TestOSMachineID:
-    """Test OS-level machine ID detection across platforms."""
-
     @patch("platform.system")
     def test_os_machine_id_delegates_to_macos(self, mock_system):
-        """Test that Darwin delegates to macOS UUID method."""
         mock_system.return_value = "Darwin"
 
         manager = AnonymizationManager()
@@ -290,7 +249,6 @@ class TestOSMachineID:
 
     @patch("platform.system")
     def test_os_machine_id_delegates_to_linux(self, mock_system):
-        """Test that Linux delegates to Linux machine-id method."""
         mock_system.return_value = "Linux"
 
         manager = AnonymizationManager()
@@ -302,7 +260,6 @@ class TestOSMachineID:
 
     @patch("platform.system")
     def test_os_machine_id_delegates_to_windows(self, mock_system):
-        """Test that Windows delegates to Windows MachineGuid method."""
         mock_system.return_value = "Windows"
 
         manager = AnonymizationManager()
@@ -314,7 +271,6 @@ class TestOSMachineID:
 
     @patch("platform.system")
     def test_os_machine_id_unknown_os(self, mock_system):
-        """Test handling of unknown operating system."""
         mock_system.return_value = "FreeBSD"
 
         manager = AnonymizationManager()
@@ -324,22 +280,17 @@ class TestOSMachineID:
 
 
 class TestHardwareFingerprint:
-    """Test hardware fingerprint generation (fallback method)."""
-
     def test_hardware_fingerprint_format(self):
-        """Test that hardware fingerprint returns pipe-separated string."""
         manager = AnonymizationManager()
         fingerprint = manager._get_hardware_fingerprint()
 
         assert isinstance(fingerprint, str)
         assert "|" in fingerprint
 
-        # Should have 4 components: machine|system|cpu_count|mac
         parts = fingerprint.split("|")
         assert len(parts) == 4
 
     def test_hardware_fingerprint_stability(self):
-        """Test that hardware fingerprint is stable across calls."""
         manager = AnonymizationManager()
 
         fp1 = manager._get_hardware_fingerprint()
@@ -351,7 +302,6 @@ class TestHardwareFingerprint:
     @patch("platform.system")
     @patch("os.cpu_count")
     def test_hardware_fingerprint_components(self, mock_cpu_count, mock_system, mock_machine):
-        """Test that hardware fingerprint contains expected components."""
         mock_machine.return_value = "arm64"
         mock_system.return_value = "Darwin"
         mock_cpu_count.return_value = 10
@@ -365,7 +315,6 @@ class TestHardwareFingerprint:
 
     @patch("platform.machine")
     def test_hardware_fingerprint_exception_handling(self, mock_machine):
-        """Test that hardware fingerprint handles exceptions gracefully."""
         mock_machine.side_effect = Exception("Test error")
 
         manager = AnonymizationManager()
@@ -375,11 +324,8 @@ class TestHardwareFingerprint:
 
 
 class TestStableMACAddress:
-    """Test stable MAC address extraction."""
-
     @patch("uuid.getnode")
     def test_stable_mac_address_format(self, mock_getnode):
-        """Test MAC address formatting."""
         mock_getnode.return_value = 0x2211EB301A8A
 
         manager = AnonymizationManager()
@@ -390,7 +336,6 @@ class TestStableMACAddress:
 
     @patch("uuid.getnode")
     def test_stable_mac_address_exception(self, mock_getnode):
-        """Test MAC address exception handling."""
         mock_getnode.side_effect = Exception("Test error")
 
         manager = AnonymizationManager()
@@ -400,36 +345,29 @@ class TestStableMACAddress:
 
 
 class TestMachineIDIntegration:
-    """Integration tests for complete machine ID generation flow."""
-
     @patch("platform.system")
     @patch("subprocess.run")
     def test_macos_uses_os_level_id(self, mock_run, mock_system):
-        """Test that macOS uses IOPlatformUUID when available."""
         mock_system.return_value = "Darwin"
         mock_run.return_value = Mock(returncode=0, stdout='"IOPlatformUUID" = "F79092CB-6DA1-5604-BBD1-78EF17E58BEF"')
 
         manager = AnonymizationManager()
         machine_id = manager.get_anonymous_machine_id()
 
-        # Should get a consistent ID based on the UUID
         assert machine_id.startswith("machine_")
         assert len(machine_id) == 24
 
-        # Calling again should give same ID
         assert machine_id == manager.get_anonymous_machine_id()
 
     @patch("platform.system")
     @patch("subprocess.run")
     def test_macos_falls_back_to_fingerprint(self, mock_run, mock_system):
-        """Test that macOS falls back to hardware fingerprint if ioreg fails."""
         mock_system.return_value = "Darwin"
         mock_run.side_effect = FileNotFoundError("ioreg not found")
 
         manager = AnonymizationManager()
         machine_id = manager.get_anonymous_machine_id()
 
-        # Should still get a valid ID from fallback
         assert machine_id.startswith("machine_")
         assert len(machine_id) == 24
 
@@ -437,7 +375,6 @@ class TestMachineIDIntegration:
     @patch("os.path.exists")
     @patch("builtins.open", new_callable=mock_open, read_data="stable-machine-id-value\n")
     def test_linux_uses_os_level_id(self, mock_file, mock_exists, mock_system):
-        """Test that Linux uses machine-id when available."""
         mock_system.return_value = "Linux"
         mock_exists.side_effect = lambda path: path == "/etc/machine-id"
 
@@ -447,17 +384,13 @@ class TestMachineIDIntegration:
         id1 = manager1.get_anonymous_machine_id()
         id2 = manager2.get_anonymous_machine_id()
 
-        # IDs should be identical across instances
         assert id1 == id2
         assert id1.startswith("machine_")
 
     def test_fallback_chain_completeness(self):
-        """Test that system always produces a machine ID, even in worst case."""
-        # Don't mock anything - let it use real system
         manager = AnonymizationManager()
         machine_id = manager.get_anonymous_machine_id()
 
-        # Should always get a valid ID
         assert machine_id is not None
         assert isinstance(machine_id, str)
         assert machine_id.startswith("machine_")
@@ -465,10 +398,7 @@ class TestMachineIDIntegration:
 
 
 class TestAnonymizationConfig:
-    """Test anonymization configuration."""
-
     def test_default_config(self):
-        """Test default configuration values."""
         config = AnonymizationConfig()
 
         assert config.machine_id_salt is None
@@ -476,22 +406,11 @@ class TestAnonymizationConfig:
         assert config.custom_sanitizers == {}
 
     def test_custom_config(self):
-        """Test custom configuration values."""
         config = AnonymizationConfig(machine_id_salt="custom_salt")
 
         assert config.machine_id_salt == "custom_salt"
 
     def test_no_flag_promises_privacy_it_does_not_deliver(self):
-        """Every remaining field must actually reach published output.
-
-        The retired flags (include_machine_id, anonymize_paths,
-        allowed_path_prefixes, include_system_profile, anonymize_hostnames,
-        anonymize_usernames) fed only the deleted legacy API. They read as
-        privacy controls but gated nothing on the publication path, which is
-        the worst kind of config: a caller could set anonymize_paths=False
-        and see no change, or leave it True and assume paths were protected
-        by it. Keep the surface honest.
-        """
         retired = {
             "include_machine_id",
             "anonymize_paths",
@@ -505,8 +424,6 @@ class TestAnonymizationConfig:
 
 
 class TestRemovePII:
-    """Test PII removal from text."""
-
     def test_removes_ip_address(self):
         manager = AnonymizationManager()
         result = manager.remove_pii("Server at 192.168.1.100 failed")
@@ -542,10 +459,6 @@ class TestRemovePII:
 
 
 class TestPublicPayloadSecretKeys:
-    """The public export path must honor every secret part the internal
-    capture path honors — both consumers read one shared list, so a key that
-    is redacted at capture time can never be published by re-export either."""
-
     @staticmethod
     def _payload(config):
         return {"platform_metadata": {"platform_raw_config": config}}
@@ -588,9 +501,6 @@ if __name__ == "__main__":
 
 
 class TestPublicPayloadApiKeyAndAccountKey:
-    """The shared secret list must cover api_key/*_account_key on the public
-    path too — these leaked through anonymize_result_payload verbatim."""
-
     def test_api_key_and_storage_account_key_are_redacted(self):
         manager = AnonymizationManager()
         out = json.dumps(
@@ -613,8 +523,6 @@ class TestPublicPayloadApiKeyAndAccountKey:
 
 
 class TestPublicPayloadCredentialAliases:
-    """The public anonymizer must share exact alias handling with capture."""
-
     def test_aliases_are_redacted_while_preserving_tuning_keys_and_path_contract(self):
         out = AnonymizationManager().anonymize_result_payload(
             {
@@ -633,15 +541,11 @@ class TestPublicPayloadCredentialAliases:
         assert out["passwd"] == PUBLIC_REDACTED_VALUE
         assert out["pwd"] == PUBLIC_REDACTED_VALUE
         assert out["pat"] == PUBLIC_REDACTED_VALUE
-        # Exact key ``path`` is a residual local-FS drop key (no public consumer).
         assert "path" not in out
         assert out["sort_key"] == "o_orderkey"
 
 
 class TestPublicPayloadSslRootCert:
-    """The libpq sslrootcert spelling ends in neither path nor file, so the
-    raw local path (leaking the home-dir username) passed through."""
-
     def test_sslrootcert_path_is_hashed(self):
         out = json.dumps(
             AnonymizationManager().anonymize_result_payload(
@@ -662,9 +566,6 @@ class TestPublicPayloadSslRootCert:
 
 
 class TestPublicPayloadTupleRecursion:
-    """A tuple fell through to the scalar branch untouched, so any payload
-    branch not pre-flattened by internal capture leaked tuple contents."""
-
     def test_tuple_nested_identifier_is_anonymized(self):
         out = json.dumps(
             AnonymizationManager().anonymize_result_payload(
@@ -753,11 +654,6 @@ class TestTuningPayloadAnonymization:
         )
 
     def test_nested_companion_constraint_shapes_are_pseudonymized(self):
-        """List-of-dicts FK tables, slash-delimited local_table, and TPC-DI-style
-        references_table/references_column must not leak identifiers. The simple
-        mapping shape was already covered; these companion shapes were the
-        residual leak after #1479.
-        """
         out = AnonymizationManager().anonymize_tuning_payload(
             {
                 "requested": {
@@ -799,7 +695,6 @@ class TestTuningPayloadAnonymization:
         assert constraints["references_column"].startswith("column_")
 
     def test_mixed_and_list_constraint_companion_shapes(self):
-        """Mixed scalar/dict collections and top-level list constraints."""
         out = AnonymizationManager().anonymize_tuning_payload(
             {
                 "requested": {
@@ -870,10 +765,6 @@ class TestTuningPayloadAnonymization:
 
 
 class TestPublicPayloadWorkspaceRoleAndApplicationIds:
-    """Near-miss variants of covered identifier keys are the recurring leak
-    pattern: workspace_name, job_role and application_id all exported
-    verbatim while workspace/workspaceid and role/iamrole were covered."""
-
     @staticmethod
     def _payload(config):
         return {"platform_metadata": {"platform_raw_config": config}}
@@ -901,10 +792,6 @@ class TestPublicPayloadWorkspaceRoleAndApplicationIds:
 
 
 class TestPublicPayloadPgUserAndTenantId:
-    """pg_user must pseudonymize like every other username spelling, and a
-    tenant id (an org-identifying GUID) must hash — both escaped the public
-    identifier map because their compact keys matched nothing."""
-
     @staticmethod
     def _payload(config):
         return {"platform_metadata": {"platform_raw_config": config}}
@@ -953,12 +840,6 @@ class TestPublicPayloadSecretMessages:
 
 class TestPublicPayloadPathPrivacy:
     def test_generic_working_directory_is_omitted(self):
-        """Unread path fields are dropped at the public boundary, not hashed.
-
-        ``working_dir`` has no publication consumer (ADR published-identifier
-        field set); emitting a confirmable ``path_`` token would only feed the
-        dictionary oracle.
-        """
         out = AnonymizationManager().anonymize_result_payload(
             {"platform_metadata": {"working_dir": "/Users/alice/benchbox/run", "mode": "sql"}}
         )
@@ -989,12 +870,10 @@ class TestPublicPayloadPathPrivacy:
         assert leaks == ["nested.0.working_dir"]
 
     def test_detector_flags_private_paths_encoded_as_object_keys(self):
-        """Scanning values alone called this payload clean."""
         leaks = find_public_path_leaks({"per_path_timings": {"/Users/alice/db": 1.2}})
         assert leaks == ["per_path_timings.<key>"]
 
     def test_key_leak_report_does_not_echo_the_key(self):
-        """The offending key *is* the private path, so it must stay redacted."""
         leaks = find_public_path_leaks({"metadata": {"/Users/alice/secret-project": True}})
         assert leaks and "alice" not in " ".join(leaks)
         assert "secret-project" not in " ".join(leaks)
@@ -1004,12 +883,6 @@ class TestPublicPayloadPathPrivacy:
         assert leaks == ["<key>"]
 
     def test_leaking_key_is_elided_from_descendant_field_paths(self):
-        """Reporting a nested leak must not splice the parent key back in.
-
-        These diagnostics are surfaced in submission PR comments and Explorer
-        exceptions, so a raw key in a child's path discloses the private path
-        precisely when the detector is doing its job.
-        """
         leaks = find_public_path_leaks({"/Users/alice/secret": {"working_dir": "/home/bob/private"}})
         joined = " ".join(leaks)
         assert "<key>.working_dir" in leaks
@@ -1018,7 +891,6 @@ class TestPublicPayloadPathPrivacy:
         assert "bob" not in joined
 
     def test_ordinary_keys_are_not_flagged(self):
-        """Relative and non-path keys stay clean - no blanket key rejection."""
         payload = {"queries": {"q1": 1.0, "tpch/q2": 2.0}, "platform": {"name": "DuckDB"}}
         assert find_public_path_leaks(payload) == []
 
@@ -1031,13 +903,6 @@ class TestPublicPayloadPathPrivacy:
 
 
 class TestPublicUnreadIdentifierDrop:
-    """Unread identifier fields are omitted, not pseudonymised.
-
-    ADR published-identifier-field-set: six fields have no consumer in the
-    publication pipeline, Explorer, or contract. Publishing a confirmable
-    ``prefix_<12 hex>`` token for them only feeds the dictionary oracle.
-    """
-
     DROP_FIELDS = (
         "machine_id",
         "working_dir",
@@ -1074,7 +939,6 @@ class TestPublicUnreadIdentifierDrop:
             assert f'"{key}"' not in serialized
         assert "alice" not in serialized
         assert "db.internal" not in serialized
-        # Retained fields still publish a pseudonym.
         assert _is_public_pseudonym(out["platform"]["config"]["endpoint"], "endpoint")
         assert _is_public_pseudonym(out["platform"]["config"]["database_name"], "database")
         assert out["metadata"]["submission_path"] == "PR-based" or _is_public_pseudonym(
@@ -1084,7 +948,6 @@ class TestPublicUnreadIdentifierDrop:
         assert out["environment"]["platform_runtime"]["runtime_type"] == "local"
 
     def test_alias_drop_keys_of_unread_identifiers_are_omitted(self):
-        """Aliases of the six unread fields must drop, not mint path_ tokens."""
         payload = {
             "platform": {
                 "config": {
@@ -1112,7 +975,6 @@ class TestPublicUnreadIdentifierDrop:
         ):
             assert key not in cfg, f"alias drop key still present: {key}"
         assert "alice" not in json.dumps(out)
-        # Retained consumers still publish under canonical keys.
         assert _is_public_pseudonym(cfg["endpoint"], "endpoint")
         assert _is_public_pseudonym(cfg["database_name"], "database")
         assert out["metadata"]["submission_path"] == "PR-based" or _is_public_pseudonym(
@@ -1120,7 +982,6 @@ class TestPublicUnreadIdentifierDrop:
         )
 
     def test_residual_local_path_keys_are_dropped_not_hashed(self):
-        """Pure local-FS residual keys omit rather than mint empty-salt path_ tokens."""
         payload = {
             "platform": {
                 "config": {
@@ -1136,7 +997,6 @@ class TestPublicUnreadIdentifierDrop:
                     "path": "/Users/alice/scratch",
                     "source_root": "/Users/alice/src",
                     "credential_file": "/Users/alice/.aws/credentials",
-                    # KEEP HASH / retained consumers
                     "sslrootcert": "/Users/alice/certs/root.pem",
                     "s3_staging_url": "s3://tenant-bucket/staging/",
                     "staging_location": "s3://tenant-bucket/staging/",
@@ -1170,9 +1030,8 @@ class TestPublicUnreadIdentifierDrop:
             assert key not in cfg, f"residual local path key still present: {key}"
         serialized = json.dumps(out, default=str)
         assert "alice" not in serialized
-        # Remote-ish / intentional privacy hashes remain published as pseudonyms.
         assert _is_public_pseudonym(cfg["sslrootcert"], "path")
-        assert _is_public_pseudonym(cfg["s3_staging_url"], "endpoint")  # *url suffix
+        assert _is_public_pseudonym(cfg["s3_staging_url"], "endpoint")
         assert _is_public_pseudonym(cfg["staging_location"], "path")
         assert _is_public_pseudonym(cfg["staging_url"], "endpoint")
         assert _is_public_pseudonym(cfg["http_path"], "path")
@@ -1184,7 +1043,6 @@ class TestPublicUnreadIdentifierDrop:
         assert _is_public_pseudonym(out["metadata"]["submission_path"], "path")
 
     def test_empty_client_host_omitted_after_machine_id_drop(self):
-        """client_host that only held machine_id must not publish as {}."""
         out = AnonymizationManager().anonymize_result_payload(
             {"environment": {"client_host": {"machine_id": "raw-machine"}, "other": 1}}
         )
@@ -1192,7 +1050,6 @@ class TestPublicUnreadIdentifierDrop:
         assert out["environment"]["other"] == 1
 
     def test_already_empty_client_host_is_omitted(self):
-        """Empty client_host maps are omitted so stored residuals can be re-derived away."""
         payload = {"environment": {"client_host": {}, "other": 1}}
         out = AnonymizationManager().anonymize_result_payload(payload)
         assert "client_host" not in out.get("environment", {})
@@ -1227,7 +1084,6 @@ class TestPublicUnreadIdentifierDrop:
         assert "working_dir" not in once.get("platform", {}).get("config", {})
 
     def test_tuning_constraints_omit_drop_keys_without_keyerror(self):
-        """Scalar walk under unconstrained keys must not KeyError when the key is dropped."""
         out = AnonymizationManager().anonymize_tuning_payload(
             {
                 "source_file": "templates/tuning/example.yaml",
@@ -1254,22 +1110,13 @@ class TestPublicUnreadIdentifierDrop:
         assert constraints["nested"]["ok"] == 1
         assert "table" in constraints
         tunings = out["requested"]["table_tunings"]
-        assert "lineitem" not in tunings  # table keys are hashed
+        assert "lineitem" not in tunings
         assert tunings, "table_tunings should retain the hashed table entry"
         for table_entry in tunings.values():
             assert "machine_id" not in table_entry
 
 
 class TestPublicPseudonymFixedPoint:
-    """Anonymization must reach a fixed point.
-
-    Curated bundles are stored already-anonymized, so the Explorer publication
-    boundary anonymizes values this module produced. Hashing a pseudonym again
-    mints a second token for the same machine, so the corpus and a freshly
-    submitted run from that machine would group apart. Nothing fails when this
-    breaks - the grouping is just silently wrong - so it is pinned here.
-    """
-
     PAYLOAD = {
         "environment": {
             "client_host": {"hostname": "host_0123456789ab"},
@@ -1294,9 +1141,6 @@ class TestPublicPseudonymFixedPoint:
         assert manager.anonymize_result_payload(once) == once
 
     def test_tuning_payload_anonymization_is_idempotent(self):
-        """Tuning hashes table/column names into mapping *keys*, so re-walking
-        an already-anonymized companion re-hashes the keys as well as values.
-        """
         manager = AnonymizationManager()
         payload = {
             "source_file": "examples/tunings/custom.yaml",
@@ -1317,12 +1161,6 @@ class TestPublicPseudonymFixedPoint:
         assert twice["environment"]["client_host"]["hostname"] == once["environment"]["client_host"]["hostname"]
 
     def test_every_emitted_pseudonym_is_recognized_as_one(self):
-        """Pin the emitter against the recognizer.
-
-        These are two halves of one contract - the ``[:12]`` slice and the
-        width the pass-through accepts. Widening one alone silently restores
-        the double-hash bug, and no payload-level test would notice.
-        """
         manager = AnonymizationManager()
         for prefix in sorted(set(_IDENTIFIER_KEYS.values()) | {"path", "host", "endpoint", "table", "column"}):
             emitted = manager._hash_public_identifier("some-private-value", prefix)
@@ -1330,12 +1168,6 @@ class TestPublicPseudonymFixedPoint:
             assert manager._hash_public_identifier(emitted, prefix) == emitted
 
     def test_capture_side_machine_id_is_omitted_not_published(self):
-        """Public boundary omits machine_id; internal capture id never publishes.
-
-        ``get_anonymous_machine_id`` remains for capture-side grouping. The
-        public walk drops the key entirely (ADR field set), so the internal
-        16-hex token is never re-emitted as a 12-hex public pseudonym.
-        """
         manager = AnonymizationManager()
         internal = manager.get_anonymous_machine_id()
         published = manager.anonymize_result_payload({"machine_id": internal, "note": "keep"})
@@ -1343,15 +1175,7 @@ class TestPublicPseudonymFixedPoint:
         assert published["note"] == "keep"
 
     def test_pass_through_does_not_cross_prefixes(self):
-        """A token only survives in the field family that would mint it.
-
-        Without prefix scoping, a ``host_``-shaped value would survive verbatim
-        inside a path field, letting a submitted payload carry a chosen token
-        into a namespace the anonymizer never assigned it to.
-        """
         manager = AnonymizationManager()
-        # submission_path is retained and path-prefixed; a host-shaped value
-        # must be re-hashed into the path namespace rather than passed through.
         out = manager.anonymize_result_payload({"submission_path": "host_0123456789ab"})
         assert out["submission_path"] != "host_0123456789ab"
         assert _is_public_pseudonym(out["submission_path"], "path")
@@ -1359,11 +1183,11 @@ class TestPublicPseudonymFixedPoint:
     @pytest.mark.parametrize(
         "value",
         [
-            "path_0123456789",  # too short
-            "path_0123456789abc",  # too long
-            "path_0123456789zz",  # not hex
-            "path_",  # no digest
-            "pathx_0123456789ab",  # prefix is not an exact match
+            "path_0123456789",
+            "path_0123456789abc",
+            "path_0123456789zz",
+            "path_",
+            "pathx_0123456789ab",
         ],
     )
     def test_only_the_exact_pseudonym_shape_passes_through(self, value):
@@ -1373,17 +1197,6 @@ class TestPublicPseudonymFixedPoint:
 
 
 class TestLegacyAnonymizationSchemeIsGone:
-    """One salted scheme, no second weaker one.
-
-    The module used to carry a parallel legacy API - sanitize_path,
-    anonymize_query_metadata, anonymize_execution_metadata,
-    anonymize_system_profile, validate_anonymization - that hashed with
-    UNSALTED md5 truncated to 8 hex and, in sanitize_path's case, returned
-    private paths completely unchanged. It had no production caller, so it
-    leaked nothing in practice, but it sat in the same module as the real
-    boundary where a future caller could reasonably have trusted it.
-    """
-
     LEGACY_METHODS = (
         "sanitize_path",
         "anonymize_query_metadata",
@@ -1397,33 +1210,15 @@ class TestLegacyAnonymizationSchemeIsGone:
         assert not hasattr(AnonymizationManager, name), f"{name} is back on the public surface"
 
     def test_no_unsalted_md5_pseudonym_scheme_remains(self):
-        """md5 is unsalted and 8 hex here - trivially reversible for a
-        username or hostname. The public boundary uses salted sha256.
-        """
         source = inspect.getsource(sys.modules[AnonymizationManager.__module__])
         assert "md5" not in source, "an md5 pseudonym scheme is back in the anonymizer"
 
     def test_every_pseudonym_emitter_uses_the_shared_salted_helper(self):
-        """Catch a second emitter even if it reaches for sha256.
-
-        The bug was two schemes, not md5 specifically. Any new
-        f"prefix_{...hexdigest()[:n]}" that bypasses _hash_public_identifier
-        would reintroduce it, so pin that the module truncates a digest in
-        exactly the two places that are supposed to.
-        """
         source = inspect.getsource(sys.modules[AnonymizationManager.__module__])
         truncations = re.findall(r"hexdigest\(\)\[:[^\]]+\]", source)
         assert len(truncations) == 2, f"unexpected digest truncations: {truncations}"
 
     def test_no_sibling_module_mints_a_pseudonym_behind_the_boundary(self):
-        """Widen the check past this one module.
-
-        The rung above reads only ``anonymization.py``, so a second emitter
-        added in a sibling under ``benchbox/core/results/`` would satisfy it
-        while reintroducing exactly the split this class exists to prevent.
-        Scan the package and require that anything minting a ``<prefix>_<hex>``
-        token does it through the shared salted helper.
-        """
         package = Path(inspect.getfile(sys.modules[AnonymizationManager.__module__])).parent
         emitter = re.compile(r"f\"[a-z_]+_\{[^}]*hexdigest\(\)")
         offenders = []
@@ -1447,20 +1242,6 @@ class TestLegacyAnonymizationSchemeIsGone:
         }, public
 
     def test_salt_does_not_reach_an_already_anonymized_value(self):
-        """Pin the salt/pass-through interaction, including its downside.
-
-        The pass-through is checked BEFORE the salt is applied, so a value that
-        is already a pseudonym survives verbatim no matter whose salt is in
-        play. That is required for idempotence, but it means changing the salt
-        does not re-pseudonymize a stored corpus: new captures adopt the new
-        salt while stored bundles keep the old pseudonyms, splitting one
-        machine across two identities. Rotating the salt requires re-deriving
-        the corpus from pre-anonymization originals. Documented under
-        "Salt rotation" in docs/reference/result-formats.md.
-
-        Scoped to retained fields (endpoint / database_name / submission_path);
-        unread identifiers are omitted rather than salted.
-        """
         a = AnonymizationManager(AnonymizationConfig(machine_id_salt="org-A"))
         b = AnonymizationManager(AnonymizationConfig(machine_id_salt="org-B"))
         raw = {"endpoint": "https://warehouse.example.invalid/sql"}
@@ -1473,10 +1254,6 @@ class TestLegacyAnonymizationSchemeIsGone:
         assert reanonymized == published_by_a, "already-anonymized values are salt-independent by design"
 
     def test_no_public_method_returns_a_private_path_verbatim(self):
-        """The concrete defect: sanitize_path('/Users/alice/bench') used to
-        return that string unchanged, and find_public_path_leaks flagged its
-        own module's output as a leak.
-        """
         manager = AnonymizationManager()
         private = "/Users/alice/bench"
         for payload in (
@@ -1488,7 +1265,6 @@ class TestLegacyAnonymizationSchemeIsGone:
             out = manager.anonymize_result_payload(payload)
             assert find_public_path_leaks(out) == [], f"{payload} leaked: {out}"
             assert "alice" not in json.dumps(out)
-            # Dropped keys must be absent; retained path keys must be hashed.
             for dropped in ("working_dir", "database_path"):
                 assert dropped not in out
             if "submission_path" in payload:
@@ -1496,8 +1272,6 @@ class TestLegacyAnonymizationSchemeIsGone:
 
 
 class TestCloudWarehouseAndOutputLocation:
-    """Databricks warehouse ids and saved cloud output locations never publish raw."""
-
     def test_databricks_warehouse_id_is_pseudonymised_everywhere(self):
         payload = {
             "platform": {
@@ -1539,7 +1313,6 @@ class TestCloudWarehouseAndOutputLocation:
         assert config["uc_catalog"].startswith("catalog_")
         assert config["uc_schema"].startswith("schema_")
         assert config["uc_volume"].startswith("volume_")
-        # Plain `catalog` carries an engine catalog type in local bundles; it stays readable.
         assert config["catalog"] == "duckdb"
 
     def test_option_source_labels_stay_readable(self):
@@ -1556,7 +1329,6 @@ class TestCloudWarehouseAndOutputLocation:
         config = AnonymizationManager().anonymize_result_payload(payload)["config"]
         assert config["platform_option_sources"]["default_output_location"] == "saved_config"
         assert config["platform_option_sources"]["database"] == "cli_option"
-        # Anything outside the label vocabulary is still treated as a value.
         assert config["platform_option_sources"]["warehouse"].startswith("warehouse_")
         assert "bucket" not in json.dumps(config["platform_options"])
 

@@ -1,5 +1,3 @@
-"""Data Vault 2.0 schema definition based on TPC-H source data."""
-
 from enum import Enum
 from pathlib import Path
 from typing import Any, NamedTuple, Optional
@@ -10,8 +8,6 @@ from benchbox.core.schema_primitives import BaseSchemaTable
 
 
 class DataType(Enum):
-    """Enumeration of SQL data types used in Data Vault schema."""
-
     INTEGER = "INTEGER"
     DECIMAL = "DECIMAL(15,2)"
     VARCHAR = "VARCHAR"
@@ -22,8 +18,6 @@ class DataType(Enum):
 
 
 class Column(NamedTuple):
-    """Represents a column in a database table."""
-
     name: str
     data_type: DataType
     size: Optional[int] = None
@@ -32,7 +26,6 @@ class Column(NamedTuple):
     foreign_key: Optional[tuple[str, str]] = None
 
     def get_sql_type(self) -> str:
-        """Get the SQL data type string for this column."""
         if self.data_type == DataType.HASHKEY:
             return "VARCHAR(64)"
         if self.data_type in (DataType.VARCHAR, DataType.CHAR) and self.size is not None:
@@ -41,8 +34,6 @@ class Column(NamedTuple):
 
 
 class Table(BaseSchemaTable):
-    """Represents a Data Vault table with its columns and constraints."""
-
     def __init__(self, name: str, columns: list[Column], table_type: str = "unknown") -> None:
         super().__init__(name, columns)
         self.table_type = table_type
@@ -82,7 +73,6 @@ LOADING_ORDER = list(_SCHEMA_SPECS["loading_order"])
 
 
 def get_table(name: str) -> Table:
-    """Get a table by name (case-insensitive lookup)."""
     name_lower = name.lower()
     if name_lower not in TABLES_BY_NAME:
         raise ValueError(f"Invalid table name: {name}. Valid tables: {list(TABLES_BY_NAME.keys())}")
@@ -90,7 +80,6 @@ def get_table(name: str) -> Table:
 
 
 def get_create_all_tables_sql(enable_primary_keys: bool = True, enable_foreign_keys: bool = True) -> str:
-    """Generate SQL to create all Data Vault tables in loading order."""
     import logging
 
     logger = logging.getLogger(__name__)
@@ -120,5 +109,4 @@ def get_create_all_tables_sql(enable_primary_keys: bool = True, enable_foreign_k
 
 
 def get_table_loading_order() -> list[str]:
-    """Get the table names in proper loading order."""
     return LOADING_ORDER.copy()

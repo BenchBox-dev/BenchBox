@@ -1,10 +1,3 @@
-"""Pinned reproducible external-source contracts for FlightData.
-
-Scale-factor month windows always end at the pinned BTS month: newly published
-months must never silently shift a scale factor's dataset. All tests are
-offline (no downloads).
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -198,8 +191,7 @@ def test_unparseable_download_fails_closed_unless_fallback_is_explicit(tmp_path,
 
 
 def test_valid_zip_without_csv_routes_through_fallback_cleanup(tmp_path, monkeypatch):
-    # A valid ZIP with no CSV raises ValueError inside _download_bts_month;
-    # it must take the same path as transport failures, not escape cleanup.
+
     import csv
     import io
     import zipfile

@@ -1,5 +1,3 @@
-"""Tests for self-contained browser snapshot gating."""
-
 import json
 from pathlib import Path
 

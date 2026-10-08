@@ -1,6 +1,5 @@
 FROM --platform=linux/arm64 ubuntu:22.04
 
-# Install build dependencies including GCC 9 for TPC-DS compatibility
 RUN apt-get update && apt-get install -y \
     build-essential \
     gcc \
@@ -12,7 +11,6 @@ RUN apt-get update && apt-get install -y \
     libc6-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Set GCC 9 as default for TPC-DS compilation
 RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 90 \
     && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 90
 

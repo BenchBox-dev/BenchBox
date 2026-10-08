@@ -1,16 +1,6 @@
-"""Slow guard: bundled TPC-H binaries emit rows with no trailing separator.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Companion to ``test_tpch_dbgen_framing.py`` (which statically checks the build
-configs). This module runs each bundled per-platform ``dbgen`` that the current
-host can actually execute and asserts its output carries no trailing ``|`` --
-BenchBox's canonical framing convention (``-DEOL_HANDLING``). Foreign-arch
-binaries are skipped per-binary; run across CI's Linux and macOS runners the
-union covers the whole platform matrix.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -30,16 +20,10 @@ pytestmark = [
     pytest.mark.slow,
 ]
 
-# Directory of bundled, runtime-priority TPC-H binaries (one dir per platform).
 _BINARIES_ROOT = Path(benchbox.__file__).parent / "_binaries" / "tpc-h"
 
 
 def _host_platform_arch() -> str:
-    """Return the ``<system>-<arch>`` dir name for the current host.
-
-    Mirrors ``TPCCompiler._get_platform_string`` so the test agrees with the
-    runtime binary resolver.
-    """
     system = platform.system().lower()
     machine = platform.machine().lower()
     if machine in ("x86_64", "amd64"):
@@ -52,7 +36,6 @@ def _host_platform_arch() -> str:
 
 
 def _dbgen_in(directory: Path) -> Path | None:
-    """Return the dbgen executable in ``directory`` (``.exe`` on Windows)."""
     for name in ("dbgen", "dbgen.exe"):
         candidate = directory / name
         if candidate.exists():
@@ -67,12 +50,6 @@ def _bundled_binary_dirs() -> list[Path]:
 
 
 def _generate_rows(dbgen_exe: Path, table: str = "n") -> list[str] | None:
-    """Run ``dbgen`` at SF 0.01 for one table; return its rows.
-
-    Returns ``None`` when the binary cannot be executed on this host (wrong
-    architecture / missing loader / no Rosetta), so callers can skip rather
-    than fail for binaries built for other platforms.
-    """
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
         dists = dbgen_exe.parent / "dists.dss"
@@ -86,10 +63,8 @@ def _generate_rows(dbgen_exe: Path, table: str = "n") -> list[str] | None:
                 timeout=30,
             )
         except OSError:
-            # e.g. "Exec format error" for a foreign-arch binary.
             return None
         if result.returncode != 0 and not result.stdout:
-            # A foreign binary may fail to load; treat as not-runnable-here.
             return None
         assert result.stdout, f"dbgen produced no output: {result.stderr!r}"
         return result.stdout.decode().splitlines()
@@ -105,7 +80,6 @@ def _assert_no_trailing_delimiter(rows: list[str], label: str) -> None:
 
 
 def test_host_binary_has_no_trailing_delimiter() -> None:
-    """The binary matching this host MUST exist and frame rows correctly."""
     host_dir = _BINARIES_ROOT / _host_platform_arch()
     dbgen_exe = _dbgen_in(host_dir)
     if dbgen_exe is None:
@@ -116,11 +90,6 @@ def test_host_binary_has_no_trailing_delimiter() -> None:
 
 
 def test_all_runnable_bundled_binaries_agree() -> None:
-    """Every bundled binary the host CAN run must share the convention.
-
-    Foreign-architecture binaries are skipped per-binary; across CI's Linux +
-    macOS runners the union covers the full platform matrix.
-    """
     binary_dirs = _bundled_binary_dirs()
     if not binary_dirs:
         pytest.skip("no bundled TPC-H binaries found")
@@ -128,10 +97,10 @@ def test_all_runnable_bundled_binaries_agree() -> None:
     checked: list[str] = []
     for directory in binary_dirs:
         dbgen_exe = _dbgen_in(directory)
-        assert dbgen_exe is not None  # guaranteed by _bundled_binary_dirs
+        assert dbgen_exe is not None
         rows = _generate_rows(dbgen_exe)
         if rows is None:
-            continue  # not executable on this host (foreign arch)
+            continue
         _assert_no_trailing_delimiter(rows, directory.name)
         checked.append(directory.name)
 

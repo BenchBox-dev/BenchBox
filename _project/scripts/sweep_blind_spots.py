@@ -1,22 +1,4 @@
 #!/usr/bin/env python3
-"""Triage and report on blind-spot findings.
-
-Subcommands::
-
-    list [--status STATUS] [--kind KIND]    Show matching findings (default: open).
-    show <id>                               Print one finding (frontmatter + body).
-    report                                  Counts by status + kind, oldest active first.
-    triage <id> --action ACTION [...]       Stamp frontmatter to record triage outcome.
-        --action dismiss [--reason "..."]
-        --action actioned [--reason "..."]
-        --action actionable --reason "..."
-        --action promote --todo-id <slug>
-
-Triage edits only the frontmatter and appends one line under a
-``## Triage log`` section. Triage does NOT author TODO files —
-``promote`` records the link to a TODO id you authored separately
-(see the DB tracker spec in ``_project/specs/todo-db-tracker.md``).
-"""
 
 from __future__ import annotations
 
@@ -43,7 +25,6 @@ SECTION_HEADING_RE = re.compile(r"(?m)^## .+$")
 
 
 def normalize_newlines(text: str) -> str:
-    """Normalize markdown line endings before parsing or rewriting."""
     return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
@@ -58,7 +39,6 @@ def find_blind_spots_dir(start: Path) -> Path:
 
 
 def split_frontmatter(text: str) -> tuple[dict, str, str]:
-    """Return (data, raw_frontmatter, body)."""
     text = normalize_newlines(text)
     m = FRONTMATTER_RE.match(text)
     if not m:
@@ -72,7 +52,6 @@ def split_frontmatter(text: str) -> tuple[dict, str, str]:
 
 
 def load_findings(bs_dir: Path) -> list[tuple[Path, dict, str]]:
-    """Load every finding (skipping README). Returns [(path, data, body), ...]."""
     out: list[tuple[Path, dict, str]] = []
     for path in sorted(bs_dir.glob("*.md")):
         if path.name == "README.md":
@@ -217,7 +196,6 @@ def cmd_report(bs_dir: Path, args: argparse.Namespace) -> int:
 
 
 def render_scalar_field(field: str, value: str) -> str:
-    """Render one simple YAML scalar assignment without reformatting the block."""
     rendered = yaml.safe_dump({field: value}, sort_keys=False, width=10_000).strip()
     if "\n" in rendered:
         raise ValueError(f"{field} must render as a single YAML line")
@@ -242,7 +220,6 @@ def replace_frontmatter_field(raw: str, field: str, value: str) -> str:
 
 
 def stamp_frontmatter(path: Path, raw_frontmatter: str, body: str, new_status: str, todo_id: str | None) -> None:
-    """Rewrite only status/todo_id while preserving the rest of the frontmatter."""
     new_raw = replace_frontmatter_field(raw_frontmatter, "status", new_status)
     if todo_id is not None:
         new_raw = replace_frontmatter_field(new_raw, "todo_id", todo_id)

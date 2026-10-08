@@ -1,24 +1,6 @@
-"""Regression tests for canonical platform type keys in tuning validation/metadata.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-From the 2026-07-12 tuning review, finding R1: adapters passed human display
-strings ("ClickHouse (Local)", "StarRocks", "Apache Doris") into
-TuningType's compatibility map, which is keyed by canonical types
-("clickhouse", "duckdb", ...). Multi-word display names matched nothing, so
-every enabled tuning type errored and tuned runs raised ValueError after data
-generation. Constraint types default to enabled=True, so even a bare
-UnifiedTuningConfiguration failed on any platform absent from the map.
-
-These tests pin the fix:
-- validate_for_platform returns only hard errors; constraint mismatches and
-  unknown-platform mismatches are warnings via validate_for_platform_detailed.
-- PlatformAdapter.canonical_platform_type sources the config type key and
-  falls back to a normalized platform_name.
-- TuningMetadataManager persists the canonical key, never the display name.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -46,14 +28,12 @@ DISPLAY_NAMES = ["StarRocks", "ClickHouse (Local)", "Doris", "Apache Doris"]
 
 
 class _StubAdapter(PlatformAdapter):
-    """Minimal concrete adapter for canonical_platform_type behavior."""
-
     def __init__(self, display_name: str = "StubPlatform", **config: Any):
         super().__init__(**config)
         self._display_name = display_name
 
     @staticmethod
-    def add_cli_arguments(parser) -> None:  # pragma: no cover - shim
+    def add_cli_arguments(parser) -> None:  # pragma: no cover
         return None
 
     @classmethod
@@ -90,8 +70,6 @@ class _StubAdapter(PlatformAdapter):
 
 
 class TestDisplayNameValidationNoLongerErrors:
-    """Default configs on display-name platforms must not hard-fail."""
-
     @pytest.mark.parametrize("display_name", DISPLAY_NAMES)
     def test_default_config_produces_no_errors_for_display_names(self, display_name):
         config = UnifiedTuningConfiguration()
@@ -102,8 +80,6 @@ class TestDisplayNameValidationNoLongerErrors:
         config = UnifiedTuningConfiguration()
         errors, warnings = config.validate_for_platform_detailed(display_name)
         assert errors == []
-        # Constraint types default to enabled=True and the display name is
-        # absent from the compatibility map, so they surface as warnings.
         assert len(warnings) == 4
         assert all("is not supported by platform" in w for w in warnings)
 
@@ -121,8 +97,6 @@ class TestDisplayNameValidationNoLongerErrors:
 
 
 class TestKnownPlatformSemanticsPreserved:
-    """Real incompatibilities on mapped platforms must still hard-error."""
-
     def test_is_known_platform(self):
         assert TuningType.is_known_platform("duckdb") is True
         assert TuningType.is_known_platform("DuckDB") is True
@@ -137,10 +111,6 @@ class TestKnownPlatformSemanticsPreserved:
             _PLATFORM_COMPATIBILITY_MAP,
         )
 
-        # _KNOWN_COMPATIBILITY_PLATFORMS is derived from the map, so these can
-        # never diverge; assert the derivation holds and pin the exact key set
-        # so accidental additions/removals fail loudly (the TODO forbids
-        # growing this map as a fix for unmapped platforms -- see ADR-3).
         assert frozenset(_PLATFORM_COMPATIBILITY_MAP) == _KNOWN_COMPATIBILITY_PLATFORMS
         assert (
             frozenset(
@@ -158,7 +128,6 @@ class TestKnownPlatformSemanticsPreserved:
             )
             == _KNOWN_COMPATIBILITY_PLATFORMS
         )
-        # Every mapped tuning type reports compatible for its platform.
         for platform, tuning_types in _PLATFORM_COMPATIBILITY_MAP.items():
             for tuning_type in tuning_types:
                 assert tuning_type.is_compatible_with_platform(platform) is True
@@ -172,7 +141,6 @@ class TestKnownPlatformSemanticsPreserved:
     def test_layout_incompatibility_on_known_platform_still_errors(self):
         config = UnifiedTuningConfiguration()
         config.disable_all_constraints()
-        # DISTRIBUTION is not in duckdb's compatibility set -> hard error.
         config.table_tunings["orders"] = TableTuning(
             table_name="orders",
             distribution=[TuningColumn(name="o_orderkey", type="INTEGER", order=1)],
@@ -188,12 +156,9 @@ class TestKnownPlatformSemanticsPreserved:
 
         errors = config.validate_for_platform("duckdb")
         assert any("'z_ordering'" in e for e in errors)
-        # ... but Z-ordering is fine on Databricks.
         assert config.validate_for_platform("databricks") == []
 
     def test_constraint_mismatch_on_known_platform_is_warning(self):
-        # clickhouse's map entry lacks FOREIGN_KEYS/CHECK_CONSTRAINTS, but
-        # constraints default enabled=True, so they downgrade to warnings.
         config = UnifiedTuningConfiguration()
         errors, warnings = config.validate_for_platform_detailed("clickhouse")
         assert errors == []
@@ -214,8 +179,6 @@ class TestKnownPlatformSemanticsPreserved:
 
 
 class TestCanonicalPlatformType:
-    """PlatformAdapter.canonical_platform_type sourcing and fallback."""
-
     def test_prefers_config_type_key(self):
         adapter = _StubAdapter(display_name="ClickHouse (Local)", type="clickhouse-local")
         assert adapter.canonical_platform_type == "clickhouse-local"
@@ -233,27 +196,16 @@ class TestCanonicalPlatformType:
         assert adapter.canonical_platform_type == "starrocks"
 
     def test_fallback_on_parenthesized_display_name_is_not_a_canonical_key(self):
-        # Pin the documented best-effort behavior: without an injected config
-        # type, a parenthesized display name normalizes to a non-canonical
-        # string (no paren-stripping surgery, per the TODO anti-patterns).
-        # This is exactly why get_platform_adapter injects config["type"].
         adapter = _StubAdapter(display_name="ClickHouse (Local)")
         assert adapter.canonical_platform_type == "clickhouse-(local)"
         assert TuningType.is_known_platform(adapter.canonical_platform_type) is False
 
     def test_injected_config_type_overrides_parenthesized_display_name(self):
-        # Simulates a factory-built adapter: get_platform_adapter sets
-        # config["type"] to the resolved canonical registry key.
         adapter = _StubAdapter(display_name="ClickHouse (Local)", type="clickhouse")
         assert adapter.canonical_platform_type == "clickhouse"
         assert TuningType.is_known_platform(adapter.canonical_platform_type) is True
 
     def test_registry_constructed_adapter_reports_canonical_type(self, tmp_path):
-        # Live-path regression: core/platform_config.py strips "type" before
-        # construction, so get_platform_adapter must re-inject the canonical
-        # registry key for canonical_platform_type to work on real adapters
-        # (including from_config implementations that rebuild their config
-        # with selected keys only, like DuckDB's).
         from benchbox.platforms import get_platform_adapter
 
         adapter = get_platform_adapter("duckdb", database_path=str(tmp_path / "t.duckdb"))
@@ -269,30 +221,25 @@ class TestCanonicalPlatformType:
     def test_validate_tuning_configuration_uses_canonical_key(self):
         adapter = _StubAdapter(display_name="StarRocks", type="starrocks")
         adapter.unified_tuning_configuration = UnifiedTuningConfiguration()
-        # Display-name formatting no longer manufactures errors.
         assert adapter.validate_tuning_configuration_for_platform() == []
         assert adapter.validate_tuning_configuration(UnifiedTuningConfiguration()) == []
 
 
 class _MetadataStubAdapter:
-    """Duck-typed adapter stub for TuningMetadataManager."""
-
     def __init__(self, platform_name: str, canonical_platform_type: str | None = None):
         self.platform_name = platform_name
         if canonical_platform_type is not None:
             self.canonical_platform_type = canonical_platform_type
         self.platform_config = {}
 
-    def create_connection(self, **_kwargs):  # pragma: no cover - not reached
+    def create_connection(self, **_kwargs):  # pragma: no cover
         return Mock()
 
-    def close_connection(self, _conn):  # pragma: no cover - not reached
+    def close_connection(self, _conn):  # pragma: no cover
         return None
 
 
 class TestMetadataPersistsCanonicalKey:
-    """TuningMetadataManager must persist the canonical type key."""
-
     def _saved_platforms(self, manager: TuningMetadataManager) -> set[str]:
         from benchbox.core.tuning.interface import BenchmarkTunings
 
@@ -305,9 +252,9 @@ class TestMetadataPersistsCanonicalKey:
         )
 
         captured: dict[str, Any] = {"records": None}
-        manager.create_metadata_table = lambda: True  # type: ignore[method-assign]
-        manager.clear_tunings = lambda _bn=None: True  # type: ignore[method-assign]
-        manager._batch_insert_records = lambda records: captured.__setitem__("records", records)  # type: ignore[method-assign]
+        manager.create_metadata_table = lambda: True
+        manager.clear_tunings = lambda _bn=None: True
+        manager._batch_insert_records = lambda records: captured.__setitem__("records", records)
 
         assert manager.save_tunings(tunings) is True
         assert captured["records"]

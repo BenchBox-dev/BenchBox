@@ -1,5 +1,3 @@
-"""Roll up merged shrink-campaign ledger fragments from a Git ref."""
-
 from __future__ import annotations
 
 import argparse
@@ -15,6 +13,9 @@ DEFAULT_TARGET_MIN = 12_000
 DEFAULT_TARGET_MAX = 19_000
 DEFAULT_REF = "origin/develop"
 DEFAULT_LEDGER_DIR = "_project/shrink-ledger"
+
+
+CLI_DESCRIPTION = "Roll up merged shrink-campaign ledger fragments from a Git ref."
 
 
 @dataclass(frozen=True)
@@ -88,7 +89,7 @@ def load_rows(ref: str, ledger_dir: str) -> list[LedgerRow]:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--ref", default=DEFAULT_REF, help="Git ref containing merged ledger fragments")
     parser.add_argument("--ledger-dir", default=DEFAULT_LEDGER_DIR, help="Ledger fragment directory")
     parser.add_argument(

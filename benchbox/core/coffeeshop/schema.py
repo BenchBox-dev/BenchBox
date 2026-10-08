@@ -1,5 +1,3 @@
-"""Canonical CoffeeShop benchmark schema aligned with the reference generator."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -27,18 +25,7 @@ _SPARK_FAMILY_DIALECTS = {"spark", "lakesail", "pyspark", "velox", "databricks"}
 
 
 def get_table_loading_order() -> list[str]:
-    """Get the FK-safe table load order for the full CoffeeShop schema.
 
-    Derived from each column's ``foreign_key: "table.column"`` metadata in
-    ``schema_specs.yaml`` via a stable topological sort, rather than a
-    hand-maintained constant, so it stays correct if the schema definitions
-    ever change. ``order_lines`` (the fact table) references
-    ``dim_locations``/``dim_products``, so it always sorts after both.
-
-    Returns:
-        All CoffeeShop table names, ordered so a table referenced by a
-        foreign key always precedes the table that references it.
-    """
     return get_fk_ordered_table_names_from_column_specs(TABLES)
 
 
@@ -47,8 +34,6 @@ def _column_type_for_dialect(column: dict[str, Any], dialect: str) -> str:
     if column["name"] == "order_time" and dialect.lower() in _SPARK_FAMILY_DIALECTS:
         return "STRING"
     if column_type == "TIME" and dialect.lower() == "clickhouse":
-        # ClickHouse TIME requires enable_time_time64_type=1 (experimental).
-        # Prefer portable remap to String ("HH:MM:SS").
         return "String"
     return column_type
 
@@ -59,7 +44,7 @@ def get_create_table_sql(
     enable_primary_keys: bool = True,
     enable_foreign_keys: bool = True,
 ) -> str:
-    """Generate a CREATE TABLE statement for the requested CoffeeShop table."""
+
     if table_name not in TABLES:
         raise ValueError(f"Unknown table: {table_name}")
 
@@ -90,7 +75,7 @@ def get_all_create_table_sql(
     enable_primary_keys: bool = True,
     enable_foreign_keys: bool = True,
 ) -> str:
-    """Render CREATE TABLE statements for all CoffeeShop tables in dependency order."""
+
     return "\n\n".join(
         get_create_table_sql(
             table_name,
@@ -103,7 +88,7 @@ def get_all_create_table_sql(
 
 
 def get_tunings() -> BenchmarkTunings:
-    """Return default tuning recommendations for the CoffeeShop schema."""
+
     tunings = BenchmarkTunings("coffeeshop")
     tunings.add_table_tuning(
         TableTuning(

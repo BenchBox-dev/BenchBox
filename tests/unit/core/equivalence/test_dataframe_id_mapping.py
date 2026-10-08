@@ -1,14 +1,6 @@
-"""Unit test: builder-local SQL-to-DataFrame ID maps cover every query ID.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Each supports_dataframe benchmark's SQL surface and DataFrame surface must
-correspond 1:1 through the benchmark's builder-local map (hand-authored dict
-or mechanical Q-prefix strip). A benchmark that gains an unmapped ID fails
-here so the gap is classified, not silently skipped.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -21,13 +13,13 @@ pytestmark = [
 
 
 def _q_strip(df_id: str) -> str:
-    """Mechanical DataFrame-to-SQL ID translation: strip the Q prefix."""
+
     assert df_id.startswith("Q"), f"DataFrame ID {df_id!r} does not use the Q-prefix convention"
     return df_id[1:]
 
 
 def test_dataframe_ids_map_to_sql_ids():
-    import benchbox.core.dataframe.benchmark_suite  # noqa: F401  # break tpch circular import
+    import benchbox.core.dataframe.benchmark_suite
     from benchbox.core.equivalence.builders.nyctaxi import NYCTAXI_SQL_TO_DF_IDS
     from benchbox.core.equivalence.builders.tsbs_devops import TSBS_DEVOPS_SQL_TO_DF_IDS
     from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark
@@ -45,7 +37,6 @@ def test_dataframe_ids_map_to_sql_ids():
 
     probe_dir = "/tmp/df-id-map-probe"
 
-    # Hand-authored maps: nyctaxi (25) and tsbs_devops (18).
     nyctaxi_sql = set(NYCTaxiBenchmark(scale_factor=0.01, output_dir=probe_dir).get_queries().keys())
     nyctaxi_df = set(NYCTAXI_DATAFRAME_QUERIES.get_query_ids())
     assert set(NYCTAXI_SQL_TO_DF_IDS.keys()) == nyctaxi_sql, (
@@ -68,7 +59,6 @@ def test_dataframe_ids_map_to_sql_ids():
         f"extra={sorted(set(TSBS_DEVOPS_SQL_TO_DF_IDS.values()) - tsbs_df)}"
     )
 
-    # Mechanical Q-prefix strip: tpch, tpcds, tpch_skew (SQL "N" <-> DF "QN").
     for label, benchmark, registry in [
         ("tpch", TPCH(scale_factor=0.01, output_dir=probe_dir), TPCH_DATAFRAME_QUERIES),
         ("tpcds", TPCDS(scale_factor=0.01, output_dir=probe_dir), TPCDS_DATAFRAME_QUERIES),
@@ -90,8 +80,6 @@ def test_dataframe_ids_map_to_sql_ids():
             f"unmapped DF={sorted(df_ids - {f'Q{s}' for s in sql_ids})}"
         )
 
-    # Read primitives: verbatim IDs; 4 DF-only fulltext/JSON IDs are classified
-    # DuckDB-unsupported exclusions, 5 SQL-only optimizer rows have no DF query.
     rp_benchmark = ReadPrimitivesBenchmark(scale_factor=0.05, output_dir=probe_dir)
     rp_sql_duckdb = set(rp_benchmark.get_queries(dialect="duckdb").keys())
     rp_df = set(get_dataframe_queries().get_query_ids())

@@ -13,32 +13,30 @@ The test suite is organized into tiers for different development workflows:
 **Fast Unit Tests** (~30 seconds, no external dependencies):
 ```bash
 make test-fast
-# or
 uv run -- python -m pytest -m fast
 ```
+Either command works. The `make` target wraps the pytest command.
 
 **Integration Tests** (~5 minutes, requires local databases):
 ```bash
 make test-integration
-# or
 uv run -- python -m pytest -m "integration and not live_integration"
 ```
 
 **E2E Tests** (validates complete CLI workflows):
 ```bash
-# Dry-run mode, fast
 uv run -- python -m pytest -m e2e_quick
 
-# Full E2E with local platforms
 uv run -- python -m pytest tests/e2e/ -v
 ```
+The first command runs in dry-run mode and is fast. The second runs full E2E tests with local platforms.
 
 **Full Suite** (requires all dependencies):
 ```bash
 make test-all
-# or
 uv run -- python -m pytest
 ```
+Either command works.
 
 ## Pytest xdist Safety
 
@@ -71,28 +69,23 @@ The suite is organized into:
 Run all smoke checks:
 ```bash
 make test-smoke
-# or
 uv run -- python -m pytest -m platform_smoke
 ```
+Either command works.
 
 Run specific platform smoke tests:
 ```bash
-# Local adapters (DuckDB/SQLite)
 uv run -- python -m pytest tests/integration/platforms/test_local_platforms_smoke.py
 
-# Cloud adapters with stubbed clients
-# Databricks
 uv run -- python -m pytest tests/integration/platforms/test_databricks_smoke.py
 
-# BigQuery
 uv run -- python -m pytest tests/integration/platforms/test_bigquery_smoke.py
 
-# Redshift
 uv run -- python -m pytest tests/integration/platforms/test_redshift_smoke.py
 
-# Snowflake
 uv run -- python -m pytest tests/integration/platforms/test_snowflake_smoke.py
 ```
+The first command covers the local adapters (DuckDB and SQLite). The rest cover the cloud adapters with stubbed clients: Databricks, BigQuery, Redshift, and Snowflake, in that order.
 
 Each test file installs lightweight client stubs automatically so you can run
 the suite without provisioning real services. Failures generally indicate a
@@ -113,15 +106,13 @@ The E2E test suite (`tests/e2e/`) provides comprehensive validation of CLI workf
 
 Run E2E tests:
 ```bash
-# Quick E2E (dry-run mode)
 uv run -- python -m pytest -m e2e_quick
 
-# Local platform tests (full execution)
 uv run -- python -m pytest -m e2e_local
 
-# All E2E tests
 uv run -- python -m pytest tests/e2e/ -v
 ```
+The commands run quick E2E tests (dry-run mode), local platform tests (full execution), and all E2E tests, in that order.
 
 See [E2E Testing Guide](../testing/e2e-testing.md) for detailed documentation.
 
@@ -171,17 +162,15 @@ full integration tests.
 To run tests that require specific dependencies:
 
 ```bash
-# Install cloud platform extras
 uv pip install -e ".[bigquery,databricks,snowflake]"
 
-# Run BigQuery tests
 make test-live-bigquery
-# or
 uv run -- python -m pytest -m bigquery
 
-# Run all tests including those requiring TPC binaries
 uv run -- python -m pytest --run-optional
 ```
+
+The first command installs the cloud platform extras. The next two run the BigQuery tests, either through the `make` target or through pytest directly. The last runs all tests, including those that require TPC binaries.
 
 ### Table-Format Integration Lane (Delta/Iceberg)
 

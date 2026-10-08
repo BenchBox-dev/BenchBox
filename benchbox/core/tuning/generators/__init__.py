@@ -1,26 +1,6 @@
-"""Platform-specific DDL generators.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This package contains DDL generators for each supported platform.
-Each generator implements the DDLGenerator protocol from
-benchbox.core.tuning.ddl_generator.
-
-Available generators:
-- DuckDBDDLGenerator: DuckDB with CTAS sorting patterns
-- RedshiftDDLGenerator: Redshift with DISTSTYLE/SORTKEY/ENCODE
-- SnowflakeDDLGenerator: Snowflake with CLUSTER BY
-- BigQueryDDLGenerator: BigQuery with PARTITION BY/CLUSTER BY
-- TrinoDDLGenerator: Trino/Presto with Hive/Iceberg/Delta connectors
-- AthenaDDLGenerator: AWS Athena with EXTERNAL TABLE support
-- PostgreSQLDDLGenerator: PostgreSQL with PARTITION BY/CLUSTER
-- TimescaleDBDDLGenerator: TimescaleDB with hypertables and compression
-- ClickHouseDDLGenerator: ClickHouse with MergeTree PARTITION BY/ORDER BY
-- DorisDDLGenerator: Apache Doris with DUPLICATE KEY/DISTRIBUTED BY HASH
-- QuestDBDDLGenerator: QuestDB with timestamp(), PARTITION BY, SYMBOL types
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from benchbox.core.tuning.ddl_generator import (
     BaseDDLGenerator,
@@ -94,50 +74,38 @@ from benchbox.core.tuning.generators.trino import (
 )
 
 __all__ = [
-    # Base classes and protocol
     "BaseDDLGenerator",
     "ColumnDefinition",
     "ColumnNullability",
     "DDLGenerator",
     "NoOpDDLGenerator",
     "TuningClauses",
-    # Azure Synapse
     "AzureSynapseDDLGenerator",
     "SynapseDistributionType",
     "SynapseIndexType",
-    # ClickHouse
     "ClickHouseDDLGenerator",
     "MergeTreeEngine",
-    # Doris
     "DorisDDLGenerator",
-    # DuckDB
     "DuckDBDDLGenerator",
-    # Firebolt
     "FireboltDDLGenerator",
-    # Redshift
     "ColumnEncoding",
     "DistStyle",
     "RedshiftDDLGenerator",
     "SortStyle",
-    # Snowflake
     "SearchOptimizationType",
     "SnowflakeDDLGenerator",
-    # BigQuery
     "BigQueryDDLGenerator",
     "PartitionGranularity",
-    # Trino/Presto/Athena
     "AthenaDDLGenerator",
     "ConnectorType",
     "FileFormat",
     "TrinoDDLGenerator",
-    # PostgreSQL/TimescaleDB/pg_duckdb/QuestDB
     "PartitionStrategy",
     "PostgreSQLDDLGenerator",
     "PgDuckDBDDLGenerator",
     "PgMooncakeDDLGenerator",
     "QuestDBDDLGenerator",
     "TimescaleDBDDLGenerator",
-    # Spark Family (Delta, Iceberg, Parquet, Hive)
     "DeltaDDLGenerator",
     "HiveDDLGenerator",
     "IcebergDDLGenerator",

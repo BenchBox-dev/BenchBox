@@ -1,19 +1,9 @@
-"""TPC-DI business intelligence analytical query suite.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides comprehensive analytical queries for TPC-DI covering
-customer profitability analysis, security performance analysis, broker
-performance metrics, market trend analysis, and portfolio analysis.
+# TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-DI specification.
 
-These queries demonstrate realistic business intelligence workloads on the
-complete TPC-DI data warehouse schema with 16 tables.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DI specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import json
 from functools import lru_cache
@@ -55,8 +45,6 @@ def _analytical_query_data() -> dict[str, Any]:
 
 
 class TPCDIAnalyticalQueries(ParameterizedQueryManager):
-    """TPC-DI business intelligence analytical query manager."""
-
     invalid_query_label = "analytical query"
 
     def __init__(self) -> None:

@@ -1,13 +1,6 @@
-"""
-Copyright 2026 Joe Harris / BenchBox Project
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Licensed under the MIT License. See LICENSE file in the project root for details.
-
-Core Report Generation Utilities
-
-This module provides functions to generate formatted string reports from
-benchmark results and other data structures.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from typing import Any
 
@@ -15,15 +8,6 @@ from benchbox.utils import format_duration
 
 
 def generate_report(result_data: dict[str, Any], verbosity: int = 0) -> str:
-    """Generate a formatted string report from benchmark results.
-
-    Args:
-        result_data: Dictionary containing benchmark results.
-        verbosity: Verbosity level (0=minimal, 1=detailed).
-
-    Returns:
-        A formatted, multi-line string representing the benchmark report.
-    """
     report_lines = []
     benchmark_name = result_data.get("benchmark", "unknown").upper()
 

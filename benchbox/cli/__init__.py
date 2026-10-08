@@ -1,14 +1,6 @@
-"""
-Copyright 2026 Joe Harris / BenchBox Project
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Licensed under the MIT License. See LICENSE file in the project root for details.
-
-CLI utilities for BenchBox.
-
-NOTE: This module uses lazy imports to avoid loading the entire CLI command
-tree (and its heavy transitive dependencies like polars/datafusion) when
-only lightweight submodules such as ``platform_hooks`` are needed.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -19,7 +11,6 @@ __all__ = ["main"]
 
 
 def __getattr__(name: str) -> Any:
-    # Lazy-load any submodule (main, commands, orchestrator, cloud_storage, etc.)
     try:
         module = importlib.import_module(f"{__name__}.{name}")
     except ModuleNotFoundError:

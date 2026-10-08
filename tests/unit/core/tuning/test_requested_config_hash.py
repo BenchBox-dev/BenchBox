@@ -1,15 +1,6 @@
-"""Unit tests for UnifiedTuningConfiguration.get_configuration_hash().
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Covers ADR-1's requested_config_hash contract
-(docs/development/tuning-adr-001-trust-and-hash-semantics.md): a full
-64-hex-char SHA-256 over canonical JSON (sort_keys, compact separators) of
-UnifiedTuningConfiguration.to_dict(), stable regardless of attribute/dict
-insertion order and distinct for differing configurations.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -44,9 +35,6 @@ def test_hash_is_deterministic_for_the_same_configuration():
 
 
 def test_hash_is_stable_across_construction_and_insertion_ordering():
-    """Two configs built with attributes/table_tunings added in different
-    orders must hash identically - the hash is over canonical (sort_keys)
-    JSON, not insertion order."""
     config_a = UnifiedTuningConfiguration()
     config_a.table_tunings["lineitem"] = TableTuning(
         table_name="lineitem", sorting=[TuningColumn(name="l_orderkey", type="INTEGER", order=1)]
@@ -58,7 +46,6 @@ def test_hash_is_stable_across_construction_and_insertion_ordering():
     config_a.platform_optimizations.z_ordering_enabled = True
     config_a.platform_optimizations.z_ordering_columns = ["a", "b"]
 
-    # Same logical configuration, built in the opposite order.
     config_b = UnifiedTuningConfiguration()
     config_b.platform_optimizations.z_ordering_columns = ["a", "b"]
     config_b.platform_optimizations.z_ordering_enabled = True

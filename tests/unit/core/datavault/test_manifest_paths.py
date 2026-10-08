@@ -1,5 +1,3 @@
-"""Regression tests for Data Vault manifest path normalization."""
-
 import json
 from datetime import datetime
 from pathlib import Path

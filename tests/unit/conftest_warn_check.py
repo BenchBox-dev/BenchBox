@@ -1,12 +1,3 @@
-"""Verifies the unreasoned-skip warn hook catches markers missing ``reason=``.
-
-The hook itself runs from ``pytest_collection_finish`` in ``tests/conftest.py``
-(NOT ``pytest_collection_modifyitems`` - that hook name is forbidden by the
-no-collection-time-marker-rewrite policy in ``tests/unit/test_marker_strategy.py``).
-This test exercises the hook's private helper directly with synthetic markers
-so it doesn't depend on spawning pytest-in-pytest.
-"""
-
 from __future__ import annotations
 
 import warnings
@@ -54,7 +45,6 @@ def test_hook_warns_on_unreasoned_skip(monkeypatch) -> None:
     assert any("bad::skip: @pytest.mark.skip without reason=" in m for m in messages)
     assert any("bad::skipif_no_reason: @pytest.mark.skipif without reason=" in m for m in messages)
     assert any("bad::xfail: @pytest.mark.xfail without reason=" in m for m in messages)
-    # Reasoned markers: no warning emitted
     assert not any("ok::" in m for m in messages)
 
 

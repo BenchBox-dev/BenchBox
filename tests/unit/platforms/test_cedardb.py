@@ -1,11 +1,6 @@
-"""Tests for CedarDB platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the CedarDBAdapter for PostgreSQL-compatible OLAP/OLTP support.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import Mock, patch
 
@@ -23,27 +18,19 @@ pytestmark = [
 
 @pytest.fixture()
 def cedardb_stubs(monkeypatch):
-    """Patch psycopg objects so tests don't require the real driver.
 
-    Must patch both cedardb and postgresql modules since CedarDBAdapter
-    inherits from PostgreSQLAdapter which checks for psycopg in its __init__.
-    """
     mock_psycopg = Mock()
     mock_psycopg.__version__ = "3.1.0"
 
-    # Patch postgresql module - parent checks for psycopg in its __init__
     monkeypatch.setattr(postgresql_module, "psycopg", mock_psycopg)
 
-    # Prevent saved local credentials from bleeding into unit tests
     with patch("benchbox.security.credentials.CredentialManager.get_platform_credentials", return_value={}):
         yield mock_psycopg
 
 
 class TestCedarDBAdapter:
-    """Unit tests for CedarDB adapter wiring and properties."""
-
     def test_initialization_defaults(self, cedardb_stubs):
-        """Adapter should initialize with CedarDB defaults."""
+
         adapter = CedarDBAdapter()
 
         assert adapter.platform_name == "CedarDB"
@@ -55,7 +42,7 @@ class TestCedarDBAdapter:
         assert adapter.schema == "public"
 
     def test_initialization_with_config(self, cedardb_stubs):
-        """Adapter should accept custom configuration."""
+
         adapter = CedarDBAdapter(
             host="cedardb.example.com",
             port=5433,
@@ -73,14 +60,14 @@ class TestCedarDBAdapter:
         assert adapter.schema == "analytics"
 
     def test_dialect_is_postgres(self, cedardb_stubs):
-        """CedarDB should use PostgreSQL dialect (wire-protocol compatible)."""
+
         adapter = CedarDBAdapter()
 
         assert adapter.get_target_dialect() == POSTGRES_DIALECT
         assert adapter.get_target_dialect() == "postgres"
 
     def test_from_config_basic(self, cedardb_stubs):
-        """from_config should create adapter with correct settings."""
+
         config = {
             "host": "cedardb.local",
             "port": 5434,
@@ -94,7 +81,7 @@ class TestCedarDBAdapter:
         assert adapter.database == "test_analytics"
 
     def test_from_config_generates_database_name(self, cedardb_stubs):
-        """from_config should generate database name from benchmark config."""
+
         config = {
             "benchmark": "tpch",
             "scale_factor": 1.0,
@@ -105,7 +92,7 @@ class TestCedarDBAdapter:
         assert adapter.database == "benchbox_tpch_sf1"
 
     def test_from_config_uses_provided_database(self, cedardb_stubs):
-        """from_config should prefer explicit database name over generated one."""
+
         config = {
             "database": "explicit_db",
             "benchmark": "tpch",
@@ -117,7 +104,7 @@ class TestCedarDBAdapter:
         assert adapter.database == "explicit_db"
 
     def test_inherits_postgresql_connection_params(self, cedardb_stubs):
-        """CedarDB adapter should inherit PostgreSQL connection parameter handling."""
+
         adapter = CedarDBAdapter(
             host="cedardb.example.com",
             port=5434,
@@ -139,7 +126,7 @@ class TestCedarDBAdapter:
         assert params["connect_timeout"] == 15
 
     def test_get_platform_info_basic(self, cedardb_stubs):
-        """Platform info should show CedarDB details."""
+
         adapter = CedarDBAdapter()
 
         info = adapter.get_platform_info(connection=None)
@@ -148,7 +135,7 @@ class TestCedarDBAdapter:
         assert info["platform_name"] == "CedarDB"
 
     def test_get_platform_info_with_connection(self, cedardb_stubs):
-        """Platform info should include version string when connection provided."""
+
         adapter = CedarDBAdapter()
 
         mock_conn = Mock()
@@ -164,10 +151,8 @@ class TestCedarDBAdapter:
 
 
 class TestCedarDBTuningTypes:
-    """Tests for CedarDB tuning type support."""
-
     def test_supports_tuning_type(self, cedardb_stubs):
-        """CedarDB should support standard PostgreSQL tuning types (except distribution)."""
+
         adapter = CedarDBAdapter()
 
         from benchbox.core.tuning.interface import TuningType
@@ -181,10 +166,8 @@ class TestCedarDBTuningTypes:
 
 
 class TestCedarDBRegistration:
-    """Tests for CedarDB platform registration."""
-
     def test_cedardb_in_platform_registry(self, cedardb_stubs):
-        """CedarDB should be registered in platform registry."""
+
         from benchbox.core.platform_registry import PlatformRegistry, auto_register_platforms
 
         auto_register_platforms()
@@ -193,7 +176,7 @@ class TestCedarDBRegistration:
         assert PlatformRegistry._adapters["cedardb"] == CedarDBAdapter
 
     def test_cedardb_metadata(self, cedardb_stubs):
-        """CedarDB should have correct metadata in registry."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         metadata = PlatformRegistry._build_platform_metadata()
@@ -204,10 +187,8 @@ class TestCedarDBRegistration:
 
 
 class TestCedarDBConfigBuilder:
-    """Tests for CedarDB configuration builder function."""
-
     def test_config_builder_basic(self, cedardb_stubs):
-        """Config builder should produce correct DatabaseConfig."""
+
         from benchbox.platforms.cedardb import _build_cedardb_config
 
         options = {"host": "localhost", "port": 5432}
@@ -220,7 +201,7 @@ class TestCedarDBConfigBuilder:
         assert config.type == "cedardb"
 
     def test_config_builder_defaults(self, cedardb_stubs):
-        """Config builder should apply defaults for missing options."""
+
         from benchbox.platforms.cedardb import _build_cedardb_config
 
         config = _build_cedardb_config("cedardb", {}, {}, None)
@@ -231,7 +212,7 @@ class TestCedarDBConfigBuilder:
         assert config.sslmode == "prefer"
 
     def test_config_builder_merges_overrides(self, cedardb_stubs):
-        """Config builder should apply overrides over options."""
+
         from benchbox.platforms.cedardb import _build_cedardb_config
 
         options = {"host": "cedardb.local"}
@@ -244,7 +225,7 @@ class TestCedarDBConfigBuilder:
         assert config.scale_factor == 10.0
 
     def test_config_builder_custom_port(self, cedardb_stubs):
-        """Config builder should accept custom port."""
+
         from benchbox.platforms.cedardb import _build_cedardb_config
 
         config = _build_cedardb_config("cedardb", {"port": 5434}, {}, None)
@@ -252,7 +233,7 @@ class TestCedarDBConfigBuilder:
         assert config.port == 5434
 
     def test_config_builder_returns_database_config(self, cedardb_stubs):
-        """Config builder should return a DatabaseConfig instance."""
+
         from benchbox.core.schemas import DatabaseConfig
         from benchbox.platforms.cedardb import _build_cedardb_config
 

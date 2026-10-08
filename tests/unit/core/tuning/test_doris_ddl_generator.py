@@ -1,12 +1,6 @@
-"""Tests for benchbox.core.tuning.generators.doris.DorisDDLGenerator.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Focused on the generator class itself - DDL string content and TuningClauses
-field values. Does not duplicate the adapter-level tests in test_doris_adapter.py.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -34,8 +28,6 @@ class TestGenerateTuningClausesLineitem:
         assert clauses.sort_by == "l_orderkey, l_linenumber"
 
     def test_distribute_by_lineitem(self, gen_tpch):
-        # Rendered-SQL contract: distribute_by holds the full DISTRIBUTED BY
-        # clause, never a bare column name.
         clauses = gen_tpch.generate_tuning_clauses(TableTuning(table_name="lineitem"))
         assert clauses.distribute_by == "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 10"
 
@@ -48,8 +40,6 @@ class TestGenerateTuningClausesLineitem:
         assert "l_orderkey" in clauses.table_properties["bloom_filter_columns"]
 
     def test_distribution_rendered_once_in_distribute_by(self, gen_tpch):
-        # The rendered clause lives in distribute_by (not additional_clauses),
-        # so dry-run preview emits it exactly once with no stray bare column.
         clauses = gen_tpch.generate_tuning_clauses(TableTuning(table_name="lineitem"))
         assert clauses.additional_clauses == []
         assert clauses.distribute_by == "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 10"
@@ -64,8 +54,6 @@ class TestGenerateTuningClausesLineitem:
 
 
 class TestPartitionByRenderedContract:
-    """partition_by holds the full PARTITION BY RANGE clause, never bare columns."""
-
     def test_partition_by_stored_rendered(self, gen_tpch):
         from benchbox.core.tuning.interface import TuningColumn
 

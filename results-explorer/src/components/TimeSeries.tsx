@@ -1,16 +1,3 @@
-// ---------------------------------------------------------------------------
-// TimeSeries - line chart of performance metric over time
-//
-// Shows geomean_ms or power_score (depending on benchmark) over run_date.
-// One line per platform_id group.  Requires ≥2 data points per series.
-//
-// Input: ChartHistoricalEntry[] (all entries for one or more platforms,
-//        sorted by platform_id + run_date internally). Both ChartHistoricalEntry
-//        and DuckDB row shapes satisfy the narrow interface.
-//
-// Python reference: textcharts.line_chart.LineChart
-// ---------------------------------------------------------------------------
-
 import type { ChartHistoricalEntry } from "@/lib/chartRegistry";
 import { useElementSize } from "@/lib/useElementSize";
 import { axisLabelAnchor, chartFrame } from "@/lib/chartFrame";
@@ -34,18 +21,10 @@ const CHART_H = 160;
 
 interface Props {
   entries: ChartHistoricalEntry[];
-  /**
-   * Primary metric to chart - `"power_score"` (higher-is-better) or
-   * `"display_geomean_ms"` (lower-is-better). The caller resolves this from
-   * the canonical `benchmark_rankings.primary_metric` column; omitted means
-   * geomean.
-   */
   primaryMetric?: "power_score" | "display_geomean_ms";
 }
 
 interface SeriesPoint {
-  /** Stable per-run identifier; used as the React key so two runs on the
-   *  same `date` (common for batch runs) don't collide on `key={date}`. */
   resultId: string;
   date: string;
   value: number;
@@ -69,9 +48,6 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
   const metric = primaryMetric ?? "display_geomean_ms";
   const higherIsBetter = metric === "power_score";
 
-  // Defensive dedup on result_id: TimeSeries trusts the caller, but if any
-  // upstream JOIN regression ever produces duplicate entries the chart
-  // would silently render stacked points. Drop the second copy.
   const seenIds = new Set<string>();
   const dedupedEntries: ChartHistoricalEntry[] = [];
   for (const e of entries) {
@@ -85,7 +61,6 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
     duplicateDayGroups.flatMap((group) => group.runs.map(({ entry }) => entry.platform_id)),
   );
 
-  // Group by platform_id, sort by run_date within each group
   const byPlatform = new Map<string, ChartHistoricalEntry[]>();
   for (const e of dedupedEntries) {
     const arr = byPlatform.get(e.platform_id) ?? [];
@@ -93,13 +68,6 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
     byPlatform.set(e.platform_id, arr);
   }
 
-  // Build the per-platform series first, then disambiguate series labels
-  // when two platform_ids share a display name (e.g. two DataFusion
-  // tracks differing only by platform_id). RunIdentity natural qualifiers
-  // (driver_version, deployment, etc.) aren't carried on
-  // ChartHistoricalEntry, so the cohort-aware formatter falls through to
-  // its short result_id tiebreaker — better than two indistinguishable
-  // "DataFusion" entries in the legend.
   let colorIdx = 0;
   const seriesDescriptors: { pid: string; firstEntry: ChartHistoricalEntry; points: SeriesPoint[] }[] = [];
   for (const [pid, platformEntries] of byPlatform) {
@@ -183,7 +151,6 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
 
   function yFor(val: number): number {
     const normalized = (val - yMin) / yRange;
-    // Higher value → top of chart for power_score; bottom for latency
     const pos = higherIsBetter ? normalized : 1 - normalized;
     return PADDING_TOP + CHART_H * (1 - pos);
   }
@@ -200,7 +167,6 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
       />
     ) : null;
 
-  // Show at most 7 x-axis labels when there are many dates
   const step = Math.ceil(allDates.length / 7);
   const shownDates = allDates.filter((_, i) => i % step === 0 || i === allDates.length - 1);
 
@@ -216,7 +182,6 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
           role="img"
           aria-label={`${metricLabel} trend over time`}
         >
-          {/* Y-axis grid + labels */}
           {yTicks.map((val, index) => {
             const y = yFor(val);
             const label =
@@ -245,7 +210,6 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
             );
           })}
 
-        {/* Series lines + dots */}
         {allSeries.map((s) => {
           const d = s.points
             .map(
@@ -274,7 +238,6 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
           );
         })}
 
-        {/* X-axis */}
         <g transform={`translate(0, ${PADDING_TOP + CHART_H})`}>
           <line x1={LABEL_W} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="var(--bb-chart-grid)" stroke-width={1} />
           {shownDates.map((date) => {
@@ -298,7 +261,6 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
         </g>
         </svg>
 
-        {/* Legend */}
         {allSeries.length > 1 && (
           <div class="flex flex-wrap gap-4 text-xs text-[var(--bb-data-fg-muted)] mt-1">
             {allSeries.map((s) => (

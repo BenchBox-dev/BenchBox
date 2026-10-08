@@ -1,28 +1,3 @@
-"""Spark / Databricks query plan parser.
-
-Parses the ``== Physical Plan ==`` section of Spark's ``EXPLAIN EXTENDED`` output
-into the harmonized ``QueryPlanDAG``. ``EXPLAIN EXTENDED`` emits four sections
-(Parsed / Analyzed / Optimized Logical Plan and Physical Plan); only the physical
-plan is parsed, since it is the most stable across Spark versions for
-fingerprinting.
-
-The physical plan uses Spark's ``TreeNode.treeString`` drawing, where nesting is
-encoded by fixed 3-character prefix groups (``+- ``/``:- `` connectors and
-``:  ``/``   `` ancestor fillers) and operators may carry a ``*(n) `` whole-stage
-codegen marker, e.g.::
-
-    *(3) HashAggregate(keys=[...], functions=[...])
-    +- Exchange hashpartitioning(...)
-       +- *(2) BroadcastHashJoin [...], Inner, BuildRight
-          :- *(2) Filter isnotnull(...)
-          :  +- FileScan parquet default.lineitem[...]
-          +- BroadcastExchange ...
-             +- FileScan parquet default.orders[...]
-
-Operator depth is the number of leading 3-char prefix groups; the operator name
-is the first word after stripping the connector and codegen marker.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -40,10 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 class SparkQueryPlanParser(QueryPlanParser):
-    """Parser for Spark / Databricks ``EXPLAIN EXTENDED`` physical-plan text."""
-
-    # Ordered (substring, type) pairs; first match in the lower-cased operator
-    # name wins, so specific names precede the generic ones they contain.
     _OPERATOR_KEYWORDS: tuple[tuple[str, LogicalOperatorType], ...] = (
         ("filescan", LogicalOperatorType.SCAN),
         ("inmemorytablescan", LogicalOperatorType.SCAN),
@@ -72,16 +43,13 @@ class SparkQueryPlanParser(QueryPlanParser):
         ("union", LogicalOperatorType.UNION),
         ("filter", LogicalOperatorType.FILTER),
         ("project", LogicalOperatorType.PROJECT),
-        # Exchange / shuffle / codegen wrappers have no dedicated logical type.
         ("broadcastexchange", LogicalOperatorType.OTHER),
         ("shuffleexchange", LogicalOperatorType.OTHER),
         ("exchange", LogicalOperatorType.OTHER),
     )
 
     _PHYSICAL_HEADER = "== Physical Plan =="
-    # One nesting level: a connector ("+- "/":- ") or an ancestor filler (":  "/"   ").
     _PREFIX_RE = re.compile(r"^((?:\+- |:- |:  |   )*)(.*)$")
-    # Optional whole-stage codegen marker, e.g. "*(3) " or "* ".
     _CODEGEN_RE = re.compile(r"^\*(?:\(\d+\))?\s*")
 
     def __init__(self):
@@ -90,12 +58,6 @@ class SparkQueryPlanParser(QueryPlanParser):
     def _parse_impl(self, query_id: str, explain_output: str) -> QueryPlanDAG:
         if not explain_output or not explain_output.strip():
             raise ValueError("Empty EXPLAIN output")
-        # An EXPLAIN-failure error string is not a plan; reject it so the capture
-        # path records a failure instead of a bogus one-node "Other" plan /
-        # fingerprint. (qpc-13: the "Could not get query plan" producers now
-        # return None instead; both the remaining "Failed to get query plan"
-        # prefix and the retired "Could not" prefix stay rejected as defense
-        # so stray error text can never parse as a plan.)
         if explain_output.lstrip().startswith(("Failed to get query plan", "Could not get query plan")):
             raise ValueError("EXPLAIN returned an error message, not a plan")
 
@@ -113,11 +75,6 @@ class SparkQueryPlanParser(QueryPlanParser):
         )
 
     def _extract_physical_section(self, explain_output: str) -> str:
-        """Return the text after the last ``== Physical Plan ==`` header.
-
-        Bare ``EXPLAIN`` (no EXTENDED) returns only the physical plan with no
-        header, so when the header is absent the whole text is used.
-        """
         idx = explain_output.rfind(self._PHYSICAL_HEADER)
         if idx == -1:
             return explain_output
@@ -130,7 +87,6 @@ class SparkQueryPlanParser(QueryPlanParser):
                 continue
             prefix, rest = self._PREFIX_RE.match(raw_line).groups()
             rest = rest.strip()
-            # Skip AQE sub-section headers like "== Initial Plan ==".
             if rest.startswith("==") and rest.endswith("=="):
                 continue
             depth = len(prefix) // 3
@@ -153,8 +109,6 @@ class SparkQueryPlanParser(QueryPlanParser):
                 if root is None:
                     root = logical_op
                 else:
-                    # A second depth-0 node (rare) becomes a child of the root so a
-                    # single connected DAG is always returned.
                     root.children.append(logical_op)
             else:
                 stack[-1][1].children.append(logical_op)
@@ -197,11 +151,8 @@ class SparkQueryPlanParser(QueryPlanParser):
 
     @staticmethod
     def _extract_table(details: str) -> str | None:
-        """Extract the table from a FileScan/Scan detail, e.g. 'FileScan parquet default.lineitem[...]'."""
-        # FileScan <format> <db.table>[columns...]
         match = re.search(r"(?:FileScan|Scan)\s+\w+\s+([A-Za-z_][\w.]*)", details)
         if match:
             return match.group(1)
-        # Fallback: a dotted identifier anywhere (e.g. "Scan hive default.orders").
         dotted = re.search(r"\b([A-Za-z_]\w*\.[A-Za-z_][\w.]*)", details)
         return dotted.group(1) if dotted else None

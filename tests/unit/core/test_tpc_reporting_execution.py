@@ -1,5 +1,3 @@
-"""Coverage tests for remaining TPC-DS/TPC-H reporting and execution modules."""
-
 from __future__ import annotations
 
 import subprocess
@@ -213,7 +211,6 @@ def test_dsdgen_runner_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     out = tmp_path / "out"
     out.mkdir()
 
-    # find/build fast path
     fake_result = SimpleNamespace(status=1, binary_path=runner.dsdgen_exe, error_message=None)
     monkeypatch.setattr(
         "benchbox.core.tpcds.generator.runner.ensure_tpc_binaries",
@@ -225,7 +222,6 @@ def test_dsdgen_runner_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     )
     assert runner._find_or_build_dsdgen() == runner.dsdgen_exe
 
-    # run single-threaded dispatch
     called = {"streaming": 0, "file": 0, "parallel": 0}
     monkeypatch.setattr(runner, "_run_streaming_dsdgen", lambda _o: called.__setitem__("streaming", 1))
     monkeypatch.setattr(runner, "_run_file_based_dsdgen", lambda _o: called.__setitem__("file", 1))
@@ -270,7 +266,6 @@ def test_tpcds_power_and_official_benchmark_helpers(monkeypatch: pytest.MonkeyPa
     assert power._calculate_power_at_size([1.0, 2.0]) > 0
     assert power.get_status()["query_sequence_length"] >= 2
 
-    # helper branches
     power._connect_database()
     power._warm_up_database()
     single = power._execute_query(1, "select 1")
@@ -299,7 +294,6 @@ def test_tpcds_power_and_official_benchmark_helpers(monkeypatch: pytest.MonkeyPa
     assert "power_at_size" in power.compare_results(out, out)
     power._disconnect_database()
 
-    # Official benchmark: monkeypatch phase classes to avoid heavy execution.
     monkeypatch.setattr("benchbox.core.tpcds.official_benchmark.TPCDSBenchmark", lambda **kwargs: SimpleNamespace())
     ob = TPCDSOfficialBenchmark(scale_factor=1.0, output_dir=tmp_path)
 
@@ -384,7 +378,6 @@ def test_tpch_throughput_and_maintenance_core_paths(monkeypatch: pytest.MonkeyPa
     )
     cfg = TPCHThroughputTestConfig(scale_factor=1.0, num_streams=2, max_workers=2, stream_timeout=0)
 
-    # Cover run() and success/failure checks by stubbing stream execution.
     ok_stream = TPCHThroughputStreamResult(
         stream_id=0,
         start_time=1.0,
@@ -400,7 +393,6 @@ def test_tpch_throughput_and_maintenance_core_paths(monkeypatch: pytest.MonkeyPa
     assert run_out.streams_executed == 2
     assert tp.validate_results(run_out) is True
 
-    # Execute one real stream path for coverage.
     stream = tp._execute_stream(0, 42, cfg)
     assert stream.queries_executed == 22
 
@@ -463,7 +455,6 @@ def test_tpcds_dsdgen_runner_error_and_fallback_paths(monkeypatch: pytest.Monkey
     out = tmp_path / "out"
     out.mkdir()
 
-    # _find_or_build_dsdgen: fallback executable exists but isn't executable.
     exe = runner.dsdgen_path / "dsdgen.exe"
     exe.write_text("x", encoding="utf-8")
     monkeypatch.setattr("benchbox.core.tpcds.generator.runner.platform.system", lambda: "Windows")
@@ -472,7 +463,6 @@ def test_tpcds_dsdgen_runner_error_and_fallback_paths(monkeypatch: pytest.Monkey
     with pytest.raises(PermissionError):
         runner._find_or_build_dsdgen()
 
-    # _find_or_build_dsdgen: neither compiler nor fallback executable available.
     exe.unlink()
     failed_result = SimpleNamespace(status=None, binary_path=None, error_message="build failed")
     monkeypatch.setattr(
@@ -481,7 +471,6 @@ def test_tpcds_dsdgen_runner_error_and_fallback_paths(monkeypatch: pytest.Monkey
     with pytest.raises(RuntimeError, match="Auto-compilation failed"):
         runner._find_or_build_dsdgen()
 
-    # _run_file_based_dsdgen: subprocess failure path.
     monkeypatch.setattr(runner, "should_use_compression", lambda: False)
 
     def _raise_called_process(*_a, **_k):
@@ -491,12 +480,10 @@ def test_tpcds_dsdgen_runner_error_and_fallback_paths(monkeypatch: pytest.Monkey
     with pytest.raises(RuntimeError, match="exit code 2"):
         runner._run_file_based_dsdgen(out)
 
-    # _run_parallel_streaming_dsdgen: aggregated error path.
     monkeypatch.setattr(runner, "should_use_compression", lambda: True)
     with pytest.raises(RuntimeError, match="parallel generation failed"):
         runner._run_parallel_streaming_dsdgen(out)
 
-    # _run_parallel_file_based_dsdgen: chunk-level and aggregated error path.
     monkeypatch.setattr("benchbox.core.tpcds.generator.runner.subprocess.run", _raise_called_process)
     with pytest.raises(RuntimeError, match="parallel file-based generation failed"):
         runner._run_parallel_file_based_dsdgen(out)
@@ -504,7 +491,7 @@ def test_tpcds_dsdgen_runner_error_and_fallback_paths(monkeypatch: pytest.Monkey
 
 @pytest.mark.skipif(sys.platform == "win32", reason="TPC-DS dsqgen binary is unstable on Windows CI")
 def test_tpcds_c_tools_and_dsqgen_helpers(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
-    # _resolve_tpcds_tool_and_template_paths fallback path.
+
     fake_compiler = SimpleNamespace(precompiled_base=None)
     monkeypatch.setattr("benchbox.core.tpcds.c_tools.get_tpc_compiler", lambda auto_compile=False: fake_compiler)
     monkeypatch.setattr("benchbox.utils.tpc_compilation.get_tpc_templates_dir", lambda _name: tmp_path / "templates")
@@ -512,7 +499,6 @@ def test_tpcds_c_tools_and_dsqgen_helpers(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert "_sources/tpc-ds/tools" in str(tools_path)
     assert str(templates_path).endswith("templates/query_templates")
 
-    # TPCDSCTools lightweight paths and info methods.
     gen = SimpleNamespace(generate=lambda qid, **kwargs: f"Q{qid}-{kwargs.get('dialect', 'x')}")
     monkeypatch.setattr("benchbox.core.tpcds.c_tools.DSQGenBinary", lambda: gen)
     monkeypatch.setattr(
@@ -544,7 +530,6 @@ def test_tpcds_c_tools_and_dsqgen_helpers(monkeypatch: pytest.MonkeyPatch, tmp_p
     dsq._query_cache = {}
     dsq._supported_dialects = {"ansi", "netezza"}
 
-    # _find_dsqgen_or_fail fallback and failure branches.
     fallback_dsqgen = dsq.tools_dir / "dsqgen"
     fallback_dsqgen.write_text("", encoding="utf-8")
     monkeypatch.setattr("benchbox.core.tpcds.c_tools.ensure_tpc_binaries", lambda *_a, **_k: {"dsqgen": None})
@@ -555,7 +540,6 @@ def test_tpcds_c_tools_and_dsqgen_helpers(monkeypatch: pytest.MonkeyPatch, tmp_p
     with pytest.raises(RuntimeError, match="Auto-compilation failed"):
         dsq._find_dsqgen_or_fail()
 
-    # parser, variations, validation, cache paths.
     assert dsq._parse_query_id("14a") == (14, "a")
     assert dsq._parse_query_id("7") == (7, None)
     with pytest.raises(ValueError):
@@ -579,7 +563,6 @@ def test_tpcds_c_tools_and_dsqgen_helpers(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert dsq.validate_query_id("1a") is True
     assert dsq.validate_query_id("99b") is False
 
-    # _clean_sql branch-heavy normalization.
     dirty = """
     -- c
     set rowcount 10
@@ -709,5 +692,5 @@ def test_tpch_maintenance_helpers_and_integrity(monkeypatch: pytest.MonkeyPatch)
             raise RuntimeError("cannot execute")
 
     maint_broken = TPCHMaintenanceTest(connection_factory=BrokenConn, scale_factor=1.0, verbose=True)
-    # When all integrity checks throw, no violations are detected, so result is True (passed).
+
     assert maint_broken.validate_data_integrity() is True

@@ -48,55 +48,52 @@ This guide provides information for developers who want to contribute to BenchBo
 BenchBox uses `pytest` for testing. Run tests using either `make` commands or direct `pytest`:
 
 ```bash
-# Fast tests for quick feedback
 make test
-# or
 uv run -- python -m pytest -m fast
 
-# Full test suite
 make test-all
-# or
 uv run -- python -m pytest
 
-# Unit tests only
 make test-unit
-# or
 uv run -- python -m pytest -m unit
 
-# Integration tests
 make test-integration
-# or
 uv run -- python -m pytest -m "integration and not live_integration"
 
-# With coverage (fast tests only - quick feedback)
 make coverage-fast
-# or routine coverage (excludes stress/resource-heavy/live tests)
 make coverage-all
-# or full tree including opt-in stress/resource-heavy/live tests (needs services + credentials)
 make coverage-opt-in-all
-# or
 uv run -- python -m pytest --cov=benchbox --cov-report=term-missing
 ```
+
+Each `uv run` line is the direct equivalent of the `make` target above it. In order, the blocks run:
+
+- Fast tests for quick feedback (`make test`).
+- The full test suite (`make test-all`).
+- Unit tests only (`make test-unit`).
+- Integration tests (`make test-integration`).
+- Coverage: `make coverage-fast` covers fast tests only, for quick feedback. `make coverage-all` is routine coverage that excludes stress, resource-heavy and live tests. `make coverage-opt-in-all` covers the full tree, including opt-in stress, resource-heavy and live tests, and needs services and credentials. The final `uv run` command is the direct equivalent for coverage.
 
 Linting and formatting run through Ruff:
 
 ```bash
 make format
-# or
 uv run ruff format .
 
 make lint
-# or
 uv run ruff check .
 ```
+
+Each `uv run` command is the direct equivalent of the `make` target above it.
 
 Type checking is available via:
 
 ```bash
 make typecheck
-# or
 uv run ty check
 ```
+
+`uv run ty check` is the direct equivalent of `make typecheck`.
 
 ## Contributing
 
@@ -140,3 +137,36 @@ quickly and only load optional dependencies when needed. See
 `docs/development/import-patterns.md` for guidance on adding new benchmarks to
 the registry, writing tests for lazy imports, and troubleshooting missing
 dependency errors.
+
+
+## Documentation templates
+
+`docs/conf.py` selects Furo and loads the first-party templates under
+`docs/_templates`. The custom `page.html` bridges ABlog into Furo's page structure:
+ABlog's default page uses a layout that Furo does not provide. Sphinx's
+`!page.html` lookup selects the installed theme's page rather than recursively
+loading the custom override. The local ABlog archive and redirect templates
+extend the custom page, keeping the shared navigation and footer controls.
+
+The body block adds the site navigation before Furo's inherited body. The footer
+adds the shared system/light/dark theme control. The extra-head block applies
+stored theme choice before the page paints and adds the Atom feed link when ABlog
+provides its feed context. The content block preserves Sphinx's rendered body,
+adds date/author/tag metadata, moves that metadata after the first page heading,
+and adds previous/next post links when enabled. Keep these responsibilities when
+changing the template structure.
+
+Template ownership follows its inputs. The installed Furo templates are external
+package content; the local overrides, blog metadata and rendered documentation
+remain first-party. `super()` selects inherited block output and `body` contains
+Sphinx's rendered document; neither proves that all emitted content is external
+or plain text. ABlog titles, collection names and feed settings also contribute
+to output. Sphinx's template environment does not enable automatic HTML escaping.
+
+The comment checker can analyze complete script/style regions that lie within a
+single literal Jinja data segment with the existing JavaScript/CSS adapters. It
+keeps unresolved rendered output visible as a coverage error. A literal source
+scan does not certify all possible rendered pages: emitted tags, expressions and
+control statements can alter executable regions; even Jinja comments can join
+script fragments after removal. Do not silence that uncertainty
+by treating framework context values as an ownership exemption.

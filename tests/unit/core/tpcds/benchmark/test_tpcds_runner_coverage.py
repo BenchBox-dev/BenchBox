@@ -694,9 +694,9 @@ def test_get_available_queries_returns_1_to_99(tpcds_benchmark):
 def test_get_table_loading_order_respects_fk_dependencies(tpcds_benchmark):
     available = ["store_sales", "date_dim", "store", "item"]
     order = tpcds_benchmark.get_table_loading_order(available)
-    # All requested tables should be returned
+
     assert sorted(order) == sorted(available)
-    # date_dim (parent dim) should appear before store_sales (fact)
+
     assert order.index("date_dim") < order.index("store_sales")
 
 
@@ -711,7 +711,7 @@ def test_get_schema_returns_all_tpcds_tables(tpcds_benchmark):
     schema = tpcds_benchmark.get_schema()
     assert isinstance(schema, dict)
     assert len(schema) > 0
-    # Check structure of one entry
+
     first_table = next(iter(schema.values()))
     assert "name" in first_table
     assert "columns" in first_table
@@ -725,7 +725,7 @@ def test_generate_data_populates_tables(tpcds_benchmark, tmp_path):
     files = tpcds_benchmark.generate_data()
     assert isinstance(files, list)
     assert len(files) > 0
-    # tables dict should be populated
+
     assert "store_sales" in tpcds_benchmark.tables
 
 
@@ -778,7 +778,7 @@ def test_get_queries_returns_dict_with_string_keys(tpcds_benchmark):
     queries = tpcds_benchmark.get_queries()
     assert isinstance(queries, dict)
     assert len(queries) > 0
-    # Keys should be strings (str(query_id))
+
     assert all(isinstance(k, str) for k in queries)
-    # Values should be non-empty strings
+
     assert all(isinstance(v, str) and len(v) > 0 for v in queries.values())

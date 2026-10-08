@@ -1,9 +1,6 @@
-"""Bottleneck detection and analysis for resource monitoring.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -15,8 +12,6 @@ from .profiler import ResourceTimeline, ResourceType, ResourceUtilization, calcu
 
 
 class BottleneckType(str, Enum):
-    """Types of performance bottlenecks."""
-
     CPU_BOUND = "cpu_bound"
     MEMORY_BOUND = "memory_bound"
     DISK_READ_BOUND = "disk_read_bound"
@@ -28,8 +23,6 @@ class BottleneckType(str, Enum):
 
 
 class BottleneckSeverity(str, Enum):
-    """Severity level of detected bottleneck."""
-
     NONE = "none"
     LOW = "low"
     MODERATE = "moderate"
@@ -39,16 +32,13 @@ class BottleneckSeverity(str, Enum):
 
 @dataclass
 class BottleneckIndicator:
-    """Single bottleneck indicator with supporting evidence."""
-
     bottleneck_type: BottleneckType
     severity: BottleneckSeverity
-    score: float  # 0.0 to 1.0 indicating likelihood
+    score: float
     evidence: list[str] = field(default_factory=list)
     recommendations: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
         return {
             "bottleneck_type": self.bottleneck_type.value,
             "severity": self.severity.value,
@@ -60,8 +50,6 @@ class BottleneckIndicator:
 
 @dataclass
 class BottleneckAnalysis:
-    """Complete bottleneck analysis result."""
-
     primary_bottleneck: BottleneckType
     primary_severity: BottleneckSeverity
     indicators: list[BottleneckIndicator] = field(default_factory=list)
@@ -69,7 +57,6 @@ class BottleneckAnalysis:
     summary: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
         return {
             "primary_bottleneck": self.primary_bottleneck.value,
             "primary_severity": self.primary_severity.value,
@@ -80,18 +67,6 @@ class BottleneckAnalysis:
 
 
 class BottleneckDetector:
-    """Detect performance bottlenecks from resource utilization data.
-
-    Analyzes resource utilization patterns to identify which resource
-    is limiting overall performance. Uses configurable thresholds and
-    heuristics to determine bottleneck severity.
-
-    Example:
-        >>> detector = BottleneckDetector()
-        >>> analysis = detector.analyze(timeline)
-        >>> emit(f"Primary bottleneck: {analysis.primary_bottleneck}")
-    """
-
     def __init__(
         self,
         cpu_high_threshold: float = 80.0,
@@ -103,18 +78,6 @@ class BottleneckDetector:
         network_mbps_high_threshold: float = 100.0,
         network_mbps_critical_threshold: float = 1000.0,
     ):
-        """Initialize bottleneck detector with thresholds.
-
-        Args:
-            cpu_high_threshold: CPU % considered high utilization.
-            cpu_critical_threshold: CPU % considered critical.
-            memory_high_threshold: Memory % considered high.
-            memory_critical_threshold: Memory % considered critical.
-            disk_iops_high_threshold: Disk IOPS considered high.
-            disk_iops_critical_threshold: Disk IOPS considered critical.
-            network_mbps_high_threshold: Network Mbps considered high.
-            network_mbps_critical_threshold: Network Mbps considered critical.
-        """
         self.cpu_high = cpu_high_threshold
         self.cpu_critical = cpu_critical_threshold
         self.memory_high = memory_high_threshold
@@ -125,14 +88,6 @@ class BottleneckDetector:
         self.network_mbps_critical = network_mbps_critical_threshold
 
     def analyze(self, timeline: ResourceTimeline) -> BottleneckAnalysis:
-        """Analyze resource timeline for bottlenecks.
-
-        Args:
-            timeline: Resource timeline with collected samples.
-
-        Returns:
-            BottleneckAnalysis with detected bottlenecks and recommendations.
-        """
         if timeline.sample_count == 0:
             return BottleneckAnalysis(
                 primary_bottleneck=BottleneckType.UNKNOWN,
@@ -140,12 +95,10 @@ class BottleneckDetector:
                 summary="Insufficient data for analysis",
             )
 
-        # Calculate utilization for each resource type
         utilizations: dict[ResourceType, ResourceUtilization] = {}
         for resource_type in ResourceType:
             utilizations[resource_type] = calculate_utilization(timeline, resource_type)
 
-        # Detect bottlenecks for each resource
         indicators: list[BottleneckIndicator] = []
         indicators.append(self._analyze_cpu(utilizations[ResourceType.CPU]))
         indicators.append(self._analyze_memory(utilizations[ResourceType.MEMORY], timeline))
@@ -154,10 +107,8 @@ class BottleneckDetector:
         indicators.append(self._analyze_network_send(utilizations[ResourceType.NETWORK_SEND]))
         indicators.append(self._analyze_network_recv(utilizations[ResourceType.NETWORK_RECV]))
 
-        # Sort by score to find primary bottleneck
         indicators.sort(key=lambda x: x.score, reverse=True)
 
-        # Determine primary bottleneck
         if indicators and indicators[0].score > 0.3:
             primary = indicators[0]
         else:
@@ -180,7 +131,6 @@ class BottleneckDetector:
         )
 
     def _analyze_cpu(self, util: ResourceUtilization) -> BottleneckIndicator:
-        """Analyze CPU utilization for bottleneck."""
         evidence = []
         recommendations = []
         severity = BottleneckSeverity.NONE
@@ -218,13 +168,11 @@ class BottleneckDetector:
         )
 
     def _analyze_memory(self, util: ResourceUtilization, timeline: ResourceTimeline) -> BottleneckIndicator:
-        """Analyze memory utilization for bottleneck."""
         evidence = []
         recommendations = []
         severity = BottleneckSeverity.NONE
         score = 0.0
 
-        # Use memory percent if available (more meaningful than absolute MB)
         if timeline.samples:
             avg_percent = sum(s.memory_percent for s in timeline.samples) / len(timeline.samples)
             peak_percent = max(s.memory_percent for s in timeline.samples)
@@ -261,7 +209,6 @@ class BottleneckDetector:
         )
 
     def _analyze_disk_read(self, util: ResourceUtilization) -> BottleneckIndicator:
-        """Analyze disk read IOPS for bottleneck."""
         evidence = []
         recommendations = []
         severity = BottleneckSeverity.NONE
@@ -299,7 +246,6 @@ class BottleneckDetector:
         )
 
     def _analyze_disk_write(self, util: ResourceUtilization) -> BottleneckIndicator:
-        """Analyze disk write IOPS for bottleneck."""
         evidence = []
         recommendations = []
         severity = BottleneckSeverity.NONE
@@ -337,7 +283,6 @@ class BottleneckDetector:
         )
 
     def _analyze_network_send(self, util: ResourceUtilization) -> BottleneckIndicator:
-        """Analyze network send rate for bottleneck."""
         evidence = []
         recommendations = []
         severity = BottleneckSeverity.NONE
@@ -375,7 +320,6 @@ class BottleneckDetector:
         )
 
     def _analyze_network_recv(self, util: ResourceUtilization) -> BottleneckIndicator:
-        """Analyze network receive rate for bottleneck."""
         evidence = []
         recommendations = []
         severity = BottleneckSeverity.NONE
@@ -417,7 +361,6 @@ class BottleneckDetector:
         primary: BottleneckIndicator,
         utilizations: dict[ResourceType, ResourceUtilization],
     ) -> str:
-        """Generate human-readable summary of bottleneck analysis."""
         if primary.bottleneck_type == BottleneckType.BALANCED:
             return "No significant bottlenecks detected. System resources are balanced."
 
@@ -446,21 +389,9 @@ class BottleneckDetector:
 
 
 def quick_bottleneck_check(timeline: ResourceTimeline) -> BottleneckType:
-    """Quick check to identify most likely bottleneck.
-
-    This is a simplified analysis that returns the most likely
-    bottleneck type without detailed analysis.
-
-    Args:
-        timeline: Resource timeline to analyze.
-
-    Returns:
-        Most likely BottleneckType.
-    """
     if timeline.sample_count == 0:
         return BottleneckType.UNKNOWN
 
-    # Simple heuristics based on resource peaks
     peak_cpu = timeline.get_peak_cpu()
     timeline.get_peak_memory_mb()
     avg_disk_read = timeline.get_avg_disk_read_iops()
@@ -468,23 +399,19 @@ def quick_bottleneck_check(timeline: ResourceTimeline) -> BottleneckType:
     avg_net_send = timeline.get_avg_network_send_mbps()
     avg_net_recv = timeline.get_avg_network_recv_mbps()
 
-    # Check memory (using percentage if samples have it)
     if timeline.samples:
         peak_mem_pct = max(s.memory_percent for s in timeline.samples)
         if peak_mem_pct > 90:
             return BottleneckType.MEMORY_BOUND
 
-    # Check CPU
     if peak_cpu > 90:
         return BottleneckType.CPU_BOUND
 
-    # Check disk I/O (if significant)
     if avg_disk_read > 1000:
         return BottleneckType.DISK_READ_BOUND
     if avg_disk_write > 1000:
         return BottleneckType.DISK_WRITE_BOUND
 
-    # Check network (if significant)
     if avg_net_send > 100 or avg_net_recv > 100:
         if avg_net_send > avg_net_recv:
             return BottleneckType.NETWORK_SEND_BOUND

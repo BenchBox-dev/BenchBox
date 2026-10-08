@@ -1,5 +1,3 @@
-"""Regression tests for CLI startup import isolation."""
-
 from __future__ import annotations
 
 import importlib
@@ -16,14 +14,12 @@ pytestmark = [
 
 
 def _clear_modules(monkeypatch: pytest.MonkeyPatch, *prefixes: str) -> None:
-    """Remove cached modules so imports in this test run through package init code again."""
     for module_name in list(sys.modules):
         if any(module_name == prefix or module_name.startswith(f"{prefix}.") for prefix in prefixes):
             monkeypatch.delitem(sys.modules, module_name, raising=False)
 
 
 def test_main_attribute_resolves_to_submodule_before_explicit_import() -> None:
-    """Attribute-first resolution must not shadow the main submodule with its function."""
     result = subprocess.run(
         [
             sys.executable,
@@ -45,7 +41,6 @@ def test_main_attribute_resolves_to_submodule_before_explicit_import() -> None:
 
 
 def test_calling_main_module_delegates_to_lazy_entrypoint(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Calling the compatibility module should resolve and invoke its lazy main export."""
     main_module = importlib.import_module("benchbox.cli.main")
     calls: list[str] = []
     monkeypatch.setattr(main_module, "main", lambda: calls.append("main"), raising=False)
@@ -56,7 +51,6 @@ def test_calling_main_module_delegates_to_lazy_entrypoint(monkeypatch: pytest.Mo
 
 
 def test_importing_conversion_submodule_does_not_import_lifecycle_runner(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Importing conversion helpers should not pull in the lifecycle runner package."""
     _clear_modules(monkeypatch, "benchbox.core.runner", "benchbox.monitoring")
 
     conversion_module = importlib.import_module("benchbox.core.runner.conversion")
@@ -68,7 +62,6 @@ def test_importing_conversion_submodule_does_not_import_lifecycle_runner(monkeyp
 
 
 def test_setup_help_does_not_require_textcharts(monkeypatch: pytest.MonkeyPatch) -> None:
-    """CLI startup should not require charting dependencies for unrelated commands."""
     _clear_modules(
         monkeypatch,
         "benchbox.cli.main",

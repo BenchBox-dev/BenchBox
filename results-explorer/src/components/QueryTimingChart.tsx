@@ -1,14 +1,6 @@
-/**
- * Grouped SVG bar chart for the compare view.
- * No external chart library - pure SVG.
- */
-
 import { formatLatencyMs, formatPlainNumber } from "@/lib/metricFormatters";
 import { useElementSize } from "@/lib/useElementSize";
 
-/**
- * Grouped bar chart for compare view - one group per query, one bar per result.
- */
 interface GroupedBar {
   queryId: string;
   values: { label: string; value: number | null; color: string }[];
@@ -31,12 +23,6 @@ export function GroupedQueryChart({ groups, unit = "ms", height = 260 }: Grouped
   const paddingBottom = 60;
   const groupGap = 8;
   const barGap = 2;
-  // This chart opts out of reflow: it stays wide and scrolls inside its own
-  // container. The viewBox must therefore be sized to the SAME minimum the CSS
-  // enforces below. Drawing 300 units into a box CSS has stretched to
-  // `groupCount * 60` px magnifies every coordinate by the ratio between them,
-  // so the bars are computed against a width the chart is not given, collide at
-  // their minimum width, and are then blown up along with the gaps.
   const scrollMinWidth = Math.max(500, groups.length * 60);
   const viewWidth = Math.max(containerWidth, scrollMinWidth);
   const chartWidth = viewWidth - paddingLeft - paddingRight;
@@ -68,7 +54,6 @@ export function GroupedQueryChart({ groups, unit = "ms", height = 260 }: Grouped
         role="img"
         aria-label="Grouped query timing bar chart"
       >
-        {/* Y-axis grid + labels */}
         {Array.from({ length: yTicks + 1 }, (_, i) => {
           const v = yStep * i;
           const y = paddingTop + chartHeight - (chartHeight * i) / yTicks;
@@ -82,7 +67,6 @@ export function GroupedQueryChart({ groups, unit = "ms", height = 260 }: Grouped
           );
         })}
 
-        {/* Groups */}
         {groups.map((group, gi) => {
           const groupX = paddingLeft + gi * (groupWidth + groupGap);
           return (
@@ -90,8 +74,6 @@ export function GroupedQueryChart({ groups, unit = "ms", height = 260 }: Grouped
               {group.values.map((v, si) => {
                 const x = groupX + si * (barWidth + barGap);
                 {
-                  /* Null means all runs failed for this query; render a dashed
-                    outline so failed queries don't misrepresent as "fastest". */
                 }
                 if (v.value === null) {
                   const y = paddingTop + chartHeight - 6;
@@ -125,7 +107,6 @@ export function GroupedQueryChart({ groups, unit = "ms", height = 260 }: Grouped
                   </rect>
                 );
               })}
-              {/* Group label */}
               <text
                 x={groupX + groupWidth / 2}
                 y={paddingTop + chartHeight + 14}
@@ -140,7 +121,6 @@ export function GroupedQueryChart({ groups, unit = "ms", height = 260 }: Grouped
           );
         })}
 
-        {/* Baseline */}
         <line
           x1={paddingLeft}
           y1={paddingTop + chartHeight}

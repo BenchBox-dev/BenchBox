@@ -1,9 +1,6 @@
-"""Unit tests for TimescaleDB Cloud deployment mode.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import os
 from unittest.mock import patch
@@ -17,10 +14,8 @@ pytestmark = [
 
 
 class TestTimescaleDBCloudMode:
-    """Tests for TimescaleDB Cloud deployment mode."""
-
     def test_cloud_mode_requires_host(self):
-        """Cloud mode raises error without host."""
+
         from benchbox.platforms.timescaledb import TimescaleDBAdapter
 
         with patch.dict(os.environ, {}, clear=True):
@@ -33,7 +28,7 @@ class TestTimescaleDBCloudMode:
             assert "TIMESCALE_HOST" in str(exc_info.value)
 
     def test_cloud_mode_requires_password(self):
-        """Cloud mode raises error without password."""
+
         from benchbox.platforms.timescaledb import TimescaleDBAdapter
 
         with patch.dict(os.environ, {}, clear=True):
@@ -50,7 +45,7 @@ class TestTimescaleDBCloudMode:
             assert "TigerData" in str(exc_info.value)
 
     def test_cloud_mode_uses_ssl(self):
-        """Cloud mode requires SSL."""
+
         from benchbox.platforms.timescaledb import TimescaleDBAdapter
 
         adapter = TimescaleDBAdapter(
@@ -63,7 +58,7 @@ class TestTimescaleDBCloudMode:
         assert adapter.sslmode == "require"
 
     def test_cloud_mode_skips_database_management(self):
-        """Cloud mode skips database management operations."""
+
         from benchbox.platforms.timescaledb import TimescaleDBAdapter
 
         adapter = TimescaleDBAdapter(
@@ -76,7 +71,7 @@ class TestTimescaleDBCloudMode:
         assert adapter.skip_database_management is True
 
     def test_cloud_mode_parses_service_url(self):
-        """Cloud mode parses service URL correctly."""
+
         from benchbox.platforms.timescaledb import TimescaleDBAdapter
 
         adapter = TimescaleDBAdapter(
@@ -92,7 +87,7 @@ class TestTimescaleDBCloudMode:
         assert adapter.sslmode == "require"
 
     def test_cloud_mode_accepts_tigerdata_env_vars(self):
-        """Cloud mode reads credentials from TIGERDATA_* environment variables."""
+
         from benchbox.platforms.timescaledb import TimescaleDBAdapter
 
         with patch.dict(
@@ -114,7 +109,7 @@ class TestTimescaleDBCloudMode:
             assert adapter.database == "env-db"
 
     def test_cloud_mode_tigerdata_env_vars_take_priority_over_timescale(self):
-        """TIGERDATA_* values should override TIMESCALE_* fallback values."""
+
         from benchbox.platforms.timescaledb import TimescaleDBAdapter
 
         with patch.dict(
@@ -141,7 +136,7 @@ class TestTimescaleDBCloudMode:
             assert adapter.database == "tigerdata-db"
 
     def test_cloud_mode_accepts_timescale_fallback_env_vars(self):
-        """Cloud mode still supports TIMESCALE_* variables when TIGERDATA_* are not set."""
+
         from benchbox.platforms.timescaledb import TimescaleDBAdapter
 
         with patch.dict(
@@ -164,7 +159,7 @@ class TestTimescaleDBCloudMode:
             assert adapter.database == "fallback-db"
 
     def test_cloud_mode_config_overrides_env(self):
-        """Config parameters override environment variables."""
+
         from benchbox.platforms.timescaledb import TimescaleDBAdapter
 
         with patch.dict(
@@ -184,7 +179,7 @@ class TestTimescaleDBCloudMode:
             assert adapter.password == "config-password"
 
     def test_cloud_mode_default_username(self):
-        """Cloud mode defaults to 'tsdbadmin' username."""
+
         from benchbox.platforms.timescaledb import TimescaleDBAdapter
 
         adapter = TimescaleDBAdapter(
@@ -196,7 +191,7 @@ class TestTimescaleDBCloudMode:
         assert adapter.username == "tsdbadmin"
 
     def test_cloud_mode_default_database(self):
-        """Cloud mode defaults to 'tsdb' database."""
+
         from benchbox.platforms.timescaledb import TimescaleDBAdapter
 
         adapter = TimescaleDBAdapter(
@@ -208,7 +203,7 @@ class TestTimescaleDBCloudMode:
         assert adapter.database == "tsdb"
 
     def test_self_hosted_mode_default(self):
-        """Self-hosted mode is the default."""
+
         from benchbox.platforms.timescaledb import TimescaleDBAdapter
 
         adapter = TimescaleDBAdapter(
@@ -220,7 +215,7 @@ class TestTimescaleDBCloudMode:
         assert getattr(adapter, "skip_database_management", False) is False
 
     def test_invalid_deployment_mode(self):
-        """Invalid deployment mode raises error."""
+
         from benchbox.platforms.timescaledb import TimescaleDBAdapter
 
         with pytest.raises(ValueError) as exc_info:
@@ -235,7 +230,7 @@ class TestTimescaleDBCloudMode:
         assert "cloud" in str(exc_info.value)
 
     def test_service_url_from_env(self):
-        """Service URL can be provided via environment variable."""
+
         from benchbox.platforms.timescaledb import TimescaleDBAdapter
 
         with patch.dict(
@@ -253,7 +248,7 @@ class TestTimescaleDBCloudMode:
             assert adapter.database == "envdb"
 
     def test_service_url_rejects_invalid_scheme(self):
-        """Service URL with non-postgres scheme raises error."""
+
         from benchbox.platforms.timescaledb import TimescaleDBAdapter
 
         with pytest.raises(ValueError, match="Unsupported scheme"):
@@ -264,10 +259,8 @@ class TestTimescaleDBCloudMode:
 
 
 class TestTimescaleDBDeploymentRegistry:
-    """Tests for TimescaleDB deployment mode registry integration."""
-
     def test_timescaledb_has_deployment_modes(self):
-        """TimescaleDB should have deployment modes in registry."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         caps = PlatformRegistry.get_platform_capabilities("timescaledb")
@@ -277,14 +270,14 @@ class TestTimescaleDBDeploymentRegistry:
         assert "cloud" in caps.deployment_modes
 
     def test_default_deployment_is_self_hosted(self):
-        """Default deployment mode should be self-hosted."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         caps = PlatformRegistry.get_platform_capabilities("timescaledb")
         assert caps.default_deployment == "self-hosted"
 
     def test_cloud_deployment_requires_credentials(self):
-        """Cloud deployment should require credentials."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         caps = PlatformRegistry.get_platform_capabilities("timescaledb")

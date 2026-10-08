@@ -289,8 +289,6 @@ describe("ChartPanel", () => {
   });
 
   it("opens a summary cohort on a chart rather than on the sparkline table", () => {
-    // A section headed "Charts" used to open on an HTML metrics table, so a
-    // reader who never touched the controls saw no chart at all.
     render(<ChartPanel context={{ kind: "summary", summary: makeSummary() }} />);
 
     expect(screen.getByRole("img", { name: /performance comparison/i })).toBeTruthy();
@@ -322,7 +320,6 @@ describe("ChartPanel", () => {
 
     render(<ChartPanel context={{ kind: "summary", summary: makeSummary() }} />);
 
-    // comparison_bar needs two results; a summary cohort cannot show it.
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Performance Bar" }).getAttribute("aria-pressed")).toBe(
         "true",
@@ -501,12 +498,6 @@ describe("ChartPanel", () => {
   });
 
   it("hides the Cost tab when no cohort row carries normalized cost data", () => {
-    // Updated contract for `results-explorer-chart-panel-scope-and-labeling`
-    // w3: rather than rendering an empty Cost panel that forces users to
-    // click through to discover "no cost recorded", the Cost tab now
-    // disappears entirely when no row has `cost_status=normalized`. The
-    // empty-state copy is preserved for the cost_scatter chart itself
-    // when a normalized cohort partially lacks data.
     render(
       <ChartPanel
         context={{
@@ -646,8 +637,6 @@ describe("ChartPanel", () => {
       />,
     );
 
-    // Fresh page load defaults to Overview. The audit reproducer was that
-    // clicking Rank from this state did not switch the panel.
     expect(screen.getByRole("tab", { name: "Overview" }).getAttribute("aria-selected")).toBe("true");
 
     fireEvent.click(screen.getByRole("tab", { name: "Rank" }));
@@ -655,7 +644,6 @@ describe("ChartPanel", () => {
     expect(screen.getByRole("tab", { name: "Rank" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("tab", { name: "Overview" }).getAttribute("aria-selected")).toBe("false");
     expect(screen.getByRole("table", { name: "Per-query platform rankings (1st = fastest)" })).toBeTruthy();
-    // Overview's signature button should no longer be in the active group.
     expect(screen.queryByRole("button", { name: "Sparkline Table" })).toBeNull();
   });
 
@@ -895,8 +883,6 @@ describe("ChartPanel", () => {
     expect(titles.some((title) => title.includes("B") && title.includes("20 ms"))).toBe(true);
     expect(titles.some((title) => title.includes("C") && title.includes("40 ms"))).toBe(true);
     expect(titles.every((title) => !title.includes("999 ms"))).toBe(true);
-    // Compare summaries intentionally carry no persisted percentile statistics,
-    // so the global basis selector cannot expose a stale percentile ladder.
     expect(screen.queryByRole("button", { name: "Percentile Ladder" })).toBeNull();
   });
 
@@ -1135,12 +1121,9 @@ describe("ChartPanel", () => {
     expect(container.querySelector("h3.sr-only")).toBeNull();
     expect(screen.getByTestId("chart-panel-group-overview")).toBeTruthy();
     expect(screen.getByTestId("chart-panel-group-per_query")).toBeTruthy();
-    // Charts from several groups are on the page at once.
     expect(screen.getByTestId("chart-panel-chart-comparison_bar")).toBeTruthy();
     expect(screen.getByTestId("chart-panel-chart-query_heatmap")).toBeTruthy();
     expect(container.querySelectorAll("[data-chart-container]").length).toBeGreaterThan(1);
-    // Comparison content that used to hide behind the Overview/Per-query tabs
-    // renders immediately.
     expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
   });
 
@@ -1155,11 +1138,6 @@ describe("ChartPanel", () => {
       />,
     );
 
-    // Neither chart gets a title/description above it: summary_box's stat
-    // tiles are labeled Platforms/Queries/Best.../Phase, and sparkline_table's
-    // columns are labeled Platform/Geomean/Power@Size/etc - a caption above
-    // either only restated those labels (the user's "weird title-bullet
-    // slugs" complaint).
     const summaryBox = screen.getByTestId("chart-panel-chart-summary_box");
     expect(summaryBox.querySelector("h4")).toBeNull();
     expect(summaryBox.querySelector("p")).toBeNull();
@@ -1249,9 +1227,6 @@ describe("ChartPanel", () => {
       />,
     );
 
-    // The open layout shows several charts at once with no tabs: each figure
-    // needs its own save control, or charts on the Compare and ResultDetail
-    // pages cannot be saved at all.
     const figures = Array.from(container.querySelectorAll("[data-testid^='chart-panel-chart-']"));
     expect(figures.length).toBeGreaterThan(1);
     for (const figure of figures) {

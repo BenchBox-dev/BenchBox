@@ -11,8 +11,6 @@ pa = pytest.importorskip("pyarrow")
 
 DMS = 1200
 
-# Category subtotals rank Music, Children, Books by revenue, which is not their
-# alphabetical order, so a sort by category instead of the SQL CASE key moves them.
 _ITEMS = [
     (1, "Books", "arts"),
     (2, "Books", "fiction"),

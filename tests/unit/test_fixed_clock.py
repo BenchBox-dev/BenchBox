@@ -1,5 +1,3 @@
-"""The fixed-clock helpers report a fixed instant to one module and leave every other caller alone."""
-
 from __future__ import annotations
 
 import os
@@ -11,7 +9,6 @@ import pytest
 
 from tests.utilities.fixed_clock import FIXED_EPOCH, FIXED_NOW, fixed_datetime_class, freeze_datetime, set_mtimes
 
-# Medium tier: these tests would take the fast-lane count past its ceiling.
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 

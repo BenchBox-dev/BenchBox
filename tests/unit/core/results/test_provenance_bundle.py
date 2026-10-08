@@ -1,5 +1,3 @@
-"""Tests for the optional provenance block in the schema-v2 bundle payload."""
-
 from __future__ import annotations
 
 from datetime import datetime
@@ -59,7 +57,6 @@ class TestProvenanceBlock:
         assert payload["provenance"] == {"funding": "unspecified"}
 
     def test_no_empty_block_emitted(self) -> None:
-        # Falsy values (None/"") must not produce an empty provenance dict, so a
-        # run without --funding stays byte-identical to a pre-provenance bundle.
+
         payload = build_result_payload(_result(funding="", result_source=None))
         assert "provenance" not in payload

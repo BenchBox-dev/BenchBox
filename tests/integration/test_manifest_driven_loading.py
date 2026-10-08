@@ -1,17 +1,3 @@
-"""Integration tests: manifest-driven CSV dialect overrides filename heuristics.
-
-These tests verify that ``DataSourceResolver.resolve()`` injects
-``table_metadata`` from a real ``_datagen_manifest.json`` into the
-``DataSource``, and that each migrated adapter uses that metadata when
-generating LOAD/COPY/INSERT/REST payloads — not the file extension.
-
-**Negative-case design**: every test places a file named ``lineitem.csv``
-(whose ``.csv`` extension alone would infer comma-delimiter) alongside a
-``_datagen_manifest.json`` that declares pipe-delimited TBL dialect
-(``csv_delimiter="|"``, ``csv_null_marker=""``).  Each adapter must emit
-``|``-based SQL/params, proving the manifest wins over the filename.
-"""
-
 from __future__ import annotations
 
 import json
@@ -28,17 +14,13 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-# ---------------------------------------------------------------------------
-# Shared test data
 
 _TABLE = "lineitem"
-# Pipe-delimited rows in a .csv file — the "wrong-extension" negative case
 _PIPE_DATA = "1|alpha\n2|beta\n"
 
 
 @pytest.fixture
 def manifest_data_dir(tmp_path: Path) -> Path:
-    """Tempdir with a pipe-delimited .csv file and a TBL-metadata manifest."""
     data_file = tmp_path / f"{_TABLE}.csv"
     data_file.write_text(_PIPE_DATA, encoding="utf-8")
 
@@ -69,17 +51,11 @@ def manifest_data_dir(tmp_path: Path) -> Path:
 
 @dataclass
 class _Benchmark:
-    """Minimal benchmark stub: tables dict + trivial DDL."""
-
     tables: dict[str, Any] = field(default_factory=dict)
     name: str = "test"
 
     def get_create_tables_sql(self, **_: Any) -> str:
         return f"CREATE TABLE {_TABLE} (id INT, value VARCHAR(100))"
-
-
-# ---------------------------------------------------------------------------
-# SingleStore
 
 
 class _S2Cursor:
@@ -119,7 +95,6 @@ def _stub_singlestoredb(monkeypatch: Any) -> None:
 
 @pytest.mark.platform_smoke
 def test_singlestore_uses_manifest_delimiter(monkeypatch: Any, manifest_data_dir: Path) -> None:
-    """Manifest '|' wins over .csv extension — LOAD DATA uses FIELDS TERMINATED BY '|'."""
     _stub_singlestoredb(monkeypatch)
 
     from benchbox.platforms.singlestore import SingleStoreAdapter
@@ -134,10 +109,6 @@ def test_singlestore_uses_manifest_delimiter(monkeypatch: Any, manifest_data_dir
     assert load_sql is not None, f"No LOAD DATA statement executed; got: {conn.statements}"
     assert "FIELDS TERMINATED BY '|'" in load_sql, load_sql
     assert "NULL DEFINED BY ''" in load_sql, load_sql
-
-
-# ---------------------------------------------------------------------------
-# PostgreSQL
 
 
 class _PGCopyCtx:
@@ -206,7 +177,6 @@ def _stub_psycopg(monkeypatch: Any) -> None:
 
 @pytest.mark.platform_smoke
 def test_postgresql_uses_manifest_delimiter(monkeypatch: Any, manifest_data_dir: Path) -> None:
-    """Manifest '|' wins over .csv extension — COPY uses DELIMITER '|' + FORMAT text."""
     _stub_psycopg(monkeypatch)
 
     from benchbox.platforms.postgresql import PostgreSQLAdapter
@@ -220,31 +190,24 @@ def test_postgresql_uses_manifest_delimiter(monkeypatch: Any, manifest_data_dir:
     copy_sql = next((s for s in conn.copies if "COPY" in s.upper()), None)
     assert copy_sql is not None, f"No COPY statement executed; copies: {conn.copies}"
     assert "DELIMITER '|'" in copy_sql, copy_sql
-    # non-None null_marker → FORMAT text branch (not FORMAT csv)
     assert "FORMAT text" in copy_sql, copy_sql
-
-
-# ---------------------------------------------------------------------------
-# Doris
 
 
 @pytest.mark.platform_smoke
 def test_doris_uses_manifest_delimiter(monkeypatch: Any, manifest_data_dir: Path) -> None:
-    """Manifest '|' wins over .csv extension — INSERT rows are pipe-split (2 columns)."""
     from tests.integration.platforms.common import install_doris_stub
 
-    state = install_doris_stub(monkeypatch)  # disables requests → INSERT fallback
+    state = install_doris_stub(monkeypatch)
 
     import benchbox.platforms.doris as doris_mod
 
-    doris_mod._requests = None  # belt-and-suspenders: ensure INSERT path
+    doris_mod._requests = None
 
     from benchbox.platforms.doris import DorisAdapter
 
     adapter = DorisAdapter(host="localhost")
     benchmark = _Benchmark(tables={_TABLE: manifest_data_dir / f"{_TABLE}.csv"})
 
-    # Build a fake pymysql connection through the installed stub
     import pymysql
 
     conn = pymysql.connect()
@@ -253,14 +216,8 @@ def test_doris_uses_manifest_delimiter(monkeypatch: Any, manifest_data_dir: Path
 
     assert state.inserts, "No INSERT statements executed"
     insert_sql, rows = state.inserts[0]
-    # Each row "1|alpha" split by '|' → 2 cols → VALUES (%s, %s)
-    # If .csv heuristic were used (delimiter=','), row would be 1 col → VALUES (%s)
     assert "VALUES (%s, %s)" in insert_sql, f"Expected 2-column INSERT from pipe split; got: {insert_sql!r}"
     assert rows[0] == ["1", "alpha"], f"Unexpected row values: {rows[0]!r}"
-
-
-# ---------------------------------------------------------------------------
-# QuestDB
 
 
 class _FakeResponse:
@@ -296,7 +253,6 @@ def _stub_psycopg_for_questdb(monkeypatch: Any) -> None:
 
 @pytest.mark.platform_smoke
 def test_questdb_uses_manifest_delimiter(monkeypatch: Any, manifest_data_dir: Path) -> None:
-    """Manifest '|' wins over .csv extension — REST /imp params use delimiter='|'."""
     _stub_psycopg_for_questdb(monkeypatch)
 
     fake_requests = _FakeRequests()
@@ -307,7 +263,6 @@ def test_questdb_uses_manifest_delimiter(monkeypatch: Any, manifest_data_dir: Pa
     adapter = QuestDBAdapter(host="localhost", loading_method="rest")
     benchmark = _Benchmark(tables={_TABLE: manifest_data_dir / f"{_TABLE}.csv"})
 
-    # REST mode does not use the psycopg connection — pass None
     adapter.load_data(benchmark, None, manifest_data_dir)
 
     assert fake_requests.post_calls, "No requests.post() call made"
@@ -316,20 +271,7 @@ def test_questdb_uses_manifest_delimiter(monkeypatch: Any, manifest_data_dir: Pa
     assert params.get("delimiter") == "|", f"Expected delimiter='|' from manifest; got: {params.get('delimiter')!r}"
 
 
-# ---------------------------------------------------------------------------
-# Non-TPC generator null markers (SingleStore strict LOAD DATA)
-#
-# nyctaxi and amplab must record csv_null_marker="" in the manifest they
-# write, so SingleStore emits NULL DEFINED BY '' instead of failing with
-# error 1264 on nullable ints. ClickBench keeps csv_null_marker=None: every
-# hits column is NOT NULL and its many legitimately-empty string fields must
-# not convert to NULL. These are dry-runs over the real generator manifest
-# code — no live SingleStore server.
-# ---------------------------------------------------------------------------
-
-
 def _assert_manifest_null_markers(tmp_path: Path, tables: dict[str, Path], benchmark: Any) -> None:
-    """Resolve manifest metadata for *tables* and require empty-string null markers."""
     from benchbox.platforms.base.data_loading import DataSourceResolver, resolve_csv_dialect
 
     resolver = DataSourceResolver()
@@ -344,14 +286,6 @@ def _assert_manifest_null_markers(tmp_path: Path, tables: dict[str, Path], bench
 
 
 def test_clickbench_generator_manifest_null_marker(tmp_path: Path) -> None:
-    """ClickBench dry-run manifest must resolve null_marker='__NULL__' for hits.
-
-    Every hits column is NOT NULL, so empty string fields must load as ""
-    rather than NULL on every platform. A None marker leaves the decision
-    to each loader default, and the cloud defaults (BigQuery, Snowflake,
-    Databricks/Spark) map bare empties to NULL; only the sentinel converts
-    to NULL while empty fields stay empty strings.
-    """
     from benchbox.core.clickbench.generator import ClickBenchDataGenerator
     from benchbox.platforms.base.data_loading import DataSourceResolver, resolve_csv_dialect
 
@@ -369,7 +303,6 @@ def test_clickbench_generator_manifest_null_marker(tmp_path: Path) -> None:
 
 
 def test_amplab_generator_manifest_null_marker(tmp_path: Path) -> None:
-    """AMPLab dry-run manifest must resolve null_marker='' for rankings."""
     from benchbox.core.amplab.generator import AMPLabDataGenerator
 
     generated = AMPLabDataGenerator(scale_factor=0.0001, output_dir=tmp_path).generate_data(tables=["rankings"])
@@ -379,7 +312,6 @@ def test_amplab_generator_manifest_null_marker(tmp_path: Path) -> None:
 
 
 def test_nyctaxi_manifest_null_marker(tmp_path: Path) -> None:
-    """nyctaxi manifest writer must resolve null_marker='' for trips (no download)."""
     from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark
 
     benchmark = NYCTaxiBenchmark(scale_factor=1.0, output_dir=tmp_path)

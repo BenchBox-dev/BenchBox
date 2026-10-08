@@ -1,5 +1,3 @@
-"""Coverage tests for cli/commands/compare_dataframes.py."""
-
 from __future__ import annotations
 
 import importlib

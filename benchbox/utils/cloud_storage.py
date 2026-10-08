@@ -1,12 +1,6 @@
-"""Cloud storage path utilities for BenchBox.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides minimal abstraction over cloud storage paths using cloudpathlib,
-allowing benchmarks to work with cloud storage locations while maintaining simplicity.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -25,7 +19,6 @@ MissingCredentialsError: type[BaseException] = Exception
 
 
 def _load_cloudpathlib() -> tuple[Any | None, type[BaseException]]:
-    """Load cloudpathlib only when a cloud path operation actually needs it."""
     global CloudPath, MissingCredentialsError
     if CloudPath is _UNLOADED_CLOUDPATHLIB:
         try:
@@ -44,44 +37,23 @@ logger = logging.getLogger(__name__)
 
 
 class DatabricksPath:
-    """Wrapper around a local path that stores Databricks UC Volume target.
-
-    This class uses composition instead of inheritance to avoid Path subclassing
-    issues. It wraps a local temporary directory path and stores the target
-    dbfs:// path for later upload by the Databricks adapter.
-
-    The class implements the os.PathLike protocol and delegates most operations
-    to the underlying Path object.
-    """
-
     def __init__(self, local_path: Union[str, Path], dbfs_target: str):
-        """Create a new DatabricksPath instance.
-
-        Args:
-            local_path: Local filesystem path (usually a temp directory)
-            dbfs_target: Target dbfs:// path for upload
-        """
         self._path = Path(local_path) if not isinstance(local_path, Path) else local_path
         self._dbfs_target = dbfs_target
 
     def __fspath__(self) -> str:
-        """Return the file system path (os.PathLike protocol)."""
         return str(self._path)
 
     def __str__(self) -> str:
-        """String representation returns the local path."""
         return str(self._path)
 
     def __repr__(self) -> str:
-        """Repr shows both local and target paths."""
         return f"DatabricksPath({self._path!r}, dbfs_target={self._dbfs_target!r})"
 
     def __truediv__(self, other: Union[str, Path]) -> Path:
-        """Path joining operator - returns regular Path."""
         return self._path / other
 
     def __eq__(self, other: object) -> bool:
-        """Equality comparison."""
         if isinstance(other, DatabricksPath):
             return self._path == other._path and self._dbfs_target == other._dbfs_target
         elif isinstance(other, (str, Path)):
@@ -89,129 +61,80 @@ class DatabricksPath:
         return False
 
     def __hash__(self) -> int:
-        """Hash based on local path."""
         return hash(self._path)
 
     @property
     def dbfs_target(self) -> str:
-        """Get the target dbfs:// path for this local directory."""
         return self._dbfs_target
 
-    # Delegate common Path operations
     def exists(self) -> bool:
-        """Check if the local path exists."""
         return self._path.exists()
 
     def mkdir(self, parents: bool = True, exist_ok: bool = True) -> None:
-        """Create the local directory."""
         self._path.mkdir(parents=parents, exist_ok=exist_ok)
 
     def is_dir(self) -> bool:
-        """Check if the local path is a directory."""
         return self._path.is_dir()
 
     def is_file(self) -> bool:
-        """Check if the local path is a file."""
         return self._path.is_file()
 
     def iterdir(self):
-        """Iterate over directory contents."""
         return self._path.iterdir()
 
     def glob(self, pattern: str):
-        """Glob for files matching pattern."""
         return self._path.glob(pattern)
 
     def rglob(self, pattern: str) -> Iterator[Path]:
-        """Recursively glob files matching pattern in the local staging path."""
         return self._path.rglob(pattern)
 
     @property
     def name(self) -> str:
-        """Get the final path component."""
         return self._path.name
 
     @property
     def parent(self) -> Path:
-        """Get the parent directory."""
         return self._path.parent
 
     @property
     def parts(self) -> tuple:
-        """Get path components."""
         return self._path.parts
 
     def as_posix(self) -> str:
-        """Return the path as a POSIX string."""
         return self._path.as_posix()
 
     @property
     def suffix(self) -> str:
-        """Get the final component's suffix."""
         return self._path.suffix
 
     def joinpath(self, *other: Union[str, Path]) -> Path:
-        """Join path components - returns a regular Path, like ``__truediv__``.
-
-        Required for parity with a plain ``Path``: the runner reaches the
-        datagen manifest through ``output_dir.joinpath(...)`` and treats an
-        object without it as an *unconfigured* output directory.
-        """
         return self._path.joinpath(*other)
 
     def stat(self, *, follow_symlinks: bool = True) -> os.stat_result:
-        """Stat the local path."""
         return self._path.stat(follow_symlinks=follow_symlinks)
 
     def resolve(self, strict: bool = False) -> Path:
-        """Resolve to absolute path."""
         return self._path.resolve(strict=strict)
 
 
 class CloudStagingPath:
-    """Universal wrapper for persistent local staging + cloud target pattern.
-
-    This class provides a consistent approach for all cloud storage providers
-    (GCS, S3, Azure, etc.) by maintaining:
-    - local_path: Persistent local directory for data generation and caching
-    - cloud_target: Target cloud URI for upload (gs://, s3://, etc.)
-
-    The class implements the os.PathLike protocol and delegates filesystem
-    operations to the local path, allowing generators to work with local files
-    while the platform adapter handles uploads to the cloud target.
-
-    This eliminates the need for temporary directories and enables data caching
-    between runs, significantly improving performance.
-    """
-
     def __init__(self, local_path: Union[str, Path], cloud_target: str):
-        """Create a new CloudStagingPath instance.
-
-        Args:
-            local_path: Persistent local filesystem path for staging/caching
-            cloud_target: Target cloud URI (gs://, s3://, etc.) for upload
-        """
         self._path = Path(local_path) if not isinstance(local_path, Path) else local_path
         self._cloud_target = cloud_target
 
     def __fspath__(self) -> str:
-        """Return the file system path (os.PathLike protocol)."""
         return str(self._path)
 
     def __str__(self) -> str:
-        """String representation returns the local path."""
         return str(self._path)
 
     def __repr__(self) -> str:
-        """Repr shows both local and cloud paths."""
         return f"CloudStagingPath({self._path!r}, cloud_target={self._cloud_target!r})"
 
     def __truediv__(self, other: Union[str, Path]) -> Path:
-        """Path joining operator - returns regular Path."""
         return self._path / other
 
     def __eq__(self, other: object) -> bool:
-        """Equality comparison."""
         if isinstance(other, CloudStagingPath):
             return self._path == other._path and self._cloud_target == other._cloud_target
         elif isinstance(other, (str, Path)):
@@ -219,114 +142,78 @@ class CloudStagingPath:
         return False
 
     def __hash__(self) -> int:
-        """Hash based on local path."""
         return hash(self._path)
 
     @property
     def cloud_target(self) -> str:
-        """Get the target cloud URI for this staging directory."""
         return self._cloud_target
 
-    # Delegate common Path operations to local path
     def exists(self) -> bool:
-        """Check if the local path exists."""
         return self._path.exists()
 
     def mkdir(self, parents: bool = True, exist_ok: bool = True) -> None:
-        """Create the local directory."""
         self._path.mkdir(parents=parents, exist_ok=exist_ok)
 
     def is_dir(self) -> bool:
-        """Check if the local path is a directory."""
         return self._path.is_dir()
 
     def is_file(self) -> bool:
-        """Check if the local path is a file."""
         return self._path.is_file()
 
     def iterdir(self):
-        """Iterate over directory contents."""
         return self._path.iterdir()
 
     def glob(self, pattern: str):
-        """Glob for files matching pattern."""
         return self._path.glob(pattern)
 
     def rglob(self, pattern: str) -> Iterator[Path]:
-        """Recursively glob files matching pattern in the local staging path."""
         return self._path.rglob(pattern)
 
     @property
     def name(self) -> str:
-        """Get the final path component."""
         return self._path.name
 
     @property
     def parent(self) -> Path:
-        """Get the parent directory."""
         return self._path.parent
 
     @property
     def parts(self) -> tuple:
-        """Get path components."""
         return self._path.parts
 
     @property
     def suffix(self) -> str:
-        """Get the final component's suffix."""
         return self._path.suffix
 
     def joinpath(self, *other: Union[str, Path]) -> Path:
-        """Join path components - returns a regular Path, like ``__truediv__``.
-
-        Required for parity with the plain ``Path`` that callers used to
-        receive: the runner joins ``_datagen_manifest.json`` onto the output
-        dir, and one call site skips manifest validation entirely when the
-        object has no ``joinpath``.
-        """
         return self._path.joinpath(*other)
 
     def stat(self, *, follow_symlinks: bool = True) -> os.stat_result:
-        """Stat the local path."""
         return self._path.stat(follow_symlinks=follow_symlinks)
 
     def as_posix(self) -> str:
-        """Return the path as a POSIX string."""
         return self._path.as_posix()
 
     def resolve(self, strict: bool = False) -> Path:
-        """Resolve to absolute path."""
         return self._path.resolve(strict=strict)
 
 
 @runtime_checkable
 class RemoteFileSystemAdapter(Protocol):
-    """Minimal adapter interface for remote file operations used by validation.
+    def file_exists(self, remote_path: str) -> bool: ...
 
-    Implementations should operate on absolute remote paths, including scheme
-    (e.g., dbfs:/Volumes/.../file). Paths are treated as opaque strings.
-    """
+    def read_file(self, remote_path: str) -> bytes: ...
 
-    def file_exists(self, remote_path: str) -> bool:  # pragma: no cover - interface
-        ...
+    def write_file(self, remote_path: str, content: bytes) -> None: ...
 
-    def read_file(self, remote_path: str) -> bytes:  # pragma: no cover - interface
-        ...
-
-    def write_file(self, remote_path: str, content: bytes) -> None:  # pragma: no cover - interface
-        ...
-
-    def list_files(self, remote_path: str, pattern: str = "*") -> list[str]:  # pragma: no cover - interface
-        ...
+    def list_files(self, remote_path: str, pattern: str = "*") -> list[str]: ...
 
 
 class DatabricksVolumeAdapter:
-    """RemoteFileSystemAdapter implementation for Databricks UC Volumes (dbfs:/Volumes/...)."""
-
     def __init__(self, workspace_client: Any | None = None, *, host: str | None = None, token: str | None = None):
         try:
-            from databricks.sdk import WorkspaceClient  # type: ignore
-        except Exception as e:  # pragma: no cover - optional dependency
+            from databricks.sdk import WorkspaceClient
+        except Exception as e:
             raise ImportError(
                 get_package_install_message("databricks-sdk", "databricks-sdk required for DatabricksVolumeAdapter.")
             ) from e
@@ -334,31 +221,29 @@ class DatabricksVolumeAdapter:
         if workspace_client is not None:
             self._ws = workspace_client
         else:
-            # Let SDK auto-configure if host/token are None
             self._ws = WorkspaceClient(host=(f"https://{host}" if host else None), token=token)
 
     def _to_ws_path(self, remote_path: str) -> str:
-        # Convert dbfs:/Volumes/... to /Volumes/...
+
         return remote_path.replace("dbfs:", "")
 
     def file_exists(self, remote_path: str) -> bool:
         path = self._to_ws_path(remote_path)
         try:
-            info = self._ws.files.get(path)  # type: ignore[attr-defined]
+            info = self._ws.files.get(path)
             return bool(info)
         except Exception:
-            # get() may raise if not found
             return False
 
     def read_file(self, remote_path: str) -> bytes:
         path = self._to_ws_path(remote_path)
         try:
-            data = self._ws.files.download(path)  # type: ignore[attr-defined]
-            # Some SDKs return bytes directly, others return a stream-like object
+            data = self._ws.files.download(path)
+
             if hasattr(data, "read"):
                 return data.read()
             return bytes(data)
-        except Exception as e:  # pragma: no cover - provider specific
+        except Exception as e:
             raise RuntimeError(f"Failed to read remote file: {remote_path}: {e}") from e
 
     def write_file(self, remote_path: str, content: bytes) -> None:
@@ -366,39 +251,26 @@ class DatabricksVolumeAdapter:
         try:
             from io import BytesIO
 
-            self._ws.files.upload(path, BytesIO(content), overwrite=True)  # type: ignore[attr-defined]
-        except Exception as e:  # pragma: no cover - provider specific
+            self._ws.files.upload(path, BytesIO(content), overwrite=True)
+        except Exception as e:
             raise RuntimeError(f"Failed to write remote file: {remote_path}: {e}") from e
 
     def list_files(self, remote_path: str, pattern: str = "*") -> list[str]:
         path = self._to_ws_path(remote_path)
         try:
-            items = self._ws.files.list(path)  # type: ignore[attr-defined]
+            items = self._ws.files.list(path)
             names: List[str] = []
             for it in items or []:
-                # Item may be dict or object; extract path/name best-effort
                 p = getattr(it, "path", None) or getattr(it, "file_path", None) or str(it)
                 names.append(p)
-            # Best-effort pattern filter (suffix/prefix wildcard only)
+
             import fnmatch
 
             return [n for n in names if fnmatch.fnmatch(n.split("/")[-1], pattern)]
-        except Exception:  # pragma: no cover - provider specific
+        except Exception:
             return []
 
 
-# Snowflake stage references are schemeless, so urlparse never yields a scheme
-# for them and the scheme list in is_cloud_path() cannot express this shape.
-# Grammar (always anchored at a leading '@'):
-#   @~/sub/path                  user stage
-#   @%table/sub/path             table stage
-#   @stage/sub/path              named stage
-#   @db.schema.stage/sub/path    qualified named stage
-# Identifiers are unquoted (letter/underscore lead) or double-quoted. Snowflake
-# escapes a double quote inside a quoted identifier by doubling it.
-# The stage and sub-path groups make this regex the single source of truth for
-# both matching and splitting, so a quoted stage name containing '/' can never
-# be mis-split by a separate parser.
 _QUOTED_STAGE_IDENTIFIER = r'"(?:[^"]|"")+"'
 _STAGE_IDENTIFIER = rf"(?:{_QUOTED_STAGE_IDENTIFIER}|[A-Za-z_][A-Za-z0-9_$]*)"
 _SNOWFLAKE_STAGE_RE = re.compile(
@@ -408,21 +280,8 @@ _SNOWFLAKE_STAGE_RE = re.compile(
 
 
 def _match_snowflake_stage(path: Union[str, Path]) -> Union[re.Match, None]:
-    """Match a Snowflake stage reference, returning the match or None.
 
-    Shared by the predicate and by :func:`get_cloud_path_info` so the grammar
-    and the stage/sub-path split can never drift apart.
-    """
-    # PurePath, not Path: this must also cover the pure flavours (PureWindowsPath),
-    # which are not Path subclasses and previously fell through to the non-str
-    # rejection below.
     if isinstance(path, PurePath):
-        # A stage reference is Snowflake URI grammar, not a local filesystem path, so
-        # it is always "/"-separated. str(WindowsPath("@~/data")) is "@~\\data", which
-        # the grammar rejects because it requires "/" after the stage token -- so a
-        # Path-typed stage silently failed to classify on Windows. Normalize it to
-        # behave like its string form everywhere. Non-stage inputs are unaffected:
-        # they do not start with "@" and never matched either way.
         path = str(path).replace("\\", "/")
 
     if not isinstance(path, str):
@@ -432,32 +291,10 @@ def _match_snowflake_stage(path: Union[str, Path]) -> Union[re.Match, None]:
 
 
 def is_snowflake_stage_path(path: Union[str, Path]) -> bool:
-    """Check if a path is a Snowflake stage reference (``@~/...``, ``@stage/...``).
-
-    Stage paths have no URI scheme, so they must be matched structurally rather
-    than through :func:`urlparse`. The match is anchored at a leading ``@`` so
-    that cloud URIs which merely contain ``@`` — notably
-    ``abfss://container@account.dfs.core.windows.net/path`` — are never
-    misrouted here.
-
-    Args:
-        path: Path to check
-
-    Returns:
-        True if path is a Snowflake user, table, named or qualified-named stage
-    """
     return _match_snowflake_stage(path) is not None
 
 
 def snowflake_stage_mode_error(path: Union[str, Path], *, table_mode: str = "native") -> str | None:
-    """Return a load-mode error for a Snowflake stage used as `staging_root`.
-
-    Native loads currently PUT to each table's own `@%TABLE` stage and only
-    retain the documented user-stage form (`@~`) as a valid remote output
-    namespace. External-table setup interpolates `staging_root` as a URI in
-    `CREATE STAGE ... URL=` and therefore cannot accept any `@...` stage
-    reference.
-    """
     match = _match_snowflake_stage(path)
     if match is None:
         return None
@@ -479,21 +316,7 @@ def snowflake_stage_mode_error(path: Union[str, Path], *, table_mode: str = "nat
 
 
 def is_cloud_path(path: Union[str, Path]) -> bool:
-    """Check if a path is a cloud storage path.
 
-    Includes dbfs:// paths (Databricks File System / Unity Catalog Volumes)
-    which require special handling via Databricks Files API, and Snowflake
-    stage references (``@~/...``), which are remote namespaces even though they
-    carry no URI scheme.
-
-    Args:
-        path: Path to check
-
-    Returns:
-        True if path is a cloud storage path (s3://, gs://, abfss://, dbfs://,
-        @stage/..., etc.)
-    """
-    # Convert Path objects (including CloudPath from cloudpathlib) to strings
     if not isinstance(path, str):
         path = str(path)
 
@@ -505,42 +328,21 @@ def is_cloud_path(path: Union[str, Path]) -> bool:
 
 
 class CloudScheme(NamedTuple):
-    """One cloud URI scheme family and everything that depends on it.
-
-    Single source of truth. Scheme identity used to be spelled out separately
-    in is_cloud_path's list, the cloudpathlib alias map, the ADLS predicate,
-    the credential env-var map and azure_synapse's provider gate -- so adding a
-    scheme to one left the others behind. That produced abfs:// classifying as
-    *local* (and so resolving to a relative directory that spills generated
-    data into the cwd), azure:// being rejected by Synapse despite being a
-    documented form, and az:// skipping its credential check entirely.
-    """
-
     canonical: str
-    """Scheme cloudpathlib registers, or the canonical spelling for staged families."""
 
     aliases: tuple[str, ...]
-    """Accepted alternative spellings, rewritten to ``canonical`` at the hand-off."""
 
     family: str
-    """Provider family, for platform-level gating (e.g. Azure Synapse)."""
 
     env_vars: tuple[str, ...]
-    """Credential environment variables checked by validate_cloud_credentials."""
 
     stages_locally: bool = False
-    """True when cloudpathlib cannot open it, so data stages locally instead."""
 
 
 _CLOUD_SCHEMES: tuple[CloudScheme, ...] = (
     CloudScheme("s3", (), "aws", ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY")),
     CloudScheme("gs", ("gcs",), "gcp", ("GOOGLE_APPLICATION_CREDENTIALS",)),
     CloudScheme("az", ("azure",), "azure", ("AZURE_STORAGE_ACCOUNT_NAME", "AZURE_STORAGE_ACCOUNT_KEY")),
-    # ADLS Gen2. Both spellings encode the storage account in the authority
-    # (abfss://container@account.dfs.core.windows.net/path), which cloudpathlib's
-    # az://container/path form cannot represent, so they stage locally rather
-    # than being rewritten -- rewriting would silently retarget whatever account
-    # the credentials happen to name.
     CloudScheme(
         "abfss",
         ("abfs",),
@@ -548,8 +350,6 @@ _CLOUD_SCHEMES: tuple[CloudScheme, ...] = (
         ("AZURE_STORAGE_ACCOUNT_NAME", "AZURE_STORAGE_ACCOUNT_KEY"),
         stages_locally=True,
     ),
-    # dbfs keeps its own DatabricksPath handling; listed so scheme recognition
-    # stays in one place.
     CloudScheme("dbfs", (), "databricks", ()),
 )
 
@@ -557,15 +357,13 @@ _SCHEME_BY_NAME: dict[str, CloudScheme] = {
     name: scheme for scheme in _CLOUD_SCHEMES for name in (scheme.canonical, *scheme.aliases)
 }
 
-# Aliases that cloudpathlib cannot open under their own name and which are NOT
-# staged locally, so they must be rewritten to the canonical scheme.
+
 _CLOUD_SCHEME_ALIASES = {
     alias: scheme.canonical for scheme in _CLOUD_SCHEMES if not scheme.stages_locally for alias in scheme.aliases
 }
 
 
 def _scheme_for(path: Union[str, Path]) -> Union[CloudScheme, None]:
-    """Return the CloudScheme for a path's URI scheme, or None if unrecognised."""
     if isinstance(path, Path):
         path = str(path)
     if not isinstance(path, str):
@@ -574,12 +372,6 @@ def _scheme_for(path: Union[str, Path]) -> Union[CloudScheme, None]:
 
 
 def _normalize_cloud_scheme(path: str) -> str:
-    """Rewrite a documented scheme alias to the one cloudpathlib registers.
-
-    ``gcs://bucket/p`` and ``azure://container/p`` are spelling variants of
-    ``gs://`` and ``az://`` — same bucket/container, same credentials — so the
-    rewrite is lossless. Anything else is returned unchanged.
-    """
     scheme, separator, rest = path.partition("://")
     if separator and scheme.lower() in _CLOUD_SCHEME_ALIASES:
         return f"{_CLOUD_SCHEME_ALIASES[scheme.lower()]}://{rest}"
@@ -587,7 +379,6 @@ def _normalize_cloud_scheme(path: str) -> str:
 
 
 def _build_cloud_path_for_validation(path: str, provider: str, cloud_path_cls: Any) -> Any:
-    """Build a provider path with explicit credentials when aliases need them."""
     normalized = _normalize_cloud_scheme(path)
     if provider.lower() not in {"az", "azure"}:
         return cloud_path_cls(normalized)
@@ -605,46 +396,16 @@ def _build_cloud_path_for_validation(path: str, provider: str, cloud_path_cls: A
 
 
 def is_adls_path(path: Union[str, Path]) -> bool:
-    """Check if a path is an Azure Data Lake Storage Gen2 URI.
-
-    Covers both ``abfss://`` and ``abfs://``. These encode the storage account
-    in the authority (``abfss://container@account.dfs.core.windows.net/path``),
-    which cloudpathlib's ``az://container/path`` form cannot represent, so they
-    are staged locally rather than rewritten.
-
-    Args:
-        path: Path to check
-
-    Returns:
-        True if path uses an ADLS Gen2 scheme
-    """
     scheme = _scheme_for(path)
     return scheme is not None and scheme.family == "azure" and scheme.stages_locally
 
 
 def cloud_provider_family(path: Union[str, Path]) -> Union[str, None]:
-    """Return the provider family for a cloud path, or None if not one.
-
-    Platform adapters gate on the family rather than on a literal list of
-    scheme spellings, so a new alias cannot be accepted by the classifier and
-    rejected by the platform.
-    """
     scheme = _scheme_for(path)
     return scheme.family if scheme is not None else None
 
 
 def is_databricks_path(path: Union[str, Path]) -> bool:
-    """Check if a path is a Databricks DBFS or UC Volume path.
-
-    Databricks paths use the dbfs:// scheme but are NOT supported by
-    cloudpathlib. They require special handling via Databricks Files API.
-
-    Args:
-        path: Path to check
-
-    Returns:
-        True if path is a dbfs:// path
-    """
     if isinstance(path, Path):
         path = str(path)
 
@@ -656,70 +417,35 @@ def is_databricks_path(path: Union[str, Path]) -> bool:
 
 
 def validate_cloud_path_support() -> bool:
-    """Validate that cloud path support is available.
-
-    Returns:
-        True if cloudpathlib is available, False otherwise
-    """
     cloud_path, _ = _load_cloudpathlib()
     return cloud_path is not None
 
 
 def create_path_handler(path: Union[str, Path]) -> Union[Path, CloudPath, DatabricksPath, CloudStagingPath]:
-    """Create appropriate path handler for local or cloud paths.
 
-    Note: dbfs:// paths (Databricks UC Volumes) and Snowflake stage paths
-    (``@~/...``) cannot be handled directly by cloudpathlib. For these paths, we
-    create a local temporary directory for data generation and store the remote
-    target as an attribute. The actual upload is handled by the platform adapter
-    during the load phase.
-
-    Args:
-        path: Local or cloud storage path (or already-created DatabricksPath/CloudPath)
-
-    Returns:
-        Path object for local paths, CloudPath for cloud paths,
-        DatabricksPath for dbfs:// paths (either created or passed through),
-        CloudStagingPath for Snowflake stage paths
-
-    Raises:
-        ImportError: If cloud path is provided but cloudpathlib not installed
-        ValueError: If cloud path format is invalid
-    """
-    # If already a DatabricksPath instance, return as-is (avoids double-wrapping)
     if isinstance(path, DatabricksPath):
         return path
 
-    # Same for CloudStagingPath. Without this it fell through to the local
-    # branch and was rebuilt as a plain Path of the staging directory, silently
-    # discarding cloud_target — so a handler that had been carrying its upload
-    # destination stopped doing so the moment it was re-wrapped.
     if isinstance(path, CloudStagingPath):
         return path
 
-    # If already a CloudPath instance, return as-is (avoids double-wrapping)
-    # Check if CloudPath is actually a class type, not None or a mock
     cloud_path_cls = CloudPath if CloudPath is not _UNLOADED_CLOUDPATHLIB else None
     if cloud_path_cls is not None and hasattr(cloud_path_cls, "__mro__") and isinstance(path, cloud_path_cls):
         return path
 
-    # Handle Databricks paths specially - they require local generation + upload
     if is_databricks_path(path):
         path_str = str(path)
 
-        # Validate dbfs:// path format for UC Volumes
         if not path_str.startswith("dbfs:/Volumes/"):
             raise ValueError(
                 f"Invalid dbfs:// path: {path_str}. "
                 f"Unity Catalog Volumes must use format: dbfs:/Volumes/catalog/schema/volume"
             )
 
-        # Create temporary directory for local data generation
         import tempfile
 
         temp_dir_str = tempfile.mkdtemp(prefix="benchbox_dbfs_")
 
-        # Create DatabricksPath that wraps the temp directory and stores the target
         databricks_path = DatabricksPath(temp_dir_str, path_str)
 
         logger.info(f"Created temporary directory for dbfs:// path: {databricks_path}")
@@ -727,9 +453,6 @@ def create_path_handler(path: Union[str, Path]) -> Union[Path, CloudPath, Databr
 
         return databricks_path
 
-    # Handle Snowflake stage paths specially - like dbfs://, they are a remote
-    # namespace cloudpathlib cannot open, so data is generated locally and the
-    # stage target is carried alongside for the adapter to upload.
     if is_snowflake_stage_path(path):
         path_str = str(path)
 
@@ -743,11 +466,6 @@ def create_path_handler(path: Union[str, Path]) -> Union[Path, CloudPath, Databr
 
         return staging_path
 
-    # Handle abfss:// specially - the URI encodes the storage account, which
-    # cloudpathlib's az:// form cannot carry, so rewriting one would silently
-    # point at whatever account the credentials happen to name. Stage locally
-    # and keep the URI for the adapter, exactly as dbfs:// and stages do. This
-    # also matches what the orchestrator already does with an abfss --output.
     if is_adls_path(path):
         path_str = str(path)
 
@@ -778,16 +496,6 @@ def create_path_handler(path: Union[str, Path]) -> Union[Path, CloudPath, Databr
 def normalize_output_dir(
     path: Union[str, Path, None],
 ) -> Union[Path, CloudPath, DatabricksPath, CloudStagingPath, None]:
-    """Coerce a benchmark output directory without dropping cloud staging wrappers.
-
-    Several benchmarks historically stored ``output_dir`` via ``Path(...)``,
-    which stringifies a ``CloudStagingPath``/``DatabricksPath`` down to its
-    local cache directory and silently discards the cloud upload target the
-    orchestrator resolved at construction time. Route those assignments
-    through here (or :func:`create_path_handler` directly) so an already-built
-    handler passes through untouched while plain strings still become
-    :class:`Path` and ``None`` stays ``None``.
-    """
     if path is None:
         return None
     if isinstance(path, (DatabricksPath, CloudStagingPath)):
@@ -798,15 +506,9 @@ def normalize_output_dir(
 
 
 def get_remote_fs_adapter(remote_path: str) -> RemoteFileSystemAdapter:
-    """Create a RemoteFileSystemAdapter for a remote path.
-
-    Currently supports Databricks UC Volumes via dbfs:/ scheme. For other
-    providers, placeholder implementations can be added in the future.
-    """
     if is_databricks_path(remote_path):
-        # Lazy import to avoid enforcing dependency when unused
         try:
-            from databricks.sdk import WorkspaceClient  # type: ignore
+            from databricks.sdk import WorkspaceClient
 
             ws = WorkspaceClient()
             return DatabricksVolumeAdapter(ws)
@@ -822,35 +524,19 @@ def get_remote_fs_adapter(remote_path: str) -> RemoteFileSystemAdapter:
                 "Ensure DATABRICKS_HOST and DATABRICKS_TOKEN are set correctly."
             ) from e
 
-    # Placeholder adapters for future S3/GCS/Azure implementations could go here
     raise ValueError(f"No RemoteFileSystemAdapter available for path: {remote_path}")
 
 
 def validate_cloud_credentials(path: Union[str, Path]) -> dict[str, Any]:
-    """Validate cloud credentials for the given path.
 
-    Args:
-        path: Cloud storage path to validate
-
-    Returns:
-        Dictionary with validation results:
-        - valid: bool indicating if credentials are valid
-        - provider: string cloud provider (s3, gcs, azure, dbfs)
-        - error: error message if validation failed
-        - env_vars: list of environment variables checked
-    """
-    # Databricks paths use Databricks access tokens, validated separately by the adapter
     if is_databricks_path(path):
         return {
-            "valid": True,  # Assume valid - will be checked by Databricks adapter
+            "valid": True,
             "provider": "dbfs",
             "error": None,
             "env_vars": ["DATABRICKS_HOST", "DATABRICKS_HTTP_PATH", "DATABRICKS_TOKEN"],
         }
 
-    # Snowflake stage references are validated by the Snowflake adapter.
-    # cloudpathlib cannot open schemeless ``@...`` references, so loading it
-    # here would turn a valid stage into a prefix validation failure.
     if is_snowflake_stage_path(path):
         return {
             "valid": True,
@@ -865,16 +551,9 @@ def validate_cloud_credentials(path: Union[str, Path]) -> dict[str, Any]:
     parsed = urlparse(str(path))
     provider = parsed.scheme
 
-    # Expected environment variables, derived from the scheme table so an alias
-    # cannot be recognised by the classifier yet skip its credential check --
-    # which is exactly what happened to the canonical `az://` spelling while
-    # its `azure://` alias was checked.
     scheme_entry = _SCHEME_BY_NAME.get(provider.lower())
     expected_vars = list(scheme_entry.env_vars) if scheme_entry else []
 
-    # ADLS URIs carry the account in their authority and are staged locally;
-    # cloudpathlib cannot represent that form. Check credentials without
-    # importing cloudpathlib so minimal Synapse installations remain usable.
     if is_adls_path(path):
         missing_vars = [var for var in expected_vars if not os.getenv(var)]
         if missing_vars:
@@ -900,19 +579,14 @@ def validate_cloud_credentials(path: Union[str, Path]) -> dict[str, Any]:
             "env_vars": [],
         }
 
-    # For S3, check multiple credential sources (not just env vars)
     if provider == "s3":
-        # Check environment variables
         has_env_creds = bool(os.getenv("AWS_ACCESS_KEY_ID") and os.getenv("AWS_SECRET_ACCESS_KEY"))
 
-        # Check AWS profile
         has_profile = bool(os.getenv("AWS_PROFILE"))
 
-        # Check credentials file
         credentials_file = Path(os.path.expanduser("~/.aws/credentials"))
         has_credentials_file = credentials_file.exists()
 
-        # Check config file with default profile
         config_file = Path(os.path.expanduser("~/.aws/config"))
         has_config_file = config_file.exists()
 
@@ -929,7 +603,6 @@ def validate_cloud_credentials(path: Union[str, Path]) -> dict[str, Any]:
                 "env_vars": expected_vars,
             }
     else:
-        # For other providers, check environment variables
         missing_vars = [var for var in expected_vars if not os.getenv(var)]
 
         if missing_vars:
@@ -940,11 +613,9 @@ def validate_cloud_credentials(path: Union[str, Path]) -> dict[str, Any]:
                 "env_vars": expected_vars,
             }
 
-    # Try to create a cloud path to test credentials. Scheme aliases are
-    # normalised first for the same reason as in create_path_handler.
     try:
         cloud_path = _build_cloud_path_for_validation(str(path), provider, cloud_path_cls)
-        # Test basic operations
+
         _ = cloud_path.exists()
         return {
             "valid": True,
@@ -971,28 +642,13 @@ def validate_cloud_credentials(path: Union[str, Path]) -> dict[str, Any]:
 def ensure_cloud_directory(
     path: Union[str, Path, CloudPath],
 ) -> Union[Path, CloudPath, DatabricksPath]:
-    """Ensure cloud or local directory exists.
-
-    Args:
-        path: Directory path to create
-
-    Returns:
-        Path object (local or cloud)
-
-    Raises:
-        Exception: If directory creation fails
-    """
     path_handler = create_path_handler(path) if isinstance(path, (str, Path)) else path
 
     try:
         if hasattr(path_handler, "mkdir"):
-            # Local Path or CloudPath with mkdir
-            path_handler.mkdir(parents=True, exist_ok=True)  # type: ignore
+            path_handler.mkdir(parents=True, exist_ok=True)
         elif hasattr(path_handler, "exists"):
-            # CloudPath - some providers auto-create directories
-            # Just check if we can access the path
-            if not path_handler.exists():  # type: ignore
-                # For cloud paths, we might need to create a marker file
+            if not path_handler.exists():
                 logger.info(f"Cloud directory will be created on first file write: {path_handler}")
     except Exception as e:
         logger.error(f"Failed to ensure directory exists: {path_handler} - {e}")
@@ -1002,24 +658,10 @@ def ensure_cloud_directory(
 
 
 def get_cloud_path_info(path: Union[str, Path]) -> dict[str, Any]:
-    """Get information about a cloud path.
 
-    Args:
-        path: Path to analyze
-
-    Returns:
-        Dictionary with path information:
-        - is_cloud: bool
-        - provider: string provider name
-        - bucket: bucket/container name (or None for dbfs)
-        - path: path within bucket
-        - credentials_valid: bool
-        - volume_info: dict with catalog/schema/volume (for dbfs only)
-    """
-    # Handle Databricks paths specially - extract UC Volume components
     if is_databricks_path(path):
         parsed = urlparse(str(path))
-        # For dbfs:/Volumes/catalog/schema/volume, extract components
+
         path_parts = parsed.path.lstrip("/").split("/")
         volume_info = {}
         if len(path_parts) >= 4 and path_parts[0] == "Volumes":
@@ -1032,14 +674,12 @@ def get_cloud_path_info(path: Union[str, Path]) -> dict[str, Any]:
         return {
             "is_cloud": True,
             "provider": "dbfs",
-            "bucket": None,  # Not applicable for DBFS
+            "bucket": None,
             "path": parsed.path,
-            "credentials_valid": True,  # Checked by Databricks adapter
+            "credentials_valid": True,
             "volume_info": volume_info,
         }
 
-    # Handle Snowflake stage paths specially - the stage name is the container
-    # and there is no scheme/netloc for urlparse to split.
     stage_match = _match_snowflake_stage(path)
     if stage_match is not None:
         stage_name = stage_match.group("stage")
@@ -1049,7 +689,7 @@ def get_cloud_path_info(path: Union[str, Path]) -> dict[str, Any]:
             "provider": "snowflake_stage",
             "bucket": stage_name,
             "path": sub_path,
-            "credentials_valid": True,  # Checked by the Snowflake adapter
+            "credentials_valid": True,
             "stage_info": {"stage": stage_name, "sub_path": sub_path},
         }
 
@@ -1067,17 +707,11 @@ def get_cloud_path_info(path: Union[str, Path]) -> dict[str, Any]:
     bucket = parsed.netloc
     cloud_path = parsed.path.lstrip("/")
 
-    # ADLS Gen2 encodes two things in the authority:
-    # abfss://<container>@<account>.dfs.core.windows.net/<path>. Reporting the
-    # whole netloc as the bucket hands consumers a container name of
-    # "container@account.dfs.core.windows.net", so split them apart and expose
-    # the account separately.
     account = None
     if is_adls_path(path) and "@" in bucket:
         bucket, _, account_host = bucket.partition("@")
         account = account_host.split(".", 1)[0] or None
 
-    # Use scheme directly so provider identity matches the URI protocol.
     provider = scheme
 
     credential_check = validate_cloud_credentials(path)
@@ -1093,14 +727,7 @@ def get_cloud_path_info(path: Union[str, Path]) -> dict[str, Any]:
 
 
 class CloudPathAdapter:
-    """Adapter to provide unified interface for local and cloud paths."""
-
     def __init__(self, path: Union[str, Path]):
-        """Initialize path adapter.
-
-        Args:
-            path: Local or cloud storage path
-        """
         self.original_path = str(path)
         self.is_cloud = is_cloud_path(path)
         self.path_handler = create_path_handler(path)
@@ -1111,49 +738,35 @@ class CloudPathAdapter:
             self.path_info = {"is_cloud": False, "provider": "local"}
 
     def exists(self) -> bool:
-        """Check if path exists."""
         try:
-            return self.path_handler.exists()  # type: ignore
+            return self.path_handler.exists()
         except Exception:
             return False
 
     def mkdir(self, parents: bool = True, exist_ok: bool = True) -> None:
-        """Create directory."""
         if hasattr(self.path_handler, "mkdir"):
-            self.path_handler.mkdir(parents=parents, exist_ok=exist_ok)  # type: ignore
+            self.path_handler.mkdir(parents=parents, exist_ok=exist_ok)
 
     def __str__(self) -> str:
-        """String representation."""
         return str(self.path_handler)
 
     def __truediv__(self, other: str) -> CloudPathAdapter:
-        """Path joining operator."""
         if self.is_cloud:
-            new_path = str(self.path_handler / other)  # type: ignore
+            new_path = str(self.path_handler / other)
         else:
             new_path = str(self.path_handler / other)
         return CloudPathAdapter(new_path)
 
     @property
     def name(self) -> str:
-        """Get the name of the path."""
-        return self.path_handler.name  # type: ignore
+        return self.path_handler.name
 
     @property
     def parent(self) -> CloudPathAdapter:
-        """Get the parent directory."""
-        return CloudPathAdapter(str(self.path_handler.parent))  # type: ignore
+        return CloudPathAdapter(str(self.path_handler.parent))
 
 
 def format_cloud_usage_guide(provider: str) -> str:
-    """Format usage guide for cloud storage provider.
-
-    Args:
-        provider: Cloud provider (s3, gs, azure, dbfs)
-
-    Returns:
-        Formatted usage guide string
-    """
     guides = {
         "dbfs": """
 Databricks DBFS / Unity Catalog Volumes Setup:
@@ -1211,35 +824,9 @@ Azure Blob Storage Setup:
 
 
 class CloudStorageGeneratorMixin:
-    """Mixin class to add cloud storage upload functionality to data generators.
-
-    This mixin provides a standardized way for all data generators to handle cloud storage
-    uploads without duplicating code. Generators should inherit from this mixin and call
-    the cloud upload methods when needed.
-    """
-
     def _is_cloud_output(self, output_dir) -> bool:
-        """Check if output directory is a cloud path."""
         return is_cloud_path(str(output_dir))
 
     def _handle_cloud_or_local_generation(self, output_dir, local_generate_func, verbose: bool = False):
-        """Handle both cloud and local generation paths.
 
-        With CloudStagingPath and DatabricksPath, both cloud and local paths now work the same way:
-        - CloudStagingPath/DatabricksPath expose their local cache path via __fspath__()
-        - Generators see the local path and work normally (validation, generation, caching)
-        - Platform adapters access the cloud_target property for uploads
-
-        This eliminates the need for temporary directories and enables persistent caching.
-
-        Args:
-            output_dir: Output directory (local path, CloudStagingPath, or DatabricksPath)
-            local_generate_func: Function to generate data locally
-            verbose: Whether to print verbose output
-
-        Returns:
-            Dictionary mapping table names to file paths
-        """
-        # Both local and cloud paths now use the same code path!
-        # CloudStagingPath/DatabricksPath implement __fspath__() to return local path
         return local_generate_func(output_dir)

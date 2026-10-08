@@ -1,5 +1,3 @@
-"""Tests for the --version flag on the BenchBox CLI."""
-
 import pytest
 from click.testing import CliRunner
 
@@ -12,7 +10,6 @@ pytestmark = [
 
 
 def test_cli_version_flag_displays_version_report():
-    """Running benchbox --version should show the formatted version report."""
     runner = CliRunner()
     result = runner.invoke(cli, ["--version"])
 

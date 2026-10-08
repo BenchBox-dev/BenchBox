@@ -27,9 +27,10 @@ defaults and standard `COPY` for bulk loading.
 | `self-hosted` | Self-hosted CedarDB server over PG wire protocol (default)     |
 
 ```bash
-# Self-hosted (default)
 benchbox run --platform cedardb --benchmark tpch --scale 1.0
 ```
+
+This uses the self-hosted mode, which is the default.
 
 ## Installation
 

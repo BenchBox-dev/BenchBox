@@ -95,24 +95,21 @@ Interactive exploration and visualization.
 ### Local Examples (No Setup)
 
 ```bash
-# Navigate to examples directory
 cd examples
 
-# Run your first benchmark
 python getting_started/local/duckdb_tpch_power.py
 
-# Try with different scale factor
 python getting_started/local/duckdb_tpch_power.py --scale 0.1
 ```
 
 ### Cloud Examples (Requires Credentials)
 
+Set the environment variables first, then run the example:
+
 ```bash
-# Set environment variables first
 export DATABRICKS_TOKEN="your-token"
 export DATABRICKS_HOST="https://your-workspace.cloud.databricks.com"
 
-# Run cloud example
 python getting_started/cloud/databricks_tpch_power.py
 ```
 
@@ -131,14 +128,12 @@ This creates:
 ### Jupyter Notebooks
 
 ```bash
-# Install Jupyter if needed
 uv pip install jupyter
 
-# Launch notebook server
 jupyter notebook notebooks/
-
-# Open desired notebook in browser
 ```
+
+Then open the desired notebook in your browser.
 
 ## Example Directory Structure
 
@@ -207,17 +202,15 @@ For detailed explanations of concepts used in these examples, see:
 ### Common Issues
 
 **`ModuleNotFoundError: No module named 'benchbox'`**
+Install BenchBox, or install it with platform-specific extras:
 ```bash
-# Install BenchBox
 uv add benchbox
 
-# Or install with platform-specific extras
 uv add benchbox --extra databricks
 ```
 
 **`DATABRICKS_TOKEN not found`**
 ```bash
-# Set required environment variables
 export DATABRICKS_TOKEN="your-token"
 export DATABRICKS_HOST="https://your-workspace.cloud.databricks.com"
 ```

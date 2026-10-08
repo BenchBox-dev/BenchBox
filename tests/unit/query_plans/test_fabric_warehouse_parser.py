@@ -1,11 +1,3 @@
-"""Unit tests for FabricWarehouseQueryPlanParser.
-
-Driven by a recorded ``SHOWPLAN_TEXT`` fixture under tests/fixtures/query_plans/
-so they run with no live Microsoft Fabric workspace. Fabric's T-SQL showplan
-format is structurally distinct from Azure Synapse's ``EXPLAIN`` XML, hence the
-dedicated parser.
-"""
-
 from pathlib import Path
 
 import pytest
@@ -48,8 +40,7 @@ class TestFabricWarehouseParserBasics:
 
     def test_statement_line_is_not_an_operator(self, parser):
         dag = parser.parse_explain_output("q1", _load("fabric_warehouse_showplan_sample.txt"))
-        # The leading SELECT statement row has no |-- connector and must be
-        # ignored, so the root is the Sort operator, not the query text.
+
         assert dag.logical_root.operator_type == LogicalOperatorType.SORT
 
     def test_tree_shape_join_over_two_scans(self, parser):

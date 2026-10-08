@@ -1,5 +1,3 @@
-"""Tests for the set-preserving corpus seed and disposition ledger (A9 w1 + review follow-ups)."""
-
 from __future__ import annotations
 
 import hashlib
@@ -22,9 +20,6 @@ IGNORED_SUFFIXES = (".manifest.json", ".applied.json", ".plans.json", ".tuning.j
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
-# The moving accepted ref is used only for freshness and provenance assertions.
-# Reproduction checks use RECORDED_SOURCE below, so an advancing mirror cannot
-# turn unchanged code red. Only the freshness path reads the live tip.
 ACCEPTED_REF = "origin/published-results"
 
 
@@ -35,13 +30,8 @@ def _recorded_source() -> str:
         return ""
 
 
-# The immutable snapshot recorded in the committed seed (M8). Reproducibility
-# checks read bytes from this SHA, never from the current tip of the branch.
 RECORDED_SOURCE = _recorded_source()
 
-# How many ref-dependent tests MUST run. If the recorded snapshot is
-# unreachable and this is not explicitly allowed, the suite fails loudly
-# instead of silently skipping ~half its coverage (M8).
 _ALLOW_MISSING_REF = os.environ.get("BENCHBOX_ALLOW_MISSING_PUBLISHED_REF") == "1"
 
 
@@ -121,23 +111,12 @@ def _blob_sha256(ref: str, path: str) -> str:
     return hashlib.sha256(proc.stdout).hexdigest()
 
 
-# ---------------------------------------------------------------------------
-# Loud-failure guard (M8)
-# ---------------------------------------------------------------------------
-
-
 def test_ref_dependent_suite_is_not_silently_skipped() -> None:
-    """If the recorded snapshot is unreachable and not explicitly allowed, fail — don't skip."""
     assert REF_AVAILABLE or _ALLOW_MISSING_REF, (
         f"recorded source {RECORDED_SOURCE or '<missing>'} is unreachable; set "
         "BENCHBOX_ALLOW_MISSING_PUBLISHED_REF=1 to allow an offline run, otherwise fetch "
         "the accepted ref so the ledger-seed contract is actually tested"
     )
-
-
-# ---------------------------------------------------------------------------
-# Seed schema
-# ---------------------------------------------------------------------------
 
 
 def test_seed_file_exists_and_is_valid_json() -> None:
@@ -171,7 +150,6 @@ def test_seed_has_required_keys() -> None:
 
 
 def test_seed_provenance_binds_recorded_snapshot() -> None:
-    """w0: the seed persists which ref resolved to the recorded SHA and when."""
     data = _seed()
     assert COMMIT_SHA_RE.match(data["source"])
     assert data["source_resolved_from"] == data["source_ref"] == ACCEPTED_REF
@@ -179,7 +157,6 @@ def test_seed_provenance_binds_recorded_snapshot() -> None:
 
 
 def test_seed_source_is_pinned_commit_sha() -> None:
-    """M8: `source` is an immutable commit SHA, not a moving branch name."""
     data = _seed()
     assert COMMIT_SHA_RE.match(data["source"]), f"source must be a 40-hex commit SHA, got {data['source']!r}"
     assert data["source_ref"] == ACCEPTED_REF
@@ -191,7 +168,6 @@ def test_seed_count_matches_union_length() -> None:
 
 
 def test_seed_bidirectional_is_derived() -> None:
-    """N12: bidirectional reflects real two-sided membership, not a hardcoded literal."""
     data = _seed()
     assert isinstance(data["bidirectional"], bool)
     expected = not data["published_only"] and not data["legacy_overlay"]
@@ -199,21 +175,14 @@ def test_seed_bidirectional_is_derived() -> None:
 
 
 def test_seed_every_path_has_a_sha256_digest() -> None:
-    """M6 / G1: exact accepted-path union exported with a per-object digest."""
     data = _seed()
     for path in data["union"]:
         digest = data["digests"].get(path)
         assert digest and SHA256_RE.match(digest), f"missing/invalid digest for {path}: {digest!r}"
 
 
-# ---------------------------------------------------------------------------
-# Set preservation (M7)
-# ---------------------------------------------------------------------------
-
-
 @skip_no_ref
 def test_seed_union_is_the_two_sided_union() -> None:
-    """M7: the union covers BOTH the accepted ref and the main working corpus."""
     accepted = set(_bundles_at_ref(_seed()["source"]))
     main = set(_worktree_bundles())
     data = _seed()
@@ -223,7 +192,6 @@ def test_seed_union_is_the_two_sided_union() -> None:
 
 @skip_no_ref
 def test_seed_dispositions_match_set_membership() -> None:
-    """M7: published_only / legacy_overlay are derived from set difference, not CLI flags."""
     accepted = set(_bundles_at_ref(_seed()["source"]))
     main = set(_worktree_bundles())
     data = _seed()
@@ -246,10 +214,9 @@ def test_seed_dispositions_cover_all_union_paths() -> None:
 
 @skip_no_ref
 def test_seed_digests_match_git_blob_bytes() -> None:
-    """M6: every recorded digest is the real sha256 of the blob at the pinned ref/worktree."""
     data = _seed()
     accepted = set(_bundles_at_ref(data["source"]))
-    sample = list(data["union"])[:: max(1, len(data["union"]) // 15)]  # ~15 spot checks
+    sample = list(data["union"])[:: max(1, len(data["union"]) // 15)]
     for path in sample:
         if path in accepted:
             expected = _blob_sha256(data["source"], path)
@@ -263,11 +230,6 @@ def test_seed_count_is_nonzero() -> None:
     assert _seed()["count"] > 0
 
 
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
-
-
 def _run_cli(*args: str, cwd: Path = REPO_ROOT) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(SCRIPT_PATH), *args],
@@ -279,12 +241,6 @@ def _run_cli(*args: str, cwd: Path = REPO_ROOT) -> subprocess.CompletedProcess[s
 
 @skip_no_ref
 def test_cli_regenerates_committed_seed_content(tmp_path: Path) -> None:
-    """The committed seed must be reproducible from the recorded input (no manual drift).
-
-    The moving ref is resolved once and bound to the recorded SHA: an advancing
-    mirror fails here with an actionable moved-ref message instead of silently
-    switching inputs and turning unchanged code red.
-    """
     out = tmp_path / "seed.json"
     result = _run_cli("--accepted-ref", RECORDED_SOURCE, "--expect-source", RECORDED_SOURCE, "--output", str(out))
     assert result.returncode == 0, result.stderr
@@ -297,7 +253,6 @@ def test_cli_regenerates_committed_seed_content(tmp_path: Path) -> None:
 
 @skip_no_ref
 def test_cli_expect_source_rejects_moved_ref(tmp_path: Path) -> None:
-    """A ref that no longer resolves to the recorded snapshot fails closed."""
     out = tmp_path / "seed.json"
     result = _run_cli("--accepted-ref", "HEAD", "--expect-source", RECORDED_SOURCE, "--output", str(out))
     assert result.returncode != 0
@@ -326,7 +281,6 @@ def test_cli_classifies_forced_legacy_overlay(tmp_path: Path) -> None:
 
 
 def test_cli_rejects_disposition_path_outside_union(tmp_path: Path) -> None:
-    """M10: an unvalidated disposition path is an error, not a silent drop."""
     out = tmp_path / "seed.json"
     result = _run_cli(
         "--accepted-ref",
@@ -341,7 +295,6 @@ def test_cli_rejects_disposition_path_outside_union(tmp_path: Path) -> None:
 
 
 def test_cli_empty_corpus_fails(tmp_path: Path) -> None:
-    """M9 / no vacuous pass: an unusable ref must exit non-zero and write nothing."""
     out = tmp_path / "seed.json"
     result = _run_cli("--accepted-ref", "4b825dc642cb6eb9a060e54bf899d150063038c2", "--output", str(out))
     assert result.returncode != 0
@@ -349,7 +302,6 @@ def test_cli_empty_corpus_fails(tmp_path: Path) -> None:
 
 
 def test_cli_reports_bad_ref_distinctly(tmp_path: Path) -> None:
-    """M9: a git failure is reported as such, not misreported as an empty corpus."""
     out = tmp_path / "seed.json"
     result = _run_cli("--accepted-ref", "totally/not/a/ref", "--output", str(out))
     assert result.returncode != 0
@@ -358,7 +310,6 @@ def test_cli_reports_bad_ref_distinctly(tmp_path: Path) -> None:
 
 @skip_no_ref
 def test_cli_materialize_dest_writes_union_and_verifies_digests(tmp_path: Path) -> None:
-    """--materialize-dest reads bytes from the recorded snapshot, not the live tip."""
     dest = tmp_path / "corpus_archive"
     result = _run_cli(
         "--accepted-ref",
@@ -376,7 +327,6 @@ def test_cli_materialize_dest_writes_union_and_verifies_digests(tmp_path: Path) 
     expected = sorted(Path(p).name for p in seed["union"])
     assert written == expected
 
-    # Tamper the seed digest and confirm materialize fails closed.
     bad_seed = tmp_path / "bad-seed.json"
     tampered = dict(seed)
     tampered["digests"] = dict(seed["digests"])
@@ -400,7 +350,6 @@ def test_cli_materialize_dest_writes_union_and_verifies_digests(tmp_path: Path) 
 
 @skip_no_ref
 def test_cli_materialize_rejects_seed_without_recorded_source(tmp_path: Path) -> None:
-    """A legacy seed with no immutable source SHA must be regenerated, not guessed."""
     legacy = tmp_path / "legacy-seed.json"
     seed = _seed()
     stripped = {k: v for k, v in seed.items() if k != "source"}
@@ -420,7 +369,6 @@ def test_cli_materialize_rejects_seed_without_recorded_source(tmp_path: Path) ->
 
 
 def _isolated_corpus_repo(path: Path) -> tuple[str, str]:
-    """Build a scratch repo with an accepted branch; return (repo, snapshot sha)."""
     path.mkdir(parents=True, exist_ok=True)
 
     def git(*args: str) -> str:
@@ -446,13 +394,6 @@ def _isolated_corpus_repo(path: Path) -> tuple[str, str]:
 
 
 def test_isolated_replay_moved_ref_fails_closed_snapshot_reproduces(tmp_path: Path) -> None:
-    """w3: replay the moving-ref incident in an isolated local repository.
-
-    Advancing the accepted branch must not change validation of the recorded
-    snapshot: regeneration bound to the old SHA reproduces it byte-identical,
-    generation from the moved ref with --expect-source fails closed, and
-    materialize still serves accepted bytes from the recorded snapshot.
-    """
     repo, snapshot = _isolated_corpus_repo(tmp_path / "iso")
 
     def cli(*args: str) -> subprocess.CompletedProcess[str]:
@@ -466,7 +407,6 @@ def test_isolated_replay_moved_ref_fails_closed_snapshot_reproduces(tmp_path: Pa
     assert seed["count"] == 3
     assert seed["dispositions"]["results-data/bundles/c.json"] == "legacy_overlay"
 
-    # Advance the accepted branch: the recorded snapshot must still reproduce.
     subprocess.run(["git", "checkout", "-q", "published-results"], cwd=repo, check=True)
     (Path(repo) / "results-data" / "bundles" / "d.json").write_text('{"id": "d"}')
     subprocess.run(["git", "add", "."], cwd=repo, check=True)
@@ -480,15 +420,12 @@ def test_isolated_replay_moved_ref_fails_closed_snapshot_reproduces(tmp_path: Pa
     assert regen["union"] == seed["union"]
     assert regen["digests"] == seed["digests"]
 
-    # The moved ref bound to the old snapshot fails closed, never switches input.
     moved = cli(
         "--accepted-ref", "published-results", "--expect-source", snapshot, "--output", str(tmp_path / "moved.json")
     )
     assert moved.returncode != 0
     assert "moved" in moved.stderr
 
-    # Materialize still serves accepted bytes from the recorded snapshot
-    # (dest layout strips the corpus prefix, as in the cutover workflow).
     (Path(repo) / "results-data" / "bundles" / "b.json").unlink()
     dest = tmp_path / "archive"
     result = cli(
@@ -506,13 +443,6 @@ def test_isolated_replay_moved_ref_fails_closed_snapshot_reproduces(tmp_path: Pa
 
 
 def test_isolated_replay_mirror_drift_breaks_bidirectional(tmp_path: Path) -> None:
-    """Replay the mirror-drift incident in an isolated local repository.
-
-    A seed built while the mirror matches the accepted snapshot is
-    bidirectional. After the mirror (main ref) drifts, a rebuild reports
-    legacy_overlay and clears bidirectional instead of silently accepting
-    the drifted content, while the pre-drift seed still reproduces.
-    """
     repo, snapshot = _isolated_corpus_repo(tmp_path / "iso")
 
     def cli(*args: str) -> subprocess.CompletedProcess[str]:
@@ -545,9 +475,6 @@ def test_isolated_replay_mirror_drift_breaks_bidirectional(tmp_path: Path) -> No
     assert regen["union"] == seed["union"]
     assert regen["digests"] == seed["digests"]
 
-    # The drifted mirror-only overlay materializes from the recorded main SHA,
-    # not the accepted snapshot (which never contained it) — even when the
-    # live worktree no longer carries those bytes.
     main_sha = subprocess.run(
         ["git", "rev-parse", "main"], cwd=repo, check=True, capture_output=True, text=True
     ).stdout.strip()
@@ -568,7 +495,6 @@ def test_isolated_replay_mirror_drift_breaks_bidirectional(tmp_path: Path) -> No
 
 
 def test_isolated_replay_mirror_only_refuses_without_immutable_main(tmp_path: Path) -> None:
-    """A mirror-only path with a live-tree main source fails closed, never guessed."""
     repo, snapshot = _isolated_corpus_repo(tmp_path / "iso")
 
     def cli(*args: str) -> subprocess.CompletedProcess[str]:

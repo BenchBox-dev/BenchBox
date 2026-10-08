@@ -1,18 +1,6 @@
-"""Tests for run command option parsing, validation, and error handling.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Covers CLI-level behavior for the `benchbox run` command including:
-- Option conflict detection (--quiet + --verbose)
-- Phase validation
-- Official mode constraints
-- Table mode / tuning incompatibility
-- Dry-run mode edge cases
-- Help topic rendering
-- Scale factor validation
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -35,15 +23,11 @@ pytestmark = [
 
 
 def _run_obj():
-    """Return the obj dict needed for invoking the run command directly."""
     return {"config": ConfigManager()}
 
 
 class TestQuietVerboseConflict:
-    """Test --quiet and --verbose mutual exclusion."""
-
     def test_quiet_and_verbose_together_exits_with_code_2(self):
-        """Using both --quiet and --verbose should exit with code 2."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -55,7 +39,6 @@ class TestQuietVerboseConflict:
         assert "cannot be used with" in result.output
 
     def test_quiet_and_double_verbose_together_exits_with_code_2(self):
-        """Using both --quiet and -vv should exit with code 2."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -68,10 +51,7 @@ class TestQuietVerboseConflict:
 
 
 class TestInvalidPhaseValidation:
-    """Test that invalid phase names are rejected."""
-
     def test_invalid_phase_name_rejected(self):
-        """A phase name not in the valid set should produce an error."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -84,7 +64,6 @@ class TestInvalidPhaseValidation:
         assert "bogus_phase" in result.output
 
     def test_mixed_valid_and_invalid_phases_rejected(self):
-        """A mix of valid and invalid phases should still fail."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -97,7 +76,6 @@ class TestInvalidPhaseValidation:
         assert "foobar" in result.output
 
     def test_valid_phases_shows_valid_list_on_error(self):
-        """Error output should list all valid phase names."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -112,10 +90,7 @@ class TestInvalidPhaseValidation:
 
 
 class TestOfficialModeValidation:
-    """Test TPC official mode constraints."""
-
     def test_official_mode_rejects_non_compliant_scale_factor(self):
-        """Official mode should reject scale factors not in the allowed set."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -128,7 +103,6 @@ class TestOfficialModeValidation:
         assert "0.01" in result.output
 
     def test_official_mode_warns_without_seed(self):
-        """Official mode without --seed should produce a warning but not fail at this stage."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -146,11 +120,9 @@ class TestOfficialModeValidation:
             obj={},
         )
 
-        # Command may fail later (platform check, etc.), but should get past official validation
         assert "Warning" in result.output or "seed" in result.output.lower()
 
     def test_official_mode_shows_compliance_banner(self):
-        """Official mode with compliant scale shows the compliance banner."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -170,16 +142,12 @@ class TestOfficialModeValidation:
             obj={},
         )
 
-        # Should reach the compliance banner before any downstream failure
         assert "TPC-Compliant" in result.output or "TPC-allowed" in result.output
         assert "Seed: 42" in result.output
 
 
 class TestTableModeAndTuningIncompatibility:
-    """Test --table-mode external + --tuning tuned rejection."""
-
     def test_external_table_mode_with_tuned_rejected(self):
-        """Combining --table-mode external with --tuning tuned should fail."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -200,7 +168,6 @@ class TestTableModeAndTuningIncompatibility:
         assert "incompatible" in result.output.lower()
 
     def test_external_table_mode_with_notuning_allowed(self):
-        """--table-mode external with --tuning notuning should pass this validation."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -219,15 +186,11 @@ class TestTableModeAndTuningIncompatibility:
             obj={},
         )
 
-        # Should not fail on incompatibility check (may fail later for other reasons)
         assert "incompatible" not in result.output.lower()
 
 
 class TestDryRunValidation:
-    """Test dry-run mode input validation."""
-
     def test_dry_run_requires_platform_and_benchmark(self):
-        """Dry run without --platform and --benchmark should fail."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -239,7 +202,6 @@ class TestDryRunValidation:
         assert "requires --platform and --benchmark" in result.output
 
     def test_dry_run_data_only_requires_benchmark(self):
-        """Dry run with --phases generate requires --benchmark."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -251,7 +213,6 @@ class TestDryRunValidation:
         assert "requires --benchmark" in result.output
 
     def test_dry_run_rejects_fractional_scale_above_one(self):
-        """Dry run should reject non-integer scale factors >= 1 (e.g., 1.5)."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -273,7 +234,6 @@ class TestDryRunValidation:
         assert "1.5" in result.output
 
     def test_dry_run_accepts_integer_scale_factor(self):
-        """Dry run should accept integer scale factors >= 1 (e.g., 1, 10)."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -292,11 +252,9 @@ class TestDryRunValidation:
             obj=_run_obj(),
         )
 
-        # Should get past scale validation (may fail downstream for missing platform)
         assert "must be whole integers" not in result.output
 
     def test_dry_run_accepts_fractional_scale_below_one(self):
-        """Dry run should accept fractional scale factors < 1 (e.g., 0.01)."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -315,11 +273,9 @@ class TestDryRunValidation:
             obj=_run_obj(),
         )
 
-        # Should get past scale validation
         assert "must be whole integers" not in result.output
 
     def test_dry_run_rejects_invalid_query_subset_without_saving_preview(self, tmp_path):
-        """Invalid query IDs must fail the public CLI instead of saving an empty preview."""
         output_dir = tmp_path / "invalid-query-preview"
         result = CliRunner().invoke(
             run,
@@ -349,7 +305,6 @@ class TestDryRunValidation:
         assert list(output_dir.glob("**/*")) == []
 
     def test_dry_run_joinorder_omitted_scale_uses_benchmark_default(self, tmp_path):
-        """Omitted --scale should use JoinOrder's canonical SF=1 registry default."""
         runner = CliRunner()
 
         with patch("benchbox.cli.dryrun.DryRunExecutor") as dry_run_executor:
@@ -378,7 +333,6 @@ class TestDryRunValidation:
         assert benchmark_config.scale_factor == 1.0
 
     def test_dry_run_joinorder_explicit_unsupported_scale_still_rejected(self, tmp_path):
-        """Explicit --scale 0.01 must still be rejected for canonical JoinOrder."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -402,7 +356,6 @@ class TestDryRunValidation:
         assert "joinorder accepts scale_factor in [1.0]; got 0.01" in result.output
 
     def test_dry_run_unknown_benchmark_rejected(self):
-        """Dry run with an unknown benchmark name should fail gracefully."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -424,10 +377,7 @@ class TestDryRunValidation:
 
 
 class TestHelpTopicRendering:
-    """Test --help and --help-topic output."""
-
     def test_run_help_shows_core_options(self):
-        """The basic --help should show core options."""
         runner = CliRunner()
         result = runner.invoke(cli, ["run", "--help"])
 
@@ -441,7 +391,6 @@ class TestHelpTopicRendering:
         assert "--tuning" in result.output
 
     def test_run_help_topic_all_shows_advanced_options(self):
-        """--help-topic all should reveal advanced options."""
         runner = CliRunner()
         result = runner.invoke(cli, ["run", "--help-topic", "all"])
 
@@ -454,21 +403,16 @@ class TestHelpTopicRendering:
         assert "--presort" in result.output
 
     def test_run_help_topic_examples_shows_usage_examples(self):
-        """--help-topic examples should show usage examples."""
         runner = CliRunner()
         result = runner.invoke(cli, ["run", "--help-topic", "examples"])
 
         assert result.exit_code == 0
         assert "benchbox run" in result.output
-        # Examples should contain platform and benchmark references
         assert "duckdb" in result.output.lower() or "tpch" in result.output.lower()
 
 
 class TestDryRunDataOnlyMode:
-    """Test dry-run with --phases generate (data-only mode)."""
-
     def test_dry_run_data_only_skips_platform(self):
-        """Dry run with --phases generate should note that platform is ignored."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -487,15 +431,11 @@ class TestDryRunDataOnlyMode:
             obj=_run_obj(),
         )
 
-        # Should warn that platform is ignored in data-only mode
         assert "Note:" in result.output or "ignored" in result.output.lower()
 
 
 class TestDuplicatePhaseDedup:
-    """Test that duplicate phases are de-duplicated."""
-
     def test_duplicate_phases_do_not_cause_error(self):
-        """Specifying the same phase twice should not fail."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -510,15 +450,11 @@ class TestDuplicatePhaseDedup:
             obj={},
         )
 
-        # Should not fail on duplicate phases (may fail downstream for platform availability)
         assert "Invalid phases" not in result.output
 
 
 class TestPlatformOptionsWithoutPlatform:
-    """Test --platform-option without --platform."""
-
     def test_platform_option_without_platform_fails(self):
-        """Using --platform-option without --platform should error."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -536,10 +472,7 @@ class TestPlatformOptionsWithoutPlatform:
 
 
 class TestNonInteractiveModeValidation:
-    """Test non-interactive mode argument requirements."""
-
     def test_non_interactive_missing_benchmark_fails(self):
-        """Non-interactive mode without --benchmark should fail."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -552,7 +485,6 @@ class TestNonInteractiveModeValidation:
         assert "--benchmark" in result.output
 
     def test_non_interactive_missing_platform_for_query_phases(self):
-        """Non-interactive mode without --platform for query phases should fail."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -565,7 +497,6 @@ class TestNonInteractiveModeValidation:
         assert "--platform" in result.output
 
     def test_non_interactive_data_only_does_not_require_platform(self):
-        """Non-interactive mode with --phases generate should not require --platform."""
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -573,13 +504,10 @@ class TestNonInteractiveModeValidation:
             obj={},
         )
 
-        # Should not fail on missing --platform in data-only mode
         assert "Missing: --platform" not in result.output
 
 
 class TestClientLinkLocalityOptions:
-    """Test --client-region, --client-cloud, --no-link-probe CLI options."""
-
     def test_client_link_options_in_help(self):
         runner = CliRunner()
         result = runner.invoke(run, ["--help"])

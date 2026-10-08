@@ -1,14 +1,5 @@
-"""Tests for the --normalize-plan-literals CLI flag.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License.
-
-Covers the flag end-to-end:
-- the flag is a recognized CLI option and is reproduced by the dry-run command
-  generator, and
-- when set on a real run, a literal-normalized fingerprint is recorded in the
-  exported plans companion file under a separate key.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License.
 
 from __future__ import annotations
 
@@ -29,7 +20,7 @@ pytestmark = [
 
 
 def _load_plans_companion(results_dir):
-    """Return the parsed plans companion payload from a results directory."""
+
     matches = glob.glob(str(results_dir / "*.plans.json"))
     assert matches, f"No plans companion file written in {results_dir}"
     with open(matches[0], encoding="utf-8") as handle:
@@ -37,8 +28,6 @@ def _load_plans_companion(results_dir):
 
 
 class TestNormalizePlanLiteralsFlagAccepted:
-    """The flag is wired into the CLI surface and dry-run reproduction."""
-
     def test_flag_is_a_recognized_option(self):
         param_names = {p.name for p in run.params}
         assert "normalize_plan_literals" in param_names
@@ -65,8 +54,6 @@ class TestNormalizePlanLiteralsFlagAccepted:
 
 
 class TestNormalizePlanLiteralsFingerprintInResults:
-    """A real run records the normalized fingerprint only when the flag is set."""
-
     def _run(self, monkeypatch, tmp_path, extra_args):
         monkeypatch.chdir(tmp_path)
         runner = CliRunner()
@@ -103,7 +90,7 @@ class TestNormalizePlanLiteralsFingerprintInResults:
         for entry in plans.values():
             assert "fingerprint" in entry
             assert "fingerprint_normalized" in entry
-            # Normalized fingerprint is still a valid SHA256 hash.
+
             assert len(entry["fingerprint_normalized"]) == 64
 
     def test_normalized_fingerprint_absent_without_flag(self, monkeypatch, tmp_path):

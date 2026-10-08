@@ -1,5 +1,3 @@
-"""Databricks reloads reset tables in place instead of dropping the schema."""
-
 from unittest.mock import MagicMock, patch
 
 import pytest

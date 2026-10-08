@@ -1,11 +1,3 @@
-"""Tests for zero-query detection in TPC-DS power test and query manager.
-
-Verifies that:
-- TPCDSQueryManager.get_all_queries() raises when dsqgen fails for all queries (w2)
-- TPCDSPowerTest.run() returns FAILED when queries_to_execute is empty (w3)
-- schema.py marks power_test phase FAILED when only the error sentinel ran
-"""
-
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -19,14 +11,7 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 class _AlwaysFailDSQGen:
-    """Fake dsqgen that always raises TPCDSError."""
-
     def generate(self, qid, **kwargs):
         from benchbox.core.tpcds.c_tools import TPCDSError
 
@@ -55,13 +40,7 @@ class _DummyConn:
         pass
 
 
-# ---------------------------------------------------------------------------
-# w2: get_all_queries raises when all dsqgen calls fail
-# ---------------------------------------------------------------------------
-
-
 def test_get_all_queries_raises_on_zero_query_generation():
-    """get_all_queries must raise RuntimeError - not return {} - when dsqgen fails for all 99 queries."""
     from benchbox.core.tpcds.queries import TPCDSQueryManager
 
     mgr = TPCDSQueryManager()
@@ -73,7 +52,6 @@ def test_get_all_queries_raises_on_zero_query_generation():
 
 
 def test_get_all_queries_partial_failure_does_not_raise():
-    """get_all_queries must NOT raise when some queries succeed (partial dsqgen failure is normal)."""
     from benchbox.core.tpcds.c_tools import TPCDSError
     from benchbox.core.tpcds.queries import TPCDSQueryManager
 
@@ -101,41 +79,26 @@ def test_get_all_queries_partial_failure_does_not_raise():
     assert all(qid in result for qid in range(1, 11))
 
 
-# ---------------------------------------------------------------------------
-# w3: TPCDSPowerTest.run() returns FAILED when queries_to_execute is empty
-# ---------------------------------------------------------------------------
-
-
 def _make_empty_stream_benchmark():
-    """Return a fake benchmark whose stream manager produces zero queries."""
     from benchbox.core.tpcds.benchmark import TPCDSBenchmark
 
     bench = TPCDSBenchmark(scale_factor=0.01, verbose=False)
 
-    # get_query always fails so stream generation produces 0 valid queries.
     def _always_fail(query_id, **kwargs):
         raise RuntimeError("dsqgen unavailable")
 
-    bench.get_query = _always_fail  # type: ignore[attr-defined]
+    bench.get_query = _always_fail
 
-    # get_queries() returns empty dict so available_query_ids falls back to range(1,100),
-    # but dsqgen still fails during stream construction / preflight.
-    bench.get_queries = dict  # type: ignore[attr-defined]
+    bench.get_queries = dict
 
     return bench
 
 
 def test_zero_query_generation_returns_failed_result_not_completed():
-    """run() must return success=False with a descriptive error when zero queries are generated.
-
-    Regression guard for the silent-COMPLETED bug: previously, a zero-query run reported
-    COMPLETED with 0ms duration instead of failing visibly.
-    """
     from benchbox.core.tpcds.power_test import TPCDSPowerTest
 
     bench = _make_empty_stream_benchmark()
 
-    # Patch create_standard_streams to return an empty stream so queries_to_execute == [].
     class _EmptyStreamManager:
         def generate_streams(self):
             return {0: []}
@@ -143,11 +106,10 @@ def test_zero_query_generation_returns_failed_result_not_completed():
     def _empty_streams(*args, **kwargs):
         return _EmptyStreamManager()
 
-    # Inject via the module namespace used by power_test.py
     import benchbox.core.tpcds.streams as streams_module
 
     original_fn = streams_module.create_standard_streams
-    streams_module.create_standard_streams = _empty_streams  # type: ignore[attr-defined]
+    streams_module.create_standard_streams = _empty_streams
     try:
         power = TPCDSPowerTest(
             benchmark=bench,
@@ -166,13 +128,7 @@ def test_zero_query_generation_returns_failed_result_not_completed():
     )
 
 
-# ---------------------------------------------------------------------------
-# schema.py: power_test phase status derived from real executions
-# ---------------------------------------------------------------------------
-
-
 def _make_phases_result(query_executions):
-    """Build a minimal BenchmarkResults-like object for _build_phases_block."""
     from benchbox.core.results.models import (
         ExecutionPhases,
         PowerTestPhase,
@@ -195,7 +151,6 @@ def _make_phases_result(query_executions):
 
 
 def test_power_test_phase_status_is_failed_when_only_error_sentinel_ran():
-    """_build_phases_block must return FAILED for power_test when only the error sentinel ran."""
     from benchbox.core.results.models import QueryExecution
     from benchbox.core.results.schema import _build_phases_block
 
@@ -218,7 +173,6 @@ def test_power_test_phase_status_is_failed_when_only_error_sentinel_ran():
 
 
 def test_power_test_phase_status_is_completed_when_real_queries_ran():
-    """_build_phases_block must return COMPLETED for power_test when real query executions exist."""
     from benchbox.core.results.models import QueryExecution
     from benchbox.core.results.schema import _build_phases_block
 

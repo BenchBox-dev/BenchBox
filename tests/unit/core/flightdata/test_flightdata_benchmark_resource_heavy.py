@@ -1,5 +1,3 @@
-"""Resource-heavy FlightData benchmark tests."""
-
 from __future__ import annotations
 
 import csv
@@ -20,10 +18,7 @@ pytestmark = [
 
 
 class TestDataGeneration:
-    """Tests for data generation (synthetic only - no network)."""
-
     def test_generate_creates_files(self):
-        """Should create CSV files for all three tables."""
         with tempfile.TemporaryDirectory() as tmpdir:
             bm = FlightDataBenchmark(scale_factor=0.01, output_dir=tmpdir, seed=42)
             paths = bm.generate_data()
@@ -34,7 +29,6 @@ class TestDataGeneration:
                 assert Path(p).stat().st_size > 0
 
     def test_generate_flights_has_rows(self):
-        """Generated flights.csv should have data rows."""
         with tempfile.TemporaryDirectory() as tmpdir:
             bm = FlightDataBenchmark(scale_factor=0.01, output_dir=tmpdir, seed=42)
             bm.generate_data()
@@ -44,7 +38,6 @@ class TestDataGeneration:
             assert len(lines) > 1, "flights.csv should have rows beyond the header"
 
     def test_generate_idempotent(self):
-        """Should return same files on second call."""
         with tempfile.TemporaryDirectory() as tmpdir:
             bm = FlightDataBenchmark(scale_factor=0.01, output_dir=tmpdir, seed=42)
             paths1 = bm.generate_data()
@@ -52,7 +45,6 @@ class TestDataGeneration:
             assert set(str(p) for p in paths1) == set(str(p) for p in paths2)
 
     def test_reference_data_airlines(self):
-        """airlines.csv should be copied with correct headers."""
         with tempfile.TemporaryDirectory() as tmpdir:
             bm = FlightDataBenchmark(scale_factor=0.01, output_dir=tmpdir, seed=42)
             bm.generate_data()
@@ -63,7 +55,6 @@ class TestDataGeneration:
             assert "name" in header
 
     def test_reference_data_airports(self):
-        """airports.csv should be copied with correct headers."""
         with tempfile.TemporaryDirectory() as tmpdir:
             bm = FlightDataBenchmark(scale_factor=0.01, output_dir=tmpdir, seed=42)
             bm.generate_data()
@@ -74,7 +65,6 @@ class TestDataGeneration:
             assert "latitude" in header
 
     def test_download_stats(self):
-        """Should return stats after generation."""
         with tempfile.TemporaryDirectory() as tmpdir:
             bm = FlightDataBenchmark(scale_factor=0.01, output_dir=tmpdir, seed=42)
             bm.generate_data()
@@ -83,7 +73,6 @@ class TestDataGeneration:
             assert stats["scale_factor"] == 0.01
 
     def test_large_scale_generation_uses_manifest_tracked_flight_shards(self, tmp_path, monkeypatch):
-        """SF1 FlightData should avoid one large flights.csv stream."""
 
         def fake_process_month(self, writer, year, month, start_id):
             writer.writerow(_flight_row(start_id, year, month))
@@ -125,7 +114,6 @@ class TestDataGeneration:
         assert [entry["row_count"] for entry in reused_entries] == [1, 1]
 
     def test_legacy_large_single_flight_file_is_split_and_removed(self, tmp_path, monkeypatch):
-        """A valid legacy single-file cache should be repaired without redownloading."""
         monkeypatch.setattr("benchbox.core.flightdata.downloader.FLIGHTS_SHARD_ROW_TARGET", 2)
         downloader = FlightDataDownloader(scale_factor=1.0, output_dir=tmp_path, seed=42, verbose=1)
         downloader._num_months = MONTHS_PER_SCALE_FACTOR
@@ -155,7 +143,6 @@ class TestDataGeneration:
         assert [entry["row_count"] for entry in entries] == [2, 2, 1]
 
     def test_legacy_large_single_flight_file_with_bad_width_is_rejected(self, tmp_path, monkeypatch):
-        """Legacy repair should fail before publishing malformed FlightData shards."""
         monkeypatch.setattr("benchbox.core.flightdata.downloader.FLIGHTS_SHARD_ROW_TARGET", 2)
         downloader = FlightDataDownloader(scale_factor=1.0, output_dir=tmp_path, seed=42, verbose=1)
         downloader._num_months = MONTHS_PER_SCALE_FACTOR
@@ -171,7 +158,6 @@ class TestDataGeneration:
         assert not (tmp_path / ".flights-shards.tmp").exists()
 
     def test_empty_legacy_large_single_flight_file_is_rejected(self, tmp_path):
-        """Empty legacy sources should not leave staged shard directories behind."""
         downloader = FlightDataDownloader(scale_factor=1.0, output_dir=tmp_path, seed=42, verbose=1)
         downloader._num_months = MONTHS_PER_SCALE_FACTOR
         legacy_path = tmp_path / "flights.csv"
@@ -185,7 +171,6 @@ class TestDataGeneration:
         assert not (tmp_path / ".flights-shards.tmp").exists()
 
     def test_existing_flight_shard_with_bad_width_is_rejected(self, tmp_path, monkeypatch):
-        """A reusable cache rejects a malformed shard without replacing its manifest."""
 
         def fake_process_month(self, writer, year, month, start_id):
             writer.writerow(_flight_row(start_id, year, month))

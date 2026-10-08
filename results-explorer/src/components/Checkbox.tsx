@@ -1,6 +1,5 @@
 import type { ComponentChildren, JSX } from "preact";
 
-// Preact convention: callers pass `class` (not `className`).
 type NativeInputProps = Omit<
   JSX.IntrinsicElements["input"],
   "type" | "onChange" | "onInput" | "size" | "checked" | "className"
@@ -8,7 +7,6 @@ type NativeInputProps = Omit<
 
 interface CheckboxProps extends NativeInputProps {
   label: ComponentChildren;
-  /** Description rendered below the label, also linked via aria-describedby. */
   description?: ComponentChildren;
   checked: boolean;
   onChange: (checked: boolean) => void;

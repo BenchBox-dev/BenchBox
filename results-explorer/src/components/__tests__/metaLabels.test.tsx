@@ -1,13 +1,3 @@
-/**
- * The shared metadata label treatments: a run date and a platform version.
- *
- * Both exist because the same value was previously spelled out in full in
- * every table cell and chart label that carried it, wrapping mid-value and
- * crowding out the measurement. Each keeps its full value in the accessible
- * name and behind one interaction, so nothing is lost by leading with the
- * short form.
- */
-
 import { render, screen, fireEvent } from "@testing-library/preact";
 import { describe, it, expect } from "vitest";
 

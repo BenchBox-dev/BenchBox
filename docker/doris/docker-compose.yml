@@ -1,30 +1,6 @@
-# Apache Doris All-in-One Docker Compose
-# Uses the official all-in-one image (FE + BE in a single container)
-#
-# Usage:
-#   docker compose -f docker-compose.yml up -d
-#   DORIS_HOST=localhost DORIS_PORT=19031 DORIS_HTTP_PORT=18030 \
-#     benchbox run --platform doris --benchmark tpch --scale 0.01
-#
-# Ports:
-#   19031 (default host) -> 9030 - MySQL protocol (query interface)
-#   18030 (default host) -> 8030 - HTTP API (Stream Load, Web UI)
-#
-# Default credentials:
-#   Username: root
-#   Password: (empty)
-
 services:
   doris:
     image: apache/doris:4.0.3-all-slim
-    # Patch memory config before starting Doris processes:
-    #   - FE default heap is -Xmx8192m which exhausts a shared container;
-    #     cap it at 1536m (FE only manages metadata, not query execution).
-    #   - BE mem_limit: cap at 8g and raise load percent limits so
-    #     MemTableMemoryLimiter does not throttle stream loads early.
-    # The bootstrap helper rewrites existing values in place or appends them if
-    # missing, so restarts converge on the intended config instead of keeping
-    # stale values from previous container runs.
     entrypoint:
       - bash
       - -c
@@ -52,10 +28,6 @@ services:
           dirname "$$(dirname "$$java_bin")"
         }
 
-        # Doris BE 4.x requires vm.max_map_count > 2000000 for memory-mapped files.
-        # Docker Desktop on macOS doesn't support vm.* via container sysctls (not
-        # namespaced), so this wrapper checks the current value first and only
-        # needs DORIS_PRIVILEGED=true when the Docker VM still needs help.
         current_map_count="$$(cat /proc/sys/vm/max_map_count 2>/dev/null || echo 0)"
         if [ "$$current_map_count" -lt 2000000 ]; then
           if ! sysctl -w vm.max_map_count=2000000 >/dev/null 2>&1; then
@@ -95,8 +67,6 @@ services:
       - "${DORIS_HTTP_PORT:-18030}:8030"
       - "${DORIS_BE_HTTP_PORT:-18040}:8040"
     environment:
-      # Default true for Docker Desktop, which cannot satisfy Doris' swap check.
-      # The wrapper above still enforces vm.max_map_count and ulimit -n explicitly.
       SKIP_CHECK_ULIMIT: "${DORIS_SKIP_CHECK_ULIMIT:-true}"
     privileged: ${DORIS_PRIVILEGED:-false}
     volumes:

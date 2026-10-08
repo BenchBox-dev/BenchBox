@@ -1,15 +1,6 @@
-"""Tests for benchbox.core.tuning.generators.starrocks.StarRocksDDLGenerator.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Focused on the generator class itself -- clause rendering, TuningClauses field
-values, identifier quoting, bucket defaults, and the dry-run
-TuningClauses/JSON shape. Adapter-level (workload) behaviour is covered by
-tests/unit/platforms/test_starrocks_workload.py and the preview/execution
-snapshot test in test_renderer_snapshot_starrocks.py.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -45,7 +36,6 @@ class TestFactoryWiring:
         assert gen.supports_tuning_type("partitioning")
         assert gen.supports_tuning_type("sorting")
         assert gen.supports_tuning_type("distribution")
-        # StarRocks has no separate clustering clause.
         assert not gen.supports_tuning_type("clustering")
 
 
@@ -72,8 +62,6 @@ class TestClauseRenderers:
 
 class TestGenerateTuningClauses:
     def test_distribution_clause_rendered_into_distribute_by(self, gen):
-        # Rendered-SQL contract (distribute_by holds the full DISTRIBUTED BY
-        # clause, never a bare column): preview and execution emit it verbatim.
         tt = TableTuning(table_name="lineitem", distribution=[TuningColumn("l_orderkey", "INT", 1)])
         clauses = gen.generate_tuning_clauses(tt)
         assert clauses.distribute_by == "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8"
@@ -81,7 +69,6 @@ class TestGenerateTuningClauses:
         assert clauses.platform == "starrocks"
 
     def test_single_distribution_column_when_multiple_configured(self, gen):
-        # StarRocks HASH distribution uses a single column -- the lowest-order one.
         tt = TableTuning(
             table_name="lineitem",
             distribution=[
@@ -168,7 +155,6 @@ class TestGenerateCreateTableDdl:
     def test_no_tuning_emits_engine_mandatory_distribution_only(self, gen):
         cols = [ColumnDefinition("r_regionkey", "INT"), ColumnDefinition("r_name", "VARCHAR(25)")]
         ddl = gen.generate_create_table_ddl("region", cols)
-        # Engine-mandatory DISTRIBUTED BY on the first column, no PARTITION/ORDER.
         assert "DISTRIBUTED BY HASH(`r_regionkey`) BUCKETS 8" in ddl
         assert "PARTITION BY" not in ddl
         assert "ORDER BY" not in ddl
@@ -193,7 +179,6 @@ class TestGenerateCreateTableDdl:
         assert "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8" in ddl
         assert "ORDER BY (l_linenumber)" in ddl
         assert ddl.count("DISTRIBUTED BY") == 1
-        # StarRocks clause order: PARTITION BY -> DISTRIBUTED BY -> ORDER BY.
         assert ddl.index("PARTITION BY") < ddl.index("DISTRIBUTED BY") < ddl.index("ORDER BY")
 
     def test_tuned_distribution_overrides_first_column(self, gen):
@@ -206,10 +191,6 @@ class TestGenerateCreateTableDdl:
 
 
 class TestInlineClausesContract:
-    """Dry-run preview (get_inline_clauses) must emit every clause fully rendered
-    exactly once -- no stray bare column line -- in PARTITION BY ->
-    DISTRIBUTED BY -> ORDER BY order."""
-
     def test_no_bare_column_and_single_distributed_by(self, gen):
         tt = TableTuning(
             table_name="lineitem",

@@ -146,17 +146,17 @@ All platform adapters inherit from `PlatformAdapter` in `benchbox/platforms/base
 from benchbox.platforms.base import PlatformAdapter
 
 class NewDatabaseAdapter(PlatformAdapter):
-    """Adapter for NewDatabase platform."""
 
     @property
     def platform_name(self) -> str:
         return "NewDatabase"
 
     def get_target_dialect(self) -> str:
-        return "newdatabase"  # SQL dialect identifier
+        return "newdatabase"
 
-    # Implement required abstract methods...
 ```
+
+`get_target_dialect()` returns the SQL dialect identifier. This snippet is abridged: a real adapter implements all required abstract methods.
 
 ### Lifecycle and Run-Scoped State
 
@@ -198,11 +198,6 @@ This allows contributors to install the adapter with `uv pip install "benchbox[n
 Create a new file: `benchbox/platforms/newdatabase.py`
 
 ```python
-"""NewDatabase platform adapter with optimizations.
-
-Provides NewDatabase-specific functionality for BenchBox benchmarking.
-"""
-
 import time
 import logging
 from pathlib import Path
@@ -210,7 +205,6 @@ from typing import Any, Dict, Tuple, Optional
 
 from .base import DriverIsolationCapability, PlatformAdapter, ConnectionConfig
 
-# Import platform client library
 try:
     import newdatabase
     from newdatabase import Connection
@@ -223,14 +217,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 class NewDatabaseAdapter(PlatformAdapter):
-    """NewDatabase platform adapter with performance optimizations."""
 
-    # Required: declare driver isolation capability (validated by CI tests).
-    # Choose one of:
-    #   SUPPORTED           - full driver isolation (DuckDB, DataFusion)
-    #   FEASIBLE_CLIENT_ONLY - client can be isolated but engine version is external
-    #   NOT_FEASIBLE        - technical constraints prevent isolation (JVM, C libs)
-    #   NOT_APPLICABLE      - no versioned driver package (e.g. SQLite, DataFrames)
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
 
     def __init__(self, **config):
@@ -238,14 +225,12 @@ class NewDatabaseAdapter(PlatformAdapter):
         if newdatabase is None:
             raise ImportError("NewDatabase client not installed. Install with: uv add newdatabase-python")
 
-        # Platform-specific configuration
         self.host = config.get('host', 'localhost')
-        self.port = config.get('port', 5432)  # Default port
+        self.port = config.get('port', 5432)
         self.database = config.get('database', 'benchbox')
         self.username = config.get('username', 'user')
         self.password = config.get('password', '')
 
-        # Performance settings
         self.connection_pool_size = config.get('connection_pool_size', 5)
         self.query_timeout = config.get('query_timeout', 300)
 
@@ -256,8 +241,15 @@ class NewDatabaseAdapter(PlatformAdapter):
     def get_target_dialect(self) -> str:
         return "newdatabase"
 
-    # Continue with required method implementations...
 ```
+
+Declaring `driver_isolation_capability` is required, and CI tests validate it. Choose one of:
+- `SUPPORTED`: full driver isolation (DuckDB, DataFusion).
+- `FEASIBLE_CLIENT_ONLY`: the client can be isolated, but the engine version is external.
+- `NOT_FEASIBLE`: technical constraints prevent isolation (JVM, C libraries).
+- `NOT_APPLICABLE`: no versioned driver package (for example SQLite and DataFrames).
+
+The remaining required methods are implemented in the following steps.
 
 ### Step 2: Implement Connection Management
 
@@ -267,18 +259,12 @@ class NewDatabaseAdapter(PlatformAdapter):
 
 See [DB API 2.0 documentation](db-api-2.md) for details on both patterns.
 
+The example below creates the connection, checks existing databases, and tests the connection with the standard cursor pattern. `check_server_database_exists` uses an admin connection that does not specify a database.
+
 ```python
 def create_connection(self, **connection_config) -> Any:
-    """Create optimized NewDatabase connection.
-
-    Returns a DB API 2.0 compliant connection object supporting either:
-    - Standard cursor pattern: connection.cursor().execute(query)
-    - Direct execute pattern: connection.execute(query)
-    """
-    # Handle existing database
     self.handle_existing_database(**connection_config)
 
-    # Get connection parameters
     host = connection_config.get('host', self.host)
     port = connection_config.get('port', self.port)
     database = connection_config.get('database', self.database)
@@ -286,7 +272,6 @@ def create_connection(self, **connection_config) -> Any:
     password = connection_config.get('password', self.password)
 
     try:
-        # Create database connection (DB API 2.0 compliant)
         connection = newdatabase.connect(
             host=host,
             port=port,
@@ -296,7 +281,6 @@ def create_connection(self, **connection_config) -> Any:
             timeout=self.query_timeout
         )
 
-        # Test connection using standard DB API 2.0 cursor pattern
         cursor = connection.cursor()
         cursor.execute("SELECT 1")
         cursor.fetchall()
@@ -310,9 +294,7 @@ def create_connection(self, **connection_config) -> Any:
         raise
 
 def check_server_database_exists(self, **connection_config) -> bool:
-    """Check if database exists on NewDatabase server."""
     try:
-        # Create admin connection (without specifying database)
         admin_connection = newdatabase.connect(
             host=connection_config.get('host', self.host),
             port=connection_config.get('port', self.port),
@@ -322,7 +304,6 @@ def check_server_database_exists(self, **connection_config) -> bool:
 
         database = connection_config.get('database', self.database)
 
-        # Check if database exists
         cursor = admin_connection.cursor()
         cursor.execute("SHOW DATABASES")
         databases = [row[0] for row in cursor.fetchall()]
@@ -336,7 +317,6 @@ def check_server_database_exists(self, **connection_config) -> bool:
             admin_connection.close()
 
 def drop_database(self, **connection_config) -> None:
-    """Drop database on NewDatabase server."""
     try:
         admin_connection = newdatabase.connect(
             host=connection_config.get('host', self.host),
@@ -368,26 +348,21 @@ def create_schema(
     enable_primary_keys: bool = True,
     enable_foreign_keys: bool = True
 ) -> float:
-    """Create schema using NewDatabase-optimized table definitions."""
     start_time = time.time()
 
     try:
-        # Get base schema SQL with constraint settings
         schema_sql = benchmark.get_create_tables_sql(
             enable_primary_keys=enable_primary_keys,
             enable_foreign_keys=enable_foreign_keys
         )
 
-        # Translate to NewDatabase dialect if needed
         if hasattr(self, 'translate_sql'):
-            schema_sql = self.translate_sql(schema_sql, "duckdb")  # From DuckDB dialect
+            schema_sql = self.translate_sql(schema_sql, "duckdb")
 
-        # Split and execute statements
         statements = [stmt.strip() for stmt in schema_sql.split(';') if stmt.strip()]
 
         cursor = connection.cursor()
         for statement in statements:
-            # Apply platform-specific optimizations
             statement = self._optimize_table_definition(statement)
             cursor.execute(statement)
             logger.debug(f"Executed schema statement: {statement[:100]}...")
@@ -404,26 +379,24 @@ def create_schema(
     return time.time() - start_time
 
 def _optimize_table_definition(self, statement: str) -> str:
-    """Apply NewDatabase-specific table optimizations."""
     if not statement.upper().startswith('CREATE TABLE'):
         return statement
 
-    # Example: Add storage engine or other platform-specific options
     if 'ENGINE' not in statement.upper():
-        statement += " ENGINE=InnoDB"  # Example for MySQL-like databases
+        statement += " ENGINE=InnoDB"
 
     return statement
 ```
+
+The `translate_sql(schema_sql, "duckdb")` call translates from the DuckDB dialect. `_optimize_table_definition` is an example hook for adding a storage engine or other platform-specific options. The `ENGINE=InnoDB` option shown is an example for MySQL-like databases.
 
 ### Step 4: Implement Data Loading
 
 ```python
 def load_data(self, benchmark, connection: Any, data_dir: Path) -> Tuple[Dict[str, int], float]:
-    """Load data using NewDatabase bulk loading capabilities."""
     start_time = time.time()
     table_stats = {}
 
-    # Get data files from benchmark
     if hasattr(benchmark, 'tables') and benchmark.tables:
         data_files = benchmark.tables
     else:
@@ -431,7 +404,6 @@ def load_data(self, benchmark, connection: Any, data_dir: Path) -> Tuple[Dict[st
 
     cursor = connection.cursor()
 
-    # Load data for each table
     for table_name, file_path in data_files.items():
         file_path = Path(file_path)
         if not file_path.exists() or file_path.stat().st_size == 0:
@@ -443,16 +415,12 @@ def load_data(self, benchmark, connection: Any, data_dir: Path) -> Tuple[Dict[st
             load_start = time.time()
             table_name_upper = table_name.upper()
 
-            # Use platform-specific bulk loading method
             if self._supports_bulk_copy():
-                # Use COPY command or equivalent
                 copy_command = self._build_copy_command(table_name_upper, file_path)
                 cursor.execute(copy_command)
             else:
-                # Fall back to INSERT statements
                 self._load_via_inserts(cursor, table_name_upper, file_path)
 
-            # Get row count
             cursor.execute(f"SELECT COUNT(*) FROM {table_name_upper}")
             row_count = cursor.fetchone()[0]
             table_stats[table_name_upper] = row_count
@@ -474,11 +442,9 @@ def load_data(self, benchmark, connection: Any, data_dir: Path) -> Tuple[Dict[st
     return table_stats, total_time
 
 def _supports_bulk_copy(self) -> bool:
-    """Check if platform supports efficient bulk loading."""
-    return True  # Implement based on platform capabilities
+    return True
 
 def _build_copy_command(self, table_name: str, file_path: Path) -> str:
-    """Build platform-specific COPY command."""
     delimiter = '|' if file_path.suffix == '.tbl' else ','
     return f"""
         COPY {table_name} FROM '{file_path}'
@@ -486,7 +452,6 @@ def _build_copy_command(self, table_name: str, file_path: Path) -> str:
     """
 
 def _load_via_inserts(self, cursor, table_name: str, file_path: Path):
-    """Load data via INSERT statements (fallback method)."""
     delimiter = '|' if file_path.suffix == '.tbl' else ','
 
     with open(file_path, 'r') as f:
@@ -496,7 +461,7 @@ def _load_via_inserts(self, cursor, table_name: str, file_path: Path):
         for line in f:
             line = line.strip()
             if line.endswith(delimiter):
-                line = line[:-1]  # Remove trailing delimiter
+                line = line[:-1]
 
             values = line.split(delimiter)
             placeholders = ','.join(['?' for _ in values])
@@ -513,6 +478,8 @@ def _load_via_inserts(self, cursor, table_name: str, file_path: Path):
         if batch:
             cursor.executemany(insert_sql, batch)
 ```
+
+`load_data` uses the platform's bulk loading method when `_supports_bulk_copy()` is true (a COPY command or equivalent), and falls back to INSERT statements otherwise. The `return True` in `_supports_bulk_copy` is a placeholder: implement it based on platform capabilities.
 
 ### Step 5: Implement Query Execution
 
@@ -547,33 +514,21 @@ aligned:
 
 ```python
 def execute_query(self, connection: Any, query: str, query_id: str) -> Dict[str, Any]:
-    """Execute query with detailed timing and metrics.
-
-    Uses DB API 2.0 standard cursor pattern for query execution.
-    The connection parameter should be a DB API 2.0 compliant connection object.
-    """
     start_time = time.time()
 
     try:
-        # DB API 2.0 standard cursor pattern
         cursor = connection.cursor()
 
-        # Apply any platform-specific query hints or settings
         self._apply_query_optimizations(cursor)
 
-        # Execute the query using DB API 2.0 execute() method
-        # (dialect translation handled by base class)
         cursor.execute(query)
 
-        # Fetch results using DB API 2.0 fetchall() method
         results = cursor.fetchall()
 
         execution_time = time.time() - start_time
 
-        # Get platform-specific metrics if available
         query_metrics = self._get_query_metrics(cursor)
 
-        # DB API 2.0 cleanup
         cursor.close()
 
         return {
@@ -598,15 +553,11 @@ def execute_query(self, connection: Any, query: str, query_id: str) -> Dict[str,
         }
 
 def _apply_query_optimizations(self, cursor):
-    """Apply platform-specific query optimizations."""
-    # Example optimizations
     cursor.execute("SET query_cache = ON")
     cursor.execute("SET optimizer_mode = 'performance'")
 
 def _get_query_metrics(self, cursor) -> Dict[str, Any]:
-    """Get platform-specific query execution metrics."""
     try:
-        # Example: Get query stats if platform supports it
         cursor.execute("SHOW QUERY STATS")
         stats = cursor.fetchall()
         return {'query_stats': stats}
@@ -614,27 +565,25 @@ def _get_query_metrics(self, cursor) -> Dict[str, Any]:
         return {}
 
 def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
-    """Apply platform optimizations based on benchmark type."""
     cursor = connection.cursor()
 
     if benchmark_type.lower() in ['olap', 'analytics', 'tpch', 'tpcds']:
-        # OLAP optimizations
         cursor.execute("SET join_algorithm = 'hash'")
         cursor.execute("SET parallel_workers = 8")
         cursor.execute("SET work_mem = '256MB'")
     elif benchmark_type.lower() in ['oltp', 'transactional']:
-        # OLTP optimizations
         cursor.execute("SET synchronous_commit = ON")
         cursor.execute("SET random_page_cost = 1.1")
 
     cursor.close()
 ```
 
+The first branch applies OLAP optimizations. The second applies OLTP optimizations.
+
 ### Step 6: Implement Platform Metadata
 
 ```python
 def _get_platform_metadata(self, connection: Any) -> Dict[str, Any]:
-    """Get platform-specific metadata and system information."""
     metadata = {
         "platform": self.platform_name,
         "host": self.host,
@@ -645,17 +594,14 @@ def _get_platform_metadata(self, connection: Any) -> Dict[str, Any]:
     try:
         cursor = connection.cursor()
 
-        # Get platform version
         cursor.execute("SELECT VERSION()")
         version_result = cursor.fetchone()
         metadata["version"] = version_result[0] if version_result else "unknown"
 
-        # Get system settings
         cursor.execute("SHOW VARIABLES LIKE 'max_connections'")
         settings = cursor.fetchall()
         metadata["settings"] = {name: value for name, value in settings}
 
-        # Get database size information
         cursor.execute("""
             SELECT
                 table_name,
@@ -686,23 +632,22 @@ def _get_platform_metadata(self, connection: Any) -> Dict[str, Any]:
 
 ### Step 7: Implement Performance Tuning (Optional)
 
+In the example, `SORTING` is supported through indexes, `CLUSTERING` through clustered indexes, and `PARTITIONING` through table partitioning.
+
 ```python
 def supports_tuning_type(self, tuning_type) -> bool:
-    """Check if NewDatabase supports a specific tuning type."""
     try:
         from benchbox.core.tuning.interface import TuningType
-        # Define supported tuning types for this platform
         supported_types = {
-            TuningType.SORTING,      # Supports indexes
-            TuningType.CLUSTERING,   # Supports clustered indexes
-            TuningType.PARTITIONING  # Supports table partitioning
+            TuningType.SORTING,
+            TuningType.CLUSTERING,
+            TuningType.PARTITIONING
         }
         return tuning_type in supported_types
     except ImportError:
         return False
 
 def generate_tuning_clause(self, table_tuning) -> str:
-    """Generate platform-specific tuning clauses for CREATE TABLE."""
     if not table_tuning or not table_tuning.has_any_tuning():
         return ""
 
@@ -711,14 +656,12 @@ def generate_tuning_clause(self, table_tuning) -> str:
     try:
         from benchbox.core.tuning.interface import TuningType
 
-        # Handle partitioning
         partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
         if partition_columns:
             sorted_cols = sorted(partition_columns, key=lambda col: col.order)
             partition_col = sorted_cols[0].name
             clauses.append(f"PARTITION BY HASH({partition_col})")
 
-        # Handle clustering
         cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
         if cluster_columns:
             sorted_cols = sorted(cluster_columns, key=lambda col: col.order)
@@ -731,7 +674,6 @@ def generate_tuning_clause(self, table_tuning) -> str:
     return " ".join(clauses)
 
 def apply_table_tunings(self, table_tuning, connection: Any) -> None:
-    """Apply tuning configurations to a table after creation."""
     if not table_tuning or not table_tuning.has_any_tuning():
         return
 
@@ -741,7 +683,6 @@ def apply_table_tunings(self, table_tuning, connection: Any) -> None:
     try:
         from benchbox.core.tuning.interface import TuningType
 
-        # Create indexes for sorting optimization
         sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)
         if sort_columns:
             sorted_cols = sorted(sort_columns, key=lambda col: col.order)
@@ -765,27 +706,24 @@ def apply_table_tunings(self, table_tuning, connection: Any) -> None:
 
 ```python
 def run_power_test(self, benchmark, **kwargs) -> Dict[str, Any]:
-    """Run TPC power test measuring single-stream query performance."""
     return self.run_benchmark(benchmark, **kwargs).__dict__
 
 def run_throughput_test(self, benchmark, **kwargs) -> Dict[str, Any]:
-    """Run TPC throughput test measuring concurrent multi-stream performance."""
-    # For now, run as single stream - extend for true multi-stream later
     return self.run_power_test(benchmark, **kwargs)
 
 def run_maintenance_test(self, benchmark, **kwargs) -> Dict[str, Any]:
-    """Run TPC maintenance test measuring data modification performance."""
     return {"status": "NOT_IMPLEMENTED", "message": "Maintenance test not implemented"}
 ```
+
+The throughput test runs as a single stream for now. Extend it for true multi-stream execution later.
 
 ## Integration Steps
 
 ### Step 1: Register the Adapter
 
-Add one typed entry to the manifest source of truth:
+Add one typed entry to the manifest source of truth, `benchbox/core/platform_manifest.py`. The entry below is abridged and JSON-shaped. A real entry also carries display metadata, libraries, requirements, and adoption fields. Set `registration_order` to the next contiguous value, and do not reorder existing adapters:
 
 ```python
-# benchbox/core/platform_manifest.py (abridged JSON-shaped entry)
 {
     "key": "newdatabase",
     "aliases": [
@@ -794,7 +732,7 @@ Add one typed entry to the manifest source of truth:
     "adapter": {
         "module": "benchbox.platforms.newdatabase",
         "class_name": "NewDatabaseAdapter",
-        "registration_order": 47,  # next contiguous value; do not reorder existing adapters
+        "registration_order": 47,
     },
     "support_status": "experimental",
     "capabilities": {
@@ -802,7 +740,6 @@ Add one typed entry to the manifest source of truth:
         "supports_dataframe": False,
         "default_mode": "sql",
     },
-    # display metadata, libraries, requirements, and adoption fields...
 }
 ```
 
@@ -833,10 +770,9 @@ make platform-manifest-check
 
 ### Step 2: Add SQL Dialect Support
 
-If your platform has a unique SQL dialect, add SQL compatibility rules or an explicit exemption under the phase-aware SQL compatibility system. Do not hide CREATE TABLE rewrites inside the adapter without registering or exempting them in the DDL governance inventory.
+If your platform has a unique SQL dialect, add SQL compatibility rules or an explicit exemption under the phase-aware SQL compatibility system. Do not hide CREATE TABLE rewrites inside the adapter without registering or exempting them in the DDL governance inventory. Put the rules in `benchbox/sql_compat/rules/ddl_optimize/newdatabase_ddl_rewrites.py`:
 
 ```python
-# benchbox/sql_compat/rules/ddl_optimize/newdatabase_ddl_rewrites.py
 from benchbox.sql_compat.rules._registration import register_ddl_rewrite
 
 register_ddl_rewrite(
@@ -850,7 +786,7 @@ register_ddl_rewrite(
 
 ### Step 3: Create Tests
 
-Create comprehensive tests in `tests/unit/platforms/test_newdatabase_adapter.py`:
+Create comprehensive tests in `tests/unit/platforms/test_newdatabase_adapter.py`. The `TestNewDatabaseIntegration` class at the end needs an actual NewDatabase instance and is skipped when the client library is not installed:
 
 ```python
 import pytest
@@ -858,11 +794,9 @@ from unittest.mock import Mock, patch, MagicMock
 from benchbox.platforms.newdatabase import NewDatabaseAdapter
 
 class TestNewDatabaseAdapter:
-    """Test cases for NewDatabase platform adapter."""
 
     @pytest.fixture
     def adapter(self):
-        """Create adapter instance for testing."""
         return NewDatabaseAdapter(
             host='localhost',
             port=5432,
@@ -872,16 +806,13 @@ class TestNewDatabaseAdapter:
         )
 
     def test_platform_name(self, adapter):
-        """Test platform name property."""
         assert adapter.platform_name == "NewDatabase"
 
     def test_target_dialect(self, adapter):
-        """Test SQL dialect identifier."""
         assert adapter.get_target_dialect() == "newdatabase"
 
     @patch('newdatabase.connect')
     def test_create_connection_success(self, mock_connect, adapter):
-        """Test successful connection creation."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -895,14 +826,12 @@ class TestNewDatabaseAdapter:
 
     @patch('newdatabase.connect')
     def test_create_connection_failure(self, mock_connect, adapter):
-        """Test connection failure handling."""
         mock_connect.side_effect = Exception("Connection failed")
 
         with pytest.raises(Exception, match="Connection failed"):
             adapter.create_connection()
 
     def test_schema_creation(self, adapter):
-        """Test schema creation process."""
         mock_benchmark = Mock()
         mock_benchmark.get_create_tables_sql.return_value = """
             CREATE TABLE test_table (id INTEGER, name VARCHAR(50));
@@ -920,8 +849,6 @@ class TestNewDatabaseAdapter:
         mock_connection.commit.assert_called_once()
 
     def test_data_loading(self, adapter, tmp_path):
-        """Test data loading functionality."""
-        # Create test data files
         test_data_file = tmp_path / "test_table.tbl"
         test_data_file.write_text("1|John Doe\n2|Jane Smith\n")
 
@@ -930,7 +857,7 @@ class TestNewDatabaseAdapter:
 
         mock_connection = Mock()
         mock_cursor = Mock()
-        mock_cursor.fetchone.return_value = (2,)  # Row count
+        mock_cursor.fetchone.return_value = (2,)
         mock_connection.cursor.return_value = mock_cursor
 
         with patch.object(adapter, '_supports_bulk_copy', return_value=True):
@@ -941,7 +868,6 @@ class TestNewDatabaseAdapter:
         assert load_time > 0
 
     def test_query_execution_success(self, adapter):
-        """Test successful query execution."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchall.return_value = [(1, 'test'), (2, 'data')]
@@ -955,7 +881,6 @@ class TestNewDatabaseAdapter:
         assert result['execution_time'] > 0
 
     def test_query_execution_failure(self, adapter):
-        """Test query execution error handling."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_cursor.execute.side_effect = Exception("SQL error")
@@ -969,7 +894,6 @@ class TestNewDatabaseAdapter:
         assert 'SQL error' in result['error']
 
     def test_platform_metadata(self, adapter):
-        """Test platform metadata collection."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchone.return_value = ("NewDatabase 1.0",)
@@ -982,14 +906,10 @@ class TestNewDatabaseAdapter:
         assert metadata['version'] == 'NewDatabase 1.0'
         assert 'settings' in metadata
 
-# Integration tests
 class TestNewDatabaseIntegration:
-    """Integration tests requiring actual NewDatabase instance."""
 
     @pytest.fixture
     def integration_adapter(self):
-        """Create adapter for integration testing."""
-        # Only run if NewDatabase is available
         pytest.importorskip("newdatabase")
 
         return NewDatabaseAdapter(
@@ -1002,7 +922,6 @@ class TestNewDatabaseIntegration:
 
     @pytest.mark.integration
     def test_end_to_end_benchmark(self, integration_adapter):
-        """Test complete benchmark execution."""
         from benchbox import ReadPrimitives
 
         benchmark = ReadPrimitives(scale_factor=0.001)
@@ -1019,10 +938,9 @@ Create platform documentation following the existing pattern in `docs/platforms/
 
 ### Step 5: Update Configuration
 
-Add the new platform to configuration files:
+Add the new platform to the example configuration files:
 
 ```yaml
-# In example configuration files
 platforms:
   newdatabase:
     host: "localhost"
@@ -1039,10 +957,8 @@ platforms:
 Run unit tests to verify basic functionality:
 
 ```bash
-# Run adapter-specific tests
 uv run -- python -m pytest tests/unit/platforms/test_newdatabase_adapter.py -v
 
-# Run all platform tests
 uv run -- python -m pytest tests/unit/platforms/ -v
 ```
 
@@ -1051,14 +967,12 @@ uv run -- python -m pytest tests/unit/platforms/ -v
 Test with actual database instance:
 
 ```bash
-# Set up test database
 export NEWDATABASE_HOST=localhost
 export NEWDATABASE_PORT=5432
 export NEWDATABASE_DATABASE=test
 export NEWDATABASE_USERNAME=test
 export NEWDATABASE_PASSWORD=test
 
-# Run integration tests
 uv run -- python -m pytest tests/integration/ -k newdatabase -v
 ```
 
@@ -1070,7 +984,6 @@ Test with small benchmark:
 from benchbox import ReadPrimitives
 from benchbox.platforms.newdatabase import NewDatabaseAdapter
 
-# Test with minimal benchmark
 benchmark = ReadPrimitives(scale_factor=0.001)
 adapter = NewDatabaseAdapter(
     host="localhost",
@@ -1124,10 +1037,10 @@ print(f"Benchmark completed in {results.total_time:.2f}s")
 
 ### Connection String Parsing
 
+The example parses connection strings of the form `newdatabase://user:pass@host:port/database`:
+
 ```python
 def _parse_connection_string(self, conn_str: str) -> Dict[str, str]:
-    """Parse database connection string."""
-    # Example: "newdatabase://user:pass@host:port/database"
     import re
 
     pattern = r"newdatabase://(?:([^:]*):([^@]*)@)?([^:]*):(\d+)/(.+)"
@@ -1147,9 +1060,10 @@ def _parse_connection_string(self, conn_str: str) -> Dict[str, str]:
 
 ### Retry Logic
 
+Retry transient failures with exponential backoff (the wait doubles after each attempt):
+
 ```python
 def _execute_with_retry(self, cursor, query: str, max_retries: int = 3):
-    """Execute query with retry logic for transient failures."""
     import time
 
     for attempt in range(max_retries):
@@ -1159,7 +1073,7 @@ def _execute_with_retry(self, cursor, query: str, max_retries: int = 3):
             if attempt == max_retries - 1:
                 raise
 
-            wait_time = 2 ** attempt  # Exponential backoff
+            wait_time = 2 ** attempt
             logger.warning(f"Query failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}")
             time.sleep(wait_time)
 ```
@@ -1171,7 +1085,6 @@ from contextlib import contextmanager
 
 @contextmanager
 def managed_connection(self, **config):
-    """Context manager for database connections."""
     connection = None
     try:
         connection = self.create_connection(**config)
@@ -1182,7 +1095,6 @@ def managed_connection(self, **config):
 
 @contextmanager
 def managed_cursor(self, connection):
-    """Context manager for database cursors."""
     cursor = None
     try:
         cursor = connection.cursor()
@@ -1198,7 +1110,6 @@ def managed_cursor(self, connection):
 
 ```python
 class PooledNewDatabaseAdapter(NewDatabaseAdapter):
-    """NewDatabase adapter with connection pooling."""
 
     def __init__(self, **config):
         super().__init__(**config)
@@ -1206,7 +1117,6 @@ class PooledNewDatabaseAdapter(NewDatabaseAdapter):
         self._pool_size = config.get('pool_size', 10)
 
     def _get_connection_pool(self):
-        """Get or create connection pool."""
         if self._connection_pool is None:
             from newdatabase.pool import ConnectionPool
 
@@ -1222,7 +1132,6 @@ class PooledNewDatabaseAdapter(NewDatabaseAdapter):
         return self._connection_pool
 
     def create_connection(self, **connection_config) -> Any:
-        """Get connection from pool."""
         pool = self._get_connection_pool()
         return pool.get_connection()
 ```
@@ -1234,10 +1143,8 @@ import asyncio
 from typing import AsyncGenerator
 
 class AsyncNewDatabaseAdapter(NewDatabaseAdapter):
-    """Async version of NewDatabase adapter."""
 
     async def create_async_connection(self, **config):
-        """Create async database connection."""
         import newdatabase.asyncio as async_newdb
 
         return await async_newdb.connect(
@@ -1249,7 +1156,6 @@ class AsyncNewDatabaseAdapter(NewDatabaseAdapter):
         )
 
     async def execute_query_async(self, connection, query: str, query_id: str):
-        """Execute query asynchronously."""
         start_time = time.time()
 
         try:

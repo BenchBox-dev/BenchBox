@@ -1,26 +1,3 @@
-"""Cross-parser signature-hygiene invariant.
-
-The plan fingerprint is a LOGICAL, stats-independent structural hash (see the
-stability contract in ``benchbox/core/results/query_plan_models.py``). A parser
-that folds an operator's raw EXPLAIN detail into a signature-bearing logical
-field leaks any cost/cardinality estimate carried in that text into the hash, so
-a stats refresh (VACUUM/ANALYZE) or a different table size silently changes the
-fingerprint. That is a bug, and historically the DuckDB parser had it (its
-FORMAT JSON ``extra_info`` dict carries ``Estimated Cardinality``).
-
-This module enforces the rule for every registered parser:
-
-1. ``test_no_parser_leaks_estimate_tokens_into_signature`` parses a recorded
-   fixture per platform and asserts the structural signature contains no
-   cost/cardinality/estimate token. Driven by recorded fixtures under
-   ``tests/fixtures/query_plans/`` (plus inline samples for the parsers that
-   ship no file fixture) so it runs with no live service.
-2. ``test_registry_is_fully_covered`` asserts every registered platform has a
-   hygiene fixture, so a newly added parser cannot silently skip the invariant.
-3. ``test_estimate_only_changes_do_not_change_fingerprint`` parses two fixtures
-   that differ ONLY in estimate values and asserts an identical fingerprint.
-"""
-
 from __future__ import annotations
 
 import json
@@ -47,12 +24,6 @@ def _load(name: str) -> str:
     return (_FIXTURES / name).read_text()
 
 
-# Tokens that must never appear in a structural signature: digit-bearing
-# cost/cardinality/estimate text, plus the DataFusion ``metrics=[...]`` block.
-# Kept aligned with the estimate vocabulary stripped in base.py: this tripwire
-# flags the unambiguous estimate forms (so it never false-positives on a genuine
-# predicate column named ``cost``/``rows``) while covering every standalone
-# estimate token the stripper knows about (selectivity, num_rows, ...).
 _ESTIMATE_TOKEN_RE = re.compile(
     r"""
     estimated\s+cardinality
@@ -72,14 +43,7 @@ _ESTIMATE_TOKEN_RE = re.compile(
 )
 
 
-# ---------------------------------------------------------------------------
-# Inline fixtures for parsers that ship no recorded file fixture. Each carries a
-# cost/cardinality estimate in the raw EXPLAIN so the leak path is exercised.
-# ---------------------------------------------------------------------------
-
-
 def _postgresql_explain(plan_rows: int, total_cost: float) -> str:
-    """PostgreSQL EXPLAIN (FORMAT JSON): estimates live in dedicated keys."""
     return json.dumps(
         [
             {
@@ -105,7 +69,6 @@ def _postgresql_explain(plan_rows: int, total_cost: float) -> str:
 
 
 def _redshift_explain(rows: int, total_cost: str) -> str:
-    """Redshift text EXPLAIN: estimates in ``(cost=.. rows=.. width=..)``."""
     return (
         f"XN HashAggregate  (cost=50.00..{total_cost} rows={rows} width=40)\n"
         f"  ->  XN Seq Scan on lineitem  (cost=0.00..25.00 rows={rows * 10} width=40)\n"
@@ -114,7 +77,6 @@ def _redshift_explain(rows: int, total_cost: str) -> str:
 
 
 def _datafusion_explain(output_rows: int) -> str:
-    """DataFusion EXPLAIN ANALYZE physical plan: estimates in ``metrics=[...]``."""
     return (
         f"physical_plan | FilterExec: id@0 > 1, "
         f"metrics=[output_rows={output_rows}, elapsed_compute=9us, "
@@ -124,7 +86,6 @@ def _datafusion_explain(output_rows: int) -> str:
 
 
 def _duckdb_explain(cardinality: int) -> str:
-    """DuckDB EXPLAIN (FORMAT JSON): ``extra_info`` dict carries Estimated Cardinality."""
     return json.dumps(
         [
             {
@@ -153,12 +114,6 @@ def _duckdb_explain(cardinality: int) -> str:
 def _sqlite_explain() -> str:
     return "QUERY PLAN\n`--SEARCH orders USING INDEX idx_orders (id=?)"
 
-
-# ---------------------------------------------------------------------------
-# Per-platform hygiene fixtures. Every registered platform must resolve here.
-# File-backed entries reuse the recorded EXPLAIN fixtures; inline entries cover
-# the parsers that ship no file fixture.
-# ---------------------------------------------------------------------------
 
 _FILE_FIXTURES: dict[str, str] = {
     "duckdb": "motherduck_duckdb_explain_sample.json",
@@ -201,13 +156,6 @@ def _signature_fixture(platform: str) -> str:
     return _INLINE_FIXTURES[platform]
 
 
-# Estimate-only pairs: two EXPLAIN renderings of the same plan that differ ONLY
-# in cost/cardinality values. The fingerprint must be identical.
-#
-# duckdb and datafusion exercise the strip helpers directly (their estimates sit
-# in a signature-bearing field before stripping). postgresql and redshift route
-# estimates into non-hashed `properties`; their pairs assert the complementary
-# guarantee that those parsers keep estimates out of the signature entirely.
 _ESTIMATE_PAIRS: dict[str, tuple[str, str]] = {
     "duckdb": (_duckdb_explain(5), _duckdb_explain(90_000)),
     "datafusion": (_datafusion_explain(48), _datafusion_explain(90_000)),
@@ -222,7 +170,6 @@ def _registered_platforms() -> list[str]:
 
 class TestRegistryCoverage:
     def test_registry_is_fully_covered(self):
-        """Every registered parser must have a hygiene fixture (future-proofing)."""
         registered = set(_registered_platforms())
         covered = set(_FILE_FIXTURES) | set(_INLINE_FIXTURES)
         missing = registered - covered
@@ -236,7 +183,6 @@ class TestRegistryCoverage:
 class TestSignatureHygiene:
     @pytest.mark.parametrize("platform", _registered_platforms())
     def test_no_parser_leaks_estimate_tokens_into_signature(self, platform):
-        """No registered parser may fold cost/cardinality text into the signature."""
         parser = get_parser_for_platform(platform)
         assert parser is not None, f"No parser registered for {platform}"
 
@@ -255,7 +201,6 @@ class TestSignatureHygiene:
 
     @pytest.mark.parametrize("platform", sorted(_ESTIMATE_PAIRS))
     def test_estimate_only_changes_do_not_change_fingerprint(self, platform):
-        """Two plans that differ only in estimates must share a fingerprint."""
         low_text, high_text = _ESTIMATE_PAIRS[platform]
         parser = get_parser_for_platform(platform)
 
@@ -272,8 +217,6 @@ class TestSignatureHygiene:
 
 
 class TestStripHelpers:
-    """Direct contract tests for the shared strip helpers."""
-
     def test_strip_estimate_keys_drops_estimate_fields_only(self):
         extra = {
             "Groups": "#0",
@@ -282,7 +225,6 @@ class TestStripHelpers:
         }
         cleaned = strip_estimate_keys(extra)
         assert cleaned == {"Groups": "#0", "Aggregates": "sum(#1)"}
-        # Input is not mutated.
         assert "Estimated Cardinality" in extra
 
     @pytest.mark.parametrize(
@@ -297,7 +239,6 @@ class TestStripHelpers:
         ["Projections", "Conditions", "Groups", "Aggregates", "Order By", "Table", "Filters"],
     )
     def test_strip_estimate_keys_keeps_structural_keys(self, structural_key):
-        # "Projections" contains the substring "ec"; it must NOT be treated as an estimate.
         result = strip_estimate_keys({structural_key: "value"})
         assert result == {structural_key: "value"}
 
@@ -317,29 +258,22 @@ class TestStripHelpers:
         assert "id>1" in out
 
     def test_strip_estimates_preserves_predicate_with_estimate_like_column(self):
-        # A genuine predicate on a column literally named 'cost' must survive: removal
-        # is anchored to explicit estimate wording, not bare cost=/rows=.
         out = strip_estimates("(cost_center = 5 AND rows_flag = 1)")
         assert out == "(cost_center = 5 AND rows_flag = 1)"
 
     @pytest.mark.parametrize(
         "predicate",
         [
-            "(cost=5 AND x=1)",  # column named 'cost', not a (cost=N..N) estimate paren
-            "WHERE num_rows = 5",  # column named 'num_rows'
-            "amount > 100 AND ec = 7",  # column named 'ec' with '=', not the 'EC:' estimate token
-            "(rows = 5 OR cardinality = 7)",  # columns named 'rows'/'cardinality'
+            "(cost=5 AND x=1)",
+            "WHERE num_rows = 5",
+            "amount > 100 AND ec = 7",
+            "(rows = 5 OR cardinality = 7)",
         ],
     )
     def test_strip_estimates_does_not_corrupt_genuine_predicates(self, predicate):
-        # Regression: the cost parenthetical and inline-token removals must be anchored
-        # to estimate wording so they never delete a real predicate whose column name
-        # collides with an estimate keyword.
         assert strip_estimates(predicate) == predicate
 
     def test_strip_estimates_removes_metrics_block_with_nested_brackets(self):
-        # Regression: the metrics block can embed bracketed values (partitioning), so the
-        # removal must reach the final ']' instead of stopping at the first inner one.
         out = strip_estimates("expr=[a@0 ASC], metrics=[output_rows=5, partitioning=[Hash([a],4)]]")
         assert out == "expr=[a@0 ASC]"
         assert "output_rows" not in out and "metrics=" not in out
@@ -356,23 +290,14 @@ class TestStripHelpers:
         ],
     )
     def test_strip_estimates_preserves_genuine_empty_list(self, predicate):
-        # Regression: a real empty-list literal must survive when no estimate token was
-        # stripped — the empty-bracket tidy-up only runs after an actual removal, so it no
-        # longer corrupts predicates such as ``arr = []`` (DuckDB/DataFusion signatures).
         assert strip_estimates(predicate) == predicate
 
     def test_strip_estimates_still_tidies_emptied_brackets_after_removal(self):
-        # When an estimate token vacated its enclosing brackets, the now-empty ``[]`` is
-        # still tidied — the guard only skips tidy-up when nothing was removed.
         out = strip_estimates("part=[Estimated Cardinality: 5], key=a")
         assert "[]" not in out
         assert "5" not in out and "key=a" in out
 
     def test_strip_estimates_preserves_empty_list_alongside_stripped_estimate(self):
-        # Regression: a genuine empty-list predicate must survive even when the SAME line
-        # also carries an estimate that gets stripped. Previously the global ``[]`` tidy-up
-        # ran on any removal and corrupted ``arr = []`` -> ``arr =``, changing the
-        # signature/fingerprint. Only estimate-vacated brackets should be removed.
         out = strip_estimates("FilterExec: arr = [], metrics=[output_rows=5]")
         assert "arr = []" in out
         assert "output_rows" not in out and "metrics=" not in out

@@ -1,5 +1,3 @@
-"""Focused tests for the curated CPU attestation backfill."""
-
 from __future__ import annotations
 
 import hashlib

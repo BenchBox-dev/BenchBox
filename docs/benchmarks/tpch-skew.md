@@ -91,34 +91,31 @@ The benchmark uses the standard 22 TPC-H queries, unchanged from the base benchm
 ```python
 from benchbox import TPCHSkew
 
-# Use moderate skew (default)
 benchmark = TPCHSkew(scale_factor=1.0)
 data_files = benchmark.generate_data()
 
-# Get queries (same as standard TPC-H)
 queries = benchmark.get_queries()
 
-# Check skew configuration
 print(benchmark.get_skew_info())
 ```
+
+This uses the moderate skew preset, which is the default. The queries are the same as in standard TPC-H, and `get_skew_info()` shows the skew configuration.
 
 ### Using Different Presets
 
 ```python
 from benchbox import TPCHSkew
 
-# Light skew for initial testing
 light_benchmark = TPCHSkew(scale_factor=0.1, skew_preset="light")
 
-# Heavy skew for optimizer stress testing
 heavy_benchmark = TPCHSkew(scale_factor=1.0, skew_preset="heavy")
 
-# Extreme skew for edge cases
 extreme_benchmark = TPCHSkew(scale_factor=1.0, skew_preset="extreme")
 
-# Realistic e-commerce patterns
 realistic_benchmark = TPCHSkew(scale_factor=1.0, skew_preset="realistic")
 ```
+
+Use `light` skew for initial testing, `heavy` for optimizer stress testing, `extreme` for edge cases, and `realistic` for e-commerce-like patterns.
 
 ### Custom Skew Configuration
 
@@ -126,7 +123,6 @@ realistic_benchmark = TPCHSkew(scale_factor=1.0, skew_preset="realistic")
 from benchbox import TPCHSkew
 from benchbox.core.tpch_skew import SkewConfiguration
 
-# Create custom configuration
 custom_config = SkewConfiguration(
     skew_factor=0.7,
     distribution_type="zipfian",
@@ -149,23 +145,20 @@ import duckdb
 from benchbox import TPCHSkew
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Initialize benchmark with heavy skew
 benchmark = TPCHSkew(scale_factor=0.1, skew_preset="heavy")
 
-# Generate skewed data
 benchmark.generate_data()
 
-# Use DuckDB adapter
 adapter = DuckDBAdapter(database=":memory:")
 adapter.load_benchmark(benchmark)
 
-# Run queries and compare with baseline
 results = adapter.run_benchmark(benchmark)
 
-# Analyze query performance
 for query_id, result in results.items():
     print(f"Q{query_id}: {result['execution_time']:.3f}s")
 ```
+
+The example generates data with heavy skew, loads it with the DuckDB adapter, runs the queries and prints the time for each. Compare the times with a baseline run.
 
 ### Comparing Uniform vs Skewed Performance
 
@@ -173,24 +166,22 @@ for query_id, result in results.items():
 from benchbox import TPCH, TPCHSkew
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Baseline: Standard TPC-H (uniform)
 uniform = TPCH(scale_factor=1.0)
 uniform.generate_data()
 
-# Test: TPC-H with heavy skew
 skewed = TPCHSkew(scale_factor=1.0, skew_preset="heavy")
 skewed.generate_data()
 
-# Compare performance
 for benchmark, name in [(uniform, "Uniform"), (skewed, "Skewed")]:
     adapter = DuckDBAdapter()
     adapter.load_benchmark(benchmark)
 
-    # Run a join-heavy query (most affected by skew)
-    query = benchmark.get_query(3)  # Q3: Shipping Priority
+    query = benchmark.get_query(3)
     result = adapter.execute_query(query)
     print(f"{name} Q3: {result['execution_time']:.3f}s")
 ```
+
+The uniform standard TPC-H run is the baseline, and the heavy-skew run is the test. Q3 (Shipping Priority) is a join-heavy query, so skew affects it the most.
 
 ## CLI Options (`--benchmark-option`)
 
@@ -204,13 +195,13 @@ Configure TPC-H Skew via `--benchmark-option KEY=VALUE`:
 Accepts hyphenated aliases (e.g. `skew-preset`).
 
 ```bash
-# Heavy skew distribution
 benchbox run --platform duckdb --benchmark tpch_skew --scale 1 \
   --benchmark-option skew_preset=heavy
 
-# List all preset options
 benchbox run --help-topic benchmarks
 ```
+
+The first command runs a heavy skew distribution, and the second lists all preset options.
 
 ## Scale Factor Guidelines
 

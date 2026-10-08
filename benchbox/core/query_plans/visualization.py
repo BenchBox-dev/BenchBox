@@ -1,10 +1,3 @@
-"""
-Query plan visualization utilities.
-
-Provides ASCII tree rendering for query plans with support for
-highlighting differences and displaying plan statistics.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -21,8 +14,6 @@ from benchbox.core.results.query_plan_models import (
 
 @dataclass
 class VisualizationOptions:
-    """Options for controlling plan visualization."""
-
     show_properties: bool = True
     show_physical: bool = False
     show_costs: bool = True
@@ -31,7 +22,6 @@ class VisualizationOptions:
 
 
 def _format_truncated_list(label: str, items: list[str], max_display: int = 3) -> list[str]:
-    """Format a labeled, truncated list for display."""
     lines = [f"{label}: {len(items)}"]
     for item in items[:max_display]:
         lines.append(f"  - {item}")
@@ -83,30 +73,12 @@ _PROPERTY_DIFF_FORMATTERS: dict[str, Any] = {
 
 
 class QueryPlanVisualizer:
-    """Renders query plans as ASCII trees."""
-
     def __init__(self, options: VisualizationOptions | None = None):
-        """
-        Initialize visualizer.
-
-        Args:
-            options: Visualization options (uses defaults if None)
-        """
         self.options = options or VisualizationOptions()
 
     def render_plan(self, plan: QueryPlanDAG) -> str:
-        """
-        Render query plan as ASCII tree.
-
-        Args:
-            plan: Query plan to render
-
-        Returns:
-            ASCII tree representation
-        """
         lines = []
 
-        # Header
         lines.append(f"Query Plan: {plan.query_id}")
         lines.append(f"Platform: {plan.platform}")
 
@@ -122,25 +94,12 @@ class QueryPlanVisualizer:
 
         lines.append("")
 
-        # Render tree
         tree_lines = self._render_operator_tree(plan.logical_root, prefix="", is_last=True)
         lines.extend(tree_lines)
 
         return "\n".join(lines)
 
     def render_summary(self, plan: QueryPlanDAG) -> str:
-        """
-        Render plan summary with statistics.
-
-        Handles both enum and string operator types gracefully.
-
-        Args:
-            plan: Query plan to summarize
-
-        Returns:
-            Summary string
-        """
-        # Count operators by type (use string keys for consistency with both enums and strings)
         operator_counts: dict[str, int] = {}
         max_depth = 0
 
@@ -157,7 +116,6 @@ class QueryPlanVisualizer:
 
         count_operators(plan.logical_root)
 
-        # Build summary
         lines = []
         lines.append(f"Query: {plan.query_id} ({plan.platform})")
         lines.append(f"Total Operators: {sum(operator_counts.values())}")
@@ -175,35 +133,22 @@ class QueryPlanVisualizer:
         return "\n".join(lines)
 
     def render_comparison(self, comparison: PlanComparison) -> str:
-        """
-        Render comparison result with highlighted differences.
-
-        Args:
-            comparison: Plan comparison result
-
-        Returns:
-            Formatted comparison string
-        """
         lines = []
 
-        # Header
         lines.append("=" * 80)
         lines.append("QUERY PLAN COMPARISON")
         lines.append("=" * 80)
         lines.append("")
 
-        # Plans being compared
         lines.append(f"Left:  {comparison.plan_left.query_id} ({comparison.plan_left.platform})")
         lines.append(f"Right: {comparison.plan_right.query_id} ({comparison.plan_right.platform})")
         lines.append("")
 
-        # Summary and similarity
         lines.append(comparison.summary)
         lines.append("")
         self._render_similarity_metrics(comparison.similarity, lines)
         self._render_operator_counts(comparison.similarity, lines)
 
-        # Detailed differences (if any)
         if comparison.operator_diffs:
             self._render_operator_diffs(comparison.operator_diffs, lines)
 
@@ -212,7 +157,6 @@ class QueryPlanVisualizer:
         return "\n".join(lines)
 
     def _render_similarity_metrics(self, sim: Any, lines: list[str]) -> None:
-        """Render similarity metrics section."""
         lines.append("Similarity Metrics:")
         lines.append(f"  Overall:    {sim.overall_similarity:6.1%}")
         lines.append(f"  Structural: {sim.structural_similarity:6.1%}")
@@ -221,7 +165,6 @@ class QueryPlanVisualizer:
         lines.append("")
 
     def _render_operator_counts(self, sim: Any, lines: list[str]) -> None:
-        """Render operator count comparison."""
         lines.append(f"Operators: {sim.total_operators_left} (left) vs {sim.total_operators_right} (right)")
         lines.append(f"  Matching:   {sim.matching_operators}")
         if sim.type_mismatches > 0:
@@ -233,7 +176,6 @@ class QueryPlanVisualizer:
         lines.append("")
 
     def _render_operator_diffs(self, operator_diffs: list[OperatorDiff], lines: list[str]) -> None:
-        """Render detailed operator differences grouped by type."""
         type_diffs = [d for d in operator_diffs if d.diff_type == "type_mismatch"]
         prop_diffs = [d for d in operator_diffs if d.diff_type == "property_mismatch"]
         struct_diffs = [d for d in operator_diffs if d.diff_type == "structure_mismatch"]
@@ -274,36 +216,21 @@ class QueryPlanVisualizer:
         is_last: bool = True,
         depth: int = 0,
     ) -> list[str]:
-        """
-        Recursively render operator tree.
-
-        Args:
-            operator: Operator to render
-            prefix: Line prefix for tree structure
-            is_last: Whether this is the last child
-            depth: Current depth in tree
-
-        Returns:
-            List of rendered lines
-        """
         if self.options.max_depth and depth >= self.options.max_depth:
             return [f"{prefix}..."]
 
         lines = []
 
-        # Tree connector
         connector = "└── " if is_last else "├── "
         line = f"{prefix}{connector}{self._format_operator(operator)}"
         lines.append(line)
 
-        # Properties (if enabled and not compact)
         if self.options.show_properties and not self.options.compact:
             extension = "    " if is_last else "│   "
             props = self._format_operator_properties(operator)
             for prop in props:
                 lines.append(f"{prefix}{extension}  {prop}")
 
-        # Children
         if operator.children:
             extension = "    " if is_last else "│   "
             for i, child in enumerate(operator.children):
@@ -319,10 +246,8 @@ class QueryPlanVisualizer:
         return lines
 
     def _format_operator(self, operator: LogicalOperator) -> str:
-        """Format operator for display. Handles both enum and string operator types."""
         op_type = get_operator_type_str(operator.operator_type)
 
-        # Add type-specific details
         details = []
 
         if operator.table_name:
@@ -332,13 +257,11 @@ class QueryPlanVisualizer:
             details.append(f"type={get_join_type_str(operator.join_type)}")
 
         if operator.filter_expressions and len(operator.filter_expressions) == 1:
-            # Show single filter inline
             expr = operator.filter_expressions[0]
             if len(expr) < 40:
                 details.append(f"filter='{expr}'")
 
         if operator.aggregation_functions and len(operator.aggregation_functions) <= 2:
-            # Show 1-2 aggregations inline
             aggs = ", ".join(operator.aggregation_functions)
             if len(aggs) < 40:
                 details.append(f"aggs=[{aggs}]")
@@ -347,7 +270,6 @@ class QueryPlanVisualizer:
         return f"{op_type}{detail_str}"
 
     def _format_operator_properties(self, operator: LogicalOperator) -> list[str]:
-        """Format operator properties for display."""
         props: list[str] = []
 
         if operator.filter_expressions and len(operator.filter_expressions) > 1:
@@ -363,7 +285,6 @@ class QueryPlanVisualizer:
         return props
 
     def _format_physical_properties(self, phys: Any) -> list[str]:
-        """Format physical operator properties for display."""
         lines = [f"Physical: {phys.operator_type}"]
         props = phys.properties if phys.properties is not None else {}
         if self.options.show_costs:
@@ -374,7 +295,6 @@ class QueryPlanVisualizer:
         return lines
 
     def _format_property_diff(self, diff: OperatorDiff) -> str:
-        """Format property difference for display."""
         diffs = diff.differences
         for key, formatter in _PROPERTY_DIFF_FORMATTERS.items():
             if key in diffs:
@@ -383,49 +303,15 @@ class QueryPlanVisualizer:
 
 
 def render_plan(plan: QueryPlanDAG, options: VisualizationOptions | None = None) -> str:
-    """
-    Render query plan as ASCII tree.
-
-    Convenience function.
-
-    Args:
-        plan: Query plan to render
-        options: Visualization options
-
-    Returns:
-        ASCII tree representation
-    """
     visualizer = QueryPlanVisualizer(options)
     return visualizer.render_plan(plan)
 
 
 def render_summary(plan: QueryPlanDAG) -> str:
-    """
-    Render plan summary with statistics.
-
-    Convenience function.
-
-    Args:
-        plan: Query plan to summarize
-
-    Returns:
-        Summary string
-    """
     visualizer = QueryPlanVisualizer()
     return visualizer.render_summary(plan)
 
 
 def render_comparison(comparison: PlanComparison) -> str:
-    """
-    Render comparison result.
-
-    Convenience function.
-
-    Args:
-        comparison: Plan comparison result
-
-    Returns:
-        Formatted comparison string
-    """
     visualizer = QueryPlanVisualizer()
     return visualizer.render_comparison(comparison)

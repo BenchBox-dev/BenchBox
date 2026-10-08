@@ -19,9 +19,6 @@ describe("GroupedQueryChart", () => {
     );
 
     const rects = Array.from(container.querySelectorAll("rect"));
-    // SVG attribute names are case-sensitive, and Preact forwards an unknown
-    // camelCase prop to setAttribute verbatim: `strokeDasharray` reaches the
-    // DOM as a name the renderer ignores, so the dash never appears.
     const dashed = rects.find((rect) => rect.getAttribute("stroke-dasharray") !== null);
     expect(dashed).toBeTruthy();
     expect(dashed?.getAttribute("fill")).toBe("none");
@@ -50,7 +47,6 @@ describe("GroupedQueryChart", () => {
       />,
     );
 
-    // No NaN in any numeric attribute - would signal division-by-zero in the scale.
     const attrs = Array.from(container.querySelectorAll("*")).flatMap((el) =>
       Array.from(el.attributes).map((a) => a.value),
     );

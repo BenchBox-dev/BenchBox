@@ -1,8 +1,5 @@
-"""Coverage tests for benchbox.platforms.azure.spark_execution_utils module.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock, call, patch
 
@@ -22,7 +19,6 @@ pytestmark = [
 
 
 def _make_response(state: str, status: str = "ok", output: dict | None = None):
-    """Build a mock requests.Response for a Livy statement poll."""
     resp = MagicMock()
     resp.status_code = 200
     payload = {"state": state}
@@ -34,7 +30,6 @@ def _make_response(state: str, status: str = "ok", output: dict | None = None):
 
 class TestWaitForLivyStatement:
     def test_success_waiting_running_available(self):
-        """State transitions WAITING → RUNNING → AVAILABLE returns output."""
         responses = [
             _make_response(LivyStatementState.WAITING),
             _make_response(LivyStatementState.RUNNING),
@@ -59,7 +54,6 @@ class TestWaitForLivyStatement:
         assert mock_get.call_count == 3
 
     def test_available_immediately(self):
-        """Single AVAILABLE response returns at once."""
         get_headers = dict
         with (
             patch("benchbox.platforms.azure.spark_execution_utils.requests.get") as mock_get,
@@ -76,7 +70,6 @@ class TestWaitForLivyStatement:
         assert result is not None
 
     def test_error_state_raises(self):
-        """ERROR state raises ConfigurationError."""
         get_headers = dict
         with (
             patch("benchbox.platforms.azure.spark_execution_utils.requests.get") as mock_get,
@@ -93,7 +86,6 @@ class TestWaitForLivyStatement:
                 )
 
     def test_cancelled_state_raises(self):
-        """CANCELLED state raises ConfigurationError."""
         get_headers = dict
         with (
             patch("benchbox.platforms.azure.spark_execution_utils.requests.get") as mock_get,
@@ -110,7 +102,6 @@ class TestWaitForLivyStatement:
                 )
 
     def test_available_with_error_output_raises(self):
-        """AVAILABLE with error output raises ConfigurationError."""
         get_headers = dict
         output = {"status": "error", "evalue": "SparkException: bad query"}
         with (
@@ -128,7 +119,6 @@ class TestWaitForLivyStatement:
                 )
 
     def test_http_non_200_raises(self):
-        """Non-200 HTTP status raises ConfigurationError."""
         bad_resp = MagicMock()
         bad_resp.status_code = 404
         get_headers = dict
@@ -146,10 +136,8 @@ class TestWaitForLivyStatement:
                 )
 
     def test_timeout_raises(self):
-        """Polling that never finishes raises ConfigurationError after timeout."""
         get_headers = dict
 
-        # elapsed_seconds always > timeout after first call
         with (
             patch("benchbox.platforms.azure.spark_execution_utils.elapsed_seconds", return_value=9999.0),
             patch("benchbox.platforms.azure.spark_execution_utils.requests.get") as mock_get,
@@ -168,7 +156,6 @@ class TestWaitForLivyStatement:
 
 class TestExecuteLivyStatement:
     def test_success_returns_output_and_time(self):
-        """execute_livy_statement posts, waits, and returns (output, elapsed)."""
         post_resp = MagicMock()
         post_resp.status_code = 201
         post_resp.json.return_value = {"id": 42}
@@ -199,7 +186,6 @@ class TestExecuteLivyStatement:
         mock_wait.assert_called_once_with("https://api/sessions", 3, 42, get_headers, 2.0)
 
     def test_post_failure_raises(self):
-        """HTTP error on POST raises ConfigurationError."""
         bad_post = MagicMock()
         bad_post.status_code = 500
         bad_post.text = "Internal Server Error"

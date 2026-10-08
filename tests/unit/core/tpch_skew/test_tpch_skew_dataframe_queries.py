@@ -1,10 +1,4 @@
-"""Unit tests for TPC-H Skew DataFrame query implementations.
-
-TPC-H Skew reuses TPC-H's query implementations since the same 22 queries
-run on skewed data distributions.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -22,8 +16,6 @@ ALL_QUERY_IDS = [f"Q{i}" for i in range(1, 23)]
 
 
 class TestTPCHSkewQueryRegistry:
-    """Tests for TPC-H Skew DataFrame query registry."""
-
     def test_registry_imports_successfully(self):
         from benchbox.core.tpch_skew.dataframe_queries import TPCH_SKEW_DATAFRAME_QUERIES
 
@@ -92,8 +84,6 @@ class TestTPCHSkewQueryRegistry:
 
 
 class TestTPCHSkewMatchesTPCH:
-    """Tests that TPC-H Skew queries match TPC-H originals."""
-
     def test_same_query_count(self):
         from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES
         from benchbox.core.tpch_skew.dataframe_queries import TPCH_SKEW_DATAFRAME_QUERIES
@@ -109,7 +99,7 @@ class TestTPCHSkewMatchesTPCH:
         assert tpch_ids == skew_ids
 
     def test_implementations_are_shared(self):
-        """Verify that TPC-H Skew reuses TPC-H's actual implementation functions."""
+
         from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES
         from benchbox.core.tpch_skew.dataframe_queries import TPCH_SKEW_DATAFRAME_QUERIES
 
@@ -122,7 +112,7 @@ class TestTPCHSkewMatchesTPCH:
             assert tpch_q.pandas_impl is skew_q.pandas_impl, f"{query_id} pandas_impl should be same function object"
 
     def test_separate_registries(self):
-        """Verify the registries are separate objects."""
+
         from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES
         from benchbox.core.tpch_skew.dataframe_queries import TPCH_SKEW_DATAFRAME_QUERIES
 
@@ -130,8 +120,6 @@ class TestTPCHSkewMatchesTPCH:
 
 
 class TestTPCHSkewQueryCategories:
-    """Tests for TPC-H Skew query category assignments."""
-
     def test_q1_has_aggregate(self):
         from benchbox.core.tpch_skew.dataframe_queries import get_tpch_skew_query
 
@@ -154,8 +142,6 @@ class TestTPCHSkewQueryCategories:
 
 
 class TestTPCHSkewBenchmarkRegistry:
-    """Tests for TPC-H Skew DataFrame support in benchmark registry."""
-
     def test_tpch_skew_supports_dataframe(self):
         from benchbox.core.benchmark_registry import get_benchmark_metadata
 

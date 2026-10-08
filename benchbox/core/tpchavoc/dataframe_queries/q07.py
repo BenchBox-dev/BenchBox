@@ -1,12 +1,6 @@
-"""TPC-Havoc DataFrame variants for Q7.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Implements 10 structurally diverse variants of TPC-H Q7 (Volume Shipping).
-Q7 is a 5-table join with self-join on nation and bidirectional nation filter.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -21,10 +15,6 @@ from benchbox.core.tpch.dataframe_queries import (
 from benchbox.core.tpchavoc.dataframe_queries._delegating_variants import make_variant_delegate
 from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_FILTER, build_yaml_variants
 
-# ---------------------------------------------------------------------------
-# v1: baseline
-# ---------------------------------------------------------------------------
-
 
 def q7_v1_expression_impl(ctx: DataFrameContext) -> Any:
     return _q7_expr_base(ctx)
@@ -32,11 +22,6 @@ def q7_v1_expression_impl(ctx: DataFrameContext) -> Any:
 
 def q7_v1_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q7_pandas_base(ctx)
-
-
-# ---------------------------------------------------------------------------
-# v2: pre-filter - filter lineitem by date before joining
-# ---------------------------------------------------------------------------
 
 
 def q7_v2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -57,7 +42,6 @@ def q7_v2_expression_impl(ctx: DataFrameContext) -> Any:
     n1 = nation.select(col("n_nationkey").alias("n1_nationkey"), col("n_name").alias("supp_nation"))
     n2 = nation.select(col("n_nationkey").alias("n2_nationkey"), col("n_name").alias("cust_nation"))
 
-    # Pre-filter lineitem by date
     filtered_lineitem = lineitem.filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") <= lit(end_date)))
 
     return (
@@ -98,7 +82,6 @@ def q7_v2_pandas_impl(ctx: DataFrameContext) -> Any:
     n2 = nation[["n_nationkey", "n_name"]].copy()
     n2.columns = ["n2_nationkey", "cust_nation"]
 
-    # Pre-filter lineitem
     filtered_li = lineitem[(lineitem["l_shipdate"] >= start_date) & (lineitem["l_shipdate"] <= end_date)]
 
     joined = supplier.merge(n1, left_on="s_nationkey", right_on="n1_nationkey")
@@ -119,11 +102,6 @@ def q7_v2_pandas_impl(ctx: DataFrameContext) -> Any:
         .agg(revenue=("volume", "sum"))
         .sort_values(["supp_nation", "cust_nation", "l_year"])
     )
-
-
-# ---------------------------------------------------------------------------
-# v3: column prune - select only needed columns from each table
-# ---------------------------------------------------------------------------
 
 
 def q7_v3_expression_impl(ctx: DataFrameContext) -> Any:
@@ -174,11 +152,6 @@ def q7_v3_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q7_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
-# v4: intermediate vars - explicit named step DataFrames
-# ---------------------------------------------------------------------------
-
-
 def q7_v4_expression_impl(ctx: DataFrameContext) -> Any:
     supplier = ctx.get_table("supplier")
     lineitem = ctx.get_table("lineitem")
@@ -222,11 +195,6 @@ def q7_v4_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q7_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
-# v5: pre-compute derived - add volume before groupby
-# ---------------------------------------------------------------------------
-
-
 def q7_v5_expression_impl(ctx: DataFrameContext) -> Any:
     return _q7_expr_base(ctx)
 
@@ -259,7 +227,6 @@ def q7_v5_pandas_impl(ctx: DataFrameContext) -> Any:
         ((joined["supp_nation"] == nation1) & (joined["cust_nation"] == nation2))
         | ((joined["supp_nation"] == nation2) & (joined["cust_nation"] == nation1))
     ].copy()
-    # Pre-compute
     joined["l_year"] = joined["l_shipdate"].dt.year
     joined["volume"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
     return (
@@ -267,11 +234,6 @@ def q7_v5_pandas_impl(ctx: DataFrameContext) -> Any:
         .agg(revenue=("volume", "sum"))
         .sort_values(["supp_nation", "cust_nation", "l_year"])
     )
-
-
-# ---------------------------------------------------------------------------
-# v6: chained style
-# ---------------------------------------------------------------------------
 
 
 def q7_v6_expression_impl(ctx: DataFrameContext) -> Any:
@@ -306,11 +268,6 @@ def q7_v6_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q7_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
-# v7: join reorder - join lineitem→supplier instead of supplier→lineitem
-# ---------------------------------------------------------------------------
-
-
 def q7_v7_expression_impl(ctx: DataFrameContext) -> Any:
     supplier = ctx.get_table("supplier")
     lineitem = ctx.get_table("lineitem")
@@ -329,7 +286,6 @@ def q7_v7_expression_impl(ctx: DataFrameContext) -> Any:
     n1 = nation.select(col("n_nationkey").alias("n1_nationkey"), col("n_name").alias("supp_nation"))
     n2 = nation.select(col("n_nationkey").alias("n2_nationkey"), col("n_name").alias("cust_nation"))
 
-    # Swapped: lineitem → supplier instead of supplier → lineitem
     return (
         lineitem.filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") <= lit(end_date)))
         .join(supplier, left_on="l_suppkey", right_on="s_suppkey")
@@ -354,22 +310,12 @@ def q7_v7_expression_impl(ctx: DataFrameContext) -> Any:
 q7_v7_pandas_impl = make_variant_delegate(q7_v2_pandas_impl, name="q7_v7_pandas_impl", module=__name__)
 
 
-# ---------------------------------------------------------------------------
-# v8: filter combination - combine nation pair filter into compound expression
-# ---------------------------------------------------------------------------
-
-
 def q7_v8_expression_impl(ctx: DataFrameContext) -> Any:
     return q7_v2_expression_impl(ctx)
 
 
 def q7_v8_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q7_pandas_base(ctx)
-
-
-# ---------------------------------------------------------------------------
-# v9: explicit sort
-# ---------------------------------------------------------------------------
 
 
 def q7_v9_expression_impl(ctx: DataFrameContext) -> Any:
@@ -448,11 +394,6 @@ def q7_v9_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
-# v10: alternative formula - volume = price - price*disc
-# ---------------------------------------------------------------------------
-
-
 def q7_v10_expression_impl(ctx: DataFrameContext) -> Any:
     supplier = ctx.get_table("supplier")
     lineitem = ctx.get_table("lineitem")
@@ -471,7 +412,6 @@ def q7_v10_expression_impl(ctx: DataFrameContext) -> Any:
     n1 = nation.select(col("n_nationkey").alias("n1_nationkey"), col("n_name").alias("supp_nation"))
     n2 = nation.select(col("n_nationkey").alias("n2_nationkey"), col("n_name").alias("cust_nation"))
 
-    # Alternative: price - price*disc
     volume_alt = col("l_extendedprice") - col("l_extendedprice") * col("l_discount")
 
     return (
@@ -524,7 +464,6 @@ def q7_v10_pandas_impl(ctx: DataFrameContext) -> Any:
         | ((joined["supp_nation"] == nation2) & (joined["cust_nation"] == nation1))
     ].copy()
     joined["l_year"] = joined["l_shipdate"].dt.year
-    # Alternative formula
     joined["volume"] = joined["l_extendedprice"] - joined["l_extendedprice"] * joined["l_discount"]
     return (
         joined.groupby(["supp_nation", "cust_nation", "l_year"], as_index=False)
@@ -532,9 +471,5 @@ def q7_v10_pandas_impl(ctx: DataFrameContext) -> Any:
         .sort_values(["supp_nation", "cust_nation", "l_year"])
     )
 
-
-# ---------------------------------------------------------------------------
-# Registry
-# ---------------------------------------------------------------------------
 
 Q7_VARIANTS = build_yaml_variants(__file__, globals(), 7, JOIN_AGG_FILTER)

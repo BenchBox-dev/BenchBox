@@ -22,14 +22,11 @@ Basic benchmark execution:
 from benchbox.tpch import TPCH
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Create benchmark and platform
 benchmark = TPCH(scale_factor=0.1)
 adapter = DuckDBAdapter()
 
-# Run benchmark
 results = benchmark.run_with_platform(adapter)
 
-# Access results
 print(f"Completed {results.successful_queries} queries")
 print(f"Average time: {results.average_query_time:.3f}s")
 ```
@@ -44,6 +41,8 @@ print(f"Average time: {results.average_query_time:.3f}s")
 base
 core
 benchmarks
+dataframe-query
+dataframe-runtime
 results
 result-analysis
 dataframe
@@ -54,6 +53,7 @@ dataframe
 ```{toctree}
 :maxdepth: 1
 
+platforms/common
 platforms/duckdb
 platforms/datafusion
 platforms/sqlite
@@ -92,14 +92,13 @@ tuning
 ```python
 from benchbox.tpcds import TPCDS
 
-# Generate data at specific scale
 benchmark = TPCDS(scale_factor=1.0, output_dir="./tpcds_data")
 data_files = benchmark.generate_data()
 
-# Reuse generated data
 benchmark2 = TPCDS(scale_factor=1.0, output_dir="./tpcds_data")
-# Skip regeneration if data exists
 ```
+
+The second benchmark reuses the data generated in the same directory. Generation is skipped when the data already exists.
 
 ### Query Access
 
@@ -108,15 +107,14 @@ from benchbox.tpch import TPCH
 
 benchmark = TPCH(scale_factor=0.1)
 
-# Get all queries
 queries = benchmark.get_queries()
 
-# Get specific query
 q1 = benchmark.get_query("q1")
 
-# Get query with parameters
 q1_parameterized = benchmark.get_query("q1", params={"date": "1998-09-02"})
 ```
+
+The example gets all queries, one specific query, and a query with parameters.
 
 ### Platform Execution
 
@@ -124,7 +122,6 @@ q1_parameterized = benchmark.get_query("q1", params={"date": "1998-09-02"})
 from benchbox.clickbench import ClickBench
 from benchbox.platforms.clickhouse import ClickHouseAdapter
 
-# Initialize components
 benchmark = ClickBench(scale_factor=0.01)
 adapter = ClickHouseAdapter(
     host="localhost",
@@ -132,32 +129,32 @@ adapter = ClickHouseAdapter(
     database="benchmark"
 )
 
-# Run with platform optimizations
 results = benchmark.run_with_platform(
     adapter,
-    query_subset=["Q1", "Q2", "Q3"]  # Optional filtering
+    query_subset=["Q1", "Q2", "Q3"]
 )
 ```
+
+The `query_subset` argument is optional. It limits the run to the listed queries.
 
 ### Result Analysis
 
 ```python
 from benchbox.core.results.models import BenchmarkResults
 
-# Load results from file
 results = BenchmarkResults.from_json_file("results.json")
 
-# Analyze query performance
 for qr in results.query_results:
     if qr.status == "SUCCESS":
         print(f"{qr.query_id}: {qr.execution_time:.3f}s")
 
-# Calculate geometric mean
 import math
 times = [qr.execution_time for qr in results.query_results
          if qr.status == "SUCCESS"]
 geomean = math.prod(times) ** (1.0 / len(times))
 ```
+
+The example loads results from a file, prints the time of each successful query, and calculates the geometric mean of the successful query times.
 
 ### Cross-Platform Comparison
 
@@ -178,10 +175,11 @@ for name, adapter in platforms.items():
     print(f"Running on {name}...")
     results[name] = benchmark.run_with_platform(adapter)
 
-# Compare performance
 for name, result in results.items():
     print(f"{name}: {result.total_execution_time:.2f}s")
 ```
+
+The final loop compares performance across the platforms.
 
 ### Error Handling
 
@@ -194,7 +192,6 @@ try:
     adapter = DuckDBAdapter()
     results = benchmark.run_with_platform(adapter)
 
-    # Check for query failures
     if results.failed_queries > 0:
         print(f"Warning: {results.failed_queries} queries failed")
         for qr in results.query_results:
@@ -206,6 +203,8 @@ except ValueError as e:
 except Exception as e:
     print(f"Execution error: {e}")
 ```
+
+The `failed_queries` check reports query failures after the run.
 
 ## Type Hints
 
@@ -221,7 +220,6 @@ def run_benchmark(
     adapter,
     config: Optional[Dict[str, Any]] = None
 ) -> BenchmarkResults:
-    """Run benchmark with type-checked parameters."""
     return benchmark.run_with_platform(adapter, **(config or {}))
 ```
 
@@ -230,17 +228,15 @@ def run_benchmark(
 Platform adapters accept configuration via constructor parameters:
 
 ```python
-# DuckDB configuration
 from benchbox.platforms.duckdb import DuckDBAdapter
 
 adapter = DuckDBAdapter(
-    database_path=":memory:",  # or file path
+    database_path=":memory:",
     memory_limit="4GB",
     thread_limit=4,
     enable_profiling=True
 )
 
-# ClickHouse configuration
 from benchbox.platforms.clickhouse import ClickHouseAdapter
 
 adapter = ClickHouseAdapter(
@@ -255,6 +251,8 @@ adapter = ClickHouseAdapter(
     }
 )
 ```
+
+The first adapter is a DuckDB configuration. `database_path` accepts `":memory:"` or a file path. The second adapter is a ClickHouse configuration.
 
 ## See Also
 

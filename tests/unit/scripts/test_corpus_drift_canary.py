@@ -1,19 +1,3 @@
-"""Directional corpus-drift canary: develop-ahead vs published-only.
-
-The scheduled workflow `.github/workflows/corpus-drift-check.yml` must:
-
-1. Fail when develop is ahead of published-results on mirrored corpus paths
-   (the leak class that motivated the canary).
-2. Report published-only paths without recommending a wipe-based full mirror that
-   would delete community submissions — including when develop-ahead is *also*
-   non-empty (mixed drift).
-3. Never use a direction-blind ``git diff FETCH_HEAD HEAD`` classification.
-4. Include a scheduled privacy scan of the published tip itself.
-
-Behavioral classification is exercised against temporary git repositories so
-the test does not depend on the live ``published-results`` tip.
-"""
-
 from __future__ import annotations
 
 import subprocess
@@ -51,7 +35,6 @@ def _init_repo(root: Path) -> None:
 
 
 def _commit_tree(root: Path, files: dict[str, str], message: str) -> str:
-    """Replace the tracked results-data tree with *files*, commit, return SHA."""
     existing = _run(["git", "ls-files", "results-data"], cwd=root)
     if existing:
         _run(["git", "rm", "-rf", "--quiet", "results-data"], cwd=root)
@@ -66,11 +49,6 @@ def _commit_tree(root: Path, files: dict[str, str], message: str) -> str:
 
 
 def classify_corpus_drift(repo: Path, published_ref: str, develop_ref: str) -> dict[str, list[str]]:
-    """Classify two-tree corpus drift the same way the workflow must.
-
-    ``git diff A B`` is A→B: Added = develop-only, Deleted = published-only,
-    Modified = content-changed on both sides.
-    """
 
     def names(diff_filter: str) -> list[str]:
         raw = subprocess.check_output(
@@ -106,12 +84,6 @@ def canary_recommendation_policy(
     stale: list[str],
     published_only: list[str],
 ) -> dict[str, bool | str]:
-    """Mirror the canary's recommendation gate for unit tests.
-
-    When published-only is non-empty, never emit a wipe-based full-mirror
-    recommendation. Mixed drift still fails for stale paths but points at the
-    union-overlay (non-destructive) sync.
-    """
     if not stale:
         return {
             "fail": False,
@@ -149,7 +121,6 @@ def _compare_step_script() -> str:
 
 def test_workflow_is_scheduled_and_report_only() -> None:
     workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
-    # PyYAML parses the unquoted workflow key `on:` as boolean True.
     on_events = workflow[True]
     assert "schedule" in on_events
     assert workflow["permissions"]["contents"] == "read"
@@ -206,7 +177,6 @@ def test_classifier_separates_published_only_from_develop_ahead(tmp_path: Path) 
 
 
 def test_classifier_mixed_develop_ahead_and_published_only(tmp_path: Path) -> None:
-    """Mixed fixture: both sides of drift present at once (the canary gate case)."""
     repo = tmp_path / "mixed"
     _init_repo(repo)
 
@@ -225,8 +195,8 @@ def test_classifier_mixed_develop_ahead_and_published_only(tmp_path: Path) -> No
     develop_sha = _commit_tree(repo, develop_files, "develop with seed + sanitization")
 
     result = classify_corpus_drift(repo, published_sha, develop_sha)
-    assert result["published_only"]  # community_a, community_b
-    assert result["stale"]  # shared content-changed + seed_new + inventory
+    assert result["published_only"]
+    assert result["stale"]
     assert "results-data/bundles/community_a.json" in result["published_only"]
     assert "results-data/bundles/seed_new.json" in result["develop_ahead"]
 
@@ -254,31 +224,20 @@ def test_classifier_in_sync_when_trees_match(tmp_path: Path) -> None:
 
 
 def test_mirror_recommendation_only_for_stale_not_published_only() -> None:
-    """Document the canary policy: only stale paths get a mirror recipe."""
     scripts = "\n".join(_workflow_run_scripts())
-    # The destructive warning is tied to the published-only branch.
     published_only_block = scripts.split("published-only")[1].split("Develop-ahead")[0]
     assert "Do NOT run a full mirror" in published_only_block
-    # Overlay / non-destructive recipe appears for develop-ahead remediation.
     assert "gh workflow run sync-results-data-to-published.yml --ref develop" in scripts
     assert "union-overlay" in scripts or "union overlay" in scripts.lower()
 
 
 def test_canary_mixed_drift_does_not_recommend_wipe_based_full_mirror() -> None:
-    """When published-only is non-empty, never recommend a wipe-based full mirror.
-
-    The compare step must gate on PUBLISHED_ONLY and require wipe prohibition
-    language in the mixed branch, even though develop-ahead is also non-empty.
-    """
     script = _compare_step_script()
     assert 'if [[ -n "${PUBLISHED_ONLY}" ]]; then' in script
-    # Mixed branch sits under the stale-paths failure path.
     stale_section = script.split('if [[ -z "${STALE_PATHS}" ]]')[1]
     assert "wipe-based full mirror" in stale_section
     assert "Do NOT use a wipe-based full mirror" in stale_section
     assert "git rm -rf results-data/bundles" in stale_section
-    # Must not present the old bare "Mirror it with:" wipe-implying recipe alone.
     assert "Mirror it with:" not in script
-    # Overlay language is required so operators know the safe apply mode.
     assert "union-overlay" in stale_section or "union overlay" in stale_section.lower()
     assert "non-destructive" in stale_section or "without" in stale_section

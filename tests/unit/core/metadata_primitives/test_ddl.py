@@ -1,5 +1,3 @@
-"""DDL rendering policy tests for metadata primitives."""
-
 from __future__ import annotations
 
 import inspect
@@ -60,8 +58,6 @@ def test_create_table_rendering_snapshot_by_dialect(dialect: str, expected: str)
 
 
 def test_clickhouse_no_primary_key_renders_bare_tuple_order_by() -> None:
-    """A ClickHouse table with no primary key renders ``ORDER BY tuple()`` — the
-    empty-order expression is verbatim, NOT wrapped as ``ORDER BY (tuple())``."""
     table = TableDefinition(
         name="sample",
         columns=[

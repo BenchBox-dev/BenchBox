@@ -1,27 +1,3 @@
-"""Presto / Trino query plan parser.
-
-Parses the JSON tree emitted by ``EXPLAIN (FORMAT JSON)`` on Presto, Trino, and
-compatible engines (Starburst, Amazon Athena) into the harmonized
-``QueryPlanDAG`` structure.
-
-The ``EXPLAIN (FORMAT JSON)`` payload is a single JSON value describing a tree of
-plan nodes. Field naming differs slightly across the family:
-
-- **Presto** nodes carry ``id``, ``name``, ``identifier`` (a string), ``details``
-  (a string), and ``children`` (a list of child nodes).
-- **Trino** nodes carry ``id``, ``name``, ``descriptor`` (an object of
-  key/value detail fields), ``outputs``, ``details`` (a list of strings),
-  ``estimates``, and ``children``.
-- Trino's distributed plans wrap fragments in a top-level object keyed by
-  fragment id; the parser unwraps that to the first/root fragment.
-
-The parser normalizes operator ``name`` to ``LogicalOperatorType`` via
-substring matching (so fused operators such as ``ScanFilterProject`` resolve to
-their dominant ``Scan`` type, and version-specific names such as ``LookupJoin``
-or ``InnerJoin`` resolve to ``Join``), falling back to the base harmonizer for
-unknown names.
-"""
-
 from __future__ import annotations
 
 import json
@@ -41,12 +17,6 @@ logger = logging.getLogger(__name__)
 
 
 class PrestoTrinoQueryPlanParser(QueryPlanParser):
-    """Parser for Presto / Trino ``EXPLAIN (FORMAT JSON)`` output."""
-
-    # Ordered (substring, type) pairs. The first substring found in the
-    # lower-cased operator name wins, so more specific / dominant operators are
-    # listed before the generic ones they may contain (e.g. a fused
-    # "ScanFilterProject" must resolve to SCAN, not FILTER or PROJECT).
     _OPERATOR_KEYWORDS: tuple[tuple[str, LogicalOperatorType], ...] = (
         ("tablescan", LogicalOperatorType.SCAN),
         ("scan", LogicalOperatorType.SCAN),
@@ -70,10 +40,6 @@ class PrestoTrinoQueryPlanParser(QueryPlanParser):
     )
 
     def __init__(self, platform_name: str = "presto_trino"):
-        # The whole family (Presto, Trino, Starburst, Athena) shares this parser,
-        # so the concrete platform is threaded in by the adapter's
-        # ``get_query_plan_parser`` override and stamped onto the captured DAG;
-        # it defaults to the generic family name for direct/registry use.
         super().__init__(platform_name)
 
     def _parse_impl(self, query_id: str, explain_output: str) -> QueryPlanDAG:
@@ -87,8 +53,6 @@ class PrestoTrinoQueryPlanParser(QueryPlanParser):
 
         fragments = self._extract_fragments(payload)
         if fragments is not None:
-            # Distributed output: root at the lowest-numbered fragment and splice
-            # the other fragments in at their RemoteSource references.
             root_id = min(fragments, key=lambda fid: self._fragment_sort_key(fid))
             root = self._build_operator(fragments[root_id], fragments=fragments, visited={root_id})
         else:
@@ -106,27 +70,18 @@ class PrestoTrinoQueryPlanParser(QueryPlanParser):
 
     @staticmethod
     def _fragment_sort_key(fragment_id: str) -> tuple[int, str]:
-        """Sort numeric fragment ids numerically; fall back to lexical for the rest."""
         text = str(fragment_id)
         return (int(text), "") if text.isdigit() else (1 << 30, text)
 
     def _extract_fragments(self, payload: Any) -> dict[str, dict[str, Any]] | None:
-        """Return the {fragment_id: node} map for fragment-keyed Trino output, else None.
-
-        Distributed ``EXPLAIN (FORMAT JSON)`` wraps each plan fragment in a
-        top-level object keyed by fragment id (``{"0": {...}, "1": {...}}``); a
-        logical (single-tree) plan is just a node with a ``name``.
-        """
         if not isinstance(payload, dict) or "name" in payload:
             return None
         fragments = {str(key): value for key, value in payload.items() if isinstance(value, dict) and "name" in value}
-        # Only treat as fragment-keyed when every value is a plan node.
         if fragments and len(fragments) == len(payload):
             return fragments
         return None
 
     def _find_root_node(self, payload: Any) -> dict[str, Any] | None:
-        """Locate the root plan node for a single-tree (logical) payload."""
         if isinstance(payload, list):
             payload = payload[0] if payload else None
         if not isinstance(payload, dict):
@@ -141,13 +96,6 @@ class PrestoTrinoQueryPlanParser(QueryPlanParser):
         fragments: dict[str, dict[str, Any]] | None = None,
         visited: set[str] | None = None,
     ) -> LogicalOperator:
-        """Recursively convert a JSON plan node into a LogicalOperator.
-
-        When ``fragments`` is provided (distributed output), a RemoteSource node
-        is spliced with the subtrees of the fragments it reads from, so the DAG
-        is not truncated at fragment boundaries. ``visited`` guards against a
-        fragment being expanded more than once on a path.
-        """
         name = str(node.get("name", "")).strip()
         details = self._node_details(node)
         logical_type = self._map_operator_type(name)
@@ -200,7 +148,6 @@ class PrestoTrinoQueryPlanParser(QueryPlanParser):
         fragments: dict[str, dict[str, Any]],
         visited: set[str],
     ) -> list[LogicalOperator]:
-        """Splice the fragments a RemoteSource/RemoteExchange reads from as children."""
         if "remotesource" not in name.lower().replace(" ", ""):
             return []
         source_ids = self._source_fragment_ids(node)
@@ -213,7 +160,6 @@ class PrestoTrinoQueryPlanParser(QueryPlanParser):
 
     @classmethod
     def _source_fragment_ids(cls, node: dict[str, Any]) -> list[str]:
-        """Parse the source fragment ids from a RemoteSource node's descriptor/details."""
         raw = cls._extract_descriptor_field(node, ("sourceFragmentIds", "sourceFragments", "sourceFragmentId"))
         if raw is None:
             details = node.get("details")
@@ -222,7 +168,6 @@ class PrestoTrinoQueryPlanParser(QueryPlanParser):
 
     @staticmethod
     def _node_details(node: dict[str, Any]) -> str:
-        """Flatten Presto ``identifier``/``details`` and Trino ``descriptor``/``details``."""
         parts: list[str] = []
         identifier = node.get("identifier")
         if isinstance(identifier, str) and identifier.strip():
@@ -266,9 +211,6 @@ class PrestoTrinoQueryPlanParser(QueryPlanParser):
             return table.strip("[]")
         identifier = node.get("identifier")
         if isinstance(identifier, str):
-            # Prefer an explicit "table = ..."; otherwise capture a fully
-            # colon-qualified name (catalog:schema:table[:version]) without
-            # truncating to the first two segments.
             match = re.search(r"table\s*=\s*([\w.:\"-]+)", identifier) or re.search(
                 r"\[?([\w.-]+(?::[\w.-]+)+)\]?", identifier
             )
@@ -305,12 +247,9 @@ class PrestoTrinoQueryPlanParser(QueryPlanParser):
         criteria = self._extract_descriptor_field(node, ("criteria", "on", "condition"))
         if criteria:
             return criteria.strip("[] ")
-        # Word-bounded so "on" does not match inside words like "Distribution:".
         match = re.search(r"\b(?:criteria|on|condition)\b\s*[=:]\s*\[?([^\]]+)\]?", details, re.IGNORECASE)
         if match:
             return match.group(1).strip()
-        # Presto join criteria live in the identifier as a parenthesized equality,
-        # e.g. [("regionkey" = "regionkey_4")].
         identifier = node.get("identifier")
         if isinstance(identifier, str):
             eq = re.search(r"\(([^)]*=[^)]*)\)", identifier)

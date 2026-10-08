@@ -1,18 +1,6 @@
-"""Additional coverage tests for BigQueryAdapter uncovered paths.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Focuses on:
-- from_config: project ID auto-detection and DefaultCredentialsError silencing
-- _load_credentials: service account file vs ADC paths
-- get_platform_info with connection: compute_configuration populated from dataset
-- _build_ctas_sort_sql: raises ValueError unless mode=off
-- staging_root with non-GCS provider raises ValueError
-- add_cli_arguments
-- check_server_database_exists and drop_database success paths
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -27,14 +15,8 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Shared fixtures and helpers
-# ---------------------------------------------------------------------------
-
-
 @pytest.fixture(autouse=True)
 def _mock_bigquery_deps():
-    # NotFound may be None (when google-cloud not installed) - create a sentinel exception class
     class _FakeNotFound(Exception):
         pass
 
@@ -50,10 +32,8 @@ def _mock_bigquery_deps():
 
 
 def _make_not_found_exception():
-    """Return a NotFound-compatible exception for tests that need to trigger the except NotFound branch."""
     import benchbox.platforms.bigquery as bq_module
 
-    # Retrieve whatever NotFound is patched to in the current test context
     nf = getattr(bq_module, "NotFound", Exception)
     return nf("not found")
 
@@ -66,14 +46,7 @@ def _make_adapter(**kwargs):
     return BigQueryAdapter(**defaults)
 
 
-# ---------------------------------------------------------------------------
-# from_config: project ID auto-detection
-# ---------------------------------------------------------------------------
-
-
 class TestFromConfigProjectAutoDetect:
-    """Test from_config auto-detects project ID via google.auth.default()."""
-
     def test_auto_detects_project_when_not_in_config(self):
         import benchbox.platforms.bigquery as bq_module
 
@@ -90,14 +63,12 @@ class TestFromConfigProjectAutoDetect:
                     {
                         "benchmark": "tpch",
                         "scale_factor": 1.0,
-                        # no project_id
                     }
                 )
 
         assert adapter.project_id == "auto-proj-123"
 
     def test_explicit_project_overrides_autodetect(self):
-        """Explicitly provided project_id takes precedence."""
         import benchbox.platforms.bigquery as bq_module
 
         with patch("benchbox.platforms.bigquery.google") as mock_google:
@@ -115,7 +86,6 @@ class TestFromConfigProjectAutoDetect:
         assert adapter.project_id == "explicit-proj"
 
     def test_silences_default_credentials_error(self):
-        """Missing ADC falls through to the actionable project ID validation error."""
         import benchbox.platforms.bigquery as bq_module
         from benchbox.core.exceptions import ConfigurationError
 
@@ -157,14 +127,7 @@ class TestFromConfigProjectAutoDetect:
         assert adapter.maximum_bytes_billed == 123456
 
 
-# ---------------------------------------------------------------------------
-# _load_credentials: both paths
-# ---------------------------------------------------------------------------
-
-
 class TestLoadCredentials:
-    """Test _load_credentials branches."""
-
     def test_service_account_file_path_used(self):
         adapter = _make_adapter()
 
@@ -196,14 +159,7 @@ class TestLoadCredentials:
         assert result is mock_creds
 
 
-# ---------------------------------------------------------------------------
-# get_platform_info: connection path populates compute_configuration
-# ---------------------------------------------------------------------------
-
-
 class TestGetPlatformInfoWithConnection:
-    """Test get_platform_info populates compute_configuration when connection provided."""
-
     def test_dataset_metadata_captured(self):
         adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
 
@@ -215,7 +171,6 @@ class TestGetPlatformInfoWithConnection:
         mock_dataset.created = None
         mock_dataset.modified = None
         mock_conn.get_dataset.return_value = mock_dataset
-        # Make reservation query raise (permission denied) - silenced
         mock_conn.query.side_effect = Exception("permission denied")
 
         info = adapter.get_platform_info(connection=mock_conn)
@@ -226,30 +181,20 @@ class TestGetPlatformInfoWithConnection:
         assert cc["dataset_location"] == "US"
 
     def test_dataset_error_silenced_basic_info_returned(self):
-        """Dataset fetch error is silenced; compute_configuration still has on-demand defaults."""
         adapter = _make_adapter()
         mock_conn = Mock()
         mock_conn.get_dataset.side_effect = RuntimeError("not found")
-        # Reservation and commitment queries also raise to produce on-demand defaults
         mock_conn.query.side_effect = RuntimeError("permission denied")
 
         info = adapter.get_platform_info(connection=mock_conn)
 
         assert info["platform_type"] == "bigquery"
-        # compute_configuration is always set; dataset_location absent (failed)
         cc = info.get("compute_configuration", {})
         assert cc.get("pricing_model") == "on-demand"
         assert "dataset_location" not in cc
 
 
-# ---------------------------------------------------------------------------
-# _build_ctas_sort_sql: raises ValueError (only mode=off returns None)
-# ---------------------------------------------------------------------------
-
-
 class TestBuildCtasSortSqlBigQuery:
-    """BigQuery _build_ctas_sort_sql raises ValueError unless mode is off."""
-
     def test_raises_value_error_for_active_mode(self):
         adapter = _make_adapter()
         col = Mock()
@@ -270,14 +215,7 @@ class TestBuildCtasSortSqlBigQuery:
         assert result is None
 
 
-# ---------------------------------------------------------------------------
-# staging_root: non-GCS provider raises ValueError
-# ---------------------------------------------------------------------------
-
-
 class TestStagingRootValidation:
-    """Test that non-GCS staging_root raises ValueError during init."""
-
     def test_s3_staging_root_raises(self):
         from benchbox.platforms.bigquery import BigQueryAdapter
 
@@ -289,14 +227,7 @@ class TestStagingRootValidation:
             )
 
 
-# ---------------------------------------------------------------------------
-# add_cli_arguments
-# ---------------------------------------------------------------------------
-
-
 class TestBigQueryAddCliArguments:
-    """Test add_cli_arguments registers expected flags."""
-
     def test_project_id_arg(self):
         import argparse
 
@@ -318,14 +249,7 @@ class TestBigQueryAddCliArguments:
         assert args.location == "US"
 
 
-# ---------------------------------------------------------------------------
-# check_server_database_exists
-# ---------------------------------------------------------------------------
-
-
 class TestCheckServerDatabaseExists:
-    """Test check_server_database_exists success and not-found paths."""
-
     def test_returns_true_when_dataset_present(self):
         adapter = _make_adapter(dataset_id="bench_ds")
 
@@ -362,20 +286,12 @@ class TestCheckServerDatabaseExists:
         assert result is False
 
 
-# ---------------------------------------------------------------------------
-# execute_query: failure path
-# ---------------------------------------------------------------------------
-
-
 class TestExecuteQueryFailure:
-    """Test execute_query returns FAILED dict on exception."""
-
     def test_exception_returned_as_failed(self):
         adapter = _make_adapter()
 
         mock_conn = Mock()
         mock_conn.query.side_effect = RuntimeError("quota exceeded")
-        # Suppress default_job_config attribute lookup
         del mock_conn._default_job_config
 
         result = adapter.execute_query(mock_conn, "SELECT 1", query_id="Q1")
@@ -385,22 +301,7 @@ class TestExecuteQueryFailure:
         assert "quota exceeded" in result["error"]
 
 
-# ---------------------------------------------------------------------------
-# get_platform_info: reservation & capacity commitment paths
-# ---------------------------------------------------------------------------
-
-
 class TestGetPlatformInfoReservations:
-    """Test get_platform_info reservation and capacity commitment branches.
-
-    The reservation queries use ``from google.cloud.bigquery import ScalarQueryParameter``
-    inside the method body.  Since google-cloud-bigquery is not installed in the test
-    environment, that import always raises ImportError, which is caught by the outer
-    ``except Exception`` block - so the connection.query() calls for reservations are
-    never reached.  We test the pricing-model logic by directly exercising the
-    compute_configuration assembly via a controlled helper that bypasses that import.
-    """
-
     def _make_row(self, **attrs):
         row = MagicMock()
         for k, v in attrs.items():
@@ -409,7 +310,6 @@ class TestGetPlatformInfoReservations:
         return row
 
     def _get_platform_info_with_mocked_scalar_param(self, adapter, mock_conn):
-        """Run get_platform_info with ScalarQueryParameter mocked so reservation queries execute."""
         import sys
         import types
 
@@ -435,7 +335,6 @@ class TestGetPlatformInfoReservations:
                 sys.modules["google.cloud.bigquery"] = old_bq
 
     def test_reservation_info_sets_flat_rate_when_no_commitment(self):
-        """Reservation exists but no capacity commitment → flat-rate pricing."""
         adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
 
         mock_conn = Mock()
@@ -447,7 +346,6 @@ class TestGetPlatformInfoReservations:
         mock_dataset.modified = None
         mock_conn.get_dataset.return_value = mock_dataset
 
-        # Build a row that represents a reservation
         res_row = self._make_row(
             reservation_name="my-reservation",
             slot_capacity=500,
@@ -460,11 +358,9 @@ class TestGetPlatformInfoReservations:
         res_job = Mock()
         res_job.result.return_value = [res_row]
 
-        # Commitment query returns empty → no commitment
         commit_job = Mock()
         commit_job.result.return_value = []
 
-        # Assignment query also empty
         assign_job = Mock()
         assign_job.result.return_value = []
 
@@ -488,7 +384,6 @@ class TestGetPlatformInfoReservations:
         assert cc.get("slot_capacity") == 500
 
     def test_annual_commitment_sets_annual_commitment_pricing(self):
-        """ANNUAL commitment plan → annual-commitment pricing model."""
         adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
 
         mock_conn = Mock()
@@ -547,7 +442,6 @@ class TestGetPlatformInfoReservations:
         assert "capacity_commitment" in cc
 
     def test_flex_commitment_sets_flex_slots_pricing(self):
-        """FLEX commitment plan → flex-slots pricing model."""
         adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
 
         mock_conn = Mock()
@@ -605,7 +499,6 @@ class TestGetPlatformInfoReservations:
         assert cc.get("pricing_model") == "flex-slots"
 
     def test_no_reservation_gives_on_demand(self):
-        """Empty reservation query → on-demand pricing and edition=ON_DEMAND."""
         adapter = _make_adapter(
             project_id="my-proj",
             dataset_id="my_ds",
@@ -654,7 +547,6 @@ class TestGetPlatformInfoReservations:
         assert metadata["platform_storage"]["staging_location"] == "gs://bench-bucket/bench-prefix"
 
     def test_monthly_commitment_sets_monthly_commitment_pricing(self):
-        """MONTHLY commitment plan → monthly-commitment pricing model."""
         adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
 
         mock_conn = Mock()
@@ -844,14 +736,7 @@ class TestGetPlatformInfoReservations:
         assert metadata["platform_compute"]["collection_status"] == "partial"
 
 
-# ---------------------------------------------------------------------------
-# drop_database
-# ---------------------------------------------------------------------------
-
-
 class TestDropDatabase:
-    """Test drop_database paths."""
-
     def test_drop_calls_delete_dataset(self):
         adapter = _make_adapter(dataset_id="bench_ds")
 
@@ -867,7 +752,6 @@ class TestDropDatabase:
         assert call_kwargs[1].get("delete_contents") is True or call_kwargs[0][1] is True or True
 
     def test_drop_database_raises_on_error(self):
-        """drop_database re-raises as RuntimeError when delete fails."""
         adapter = _make_adapter(dataset_id="fail_ds")
 
         with patch.object(adapter, "_create_admin_client") as mock_factory:
@@ -880,19 +764,10 @@ class TestDropDatabase:
                 adapter.drop_database()
 
 
-# ---------------------------------------------------------------------------
-# _validate_database_compatibility
-# ---------------------------------------------------------------------------
-
-
 class TestValidateDatabaseCompatibility:
-    """Test _validate_database_compatibility BigQuery-specific paths."""
-
     def test_empty_table_detected_as_failed_load(self):
-        """More than half empty tables → result.is_valid = False."""
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
 
-        # Mock the base validator to return valid result
         from unittest.mock import MagicMock
 
         mock_result = MagicMock()
@@ -932,7 +807,6 @@ class TestValidateDatabaseCompatibility:
         assert len(result.issues) > 0
 
     def test_tables_with_rows_pass_validation(self):
-        """Tables with row data → validation passes (is_valid stays True)."""
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
 
         mock_result = MagicMock()
@@ -963,7 +837,6 @@ class TestValidateDatabaseCompatibility:
         assert result.is_valid is True
 
     def test_already_invalid_base_result_returned_early(self):
-        """Base validator invalid result returned without BQ-specific check."""
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
 
         mock_result = MagicMock()
@@ -977,16 +850,8 @@ class TestValidateDatabaseCompatibility:
         assert result.is_valid is False
 
 
-# ---------------------------------------------------------------------------
-# _cleanup_empty_tables_if_needed
-# ---------------------------------------------------------------------------
-
-
 class TestCleanupEmptyTablesIfNeeded:
-    """Test _cleanup_empty_tables_if_needed cleanup logic."""
-
     def test_empty_tables_deleted_when_majority_empty(self):
-        """More than half empty → delete_table called and database_was_reused=False."""
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
         adapter.database_was_reused = True
 
@@ -1020,7 +885,6 @@ class TestCleanupEmptyTablesIfNeeded:
         assert adapter.database_was_reused is False
 
     def test_no_empty_tables_no_deletion(self):
-        """No empty tables → delete_table not called."""
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
 
         mock_dataset_ref = Mock()
@@ -1041,7 +905,6 @@ class TestCleanupEmptyTablesIfNeeded:
         mock_client.delete_table.assert_not_called()
 
     def test_no_tables_returns_early(self):
-        """No tables → no work done (returns immediately)."""
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
 
         mock_dataset_ref = Mock()
@@ -1054,13 +917,11 @@ class TestCleanupEmptyTablesIfNeeded:
         mock_client.delete_table.assert_not_called()
 
     def test_minority_empty_tables_not_deleted(self):
-        """Minority empty tables (< 50%) → not deleted."""
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
 
         mock_dataset_ref = Mock()
         mock_dataset_ref.table = lambda t: f"ref/{t}"
 
-        # 1 empty out of 3 → minority
         def make_table_info(tid):
             m = Mock()
             m.reference = f"ref_{tid}"
@@ -1091,14 +952,7 @@ class TestCleanupEmptyTablesIfNeeded:
         mock_client.delete_table.assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# execute_query: success path
-# ---------------------------------------------------------------------------
-
-
 class TestExecuteQuerySuccess:
-    """Test execute_query success path and job statistics."""
-
     def test_success_returns_job_statistics(self):
         adapter = _make_adapter()
 
@@ -1114,7 +968,6 @@ class TestExecuteQuerySuccess:
         mock_job.job_id = "job-abc-123"
         mock_conn.query.return_value = mock_job
 
-        # Remove _default_job_config so it falls back to bigquery mock
         del mock_conn._default_job_config
 
         result = adapter.execute_query(mock_conn, "SELECT 42", query_id="Q1")
@@ -1126,7 +979,6 @@ class TestExecuteQuerySuccess:
         assert result["job_id"] == "job-abc-123"
 
     def test_backtick_query_uses_normalize_case(self):
-        """Queries with backtick identifiers use _normalize_table_names_case."""
         adapter = _make_adapter()
 
         mock_conn = Mock()
@@ -1146,13 +998,11 @@ class TestExecuteQuerySuccess:
         result = adapter.execute_query(mock_conn, backtick_query, query_id="Q5")
 
         assert result["query_id"] == "Q5"
-        # Verify the translated query has uppercased table names
         translated = result.get("translated_query")
         if translated:
             assert "LINEITEM" in translated
 
     def test_query_with_default_job_config(self):
-        """execute_query uses connection._default_job_config when available."""
         adapter = _make_adapter()
 
         mock_conn = Mock()
@@ -1172,20 +1022,12 @@ class TestExecuteQuerySuccess:
 
         result = adapter.execute_query(mock_conn, "SELECT 1", query_id="Q2")
         assert result["query_id"] == "Q2"
-        # Verify job config was passed to query
         mock_conn.query.assert_called_once()
         call_kwargs = mock_conn.query.call_args
         assert call_kwargs[1].get("job_config") is mock_job_config
 
 
-# ---------------------------------------------------------------------------
-# configure_for_benchmark
-# ---------------------------------------------------------------------------
-
-
 class TestConfigureForBenchmark:
-    """Test configure_for_benchmark sets job config on connection."""
-
     def test_olap_benchmark_sets_standard_sql(self):
         adapter = _make_adapter()
 
@@ -1237,14 +1079,7 @@ class TestConfigureForBenchmark:
         assert mock_job_config.maximum_bytes_billed == 1000000000
 
 
-# ---------------------------------------------------------------------------
-# get_query_plan
-# ---------------------------------------------------------------------------
-
-
 class TestGetQueryPlan:
-    """Test get_query_plan contract (no EXPLAIN-text path)."""
-
     def test_unconfigured_dry_run_job_returns_none(self):
         adapter = _make_adapter()
 
@@ -1262,14 +1097,7 @@ class TestGetQueryPlan:
         assert adapter.get_query_plan(mock_conn, "INVALID SQL") is None
 
 
-# ---------------------------------------------------------------------------
-# get_table_row_count
-# ---------------------------------------------------------------------------
-
-
 class TestGetTableRowCount:
-    """Test get_table_row_count via query API."""
-
     def test_returns_count_from_query_result(self):
         adapter = _make_adapter(project_id="test-proj", dataset_id="test_ds")
 
@@ -1281,7 +1109,6 @@ class TestGetTableRowCount:
         count = adapter.get_table_row_count(mock_conn, "lineitem")
 
         assert count == 1000
-        # Verify table name uppercased in query
         call_args = mock_conn.query.call_args[0][0]
         assert "LINEITEM" in call_args
 
@@ -1306,14 +1133,7 @@ class TestGetTableRowCount:
         assert count == 0
 
 
-# ---------------------------------------------------------------------------
-# generate_tuning_clause
-# ---------------------------------------------------------------------------
-
-
 class TestGenerateTuningClause:
-    """Test generate_tuning_clause SQL fragment generation."""
-
     def test_date_column_partition_and_clustering(self):
         adapter = _make_adapter()
 
@@ -1430,14 +1250,7 @@ class TestGenerateTuningClause:
         assert clause == ""
 
 
-# ---------------------------------------------------------------------------
-# apply_table_tunings
-# ---------------------------------------------------------------------------
-
-
 class TestApplyTableTunings:
-    """Test apply_table_tunings logs warning for recreation needs."""
-
     def test_no_tuning_returns_early(self):
         adapter = _make_adapter()
         mock_conn = Mock()
@@ -1462,7 +1275,7 @@ class TestApplyTableTunings:
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
 
         mock_table_obj = Mock()
-        mock_table_obj.time_partitioning = None  # No partitioning → needs recreation
+        mock_table_obj.time_partitioning = None
         mock_table_obj.clustering_fields = []
 
         mock_dataset_ref = Mock()
@@ -1501,14 +1314,7 @@ class TestApplyTableTunings:
         assert any("Consider recreating the table" in call.args[0] for call in mock_warning.call_args_list)
 
 
-# ---------------------------------------------------------------------------
-# _build_bigquery_config
-# ---------------------------------------------------------------------------
-
-
 class TestBuildBigQueryConfig:
-    """Test _build_bigquery_config credential loading and config building."""
-
     def test_builds_config_from_saved_credentials(self):
         from benchbox.platforms.bigquery import _build_bigquery_config
 
@@ -1626,14 +1432,7 @@ class TestBuildBigQueryConfig:
         assert config.project_id == "proj"
 
 
-# ---------------------------------------------------------------------------
-# close_connection
-# ---------------------------------------------------------------------------
-
-
 class TestCloseConnection:
-    """Test close_connection credential error suppression."""
-
     def test_normal_close_called(self):
         adapter = _make_adapter()
 
@@ -1677,7 +1476,6 @@ class TestCloseConnection:
 
     def test_none_connection_handled(self):
         adapter = _make_adapter()
-        # Should not raise
         adapter.close_connection(None)
 
     def test_transport_close_called(self):
@@ -1692,14 +1490,7 @@ class TestCloseConnection:
         mock_transport.close.assert_called_once()
 
 
-# ---------------------------------------------------------------------------
-# _get_existing_tables
-# ---------------------------------------------------------------------------
-
-
 class TestGetExistingTables:
-    """Test _get_existing_tables returns lowercase table names."""
-
     def test_returns_lowercase_table_names(self):
         adapter = _make_adapter(dataset_id="bench_ds", project_id="test-proj")
 
@@ -1727,14 +1518,7 @@ class TestGetExistingTables:
         assert tables == []
 
 
-# ---------------------------------------------------------------------------
-# _validate_data_integrity
-# ---------------------------------------------------------------------------
-
-
 class TestValidateDataIntegrity:
-    """Test _validate_data_integrity BigQuery-specific query method."""
-
     def test_all_tables_accessible_returns_passed(self):
         adapter = _make_adapter(dataset_id="bench_ds", project_id="test-proj")
 
@@ -1762,14 +1546,7 @@ class TestValidateDataIntegrity:
         assert "inaccessible_tables" in details
 
 
-# ---------------------------------------------------------------------------
-# supports_tuning_type
-# ---------------------------------------------------------------------------
-
-
 class TestSupportsTuningType:
-    """Test supports_tuning_type for supported and unsupported types."""
-
     def test_partitioning_supported(self):
         adapter = _make_adapter()
 
@@ -1801,14 +1578,7 @@ class TestSupportsTuningType:
             pytest.skip("TuningType not available")
 
 
-# ---------------------------------------------------------------------------
-# apply_constraint_configuration
-# ---------------------------------------------------------------------------
-
-
 class TestApplyConstraintConfiguration:
-    """Test apply_constraint_configuration logs without raising."""
-
     def test_primary_key_enabled_logs_message(self):
         adapter = _make_adapter()
 
@@ -1818,7 +1588,6 @@ class TestApplyConstraintConfiguration:
         mock_fk_config.enabled = False
         mock_conn = Mock()
 
-        # Should complete without error
         adapter.apply_constraint_configuration(mock_pk_config, mock_fk_config, mock_conn)
 
     def test_foreign_key_enabled_logs_message(self):
@@ -1839,14 +1608,7 @@ class TestApplyConstraintConfiguration:
         adapter.apply_constraint_configuration(None, None, mock_conn)
 
 
-# ---------------------------------------------------------------------------
-# apply_platform_optimizations
-# ---------------------------------------------------------------------------
-
-
 class TestApplyPlatformOptimizations:
-    """Test apply_platform_optimizations handles None and valid config."""
-
     def test_none_config_returns_early(self):
         adapter = _make_adapter()
         mock_conn = Mock()
@@ -1869,22 +1631,10 @@ class TestApplyPlatformOptimizations:
         assert mock_conn.mock_calls == []
 
 
-# ---------------------------------------------------------------------------
-# _normalize_table_names_case
-# ---------------------------------------------------------------------------
-
-
 class TestNormalizeTableNamesCase:
-    """Test _normalize_table_names_case uppercases backtick-quoted single-word identifiers.
-
-    The regex pattern r"`([a-z_][a-z0-9_]*)`" only matches single-word identifiers
-    (no dots), so only simple backtick names are uppercased.
-    """
-
     def test_lowercase_single_word_backtick_uppercased(self):
         adapter = _make_adapter()
 
-        # The regex matches simple single-word identifiers inside backticks
         query = "SELECT * FROM `lineitem` JOIN `orders` ON 1=1"
         result = adapter._normalize_table_names_case(query)
 
@@ -1894,43 +1644,29 @@ class TestNormalizeTableNamesCase:
     def test_already_uppercase_single_word_unchanged(self):
         adapter = _make_adapter()
 
-        # Uppercase single-word identifiers don't match lowercase-only pattern
         query = "SELECT * FROM `LINEITEM`"
         result = adapter._normalize_table_names_case(query)
 
-        # Pattern requires lowercase start, so LINEITEM won't change; result equals input
         assert "`LINEITEM`" in result
 
     def test_mixed_case_single_word_uppercased(self):
-        """Mixed-case identifiers normalize to UPPERCASE to match the schema."""
         adapter = _make_adapter()
 
         query = "SELECT * FROM `LineItem`"
         result = adapter._normalize_table_names_case(query)
 
-        # Backtick-quoted identifiers are case-sensitive in BigQuery while
-        # tables are stored UPPERCASE, so LineItem must become LINEITEM
         assert "`LINEITEM`" in result
 
     def test_full_path_backtick_not_matched_by_single_word_pattern(self):
-        """Full paths like `proj.ds.table` are not matched - dots outside char class."""
         adapter = _make_adapter()
 
         query = "SELECT * FROM `test_project.test_ds.lineitem`"
         result = adapter._normalize_table_names_case(query)
 
-        # Full path stays unchanged - regex only matches single-word identifiers
         assert "`test_project.test_ds.lineitem`" in result
 
 
-# ---------------------------------------------------------------------------
-# _qualify_table_names
-# ---------------------------------------------------------------------------
-
-
 class TestQualifyTableNames:
-    """Test _qualify_table_names adds fully qualified names."""
-
     def test_table_name_qualified(self):
         adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
 
@@ -1942,7 +1678,6 @@ class TestQualifyTableNames:
         assert "LINEITEM" in result
 
     def test_merge_using_source_qualified_alias_preserved(self):
-        """The USING source is a real table (qualify it); its alias is kept."""
         adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
 
         query = "MERGE INTO target AS t USING source_updates AS s ON t.id = s.id WHEN MATCHED THEN UPDATE SET x = s.x"
@@ -1952,7 +1687,6 @@ class TestQualifyTableNames:
         assert "`my-proj.my_ds.TARGET` AS t" in result
 
     def test_update_alias_not_qualified(self):
-        """An UPDATE target alias must not be rewritten as a table."""
         adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
 
         query = "UPDATE lineitem AS l SET l_tax = l_tax * 2"
@@ -1969,11 +1703,6 @@ class TestQualifyTableNames:
         assert "DELETE FROM `my-proj.my_ds.LINEITEM`" in result
 
 
-# ---------------------------------------------------------------------------
-# preprocess_operation_sql: WHERE-true backfill for filter-less DML
-# ---------------------------------------------------------------------------
-
-
 def _make_operation(write_sql: str):
     from benchbox.core.write_primitives.catalog import WriteOperation
 
@@ -1986,8 +1715,6 @@ def _make_operation(write_sql: str):
 
 
 class TestPreprocessOperationSqlWhereTrue:
-    """Filter-less UPDATE/DELETE gain WHERE true for BigQuery DML."""
-
     def test_update_without_where_gains_where_true(self):
         adapter = _make_adapter()
 
@@ -2045,8 +1772,6 @@ class TestPreprocessOperationSqlWhereTrue:
 
 
 class TestQualifyAlterTable:
-    """ALTER TABLE targets qualify like other DDL/DML targets."""
-
     def test_alter_table_qualified(self):
         adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
 
@@ -2055,14 +1780,7 @@ class TestQualifyAlterTable:
         assert "ALTER TABLE `my-proj.my_ds.TEST_ALTER` ADD COLUMN created DATE" in result
 
 
-# ---------------------------------------------------------------------------
-# _build_load_job_config
-# ---------------------------------------------------------------------------
-
-
 class TestBuildLoadJobConfig:
-    """Test _build_load_job_config creates appropriate config for each format."""
-
     def test_parquet_format_uses_parquet_source_format(self):
         import benchbox.platforms.bigquery as bq_module
 
@@ -2117,14 +1835,7 @@ class TestBuildLoadJobConfig:
         assert call_kwargs["field_delimiter"] == "|"
 
 
-# ---------------------------------------------------------------------------
-# apply_unified_tuning
-# ---------------------------------------------------------------------------
-
-
 class TestApplyUnifiedTuning:
-    """Test apply_unified_tuning delegates to sub-methods."""
-
     def test_none_config_returns_early(self):
         adapter = _make_adapter()
         mock_conn = Mock()
@@ -2158,7 +1869,7 @@ class TestApplyUnifiedTuning:
             adapter.apply_unified_tuning(mock_unified, mock_conn)
 
         mock_constraints.assert_called_once()
-        mock_table_tunings.assert_not_called()  # No table tunings configured
+        mock_table_tunings.assert_not_called()
 
     def test_table_tunings_iterated(self):
         adapter = _make_adapter()
@@ -2182,20 +1893,13 @@ class TestApplyUnifiedTuning:
         mock_apply.assert_called_once_with(mock_tuning, mock_conn)
 
 
-# ---------------------------------------------------------------------------
-# create_schema
-# ---------------------------------------------------------------------------
-
-
 class TestCreateSchema:
-    """Test create_schema dataset creation and statement execution."""
-
     def test_existing_dataset_no_create(self):
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
 
         mock_conn = Mock()
         mock_conn.dataset.return_value = Mock()
-        mock_conn.get_dataset.return_value = Mock()  # Dataset exists → no NotFound
+        mock_conn.get_dataset.return_value = Mock()
 
         mock_query_job = Mock()
         mock_conn.query.return_value = mock_query_job
@@ -2221,7 +1925,6 @@ class TestCreateSchema:
             adapter.create_schema(Mock(), mock_conn)
 
     def test_new_dataset_created_when_not_found(self):
-        """NotFound exception triggers dataset creation."""
         import benchbox.platforms.bigquery as bq_module
 
         adapter = _make_adapter(dataset_id="new_ds", project_id="test-proj")
@@ -2230,7 +1933,6 @@ class TestCreateSchema:
         mock_conn.dataset.return_value = Mock()
         mock_bq = MagicMock()
         mock_bq.Dataset.return_value = Mock()
-        # Make get_dataset raise the patched NotFound exception
         mock_conn.get_dataset.side_effect = _make_not_found_exception()
         mock_conn.create_dataset.return_value = Mock()
         mock_conn.query.return_value = Mock()
@@ -2245,17 +1947,9 @@ class TestCreateSchema:
         assert isinstance(result, float)
 
 
-# ---------------------------------------------------------------------------
-# load_data
-# ---------------------------------------------------------------------------
-
-
 class TestLoadData:
-    """Test load_data orchestration paths."""
-
     def test_direct_loading_when_no_storage_bucket(self):
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
-        # No storage_bucket → direct loading path
         adapter.storage_bucket = None
 
         mock_conn = Mock()
@@ -2324,14 +2018,7 @@ class TestLoadData:
             adapter.load_data(mock_benchmark, mock_conn, Path("/tmp/data"))
 
 
-# ---------------------------------------------------------------------------
-# validate_external_table_requirements
-# ---------------------------------------------------------------------------
-
-
 class TestValidateExternalTableRequirements:
-    """Test validate_external_table_requirements raises without bucket."""
-
     def test_no_bucket_raises_value_error(self):
         adapter = _make_adapter()
         adapter.storage_bucket = None
@@ -2342,17 +2029,10 @@ class TestValidateExternalTableRequirements:
     def test_with_bucket_no_error(self):
         adapter = _make_adapter(storage_bucket="my-bucket")
 
-        adapter.validate_external_table_requirements()  # Should not raise
-
-
-# ---------------------------------------------------------------------------
-# _convert_to_bigquery_table
-# ---------------------------------------------------------------------------
+        adapter.validate_external_table_requirements()
 
 
 class TestConvertToBigQueryTable:
-    """Test _convert_to_bigquery_table SQL conversion."""
-
     def test_non_create_statement_returned_unchanged(self):
         adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
 
@@ -2396,7 +2076,6 @@ class TestConvertToBigQueryTable:
         stmt = "CREATE OR REPLACE TABLE LINEITEM (l_orderkey INT64)"
         result = adapter._convert_to_bigquery_table(stmt)
 
-        # Should not have double OR REPLACE
         assert result.count("OR REPLACE") == 1
 
     def test_ctas_table_target_still_qualified(self):
@@ -2408,14 +2087,6 @@ class TestConvertToBigQueryTable:
         assert "`my-proj.my_ds.T`" in result
 
     def test_ctas_view_statements_keep_view_shape_with_qualified_target(self):
-        """CREATE VIEW shapes must not be rewritten into CREATE TABLE.
-
-        The ddl_create_view_simple operation emits plain CREATE VIEW; its
-        information_schema.views validation and DROP VIEW cleanup break when
-        the rewrite materializes a physical table instead. View targets are
-        still dataset-qualified: the query-time connection carries no
-        default dataset, so an unqualified target fails server-side.
-        """
         adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
 
         result = adapter._convert_to_bigquery_table(
@@ -2424,8 +2095,6 @@ class TestConvertToBigQueryTable:
         assert result.startswith("CREATE VIEW `my-proj.my_ds.ORDERS_VIEW` AS")
         assert "TABLE" not in result.split("AS")[0]
 
-        # OR REPLACE views keep their shape with a qualified target; TEMP,
-        # TEMPORARY, and MATERIALIZED views pass through untouched.
         assert (
             adapter._convert_to_bigquery_table("CREATE OR REPLACE VIEW v AS SELECT 1")
             == "CREATE OR REPLACE VIEW `my-proj.my_ds.V` AS SELECT 1"
@@ -2437,18 +2106,12 @@ class TestConvertToBigQueryTable:
             assert adapter._convert_to_bigquery_table(stmt) == stmt
 
     def test_ctas_materialized_view_keeps_shape_with_qualified_target(self):
-        """Materialized views are dataset objects: qualify, do not tablify."""
         adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
 
         result = adapter._convert_to_bigquery_table("CREATE MATERIALIZED VIEW mv AS SELECT 1")
         assert result == "CREATE MATERIALIZED VIEW `my-proj.my_ds.MV` AS SELECT 1"
 
     def test_ctas_temp_tables_pass_through_unqualified(self):
-        """TEMP tables stay session-scoped: no dataset qualification.
-
-        Qualifying the target or dropping TEMP would convert a temporary
-        table into a permanent dataset table.
-        """
         adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
 
         for stmt in (
@@ -2458,14 +2121,7 @@ class TestConvertToBigQueryTable:
             assert adapter._convert_to_bigquery_table(stmt) == stmt
 
 
-# ---------------------------------------------------------------------------
-# _filter_valid_files and _ensure_file_list
-# ---------------------------------------------------------------------------
-
-
 class TestFilterValidFiles:
-    """Test _filter_valid_files filters non-existent and zero-size files."""
-
     def test_cloud_path_included_when_allow_cloud(self):
         adapter = _make_adapter()
 
@@ -2486,8 +2142,6 @@ class TestFilterValidFiles:
 
 
 class TestEnsureFileList:
-    """Test _ensure_file_list normalization."""
-
     def test_list_returned_as_is(self):
         adapter = _make_adapter()
 
@@ -2503,20 +2157,12 @@ class TestEnsureFileList:
         assert result == [path]
 
 
-# ---------------------------------------------------------------------------
-# _load_tables_direct
-# ---------------------------------------------------------------------------
-
-
 class TestLoadTablesDirect:
-    """Test _load_tables_direct with no valid files and with files."""
-
     def test_skips_table_with_no_valid_files(self):
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
 
         mock_conn = Mock()
 
-        # No valid files → table gets row count of 0 with a zero timing entry
         with patch.object(adapter, "_filter_valid_files", return_value=[]):
             stats, timings = adapter._load_tables_direct(mock_conn, {"lineitem": [Path("/nonexistent.parquet")]})
 
@@ -2525,7 +2171,6 @@ class TestLoadTablesDirect:
         mock_conn.load_table_from_file.assert_not_called()
 
     def test_failed_table_load_logged(self):
-        """Failed table load returns 0 row count."""
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
 
         mock_conn = Mock()
@@ -2549,14 +2194,7 @@ class TestLoadTablesDirect:
             tmp_path.unlink(missing_ok=True)
 
 
-# ---------------------------------------------------------------------------
-# _load_tables_via_cloud_storage
-# ---------------------------------------------------------------------------
-
-
 class TestLoadTablesViaCloudStorage:
-    """Test _load_tables_via_cloud_storage orchestration."""
-
     def test_skips_table_with_no_valid_files(self):
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
 
@@ -2589,14 +2227,7 @@ class TestLoadTablesViaCloudStorage:
         assert timings == {"LINEITEM": {"total_ms": 0}}
 
 
-# ---------------------------------------------------------------------------
-# _get_platform_metadata
-# ---------------------------------------------------------------------------
-
-
 class TestGetPlatformMetadata:
-    """Test _get_platform_metadata collects dataset and table info."""
-
     def test_basic_metadata_returned(self):
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
 
@@ -2640,7 +2271,6 @@ class TestGetPlatformMetadata:
         assert "metadata_error" in metadata
 
     def test_project_info_permission_error_silenced(self):
-        """get_project failure is silenced gracefully."""
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
 
         mock_dataset = Mock()
@@ -2658,18 +2288,10 @@ class TestGetPlatformMetadata:
 
         metadata = adapter._get_platform_metadata(mock_conn)
         assert metadata["platform"] in ("bigquery", "BigQuery")
-        # project_info not present (permission denied was silenced)
         assert "project_info" not in metadata
 
 
-# ---------------------------------------------------------------------------
-# create_connection
-# ---------------------------------------------------------------------------
-
-
 class TestCreateConnection:
-    """Test create_connection success and error paths."""
-
     def test_successful_connection_returned(self):
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
 
@@ -2731,14 +2353,7 @@ class TestCreateConnection:
         mock_cleanup.assert_called_once_with(mock_client)
 
 
-# ---------------------------------------------------------------------------
-# _prepare_external_parquet_uris
-# ---------------------------------------------------------------------------
-
-
 class TestPrepareExternalParquetUris:
-    """Test _prepare_external_parquet_uris builds GCS URIs."""
-
     def test_cloud_parquet_uri_included(self):
         adapter = _make_adapter(storage_bucket="my-bucket", storage_prefix="benchbox")
 
@@ -2756,20 +2371,10 @@ class TestPrepareExternalParquetUris:
         assert len(result) == 0
 
 
-# ---------------------------------------------------------------------------
-# get_target_dialect
-# ---------------------------------------------------------------------------
-
-
 class TestGetTargetDialect:
     def test_returns_bigquery(self):
         adapter = _make_adapter()
         assert adapter.get_target_dialect() == "bigquery"
-
-
-# ---------------------------------------------------------------------------
-# _get_connection_params
-# ---------------------------------------------------------------------------
 
 
 class TestGetConnectionParams:
@@ -2788,14 +2393,7 @@ class TestGetConnectionParams:
         assert params["project_id"] == "override-proj"
 
 
-# ---------------------------------------------------------------------------
-# _load_table_via_cloud_storage (direct path)
-# ---------------------------------------------------------------------------
-
-
 class TestLoadTableViaCloudStorage:
-    """Test _load_table_via_cloud_storage uploads blob and calls load_table_from_uri."""
-
     def test_uploads_file_and_loads_via_uri(self):
         adapter = _make_adapter(
             dataset_id="test_ds",
@@ -2815,7 +2413,6 @@ class TestLoadTableViaCloudStorage:
 
         mock_row_job = Mock()
         mock_row_job.result.return_value = [(1000,)]
-        # For the _get_table_row_count call
         mock_conn.query.return_value = mock_row_job
 
         mock_blob = Mock()
@@ -2840,14 +2437,7 @@ class TestLoadTableViaCloudStorage:
             tmp_path.unlink(missing_ok=True)
 
 
-# ---------------------------------------------------------------------------
-# _load_table_direct (direct path)
-# ---------------------------------------------------------------------------
-
-
 class TestLoadTableDirect:
-    """Test _load_table_direct opens file and calls load_table_from_file."""
-
     def test_loads_file_directly(self):
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
 
@@ -2881,14 +2471,7 @@ class TestLoadTableDirect:
             tmp_path.unlink(missing_ok=True)
 
 
-# ---------------------------------------------------------------------------
-# _resolve_data_files
-# ---------------------------------------------------------------------------
-
-
 class TestResolveDataFiles:
-    """Test _resolve_data_files delegates to DataSourceResolver."""
-
     def test_returns_tables_from_resolver(self):
         adapter = _make_adapter()
         benchmark = Mock()
@@ -2922,14 +2505,7 @@ class TestResolveDataFiles:
                 adapter._resolve_data_files(Mock(), Path("/tmp/data"))
 
 
-# ---------------------------------------------------------------------------
-# create_external_tables
-# ---------------------------------------------------------------------------
-
-
 class TestCreateExternalTables:
-    """Test create_external_tables flow."""
-
     def test_creates_parquet_external_table(self):
         adapter = _make_adapter(
             dataset_id="test_ds",
@@ -2979,14 +2555,7 @@ class TestCreateExternalTables:
             adapter.create_external_tables(Mock(), mock_conn, Path("/tmp"))
 
 
-# ---------------------------------------------------------------------------
-# execute_query: validation branch
-# ---------------------------------------------------------------------------
-
-
 class TestExecuteQueryValidation:
-    """Test execute_query with validate_row_count enabled."""
-
     def test_validation_called_when_benchmark_type_provided(self):
         adapter = _make_adapter()
 
@@ -3027,14 +2596,7 @@ class TestExecuteQueryValidation:
         assert result["query_id"] == "Q1"
 
 
-# ---------------------------------------------------------------------------
-# supports_tuning_type: ImportError path
-# ---------------------------------------------------------------------------
-
-
 class TestSupportsTuningTypeImportError:
-    """Test supports_tuning_type returns False when TuningType import fails."""
-
     def test_import_error_returns_false(self):
         adapter = _make_adapter()
 
@@ -3044,14 +2606,7 @@ class TestSupportsTuningTypeImportError:
         assert result is False
 
 
-# ---------------------------------------------------------------------------
-# apply_table_tunings: distribution and sorting warning paths
-# ---------------------------------------------------------------------------
-
-
 class TestApplyTableTuningsDistributionSorting:
-    """Test apply_table_tunings logs distribution/sorting warnings."""
-
     def test_distribution_warning_logged(self):
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
 
@@ -3095,15 +2650,14 @@ class TestApplyTableTuningsDistributionSorting:
 
         mock_tuning.get_columns_by_type.side_effect = get_cols_by_type
 
-        # Should complete without raising
         adapter.apply_table_tunings(mock_tuning, mock_conn)
 
     def test_clustering_mismatch_triggers_recreation_warning(self):
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
 
         mock_table_obj = Mock()
-        mock_table_obj.time_partitioning = Mock()  # Has partitioning
-        mock_table_obj.clustering_fields = ["wrong_col"]  # Wrong clustering
+        mock_table_obj.time_partitioning = Mock()
+        mock_table_obj.clustering_fields = ["wrong_col"]
 
         mock_dataset_ref = Mock()
         mock_table_ref = Mock()
@@ -3134,18 +2688,10 @@ class TestApplyTableTuningsDistributionSorting:
 
         mock_tuning.get_columns_by_type.side_effect = get_cols_by_type
 
-        # Should complete without raising
         adapter.apply_table_tunings(mock_tuning, mock_conn)
 
 
-# ---------------------------------------------------------------------------
-# _build_bigquery_config: staging_root via default_output_location
-# ---------------------------------------------------------------------------
-
-
 class TestBuildBigQueryConfigDefaultOutput:
-    """Test _build_bigquery_config uses default_output_location as staging_root fallback."""
-
     def test_gs_default_output_location_used_as_staging(self):
         from benchbox.platforms.bigquery import _build_bigquery_config
 
@@ -3169,7 +2715,6 @@ class TestBuildBigQueryConfigDefaultOutput:
                 info=mock_info,
             )
 
-        # GCS path should have been parsed into storage_bucket
         assert config.storage_bucket == "output-bucket"
 
     def test_non_gs_default_output_ignored(self):
@@ -3195,18 +2740,10 @@ class TestBuildBigQueryConfigDefaultOutput:
                 info=mock_info,
             )
 
-        # S3 path should not be used as storage_bucket for BigQuery
         assert config.storage_bucket is None
 
 
-# ---------------------------------------------------------------------------
-# _create_storage_bucket
-# ---------------------------------------------------------------------------
-
-
 class TestCreateStorageBucket:
-    """Test _create_storage_bucket creates storage client."""
-
     def test_creates_bucket_reference(self):
         adapter = _make_adapter(storage_bucket="my-bucket")
 
@@ -3229,22 +2766,14 @@ class TestCreateStorageBucket:
         assert bucket is mock_bucket
 
 
-# ---------------------------------------------------------------------------
-# close_connection: transport cleanup
-# ---------------------------------------------------------------------------
-
-
 class TestCloseConnectionTransport:
-    """Test close_connection transport cleanup path."""
-
     def test_transport_without_close_method(self):
         adapter = _make_adapter()
 
-        mock_transport = Mock(spec=[])  # No close method
+        mock_transport = Mock(spec=[])
         mock_conn = Mock()
         mock_conn._transport = mock_transport
 
-        # Should not raise
         adapter.close_connection(mock_conn)
 
     def test_transport_close_error_silenced(self):
@@ -3255,18 +2784,10 @@ class TestCloseConnectionTransport:
         mock_conn = Mock()
         mock_conn._transport = mock_transport
 
-        # Should not raise
         adapter.close_connection(mock_conn)
 
 
-# ---------------------------------------------------------------------------
-# _prepare_external_table_uris
-# ---------------------------------------------------------------------------
-
-
 class TestPrepareExternalTableUris:
-    """Test _prepare_external_table_uris delegates to delta or parquet."""
-
     def test_returns_parquet_format_for_parquet_files(self):
         adapter = _make_adapter(storage_bucket="my-bucket")
 
@@ -3284,9 +2805,8 @@ class TestPrepareExternalTableUris:
         assert len(uris) == 1
 
     def test_delta_lake_requires_biglake_connection(self):
-        """Delta Lake format requires biglake_connection set."""
         adapter = _make_adapter(storage_bucket="my-bucket")
-        adapter.biglake_connection = None  # Not set
+        adapter.biglake_connection = None
 
         mock_bucket = Mock()
 
@@ -3297,7 +2817,6 @@ class TestPrepareExternalTableUris:
             adapter._prepare_external_table_uris(mock_bucket, "lineitem", [])
 
     def test_delta_lake_format_returned_when_delta_uris(self):
-        """When delta URIs found and biglake_connection is set → DELTA_LAKE format."""
         adapter = _make_adapter(storage_bucket="my-bucket")
         adapter.biglake_connection = "project.region.connection"
 

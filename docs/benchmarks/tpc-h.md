@@ -154,17 +154,13 @@ and SQL paths are validated against the same result set.
 ```python
 from benchbox import TPCH
 
-# Initialize TPC-H benchmark
 tpch = TPCH(scale_factor=1.0, output_dir="tpch_data")
 
-# Generate data
 data_files = tpch.generate_data()
 
-# Get all queries
 queries = tpch.get_queries()
 print(f"Generated {len(queries)} queries")
 
-# Get specific query with parameters
 query_1 = tpch.get_query(1, seed=42)
 print(query_1)
 ```
@@ -172,25 +168,22 @@ print(query_1)
 ### Data Generation with Custom Scale
 
 ```python
-# Generate smaller dataset for testing
 tpch_small = TPCH(scale_factor=0.1, output_dir="tpch_small")
 data_files = tpch_small.generate_data()
 
-# Check generated files
 for file_path in data_files:
-    table_name = file_path.stem  # Get filename without extension
+    table_name = file_path.stem
     print(f"{table_name}: {file_path}")
 ```
 
 ### SQL Dialect Translation
 
+Queries are automatically translated to the requested dialect via sqlglot:
+
 ```python
-# Get query in different SQL dialects
 query_postgres = tpch.get_query(1, dialect="postgres")
 query_duckdb = tpch.get_query(1, dialect="duckdb")
 query_mysql = tpch.get_query(1, dialect="mysql")
-
-# Queries are automatically translated via sqlglot
 ```
 
 ### DuckDB Integration Example
@@ -199,21 +192,17 @@ query_mysql = tpch.get_query(1, dialect="mysql")
 import duckdb
 from benchbox import TPCH
 
-# Initialize benchmark and generate data
 tpch = TPCH(scale_factor=0.01, output_dir="tpch_tiny")
 data_files = tpch.generate_data()
 
-# Create DuckDB connection and schema
 conn = duckdb.connect("tpch.duckdb")
 schema_sql = tpch.get_create_tables_sql()
 conn.execute(schema_sql)
 
-# Load data (simplified example)
 for table_name in tpch.get_available_tables():
     file_path = tpch.tables[table_name.upper()]
     table_name_lower = table_name.lower()
 
-    # Load TBL file with pipe delimiter
     conn.execute(f"""
         INSERT INTO {table_name_upper}
         SELECT * FROM read_csv('{file_path}',
@@ -221,7 +210,6 @@ for table_name in tpch.get_available_tables():
                               header=false)
     """)
 
-# Run queries
 for query_id in range(1, 23):
     query_sql = tpch.get_query(query_id, dialect="duckdb")
     result = conn.execute(query_sql).fetchall()
@@ -231,14 +219,12 @@ for query_id in range(1, 23):
 ### Stream Processing
 
 ```python
-# Generate query streams for throughput testing
 stream_files = tpch.generate_streams(
     num_streams=4,
     rng_seed=42,
     streams_output_dir="streams"
 )
 
-# Get stream information
 for i, stream_info in enumerate(tpch.get_all_streams_info()):
     print(f"Stream {i}: {stream_info['query_count']} queries")
     print(f"  Permutation: {stream_info['permutation']}")
@@ -316,20 +302,21 @@ for i, stream_info in enumerate(tpch.get_all_streams_info()):
 
 ### Advanced Configuration
 
+`verbose=True` enables detailed logging and `parallel=4` runs data generation in parallel. In `get_query()`, `seed` makes parameters reproducible, `scale_factor` overrides the scale factor, and `dialect` sets the target dialect.
+
 ```python
 tpch = TPCH(
     scale_factor=1.0,
     output_dir="tpch_data",
-    verbose=True,          # Enable detailed logging
-    parallel=4             # Parallel data generation
+    verbose=True,
+    parallel=4
 )
 
-# Custom query parameters
 query = tpch.get_query(
     query_id=1,
-    seed=42,               # Reproducible parameters
-    scale_factor=1.0,      # Override scale factor
-    dialect="duckdb"       # Target dialect
+    seed=42,
+    scale_factor=1.0,
+    dialect="duckdb"
 )
 ```
 
@@ -340,11 +327,9 @@ query = tpch.get_query(
 ```python
 from benchbox import TPCH
 
-# Generate TPC-H data for Databricks
 tpch = TPCH(scale_factor=10, output_dir="/dbfs/tpch_sf10")
 data_files = tpch.generate_data()
 
-# Create tables in Databricks
 for table_name in tpch.get_available_tables():
     spark.sql(f"""
         CREATE TABLE IF NOT EXISTS {table_name}
@@ -357,7 +342,6 @@ for table_name in tpch.get_available_tables():
         )
     """)
 
-# Run queries with Spark SQL
 for query_id in range(1, 23):
     query_sql = tpch.get_query(query_id, dialect="spark")
     df = spark.sql(query_sql)
@@ -371,7 +355,6 @@ import time
 from statistics import mean, median
 
 def benchmark_queries(tpch, connection, query_list=None):
-    """Run TPC-H performance benchmark."""
     if query_list is None:
         query_list = range(1, 23)
 
@@ -380,7 +363,6 @@ def benchmark_queries(tpch, connection, query_list=None):
     for query_id in query_list:
         times = []
 
-        # Run each query 3 times
         for run in range(3):
             query_sql = tpch.get_query(query_id, dialect="duckdb")
 
@@ -399,7 +381,6 @@ def benchmark_queries(tpch, connection, query_list=None):
 
     return results
 
-# Usage
 results = benchmark_queries(tpch, conn)
 for query_id, stats in results.items():
     print(f"Q{query_id}: {stats['median']:.2f}s ({stats['rows']} rows)")
@@ -430,30 +411,34 @@ for query_id, stats in results.items():
 ### Data Generation Issues
 
 **Issue: Out of memory during generation**
+
+Solution: use a smaller scale factor or increase the number of parallel processes.
 ```python
-# Solution: Use a smaller scale factor or increase parallel processes
-tpch = TPCH(scale_factor=1.0, parallel=8)  # More parallel processes
+tpch = TPCH(scale_factor=1.0, parallel=8)
 ```
 
 **Issue: Slow data generation**
+
+Solution: check disk I/O and use SSD storage.
 ```python
-# Solution: Check disk I/O and use SSD storage
 tpch = TPCH(output_dir="/fast/ssd/path")
 ```
 
 ### Query Execution Issues
 
 **Issue: Query timeout on large scale factors**
+
+Solution: start with a smaller scale factor and optimize queries.
 ```python
-# Solution: Start with smaller scale and optimize queries
-tpch = TPCH(scale_factor=0.1)  # Start small
-query = tpch.get_query(21, dialect="duckdb")  # Use configured dialect
+tpch = TPCH(scale_factor=0.1)
+query = tpch.get_query(21, dialect="duckdb")
 ```
 
 **Issue: Parameter substitution errors**
+
+Solution: use explicit seeds for reproducible parameters.
 ```python
-# Solution: Use explicit seeds for reproducible parameters
-query = tpch.get_query(1, seed=42)  # Reproducible
+query = tpch.get_query(1, seed=42)
 ```
 
 ## See Also

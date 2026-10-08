@@ -66,13 +66,6 @@ def build_drift_check_payload(adapter: PlatformAdapter) -> dict[str, Any] | None
 
 
 def _fold_one_layout_op(ledger: Any, op: dict[str, Any]) -> str:
-    """Fold one layout op into *ledger*; return the fold outcome.
-
-    Outcomes: ``executed`` (applied), ``failed`` (a real failure: an
-    attempted statement that errored, or an unrecognized status), or
-    ``dropped`` (a deliberate skip, recorded with its ``skipped:`` reason so
-    it still blocks ``applied_verified`` without producing ``failed``).
-    """
     status = op.get("status")
     if status == "applied":
         ledger.record(

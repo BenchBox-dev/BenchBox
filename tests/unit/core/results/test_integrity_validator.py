@@ -1,5 +1,3 @@
-"""Unit tests for the result integrity validator."""
-
 from __future__ import annotations
 
 import copy
@@ -29,15 +27,11 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 RESULTS_DIR = Path("benchmark_runs/results")
 
 
 def _make_valid_tpch_result(**overrides: Any) -> dict[str, Any]:
-    """Build a minimal but complete TPC-H result dict that passes all checks."""
     queries = []
     for qid in range(1, 23):
         for iteration in range(3):
@@ -112,7 +106,6 @@ def _make_valid_tpch_result(**overrides: Any) -> dict[str, Any]:
 
 
 def _find_latest_per_benchmark() -> dict[str, Path]:
-    """Return {canonical_benchmark_id: latest_file_path} for DuckDB SF1 runs."""
     files = glob.glob(str(RESULTS_DIR / "*_sf1_duckdb_*_2026*.json"))
     benchmarks: dict[str, Path] = {}
     for f in files:
@@ -126,18 +119,11 @@ def _find_latest_per_benchmark() -> dict[str, Path]:
     return benchmarks
 
 
-# Cache discovery at module level for parametrization
 _LATEST_BY_BENCHMARK = _find_latest_per_benchmark() if RESULTS_DIR.is_dir() else {}
 
 
 def _reference_file_ids() -> list[str]:
-    """Return sorted list of canonical benchmark IDs with reference files."""
     return sorted(_LATEST_BY_BENCHMARK.keys())
-
-
-# ---------------------------------------------------------------------------
-# TestIntegrityValidatorReferenceFiles
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.skipif(
@@ -145,11 +131,8 @@ def _reference_file_ids() -> list[str]:
     reason="benchmark_runs/results/ not present",
 )
 class TestIntegrityValidatorReferenceFiles:
-    """Tests against real DuckDB SF1 reference result files."""
-
     @pytest.mark.parametrize("benchmark_id", _reference_file_ids())
     def test_reference_file_does_not_fail(self, benchmark_id: str) -> None:
-        """Each DuckDB SF1 reference file must produce overall_status != FAIL."""
         path = _LATEST_BY_BENCHMARK[benchmark_id]
         report = validate_file(path)
         assert report.overall_status != CheckStatus.FAIL, f"{path.name} ({benchmark_id}) has FAILs: " + "; ".join(
@@ -157,7 +140,6 @@ class TestIntegrityValidatorReferenceFiles:
         )
 
     def test_tpch_passes_sf1_row_counts(self) -> None:
-        """TPC-H reference file should pass the sf1_row_counts believability check."""
         path = _LATEST_BY_BENCHMARK.get("tpch")
         if path is None:
             pytest.skip("No tpch reference file")
@@ -167,7 +149,6 @@ class TestIntegrityValidatorReferenceFiles:
         assert row_check.status == CheckStatus.PASS
 
     def test_transaction_primitives_passes_despite_failures(self) -> None:
-        """transaction_primitives has high failure rate but should still pass."""
         path = _LATEST_BY_BENCHMARK.get("transaction_primitives")
         if path is None:
             pytest.skip("No transaction_primitives reference file")
@@ -178,8 +159,7 @@ class TestIntegrityValidatorReferenceFiles:
         assert rate_check.status == CheckStatus.PASS
 
     def test_legacy_alias_resolves_to_correct_spec(self) -> None:
-        """Legacy aliases should resolve to the correct canonical spec."""
-        # Directly test alias resolution rather than relying on file benchmark.id
+
         for alias, canonical in LEGACY_ALIASES.items():
             spec = get_spec(alias)
             assert spec is not None, f"No spec found for alias {alias}"
@@ -188,18 +168,8 @@ class TestIntegrityValidatorReferenceFiles:
             )
 
 
-# ---------------------------------------------------------------------------
-# TestIntegrityValidatorSyntheticData
-# ---------------------------------------------------------------------------
-
-
 class TestIntegrityValidatorSyntheticData:
-    """Tests with synthetic data to validate specific failure modes."""
-
-    # --- Structural checks ---
-
     def test_missing_required_key(self) -> None:
-        """Removing 'queries' key should produce a structural FAIL."""
         data = _make_valid_tpch_result()
         del data["queries"]
         validator = ResultIntegrityValidator()
@@ -209,7 +179,6 @@ class TestIntegrityValidatorSyntheticData:
         assert schema_check.status == CheckStatus.FAIL
 
     def test_query_count_math_wrong(self) -> None:
-        """passed + failed != total should FAIL."""
         data = _make_valid_tpch_result()
         data["summary"]["queries"] = {"total": 100, "passed": 50, "failed": 30}
         validator = ResultIntegrityValidator()
@@ -218,7 +187,6 @@ class TestIntegrityValidatorSyntheticData:
         assert check.status == CheckStatus.FAIL
 
     def test_negative_timing(self) -> None:
-        """Negative avg_ms should FAIL."""
         data = _make_valid_tpch_result()
         data["summary"]["timing"]["avg_ms"] = -1.0
         validator = ResultIntegrityValidator()
@@ -227,10 +195,9 @@ class TestIntegrityValidatorSyntheticData:
         assert check.status == CheckStatus.FAIL
 
     def test_percentile_inversion(self) -> None:
-        """p95 < p90 should FAIL."""
         data = _make_valid_tpch_result()
         data["summary"]["timing"]["p90_ms"] = 300.0
-        data["summary"]["timing"]["p95_ms"] = 200.0  # Inverted!
+        data["summary"]["timing"]["p95_ms"] = 200.0
         data["summary"]["timing"]["p99_ms"] = 320.0
         validator = ResultIntegrityValidator()
         report = validator.validate(data)
@@ -238,7 +205,6 @@ class TestIntegrityValidatorSyntheticData:
         assert check.status == CheckStatus.FAIL
 
     def test_invalid_phase_status(self) -> None:
-        """An invalid phase status value should FAIL."""
         data = _make_valid_tpch_result()
         data["phases"]["power_test"]["status"] = "INVALID"
         validator = ResultIntegrityValidator()
@@ -247,7 +213,6 @@ class TestIntegrityValidatorSyntheticData:
         assert check.status == CheckStatus.FAIL
 
     def test_query_entry_missing_field(self) -> None:
-        """Query entry missing 'ms' field should FAIL."""
         data = _make_valid_tpch_result()
         del data["queries"][0]["ms"]
         validator = ResultIntegrityValidator()
@@ -256,7 +221,6 @@ class TestIntegrityValidatorSyntheticData:
         assert check.status == CheckStatus.FAIL
 
     def test_query_ms_negative(self) -> None:
-        """Query with negative ms should FAIL."""
         data = _make_valid_tpch_result()
         data["queries"][0]["ms"] = -5.0
         validator = ResultIntegrityValidator()
@@ -264,12 +228,9 @@ class TestIntegrityValidatorSyntheticData:
         check = next(c for c in report.checks if c.name == "query_ms_non_negative")
         assert check.status == CheckStatus.FAIL
 
-    # --- Completeness checks ---
-
     def test_missing_query_ids(self) -> None:
-        """Removing 50% of TPC-H query IDs should FAIL expected_query_ids."""
         data = _make_valid_tpch_result()
-        # Keep only queries with id 1-11 (remove 12-22)
+
         data["queries"] = [q for q in data["queries"] if int(q["id"]) <= 11]
         validator = ResultIntegrityValidator()
         report = validator.validate(data)
@@ -277,7 +238,6 @@ class TestIntegrityValidatorSyntheticData:
         assert check.status == CheckStatus.FAIL
 
     def test_no_measurement_queries(self) -> None:
-        """All entries with iter=0 and no measurement run_type should FAIL."""
         data = _make_valid_tpch_result()
         for q in data["queries"]:
             q["iter"] = 0
@@ -288,7 +248,6 @@ class TestIntegrityValidatorSyntheticData:
         assert check.status == CheckStatus.FAIL
 
     def test_missing_tables_object(self) -> None:
-        """TPC-H spec requires tables - missing should WARN."""
         data = _make_valid_tpch_result()
         del data["tables"]
         validator = ResultIntegrityValidator()
@@ -297,7 +256,6 @@ class TestIntegrityValidatorSyntheticData:
         assert check.status == CheckStatus.WARN
 
     def test_power_phase_failed(self) -> None:
-        """Power test phase with FAILED status should WARN."""
         data = _make_valid_tpch_result()
         data["phases"]["power_test"]["status"] = "FAILED"
         validator = ResultIntegrityValidator()
@@ -306,20 +264,16 @@ class TestIntegrityValidatorSyntheticData:
         assert check.status == CheckStatus.WARN
 
     def test_tpc_metrics_missing(self) -> None:
-        """TPC-H result without tpc_metrics should be INFO (not WARN - unofficial runs never have QphH)."""
         data = _make_valid_tpch_result()
         del data["summary"]["tpc_metrics"]
         validator = ResultIntegrityValidator()
         report = validator.validate(data)
         check = next(c for c in report.checks if c.name == "tpc_metrics")
         assert check.status == CheckStatus.INFO
-        # Must not elevate overall status
+
         assert report.overall_status == CheckStatus.PASS
 
-    # --- Believability checks ---
-
     def test_avg_exceeds_max(self) -> None:
-        """avg_ms > max_ms should FAIL."""
         data = _make_valid_tpch_result()
         data["summary"]["timing"]["avg_ms"] = 500.0
         data["summary"]["timing"]["max_ms"] = 330.0
@@ -329,18 +283,16 @@ class TestIntegrityValidatorSyntheticData:
         assert check.status == CheckStatus.FAIL
 
     def test_geomean_outside_range(self) -> None:
-        """geometric_mean_ms < min_ms should FAIL."""
         data = _make_valid_tpch_result()
-        data["summary"]["timing"]["geometric_mean_ms"] = 50.0  # Below min_ms=110
+        data["summary"]["timing"]["geometric_mean_ms"] = 50.0
         validator = ResultIntegrityValidator()
         report = validator.validate(data)
         check = next(c for c in report.checks if c.name == "geomean_plausible")
         assert check.status == CheckStatus.FAIL
 
     def test_wrong_sf1_row_counts(self) -> None:
-        """Wrong lineitem row count at SF=1 should FAIL (benchmark ran against incorrect data)."""
         data = _make_valid_tpch_result()
-        # Set lineitem to a wildly wrong count
+
         for t in data["tables"]:
             if t["name"] == "lineitem":
                 t["rows"] = 1000
@@ -350,9 +302,8 @@ class TestIntegrityValidatorSyntheticData:
         assert check.status == CheckStatus.FAIL
 
     def test_sf1_missing_tables_fails(self) -> None:
-        """Missing expected tables from tables metadata should FAIL."""
         data = _make_valid_tpch_result()
-        # Remove lineitem from tables list
+
         data["tables"] = [t for t in data["tables"] if t["name"] != "lineitem"]
         validator = ResultIntegrityValidator()
         report = validator.validate(data)
@@ -361,16 +312,14 @@ class TestIntegrityValidatorSyntheticData:
         assert "missing" in check.message.lower()
 
     def test_timing_outlier(self) -> None:
-        """Query exceeding 30 minutes should WARN."""
         data = _make_valid_tpch_result()
-        data["queries"][0]["ms"] = 2_000_000  # ~33 minutes
+        data["queries"][0]["ms"] = 2_000_000
         validator = ResultIntegrityValidator()
         report = validator.validate(data)
         check = next(c for c in report.checks if c.name == "timing_outliers")
         assert check.status == CheckStatus.WARN
 
     def test_load_time_zero(self) -> None:
-        """Load time of 0ms should WARN."""
         data = _make_valid_tpch_result()
         data["phases"]["data_loading"]["duration_ms"] = 0
         validator = ResultIntegrityValidator()
@@ -379,7 +328,6 @@ class TestIntegrityValidatorSyntheticData:
         assert check.status == CheckStatus.WARN
 
     def test_high_failure_exempt(self) -> None:
-        """transaction_primitives with 95% failure should still PASS success_rate."""
         data = _make_valid_tpch_result()
         data["benchmark"]["id"] = "transaction_primitives"
         data["summary"]["queries"] = {"total": 100, "passed": 5, "failed": 95}
@@ -389,9 +337,8 @@ class TestIntegrityValidatorSyntheticData:
         assert check.status == CheckStatus.PASS
 
     def test_duplicate_execution(self) -> None:
-        """Duplicate (id, iter, stream) should WARN."""
         data = _make_valid_tpch_result()
-        # Add a duplicate entry
+
         dupe = copy.deepcopy(data["queries"][0])
         data["queries"].append(dupe)
         validator = ResultIntegrityValidator()
@@ -399,27 +346,20 @@ class TestIntegrityValidatorSyntheticData:
         check = next(c for c in report.checks if c.name == "no_duplicate_executions")
         assert check.status == CheckStatus.WARN
 
-    # --- Report utility methods ---
-
     def test_passed_method(self) -> None:
-        """IntegrityReport.passed() returns True when overall_status is PASS."""
         data = _make_valid_tpch_result()
         validator = ResultIntegrityValidator()
         report = validator.validate(data)
         assert report.passed()
 
     def test_has_warnings_method(self) -> None:
-        """IntegrityReport.has_warnings() detects WARN checks."""
         data = _make_valid_tpch_result()
-        del data["tables"]  # Will trigger tables_object WARN
+        del data["tables"]
         validator = ResultIntegrityValidator()
         report = validator.validate(data)
         assert report.has_warnings()
 
-    # --- Convenience functions ---
-
     def test_validate_file(self, tmp_path: Path) -> None:
-        """validate_file() loads and validates a JSON file."""
         data = _make_valid_tpch_result()
         filepath = tmp_path / "test_result.json"
         filepath.write_text(json.dumps(data))
@@ -428,29 +368,25 @@ class TestIntegrityValidatorSyntheticData:
         assert report.file == str(filepath)
 
     def test_validate_directory(self, tmp_path: Path) -> None:
-        """validate_directory() processes multiple files."""
         for i in range(3):
             data = _make_valid_tpch_result()
             filepath = tmp_path / f"result_{i}.json"
             filepath.write_text(json.dumps(data))
-        # Also create a .plans.json file that should be excluded
+
         (tmp_path / "result_0.plans.json").write_text("{}")
-        # An .override.json companion must be excluded as well, not
-        # validated as a result bundle.
+
         (tmp_path / "result_0.override.json").write_text("{}")
         reports = validate_directory(tmp_path)
         assert len(reports) == 3
         assert all(r.passed() for r in reports)
 
     def test_validate_directory_bad_json(self, tmp_path: Path) -> None:
-        """validate_directory() handles unparseable files gracefully."""
         (tmp_path / "bad.json").write_text("not json")
         reports = validate_directory(tmp_path)
         assert len(reports) == 1
         assert reports[0].overall_status == CheckStatus.FAIL
 
     def test_validate_file_bad_json(self, tmp_path: Path) -> None:
-        """validate_file() handles unparseable files gracefully."""
         bad_file = tmp_path / "bad.json"
         bad_file.write_text("not json")
         report = validate_file(bad_file)
@@ -458,13 +394,7 @@ class TestIntegrityValidatorSyntheticData:
         assert report.checks[0].name == "file_readable"
 
 
-# ---------------------------------------------------------------------------
-# TestVectorSearchExportIntegrity
-# ---------------------------------------------------------------------------
-
-
 def _make_vector_search_result() -> BenchmarkResults:
-    """Build a complete vector_search run using producer-style Q1-Q6 IDs."""
     query_results = [
         {
             "query_id": f"Q{i}",
@@ -497,19 +427,11 @@ def _make_vector_search_result() -> BenchmarkResults:
 
 
 class TestVectorSearchExportIntegrity:
-    """A complete vector_search export must pass the expected-query-IDs check.
-
-    Schema-v2 export normalizes producer IDs Q1-Q6 to 1-6, so the spec must
-    record the normalized form or every complete run reports 0/6 and fails.
-    """
-
     def test_export_normalizes_query_ids(self) -> None:
-        """Export converts Q1-Q6 producer IDs to normalized 1-6 IDs."""
         payload = build_result_payload(_make_vector_search_result())
         assert [q["id"] for q in payload["queries"]] == ["1", "2", "3", "4", "5", "6"]
 
     def test_complete_export_passes_expected_query_ids(self) -> None:
-        """All six exported queries match the spec set (6/6, no FAIL)."""
         payload = build_result_payload(_make_vector_search_result())
         payload["export"] = {"format": "json"}
         report = ResultIntegrityValidator().validate(payload)
@@ -519,7 +441,6 @@ class TestVectorSearchExportIntegrity:
         assert report.overall_status == CheckStatus.PASS
 
     def test_skipped_queries_satisfy_count_math(self) -> None:
-        """A version-gated skip (StarRocks Q2) must not fail count arithmetic."""
         data = _make_valid_tpch_result()
         data["summary"]["queries"] = {"total": 6, "passed": 5, "failed": 0, "skipped": 1}
         report = ResultIntegrityValidator().validate(data)
@@ -527,7 +448,6 @@ class TestVectorSearchExportIntegrity:
         assert check.status == CheckStatus.PASS
 
     def test_skipped_queries_discounted_from_success_rate(self) -> None:
-        """5/5 billable with 1 compat skip passes a 1.0 floor."""
         data = _make_valid_tpch_result()
         data["summary"]["queries"] = {"total": 6, "passed": 5, "failed": 0, "skipped": 1}
         report = ResultIntegrityValidator().validate(data)
@@ -536,7 +456,6 @@ class TestVectorSearchExportIntegrity:
 
     @pytest.mark.parametrize("benchmark_id", ["tpch", "vector_search", "tpchavoc", "unknown_benchmark"])
     def test_all_skipped_queries_do_not_pass_success_rate(self, benchmark_id: str) -> None:
-        """Compatibility skips cannot certify a run with no executed query."""
         if benchmark_id == "vector_search":
             data = build_result_payload(_make_vector_search_result())
             data["export"] = {"format": "json"}

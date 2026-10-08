@@ -1,17 +1,3 @@
-"""Coverage tests for platform adapter modules (w10).
-
-Wave: coverage-per-module-50-remaining (w10)
-Targets:
-  - benchbox/platforms/dataframe/__init__.py  (46% -> 50%)
-  - benchbox/platforms/dataframe/ducklake_maintenance.py  (0% -> 50%)
-  - benchbox/platforms/influxdb/client.py  (43% -> 50%)
-  - benchbox/platforms/base/data_loading.py  (45% -> 50%)
-  - benchbox/platforms/bigquery.py  (49% -> 50%)
-  - benchbox/platforms/redshift.py  (48% -> 50%)
-  - benchbox/platforms/athena.py  (37% -> 50%)
-  - benchbox/platforms/fabric_warehouse.py  (41% -> 50%)
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -31,16 +17,9 @@ pytestmark = [
 ]
 
 
-# ===================================================================
-# dataframe/__init__.py - optional import fallbacks
-# ===================================================================
-
-
 class TestDataFrameInit:
-    """Test the optional import fallback paths in dataframe/__init__.py."""
-
     def test_core_exports_available(self):
-        """Verify core (non-optional) exports are importable."""
+
         from benchbox.platforms.dataframe import (
             PANDAS_AVAILABLE,
             POLARS_AVAILABLE,
@@ -135,11 +114,6 @@ class TestDataFrameInit:
         assert df_mod is not None
 
 
-# ===================================================================
-# ducklake_maintenance.py
-# ===================================================================
-
-
 class TestDuckLakeCapabilities:
     def test_capabilities_structure(self):
         from benchbox.platforms.dataframe.ducklake_maintenance import DUCKLAKE_CAPABILITIES
@@ -188,7 +162,7 @@ class TestDuckLakeMaintenanceOperations:
         from benchbox.platforms.dataframe.ducklake_maintenance import DuckLakeMaintenanceOperations
 
         ops = DuckLakeMaintenanceOperations()
-        # Mock _convert_to_arrow to return empty table
+
         mock_arrow = MagicMock()
         mock_arrow.num_rows = 0
         with patch.object(ops, "_convert_to_arrow", return_value=mock_arrow):
@@ -237,11 +211,6 @@ class TestGetDuckLakeMaintenanceOperations:
 
             result = get_ducklake_maintenance_operations()
         assert result is None
-
-
-# ===================================================================
-# influxdb/client.py
-# ===================================================================
 
 
 class TestInfluxDBEscapeFunctions:
@@ -306,7 +275,7 @@ class TestToLineProtocol:
 
         dt = datetime(2024, 1, 1, 0, 0, 0)
         result = to_line_protocol("cpu", {}, {"usage": 50.0}, timestamp=dt)
-        assert " " in result  # timestamp appended
+        assert " " in result
 
     def test_no_tags(self):
         from benchbox.platforms.influxdb.client import to_line_protocol
@@ -397,11 +366,6 @@ class TestInfluxDBConnection:
         assert conn._client_type == "flightsql"
 
 
-# ===================================================================
-# base/data_loading.py - Data source providers
-# ===================================================================
-
-
 class TestBenchmarkTablesSource:
     def test_can_provide_with_tables(self):
         from benchbox.platforms.base.data_loading import BenchmarkTablesSource
@@ -414,7 +378,7 @@ class TestBenchmarkTablesSource:
         from benchbox.platforms.base.data_loading import BenchmarkTablesSource
 
         src = BenchmarkTablesSource()
-        benchmark = types.SimpleNamespace()  # no tables attribute
+        benchmark = types.SimpleNamespace()
         assert src.can_provide(benchmark, Path("/data")) is False
 
     def test_get_data_source_normalizes_to_list(self):
@@ -443,7 +407,7 @@ class TestBenchmarkImplTablesSource:
         from benchbox.platforms.base.data_loading import BenchmarkImplTablesSource
 
         src = BenchmarkImplTablesSource()
-        benchmark = types.SimpleNamespace()  # no _impl attribute
+        benchmark = types.SimpleNamespace()
         assert src.can_provide(benchmark, Path("/data")) is False
 
 
@@ -476,12 +440,12 @@ class TestDataSourceResolver:
         from benchbox.platforms.base.data_loading import DataSourceResolver
 
         resolver = DataSourceResolver()
-        benchmark = types.SimpleNamespace()  # no tables, no _impl, no get_tables
+        benchmark = types.SimpleNamespace()
         result = resolver.resolve(benchmark, Path("/nonexistent"))
         assert result is None
 
     def test_platform_name_propagates_to_manifest_source(self):
-        """Test that platform_name is set on the ManifestFileSource provider."""
+
         from benchbox.platforms.base.data_loading import DataSourceResolver, ManifestFileSource
 
         resolver = DataSourceResolver(platform_name="datafusion")
@@ -490,7 +454,7 @@ class TestDataSourceResolver:
         assert manifest_sources[0]._platform_name == "datafusion"
 
     def test_platform_name_default_is_duckdb(self):
-        """Test that without platform_name, ManifestFileSource defaults to 'duckdb'."""
+
         from benchbox.platforms.base.data_loading import DataSourceResolver, ManifestFileSource
 
         resolver = DataSourceResolver()
@@ -537,26 +501,21 @@ class TestDataSource:
         assert "orders" in ds.tables
 
 
-# ===================================================================
-# bigquery.py - push from 49% to 50%
-# ===================================================================
-
-
 class TestBigQueryAdapterPaths:
     def test_normalize_table_name(self):
-        """BigQuery is case-insensitive, table names get lowered."""
+
         from benchbox.platforms.bigquery import BigQueryAdapter
 
         adapter = BigQueryAdapter.__new__(BigQueryAdapter)
         adapter.platform_type = "bigquery"
         adapter._case_sensitive = False
-        # Test the case normalization helper if it exists
+
         if hasattr(adapter, "_normalize_table_name"):
             result = adapter._normalize_table_name("MyTable")
             assert result == "mytable"
 
     def test_gcs_path_detection(self):
-        """Test GCS path detection logic."""
+
         from benchbox.utils.cloud_storage import is_cloud_path
 
         assert is_cloud_path("gs://bucket/path") is True
@@ -569,11 +528,6 @@ class TestBigQueryAdapterPaths:
         assert hasattr(BigQueryAdapter, "execute_query")
 
 
-# ===================================================================
-# redshift.py - push from 48% to 50%
-# ===================================================================
-
-
 class TestRedshiftAdapterPaths:
     def test_adapter_class_exists(self):
         from benchbox.platforms.redshift import RedshiftAdapter
@@ -582,22 +536,15 @@ class TestRedshiftAdapterPaths:
         assert hasattr(RedshiftAdapter, "execute_query")
 
     def test_redshift_hostname_parsing(self):
-        """Test serverless vs provisioned hostname detection."""
+
         from benchbox.platforms.redshift import RedshiftAdapter
 
         adapter = RedshiftAdapter.__new__(RedshiftAdapter)
         if hasattr(adapter, "_parse_hostname"):
-            # Provisioned
             result = adapter._parse_hostname("mycluster.abc123.us-east-1.redshift.amazonaws.com")
             assert "us-east-1" in str(result) or result is not None
         elif hasattr(adapter, "_detect_endpoint_type"):
-            # Just verify method is callable
             assert callable(adapter._detect_endpoint_type)
-
-
-# ===================================================================
-# athena.py - push from 37% to 50%
-# ===================================================================
 
 
 class TestAthenaAdapterPaths:
@@ -607,7 +554,7 @@ class TestAthenaAdapterPaths:
         assert AthenaAdapter is not None
 
     def test_dialect_is_trino(self):
-        """Athena uses Trino SQL dialect."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         adapter = AthenaAdapter.__new__(AthenaAdapter)
@@ -615,16 +562,10 @@ class TestAthenaAdapterPaths:
             assert adapter.dialect in ("trino", "presto", "athena")
 
     def test_s3_staging_path_construction(self):
-        """Test S3 path handling for Athena staging."""
-        # Athena requires S3 for query results and data staging
+
         test_bucket = "s3://my-benchbox-bucket/athena-results/"
         assert test_bucket.startswith("s3://")
         assert not test_bucket.startswith("s3://s3://")
-
-
-# ===================================================================
-# fabric_warehouse.py - push from 41% to 50%
-# ===================================================================
 
 
 class TestFabricWarehouseAdapterPaths:
@@ -634,8 +575,7 @@ class TestFabricWarehouseAdapterPaths:
         assert FabricWarehouseAdapter is not None
 
     def test_onelake_path_prefix(self):
-        """Test OneLake path construction."""
-        # OneLake paths follow: abfss://workspace@onelake.dfs.fabric.microsoft.com/
+
         prefix = "abfss://"
         assert prefix in "abfss://workspace@onelake.dfs.fabric.microsoft.com/lakehouse/Files/"
 
@@ -664,7 +604,6 @@ class TestFabricWarehouseAdapterPaths:
                     warehouse="mywarehouse",
                     auth_method="service_principal",
                     client_id="test",
-                    # missing client_secret and tenant_id
                 )
 
     def test_init_no_database_raises(self):
@@ -675,7 +614,6 @@ class TestFabricWarehouseAdapterPaths:
             with pytest.raises(ConfigurationError, match="warehouse name"):
                 FabricWarehouseAdapter(
                     workspace="test-guid",
-                    # no warehouse or database
                 )
 
     def test_init_builds_server_from_workspace(self):
@@ -721,11 +659,6 @@ class TestFabricWarehouseAdapterPaths:
             assert adapter.get_target_dialect() == FABRIC_DIALECT
 
 
-# ===================================================================
-# athena.py - additional coverage for constructor/validation
-# ===================================================================
-
-
 class TestAthenaAdapterInit:
     def test_init_with_staging_dir(self):
         from benchbox.platforms.athena import AthenaAdapter
@@ -753,7 +686,7 @@ class TestAthenaAdapterInit:
                     aws_secret_access_key="secret",
                 )
                 assert adapter.s3_bucket == "my-bucket"
-                assert adapter.s3_prefix == "data"  # stripped trailing slash
+                assert adapter.s3_prefix == "data"
 
     def test_init_data_format_default(self):
         from benchbox.platforms.athena import AthenaAdapter
@@ -781,11 +714,6 @@ class TestAthenaAdapterInit:
                 )
                 assert adapter._total_data_scanned_bytes == 0
                 assert adapter._query_count == 0
-
-
-# ===================================================================
-# data_loading.py - additional coverage: SchemaInspector, RowBatchProcessor
-# ===================================================================
 
 
 class TestSchemaInspector:
@@ -829,7 +757,7 @@ class TestRowBatchProcessor:
         fh = io.StringIO("a|b|c\n1|2|3\n4|5|6\n")
         batches = list(processor.process_file(fh, "|", 3))
         assert len(batches) == 1
-        assert batches[0][1] == 3  # 3 rows (including header)
+        assert batches[0][1] == 3
 
     def test_process_file_multiple_batches(self):
         import io
@@ -852,7 +780,7 @@ class TestRowBatchProcessor:
         batches = list(processor.process_file(fh, "|", 4))
         assert len(batches) == 1
         row = batches[0][0][0]
-        assert len(row) == 4  # padded to 4
+        assert len(row) == 4
 
     def test_process_file_skips_empty_lines(self):
         import io
@@ -862,7 +790,7 @@ class TestRowBatchProcessor:
         processor = RowBatchProcessor(batch_size=100)
         fh = io.StringIO("1|2\n\n\n3|4\n")
         batches = list(processor.process_file(fh, "|", 2))
-        assert batches[0][1] == 2  # only 2 non-empty lines
+        assert batches[0][1] == 2
 
 
 class TestDelimitedFileHandler:
@@ -894,8 +822,6 @@ class TestFileFormatRegistry:
 
 
 class TestManifestFileSourceV1:
-    """Test v1 manifest file parsing."""
-
     def test_get_data_source_v1(self, tmp_path):
         import json
 
@@ -911,14 +837,9 @@ class TestManifestFileSourceV1:
 
         src = ManifestFileSource()
         result = src.get_data_source(types.SimpleNamespace(), tmp_path)
-        # Result may be None if v2 parser consumes it; just verify no crash
+
         if result is not None:
             assert "orders" in result.tables
-
-
-# ===================================================================
-# ducklake_maintenance.py - additional do_* method coverage
-# ===================================================================
 
 
 class TestDuckLakeDoMethods:
@@ -927,7 +848,7 @@ class TestDuckLakeDoMethods:
 
         ops = DuckLakeMaintenanceOperations()
         mock_conn = MagicMock()
-        # Before: 100 rows, After: 95 rows
+
         mock_conn.execute.return_value.fetchone.side_effect = [(100,), (95,)]
         with patch.object(ops, "_get_connection", return_value=mock_conn):
             result = ops._do_delete("/data/orders", "order_id > 100")
@@ -972,14 +893,9 @@ class TestDuckLakeDoMethods:
             with patch.object(ops, "_get_connection", return_value=mock_conn):
                 result = ops._do_insert("/data/orders", MagicMock(), None, "overwrite")
         assert result == 10
-        # Verify DELETE was called before INSERT
+
         calls = [str(c) for c in mock_conn.execute.call_args_list]
         assert any("DELETE" in c for c in calls)
-
-
-# ===================================================================
-# redshift.py - additional coverage for from_config and platform_name
-# ===================================================================
 
 
 class TestRedshiftFromConfig:
@@ -992,13 +908,7 @@ class TestRedshiftFromConfig:
     def test_has_add_cli_arguments(self):
         from benchbox.platforms.redshift import RedshiftAdapter
 
-        # Verify static method exists and is callable
         assert callable(RedshiftAdapter.add_cli_arguments)
-
-
-# ===================================================================
-# bigquery.py - additional coverage for add_cli_arguments, query cache
-# ===================================================================
 
 
 class TestBigQueryFromConfig:
@@ -1108,7 +1018,7 @@ class TestAthenaAdditionalCoverage:
         adapter._query_count = 4
 
         summary = adapter.get_cost_summary()
-        # Decimal TB per the unit contract: 2 * 2^40 bytes at $5.00/TB.
+
         expected_total = (2 * (1024**4)) / (10**12) * 5.0
         assert summary["total_cost_usd"] == pytest.approx(expected_total)
         assert summary["average_cost_per_query_usd"] == pytest.approx(expected_total / 4)

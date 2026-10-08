@@ -20,15 +20,15 @@ Citus is a PostgreSQL extension that transparently distributes tables across a c
 ## Quick Start
 
 ```bash
-# Coordinator-local tables (measures single-node Postgres on a Citus server)
 benchbox run --platform citus --benchmark tpch --scale 0.01
 
-# Distributed TPC-H on l_orderkey
 benchbox run --platform citus --benchmark tpch --scale 1.0 \
   --platform-option host=citus.example.com \
   --platform-option password=secret \
   --platform-option distribution_column=l_orderkey
 ```
+
+The first command uses coordinator-local tables, which measures single-node Postgres on a Citus server. The second runs distributed TPC-H, distributing tables on `l_orderkey`.
 
 ## Installation
 
@@ -52,9 +52,10 @@ docker run -d --name citus \
   -p 5432:5432 \
   citusdata/citus:latest
 
-# Verify extension
 psql -h localhost -U postgres -c "CREATE EXTENSION citus;"
 ```
+
+The `psql` command creates the extension and verifies that it is available.
 
 See the [Citus GitHub repository](https://github.com/citusdata/citus) for worker setup and additional installation methods.
 

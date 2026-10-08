@@ -1,11 +1,3 @@
-"""Core validation orchestration service.
-
-Provides programmatic access to the full validation workflow (preflight,
-manifest, database, and platform capability checks) without relying on CLI
-modules. This enables benchmarks, adapters, and external automation to trigger
-validation directly from the core package.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -23,15 +15,11 @@ from .engines import (
 
 @dataclass(frozen=True)
 class PlatformValidationResult:
-    """Container for platform capability and optional connection health checks."""
-
     capabilities: ValidationResult
     connection_health: ValidationResult | None = None
 
 
 class ValidationService:
-    """Core validation service coordinating data and database checks."""
-
     def __init__(
         self,
         *,
@@ -41,21 +29,16 @@ class ValidationService:
         self._data_engine = data_engine or DataValidationEngine()
         self._db_engine = db_engine or DatabaseValidationEngine()
 
-    # ------------------------------------------------------------------
-    # Individual validation helpers
-    # ------------------------------------------------------------------
     def run_preflight(
         self,
         benchmark_type: str,
         scale_factor: float,
         output_dir: Path,
     ) -> ValidationResult:
-        """Validate that the environment is ready for data generation."""
 
         return self._data_engine.validate_preflight_conditions(benchmark_type, scale_factor, output_dir)
 
     def run_manifest(self, manifest_path: Path) -> ValidationResult:
-        """Validate generated data files referenced by the manifest."""
 
         return self._data_engine.validate_generated_data(manifest_path)
 
@@ -65,7 +48,6 @@ class ValidationService:
         benchmark_type: str,
         scale_factor: float,
     ) -> ValidationResult:
-        """Validate loaded database contents for a benchmark."""
 
         return self._db_engine.validate_loaded_data(connection, benchmark_type, scale_factor)
 
@@ -76,7 +58,6 @@ class ValidationService:
         *,
         connection: Any | None = None,
     ) -> PlatformValidationResult:
-        """Validate platform capabilities and optional connection health."""
 
         capabilities = platform_adapter.validate_platform_capabilities(benchmark_type)
         connection_health = None
@@ -86,9 +67,6 @@ class ValidationService:
 
         return PlatformValidationResult(capabilities=capabilities, connection_health=connection_health)
 
-    # ------------------------------------------------------------------
-    # Composite workflows
-    # ------------------------------------------------------------------
     def run_comprehensive(
         self,
         *,
@@ -99,7 +77,6 @@ class ValidationService:
         connection: Any | None = None,
         platform_adapter: Any | None = None,
     ) -> list[ValidationResult]:
-        """Execute the full validation workflow and return collected results."""
 
         results: list[ValidationResult] = []
 
@@ -122,12 +99,8 @@ class ValidationService:
 
         return results
 
-    # ------------------------------------------------------------------
-    # Summary helpers
-    # ------------------------------------------------------------------
     @staticmethod
     def summarize(results: Sequence[ValidationResult]) -> ValidationSummary:
-        """Build a validation summary from a sequence of validation results."""
 
         filtered: list[ValidationResult] = [res for res in results if res is not None]
         total = len(filtered)

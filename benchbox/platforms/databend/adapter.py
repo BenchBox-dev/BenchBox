@@ -1,29 +1,6 @@
-"""Databend cloud-native OLAP platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides Databend-specific optimizations for cloud-native analytical workloads.
-Databend is a Rust-based data warehouse with Snowflake-compatible SQL, compute/storage
-separation, and object storage backend (S3, GCS, Azure Blob, MinIO).
-
-Deployment Modes:
-- Cloud: Databend Cloud managed service (requires credentials)
-- Self-hosted: User-managed Databend cluster with object storage backend
-
-SQL Translation Strategy:
-- Uses Snowflake dialect as translation proxy via sqlglot
-- Databend claims ~100% Snowflake SQL compatibility
-- Custom optimizations applied for known edge cases
-
-Authentication:
-- Cloud: Uses environment variables or config:
-  - DATABEND_HOST: Hostname (e.g., tenant--warehouse.gw.databend.com)
-  - DATABEND_USER: Username
-  - DATABEND_PASSWORD: Password
-- Self-hosted: DSN-based connection (databend+http://user:pass@host:port/database)
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -55,33 +32,15 @@ from benchbox.utils.dependencies import (
 )
 
 try:
-    import databend_driver  # noqa: F401
+    import databend_driver
 
     DATABEND_AVAILABLE = True
 except ImportError:
     DATABEND_AVAILABLE = False
-    databend_driver = None  # type: ignore[assignment]
+    databend_driver = None
 
 
 class DatabendAdapter(PlatformAdapter):
-    """Databend platform adapter for cloud-native analytical query execution.
-
-    Supports two deployment modes:
-    - **Databend Cloud**: Managed cloud service requiring authentication
-    - **Self-hosted**: User-managed Databend cluster with object storage backend
-
-    Key Features:
-    - Snowflake-compatible SQL dialect
-    - Compute/storage separation on object storage
-    - Vectorized query execution in Rust
-    - DB-API 2.0 compliant Python driver
-
-    SQL Translation:
-    - Uses Snowflake dialect via sqlglot as translation proxy
-    - Databend claims ~100% Snowflake SQL compatibility
-    - Edge-case optimizations applied via _optimize_table_definition()
-    """
-
     physical_identifier_case = "lower"
 
     plan_capture_phase_eligible = True
@@ -90,35 +49,16 @@ class DatabendAdapter(PlatformAdapter):
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
 
     def __init__(self, **config):
-        """Initialize Databend adapter.
-
-        Args:
-            **config: Configuration options including:
-                Connection options:
-                - host: Databend host (or use DATABEND_HOST env)
-                - port: Databend port (default: 443 for cloud, 8000 for self-hosted)
-                - username: Username (or use DATABEND_USER env)
-                - password: Password (or use DATABEND_PASSWORD env)
-                - database: Database name (default: benchbox)
-                - dsn: Full DSN string (overrides individual params)
-                - ssl: Enable SSL (default: True for cloud)
-
-                Benchmark options:
-                - disable_result_cache: Disable caching for benchmarks (default: True)
-        """
         super().__init__(**config)
 
-        # Check dependencies
         if not DATABEND_AVAILABLE:
             available, missing = check_platform_dependencies("databend", ["databend-driver"])
             if not available:
                 error_msg = get_dependency_error_message("databend", missing)
                 raise ImportError(error_msg)
 
-        # Use Snowflake dialect as translation proxy
         self._dialect = "snowflake"
 
-        # Connection configuration with env var fallbacks
         self.host = config.get("host") or os.environ.get("DATABEND_HOST")
         self.port = config.get("port") or os.environ.get("DATABEND_PORT")
         self.username = config.get("username") or os.environ.get("DATABEND_USER") or "benchbox"
@@ -127,13 +67,10 @@ class DatabendAdapter(PlatformAdapter):
         self.dsn = config.get("dsn") or os.environ.get("DATABEND_DSN")
         self.ssl = self._coerce_bool(config.get("ssl"), True)
 
-        # Warehouse (Databend Cloud concept)
         self.warehouse = config.get("warehouse") or os.environ.get("DATABEND_WAREHOUSE")
 
-        # Benchmark options
         self.disable_result_cache = self._coerce_bool(config.get("disable_result_cache"), True)
 
-        # Validate configuration
         if not self.dsn and not self.host:
             raise ConfigurationError(
                 "Databend configuration is incomplete. Provide either:\n"
@@ -149,12 +86,10 @@ class DatabendAdapter(PlatformAdapter):
 
     @property
     def platform_name(self) -> str:
-        """Return platform display name."""
         return "Databend"
 
     @staticmethod
     def add_cli_arguments(parser) -> None:
-        """Add Databend-specific CLI arguments."""
         databend_group = parser.add_argument_group("Databend Arguments")
 
         databend_group.add_argument(
@@ -210,7 +145,6 @@ class DatabendAdapter(PlatformAdapter):
 
     @classmethod
     def from_config(cls, config: dict[str, Any]):
-        """Create Databend adapter from unified configuration."""
         from benchbox.platforms.base.config_utils import build_adapter_config
 
         return cls(
@@ -223,28 +157,16 @@ class DatabendAdapter(PlatformAdapter):
         )
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for Databend.
-
-        Databend uses Snowflake-compatible SQL, so we use the Snowflake
-        dialect as a translation proxy via sqlglot.
-        """
         return "snowflake"
 
     def _build_dsn(self) -> str:
-        """Build connection DSN from individual parameters.
-
-        Returns:
-            DSN string in format: databend+http://user:pass@host:port/database?options
-        """
         if self.dsn:
             return self._normalize_dsn_scheme(self.dsn)
 
-        # Determine port
         port = self.port
         if not port:
             port = 443 if self.ssl else 8000
 
-        # Build DSN
         user_part = quote(self.username, safe="") if self.username else ""
         if self.password:
             user_part = f"{user_part}:{quote(self.password, safe='')}"
@@ -253,7 +175,6 @@ class DatabendAdapter(PlatformAdapter):
 
         dsn = f"{scheme}://{user_part}@{self.host}:{port}/{self.database}"
 
-        # Add warehouse parameter for Databend Cloud
         params = []
         if not self.ssl:
             params.append("sslmode=disable")
@@ -267,7 +188,6 @@ class DatabendAdapter(PlatformAdapter):
 
     @staticmethod
     def _get_blocking_connection(client: Any) -> Any:
-        """Normalize databend-driver client objects across driver versions."""
         if all(hasattr(client, method) for method in ("query_row", "query_iter", "exec")):
             return client
         if hasattr(client, "get_conn"):
@@ -276,7 +196,6 @@ class DatabendAdapter(PlatformAdapter):
 
     @staticmethod
     def _normalize_dsn_scheme(dsn: str) -> str:
-        """Map legacy BenchBox DSN schemes to the databend-driver variants."""
         if dsn.startswith("databend+ssl://"):
             return "databend+https://" + dsn[len("databend+ssl://") :]
         if dsn.startswith("databend://"):
@@ -287,13 +206,8 @@ class DatabendAdapter(PlatformAdapter):
         return dsn
 
     def create_connection(self, **connection_config) -> Any:
-        """Create Databend connection.
-
-        Uses databend-driver for DB-API 2.0 connectivity.
-        """
         self.log_operation_start("Databend connection")
 
-        # Handle existing database using base class method
         self.handle_existing_database(**connection_config)
 
         dsn = self._build_dsn()
@@ -306,7 +220,6 @@ class DatabendAdapter(PlatformAdapter):
             client = BlockingDatabendClient(dsn)
             connection = self._get_blocking_connection(client)
 
-            # Test connection
             row = connection.query_row("SELECT 1")
             if row is None:
                 raise ConnectionError("Databend connection test returned no result")
@@ -323,37 +236,25 @@ class DatabendAdapter(PlatformAdapter):
             raise
 
     def create_schema(self, benchmark, connection: Any) -> float:
-        """Create schema using Snowflake-compatible table definitions.
-
-        Databend uses Snowflake-compatible DDL with some differences:
-        - Supports most Snowflake data types
-        - No foreign key constraint enforcement
-        - Clustering keys instead of sort keys
-        """
         start_time = mono_time()
 
         try:
-            # Create database if it doesn't exist
             connection.exec(f"CREATE DATABASE IF NOT EXISTS {self._quote_identifier(self.database)}")
             connection.exec(f"USE {self._quote_identifier(self.database)}")
 
-            # Use common schema creation helper with Snowflake dialect
             schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
-            # Split schema into individual statements and execute
             statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
 
             for statement in statements:
                 if not statement:
                     continue
 
-                # Optimize table definition for Databend
                 statement = self._optimize_table_definition(statement)
                 try:
                     connection.exec(statement)
                     self.logger.debug(f"Executed schema statement: {statement[:100]}...")
                 except Exception as e:
-                    # If table already exists, drop and recreate
                     if "already exists" in str(e).lower():
                         table_name = self._extract_table_name(statement)
                         if table_name:
@@ -373,15 +274,6 @@ class DatabendAdapter(PlatformAdapter):
     def load_data(
         self, benchmark, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load data using INSERT statements.
-
-        Databend supports:
-        - INSERT INTO ... VALUES for batch loading
-        - COPY INTO from S3/staged files for large datasets
-        - Streaming load via HTTP API
-
-        This implementation uses INSERT batching which works for both modes.
-        """
         start_time = mono_time()
         table_stats: dict[str, int] = {}
 
@@ -441,11 +333,6 @@ class DatabendAdapter(PlatformAdapter):
         data_source: Any,
         benchmark: Any,
     ) -> int:
-        """Read data files and insert rows into Databend in batches.
-
-        Returns:
-            Total number of rows loaded.
-        """
         total_rows_loaded = 0
         batch_size = 500
 
@@ -501,7 +388,6 @@ class DatabendAdapter(PlatformAdapter):
         return total_rows_loaded
 
     def _resolve_data_files(self, benchmark, data_dir: Path) -> Any:
-        """Resolve data files via DataSourceResolver."""
         return resolve_adapter_data_source(self, benchmark, data_dir)
 
     def execute_query(
@@ -514,25 +400,19 @@ class DatabendAdapter(PlatformAdapter):
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute query with detailed timing and performance tracking."""
-        # Ensure we're using the correct database (outside of timing)
         connection.exec(f"USE {self._quote_identifier(self.database)}")
 
-        # Start timing after USE to measure only the actual query
         start_time = mono_time()
 
         try:
-            # Execute the query using query_iter for row results
             rows = connection.query_iter(query)
             result = list(rows)
 
             execution_time = elapsed_seconds(start_time)
             actual_row_count = len(result)
 
-            # Query statistics
             query_stats = {"execution_time_seconds": execution_time}
 
-            # Validate row count if enabled
             validation_result = None
             if validate_row_count and benchmark_type:
                 from benchbox.core.validation.query_validation import QueryValidator
@@ -556,7 +436,6 @@ class DatabendAdapter(PlatformAdapter):
                         f"(expected: {validation_result.expected_row_count})"
                     )
 
-            # Build result with consistent validation field mapping
             result_dict = self._build_query_result_with_validation(
                 query_id=query_id,
                 execution_time=execution_time,
@@ -580,19 +459,11 @@ class DatabendAdapter(PlatformAdapter):
                 "error_type": type(e).__name__,
             }
 
-        # Capture and merge the structured query plan (SUCCESS-guarded in the
-        # helper). Kept outside the try so a strict_plan_capture PlanCaptureError
-        # propagates instead of being swallowed and mislabeling the query FAILED.
         self._merge_plan_capture_into_result(result_dict, connection, query, query_id)
 
         return result_dict
 
     def get_query_plan(self, connection: Any, query: str) -> str | None:
-        """Get query execution plan for analysis.
-
-        Databend ``EXPLAIN <query>`` returns a box-drawing text tree (one plan
-        line per row). Returns None on failure so plan capture degrades silently.
-        """
         try:
             rows = connection.query_iter(f"EXPLAIN {query}")
             plan_rows = list(rows)
@@ -603,13 +474,11 @@ class DatabendAdapter(PlatformAdapter):
             return None
 
     def get_query_plan_parser(self):
-        """Get the Databend query plan parser."""
         from benchbox.core.query_plans.parsers.databend import DatabendQueryPlanParser
 
         return DatabendQueryPlanParser()
 
     def close_connection(self, connection: Any) -> None:
-        """Close Databend connection."""
         try:
             if connection and hasattr(connection, "close"):
                 connection.close()
@@ -617,11 +486,6 @@ class DatabendAdapter(PlatformAdapter):
             self.logger.warning(f"Error closing connection: {e}")
 
     def test_connection(self) -> bool:
-        """Test connection to Databend.
-
-        Returns:
-            True if connection successful, False otherwise
-        """
         client = None
         connection = None
         try:
@@ -642,7 +506,6 @@ class DatabendAdapter(PlatformAdapter):
                 client.close()
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get Databend platform information."""
         platform_info = {
             "platform_type": "databend",
             "platform_name": self.platform_name,
@@ -655,7 +518,6 @@ class DatabendAdapter(PlatformAdapter):
         if self.warehouse:
             platform_info["warehouse"] = self.warehouse
 
-        # Get driver version
         try:
             import databend_driver as dd
 
@@ -663,7 +525,6 @@ class DatabendAdapter(PlatformAdapter):
         except (ImportError, AttributeError):
             platform_info["client_library_version"] = None
 
-        # Try to get server version from connection
         if connection:
             try:
                 row = connection.query_row("SELECT version()")
@@ -677,13 +538,8 @@ class DatabendAdapter(PlatformAdapter):
         return platform_info
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
-        """Apply Databend-specific optimizations based on benchmark type.
-
-        Databend's vectorized Rust engine is optimized by default for analytical workloads.
-        """
         self.log_verbose(f"Configuring Databend for {benchmark_type} benchmark")
 
-        # Disable query result cache for accurate benchmark measurements
         if self.disable_result_cache:
             try:
                 connection.exec("SET enable_query_result_cache = 0")
@@ -695,7 +551,6 @@ class DatabendAdapter(PlatformAdapter):
             self.log_verbose("Databend vectorized engine optimized for analytical workloads")
 
     def check_server_database_exists(self, **connection_config) -> bool:
-        """Check if database exists in Databend."""
         database = connection_config.get("database", self.database)
 
         client = None
@@ -723,7 +578,6 @@ class DatabendAdapter(PlatformAdapter):
                 client.close()
 
     def drop_database(self, **connection_config) -> None:
-        """Drop database in Databend."""
         database = connection_config.get("database", self.database)
 
         connection = None
@@ -744,11 +598,6 @@ class DatabendAdapter(PlatformAdapter):
     _supported_tuning_type_names = ("CLUSTERING",)
 
     def generate_tuning_clause(self, table_tuning) -> str:
-        """Generate Databend-specific tuning clauses.
-
-        Databend supports CLUSTER BY for controlling data layout,
-        similar to Snowflake's clustering keys.
-        """
         if not table_tuning or not table_tuning.has_any_tuning():
             return ""
 
@@ -757,7 +606,6 @@ class DatabendAdapter(PlatformAdapter):
         try:
             from benchbox.core.tuning.interface import TuningType
 
-            # Handle clustering
             clustering_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
             if clustering_columns:
                 sorted_cols = sorted(clustering_columns, key=lambda col: col.order)
@@ -770,10 +618,6 @@ class DatabendAdapter(PlatformAdapter):
         return " ".join(clauses) if clauses else ""
 
     def apply_table_tunings(self, table_tuning, connection: Any) -> None:
-        """Apply tuning configurations to a Databend table.
-
-        Databend supports ALTER TABLE ... CLUSTER BY for post-creation clustering.
-        """
         if not table_tuning or not table_tuning.has_any_tuning():
             return
 
@@ -795,13 +639,11 @@ class DatabendAdapter(PlatformAdapter):
             self.logger.warning("Tuning interface not available - skipping tuning application")
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
-        """Apply unified tuning configuration to Databend."""
         from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning
 
         apply_standard_unified_tuning(self, unified_config, connection)
 
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
-        """Apply Databend-specific platform optimizations."""
         if not platform_config:
             return
 
@@ -813,39 +655,24 @@ class DatabendAdapter(PlatformAdapter):
     )
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
-        """Run ANALYZE on table for query optimization.
-
-        Databend collects statistics automatically via its storage engine.
-        """
         self.logger.debug(f"Databend collects statistics automatically - skipping explicit ANALYZE for {table_name}")
 
     def _optimize_table_definition(self, statement: str) -> str:
-        """Optimize table definition for Databend.
-
-        Databend-specific type mappings and constraint handling:
-        - CHAR(n) -> VARCHAR (Databend uses VARCHAR for strings)
-        - Remove FOREIGN KEY constraints (not enforced)
-        - Remove PRIMARY KEY constraints from column definitions
-        """
         if not statement.upper().strip().startswith("CREATE"):
             return statement
 
-        # Replace CHAR(n) with VARCHAR (Databend prefers VARCHAR)
         statement = re.sub(r"\bCHAR\s*\(\s*(\d+)\s*\)", r"VARCHAR(\1)", statement, flags=re.IGNORECASE)
 
-        # Remove inline PRIMARY KEY constraints
         statement = re.sub(r",?\s*PRIMARY\s+KEY\s*\([^)]*\)", "", statement, flags=re.IGNORECASE)
 
         statement = strip_foreign_keys(statement)
 
-        # Clean up double commas left by PRIMARY KEY removal
         statement = re.sub(r",\s*,", ",", statement)
         statement = re.sub(r",\s*\)", ")", statement)
 
         return statement
 
     def _extract_table_name(self, statement: str) -> str | None:
-        """Extract table name from CREATE TABLE statement."""
         try:
             match = re.search(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)", statement, re.IGNORECASE)
             if match:
@@ -855,13 +682,11 @@ class DatabendAdapter(PlatformAdapter):
         return None
 
     def _quote_identifier(self, name: str) -> str:
-        """Safely quote identifiers for Databend using backticks."""
         if not isinstance(name, str) or not name:
             raise ValueError("Identifier must be a non-empty string")
         return "`" + name.replace("`", "``") + "`"
 
     def _coerce_bool(self, value: Any, default: bool) -> bool:
-        """Coerce potentially string config values to booleans."""
         if value is None:
             return default
         if isinstance(value, str):

@@ -1,13 +1,6 @@
-"""
-Copyright 2026 Joe Harris / BenchBox Project
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Licensed under the MIT License. See LICENSE file in the project root for details.
-
-Platform Registry and Factory
-
-This module provides a centralized registry and factory for platform adapters,
-enabling dynamic discovery and instantiation of platform adapters.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import argparse
 import importlib
@@ -42,12 +35,6 @@ OptionalAdapterImportStatus = Literal[
     "not_configured",
 ]
 
-# The output location the Snowflake credential prompt advertises as its
-# default. It lives next to get_cloud_path_examples() — and is the first entry
-# of the snowflake example list — so the prompt and the documented examples
-# cannot drift apart again. Any value here must stay acceptable to
-# benchbox.utils.cloud_storage.is_cloud_path, which is the classifier the run
-# path uses; a test pins that agreement.
 SNOWFLAKE_DEFAULT_OUTPUT_LOCATION = "@~/benchbox"
 
 _NATIVE_IMPORT_ERROR_MARKERS = (
@@ -64,7 +51,6 @@ _NATIVE_IMPORT_ERROR_MARKERS = (
 
 
 def _is_internal_module_miss(missing_name: str, module_path: str | None = None) -> bool:
-    """Return whether a ModuleNotFoundError names BenchBox code, not an SDK dependency."""
     if module_path is not None and (missing_name == module_path or missing_name.startswith(f"{module_path}.")):
         return True
     return missing_name == "benchbox" or missing_name.startswith("benchbox.")
@@ -72,8 +58,6 @@ def _is_internal_module_miss(missing_name: str, module_path: str | None = None) 
 
 @dataclass(frozen=True)
 class OptionalAdapterDiagnostic:
-    """Diagnostic detail for an optional adapter import attempt."""
-
     platform_name: str
     module_path: str
     class_name: str
@@ -84,7 +68,6 @@ class OptionalAdapterDiagnostic:
     error_message: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-friendly representation for CLI/tests/docs tooling."""
         return {
             "platform_name": self.platform_name,
             "module_path": self.module_path,
@@ -99,25 +82,6 @@ class OptionalAdapterDiagnostic:
 
 @dataclass
 class DeploymentCapability:
-    """Describes requirements and characteristics of a specific deployment mode.
-
-    Deployment modes represent different ways to run the same database engine:
-    - local: Embedded or in-process (DuckDB, chDB, SQLite)
-    - self-hosted: User-managed server/cluster (ClickHouse server, Trino)
-    - managed: Vendor-managed cloud service (MotherDuck, ClickHouse Cloud, Snowflake)
-
-    Attributes:
-        mode: Deployment category (local, self-hosted, or managed)
-        requires_credentials: Whether authentication is needed
-        requires_cloud_storage: Whether cloud storage staging is required for data loading
-        requires_network: Whether network connectivity to a remote service is required
-        default_for_platform: Whether this is the platform's default deployment mode
-        display_name: Human-readable name for this deployment mode
-        description: Description of this deployment mode
-        dependencies: Additional package dependencies for this deployment mode
-        auth_methods: Supported authentication methods (password, oauth, token, api_key, etc.)
-    """
-
     mode: Literal["local", "self-hosted", "managed"]
     requires_credentials: bool = False
     requires_cloud_storage: bool = False
@@ -131,22 +95,6 @@ class DeploymentCapability:
 
 @dataclass
 class PlatformCapability:
-    """Platform execution mode and deployment capabilities.
-
-    Tracks which execution modes (SQL, DataFrame) a platform supports,
-    its default mode, and deployment mode information.
-
-    Attributes:
-        supports_sql: Whether platform supports SQL execution mode
-        supports_dataframe: Whether platform supports DataFrame execution mode
-        default_mode: Default execution mode (sql or dataframe)
-        deployment_modes: Available deployment modes mapped by name
-        default_deployment: Name of the default deployment mode
-        platform_family: Platform family for dialect inheritance (e.g., "duckdb", "clickhouse")
-        inherits_from: Parent platform name for configuration inheritance
-        cost_class: Coarse cost model for prompt safety gates
-    """
-
     supports_sql: bool = False
     supports_dataframe: bool = False
     default_mode: Literal["sql", "dataframe"] = "sql"
@@ -159,19 +107,6 @@ class PlatformCapability:
 
 
 class PlatformRegistry:
-    """Registry for platform adapters with factory functionality.
-
-    Static definitions are projected from ``benchbox.core.platform_manifest``.
-    This class owns runtime adapter state and factory behavior. The
-    get_platform_adapter() function in benchbox/platforms/__init__.py delegates
-    to this registry for adapter lookup while handling CLI-specific concerns.
-
-    Alias Support:
-        Platform aliases (e.g., 'sqlite3' -> 'sqlite') are resolved via
-        resolve_platform_name() before any lookup. This allows users to
-        use familiar names while the registry maintains canonical names.
-    """
-
     _adapters: dict[str, type[PlatformAdapter]] = {}
     _availability_cache: Optional[dict[str, bool]] = None
     _platform_metadata: dict[str, dict[str, Any]] = {}
@@ -180,68 +115,25 @@ class PlatformRegistry:
 
     @classmethod
     def resolve_platform_name(cls, platform_name: str) -> str:
-        """Resolve user input (with possible alias) to canonical platform name.
-
-        This method normalizes platform names and resolves aliases to their
-        canonical counterparts. It should be called before any platform lookup.
-
-        Args:
-            platform_name: User-provided platform name (may be an alias)
-
-        Returns:
-            Canonical platform name (lowercase)
-
-        Examples:
-            >>> PlatformRegistry.resolve_platform_name("SQLite3")
-            'sqlite'
-            >>> PlatformRegistry.resolve_platform_name("azure_synapse")
-            'synapse'
-            >>> PlatformRegistry.resolve_platform_name("DuckDB")
-            'duckdb'
-        """
         normalized = platform_name.lower()
         return cls._platform_aliases.get(normalized, normalized)
 
     @classmethod
     def get_all_aliases(cls) -> dict[str, str]:
-        """Get all platform name aliases.
-
-        Returns:
-            Dictionary mapping alias names to their canonical platform names.
-            Useful for CLI help and documentation.
-
-        Examples:
-            >>> PlatformRegistry.get_all_aliases()
-            {'sqlite3': 'sqlite', 'azure_synapse': 'synapse'}
-        """
         return cls._platform_aliases.copy()
 
     @classmethod
     def _build_platform_metadata(cls) -> dict[str, dict[str, Any]]:
-        """Build mutable legacy metadata from the typed manifest authority."""
         return get_platform_metadata()
 
     @classmethod
     def _ensure_registered(cls) -> None:
-        """Lazily trigger auto_register_platforms() on first registry access.
-
-        This avoids eagerly importing every platform adapter (and their heavy
-        native dependencies like chdb/polars/datafusion/duckdb) at module load
-        time.  Instead, the imports are deferred until something actually queries
-        the registry, which most unit tests never do.
-        """
         if not cls._auto_registered:
             cls._auto_registered = True
             auto_register_platforms()
 
     @classmethod
     def register_adapter(cls, platform_name: str, adapter_class: type[PlatformAdapter]) -> None:
-        """Register a built-in or third-party adapter under a canonical key.
-
-        Args:
-            platform_name: Name of the platform (e.g., 'duckdb', 'databricks')
-            adapter_class: Platform adapter class
-        """
         normalized = platform_name.lower()
         if not is_valid_platform_key(normalized):
             raise ValueError(f"Platform {platform_name!r} is not a valid canonical adapter key")
@@ -260,27 +152,13 @@ class PlatformRegistry:
                 f"Platform {canonical_name!r} is already registered with {existing.__module__}.{existing.__name__}"
             )
         cls._adapters[canonical_name] = adapter_class
-        # Clear availability cache when new adapter is registered
         cls._availability_cache = None
-        # Initialize metadata if not present
         if not cls._platform_metadata:
             cls._platform_metadata = cls._build_platform_metadata()
 
     @classmethod
     def get_adapter_class(cls, platform_name: str) -> type[PlatformAdapter]:
-        """Get platform adapter class by name.
-
-        Args:
-            platform_name: Name of the platform (aliases are resolved automatically)
-
-        Returns:
-            Platform adapter class
-
-        Raises:
-            ValueError: If platform is not registered
-        """
         cls._ensure_registered()
-        # Resolve aliases to canonical name
         canonical_name = cls.resolve_platform_name(platform_name)
 
         if canonical_name not in cls._adapters:
@@ -290,61 +168,35 @@ class PlatformRegistry:
 
     @classmethod
     def create_adapter(cls, platform_name: str, config: dict[str, Any]) -> PlatformAdapter:
-        """Create platform adapter instance from configuration.
-
-        Args:
-            platform_name: Name of the platform
-            config: Unified configuration dictionary
-
-        Returns:
-            Platform adapter instance
-        """
         adapter_class = cls.get_adapter_class(platform_name)
         return adapter_class.from_config(config)
 
     @classmethod
     def add_platform_arguments(cls, parser: argparse.ArgumentParser, platform_name: str) -> None:
-        """Add platform-specific arguments to parser.
-
-        Args:
-            parser: Argument parser to add arguments to
-            platform_name: Name of the platform
-        """
         adapter_class = cls.get_adapter_class(platform_name)
         adapter_class.add_cli_arguments(parser)
 
     @classmethod
     def get_available_platforms(cls) -> list[str]:
-        """Get list of available platform names.
-
-        Returns:
-            List of registered platform names
-        """
         cls._ensure_registered()
         return list(cls._adapters.keys())
 
     @classmethod
     def _detect_library(cls, lib_spec: dict[str, Any]) -> LibraryInfo:
-        """Detect a single library."""
         lib_name = lib_spec["name"]
         import_name = lib_spec.get("import_name", lib_name)
 
-        # Optional native modules can change cwd before failing to load.
         original_cwd = os.getcwd()
         try:
             module = importlib.import_module(import_name)
             version = getattr(module, "__version__", None)
-            # Handle edge cases where __version__ is not a string
-            # (e.g., clickhouse_connect has __version__ as a module)
             if version is not None and not isinstance(version, str):
-                # Try common patterns for version submodules/attributes
                 if hasattr(version, "version"):
                     version = version.version
                 elif hasattr(version, "VERSION"):
                     version = version.VERSION
                 else:
                     version = None
-            # Ensure version is a string or None
             if version is not None and not isinstance(version, str):
                 version = str(version) if version else None
             return LibraryInfo(name=lib_name, version=version, installed=True)
@@ -355,13 +207,11 @@ class PlatformRegistry:
 
     @staticmethod
     def _extract_requirement_package(requirement: str) -> Optional[str]:
-        """Extract distribution name from a requirement string."""
 
         if not requirement:
             return None
 
         requirement = requirement.strip()
-        # Ignore descriptive requirements (e.g. "sqlite3 (built-in)")
         if "(" in requirement and ")" in requirement and " " in requirement:
             return requirement.split(" ", 1)[0]
 
@@ -375,11 +225,6 @@ class PlatformRegistry:
 
     @classmethod
     def get_platform_availability(cls) -> dict[str, bool]:
-        """Get availability status for all registered platforms.
-
-        Returns:
-            Dictionary mapping platform names to availability status
-        """
         cls._ensure_registered()
         if cls._availability_cache is not None:
             return cls._availability_cache.copy()
@@ -390,7 +235,6 @@ class PlatformRegistry:
         availability = {}
         for platform_name in cls._adapters:
             if platform_name in cls._platform_metadata:
-                # Use detailed library detection
                 platform_spec = cls._platform_metadata[platform_name]
                 available = True
 
@@ -406,7 +250,6 @@ class PlatformRegistry:
 
                 availability[platform_name] = available
             else:
-                # Fallback to old method
                 try:
                     adapter_class = cls._adapters[platform_name]
                     test_config = {"database_path": ":memory:"} if platform_name == "duckdb" else {}
@@ -422,32 +265,15 @@ class PlatformRegistry:
 
     @classmethod
     def is_platform_available(cls, platform_name: str) -> bool:
-        """Check if a specific platform is available.
-
-        Args:
-            platform_name: Name of the platform to check
-
-        Returns:
-            True if platform is available
-        """
         availability = cls.get_platform_availability()
         return availability.get(platform_name, False)
 
     @classmethod
     def get_platform_info(cls, platform_name: str) -> Optional[PlatformInfo]:
-        """Get comprehensive platform information.
-
-        Args:
-            platform_name: Name of the platform (aliases are resolved automatically)
-
-        Returns:
-            Platform information or None if not found
-        """
         cls._ensure_registered()
         if not cls._platform_metadata:
             cls._platform_metadata = cls._build_platform_metadata()
 
-        # Resolve aliases to canonical name
         canonical_name = cls.resolve_platform_name(platform_name)
 
         if canonical_name not in cls._platform_metadata:
@@ -455,7 +281,6 @@ class PlatformRegistry:
 
         platform_spec = cls._platform_metadata[canonical_name]
 
-        # Detect libraries
         libraries = []
         available = True
 
@@ -466,11 +291,9 @@ class PlatformRegistry:
             if lib_spec.get("required", True) and not lib_info.installed and not lib_spec.get("alternative", False):
                 available = False
 
-        # Check if driver_package is explicitly set in metadata
         if "driver_package" in platform_spec:
             driver_package = platform_spec["driver_package"]
         else:
-            # Fallback: extract from requirements if not explicitly specified
             requirements = platform_spec.get("requirements", [])
             driver_package = cls._extract_requirement_package(requirements[0]) if requirements else None
 
@@ -492,19 +315,10 @@ class PlatformRegistry:
 
     @classmethod
     def get_platform_requirements(cls, platform_name: str) -> str:
-        """Get installation requirements for a platform.
-
-        Args:
-            platform_name: Name of the platform
-
-        Returns:
-            Installation requirements string
-        """
         info = cls.get_platform_info(platform_name)
         if info:
             return info.installation_command
 
-        # Fallback to old static mapping
         requirements_map = {
             "duckdb": "uv add duckdb",
             "databricks": "uv add databricks-sql-connector",
@@ -521,14 +335,6 @@ class PlatformRegistry:
 
     @classmethod
     def get_platforms_by_category(cls, category: str) -> list[str]:
-        """Get platforms filtered by category.
-
-        Args:
-            category: Platform category ('analytical', 'cloud', 'embedded', etc.)
-
-        Returns:
-            List of platform names in the category
-        """
         cls._ensure_registered()
         if not cls._platform_metadata:
             cls._platform_metadata = cls._build_platform_metadata()
@@ -541,14 +347,6 @@ class PlatformRegistry:
 
     @classmethod
     def get_platforms_by_adoption(cls, tier: str) -> list[str]:
-        """Get platforms by adoption tier.
-
-        Args:
-            tier: Adoption tier ('mainstream', 'established', 'emerging', 'niche')
-
-        Returns:
-            List of platform names in the specified tier
-        """
         cls._ensure_registered()
         if not cls._platform_metadata:
             cls._platform_metadata = cls._build_platform_metadata()
@@ -561,34 +359,14 @@ class PlatformRegistry:
 
     @classmethod
     def requires_cloud_storage(cls, platform_name: str) -> bool:
-        """Check if a platform requires cloud storage for data loading.
-
-        Cloud platforms (Databricks, BigQuery, Snowflake, Redshift) require
-        a cloud storage staging location for loading benchmark data.
-
-        Args:
-            platform_name: Name of the platform
-
-        Returns:
-            True if platform requires cloud storage staging location
-        """
         if not cls._platform_metadata:
             cls._platform_metadata = cls._build_platform_metadata()
 
         metadata = cls._platform_metadata.get(platform_name.lower(), {})
-        # Cloud platforms require staging locations for data loading
         return metadata.get("category") == "cloud"
 
     @classmethod
     def get_cloud_path_examples(cls, platform_name: str) -> list[str]:
-        """Get example cloud paths for a platform.
-
-        Args:
-            platform_name: Name of the platform
-
-        Returns:
-            List of example cloud path formats for the platform
-        """
         examples = {
             "databricks": [
                 "dbfs:/Volumes/catalog/schema/volume/benchbox",
@@ -600,8 +378,6 @@ class PlatformRegistry:
                 "gs://my-bucket/benchbox/data",
             ],
             "snowflake": [
-                # User stage first: it is what the credential prompt defaults to
-                # and needs no cloud-storage setup.
                 SNOWFLAKE_DEFAULT_OUTPUT_LOCATION,
                 "s3://my-bucket/benchbox/data",
                 "azure://my-container/benchbox/data",
@@ -620,33 +396,24 @@ class PlatformRegistry:
 
     @classmethod
     def clear_cache(cls) -> None:
-        """Clear the availability cache."""
         cls._availability_cache = None
 
     @classmethod
     def _get_cached_platform_metadata(cls) -> dict[str, dict[str, Any]]:
-        """Return the internal metadata cache for read-only registry decisions."""
         if not cls._platform_metadata:
             cls._platform_metadata = cls._build_platform_metadata()
         return cls._platform_metadata
 
     @classmethod
     def get_all_platform_metadata(cls) -> dict[str, dict[str, Any]]:
-        """Get a fully isolated mutable copy of all platform metadata.
-
-        Returns:
-            Dictionary mapping platform names to independently mutable metadata.
-        """
         return deepcopy(cls._get_cached_platform_metadata())
 
     @classmethod
     def get_platform_names(cls) -> list[str]:
-        """Get platform names without copying nested metadata values."""
         return list(cls._get_cached_platform_metadata())
 
     @classmethod
     def get_platform_support_status(cls, platform_name: str) -> Optional[SupportStatus]:
-        """Return the registry support status for a platform."""
         metadata = cls._get_cached_platform_metadata()
         canonical_name = cls.resolve_platform_name(platform_name)
         platform_spec = metadata.get(canonical_name)
@@ -656,7 +423,6 @@ class PlatformRegistry:
 
     @classmethod
     def get_platforms_by_support_status(cls, status: SupportStatus) -> list[str]:
-        """Get platforms filtered by product support status."""
         if status not in SUPPORT_STATUS_VALUES:
             raise ValueError(f"Unknown support_status {status!r}. Expected one of: {', '.join(SUPPORT_STATUS_VALUES)}")
 
@@ -665,7 +431,6 @@ class PlatformRegistry:
 
     @classmethod
     def get_platform_count_summary(cls) -> dict[str, Any]:
-        """Return registry-derived platform counts for docs drift checks."""
         metadata = cls._get_cached_platform_metadata()
         status_counts = Counter(spec["support_status"] for spec in metadata.values())
         category_counts = Counter(spec.get("category", "unknown") for spec in metadata.values())
@@ -703,7 +468,6 @@ class PlatformRegistry:
         *,
         module_path: str | None = None,
     ) -> OptionalAdapterImportStatus:
-        """Classify an optional adapter import failure without raising it."""
         message = str(exc).lower()
         if isinstance(exc, ModuleNotFoundError):
             missing_name = exc.name or ""
@@ -721,13 +485,6 @@ class PlatformRegistry:
         cls,
         platform_names: Optional[Iterable[str]] = None,
     ) -> dict[str, dict[str, Any]]:
-        """Diagnose optional adapter import health on demand.
-
-        Normal registry discovery remains fail-open for missing optional
-        dependencies. This explicit diagnostic path imports selected adapters
-        and reports whether a failure is dependency, native-library, broken
-        adapter, deprecated, or intentionally disabled status.
-        """
         requested = None
         if platform_names is not None:
             requested = {cls.resolve_platform_name(platform_name) for platform_name in platform_names}
@@ -754,30 +511,13 @@ class PlatformRegistry:
 
     @classmethod
     def detect_library(cls, lib_spec: dict[str, Any]) -> LibraryInfo:
-        """Detect a single library for CLI use.
-
-        Args:
-            lib_spec: Library specification dictionary
-
-        Returns:
-            LibraryInfo object with detection results
-        """
         return cls._detect_library(lib_spec)
 
     @classmethod
     def get_platform_capabilities(cls, platform_name: str) -> Optional[PlatformCapability]:
-        """Get capability information for a platform.
-
-        Args:
-            platform_name: Name of the platform (aliases are resolved automatically)
-
-        Returns:
-            PlatformCapability object or None if platform not found
-        """
         if not cls._platform_metadata:
             cls._platform_metadata = cls._build_platform_metadata()
 
-        # Resolve aliases to canonical name
         canonical_name = cls.resolve_platform_name(platform_name)
         metadata = cls._platform_metadata.get(canonical_name)
         if metadata is None:
@@ -785,7 +525,6 @@ class PlatformRegistry:
 
         caps = metadata.get("capabilities", {})
 
-        # Parse deployment modes from metadata
         deployment_modes: dict[str, DeploymentCapability] = {}
         deployment_data = caps.get("deployment_modes", {})
         for mode_name, mode_spec in deployment_data.items():
@@ -801,8 +540,6 @@ class PlatformRegistry:
                 auth_methods=deepcopy(mode_spec.get("auth_methods", [])),
             )
 
-        # unsupported_benchmarks is computed from registry benchmark_gate rules,
-        # the single source. The manifest carries no per-platform gate dict.
         import benchbox.sql_compat.rules.benchmark_gate.clickhouse_local_gate  # noqa: F401
         import benchbox.sql_compat.rules.benchmark_gate.lakesail_gate  # noqa: F401
         import benchbox.sql_compat.rules.benchmark_gate.pg_family_gate  # noqa: F401
@@ -836,18 +573,6 @@ class PlatformRegistry:
 
     @classmethod
     def get_platform_conflicts(cls, platform_name: str) -> list[str]:
-        """Get list of platforms that conflict with the given platform.
-
-        Some PostgreSQL extensions share libraries (e.g., pg_duckdb and
-        pg_mooncake share libduckdb.so) and cannot coexist in the same
-        PostgreSQL instance.
-
-        Args:
-            platform_name: Name of the platform (aliases are resolved automatically)
-
-        Returns:
-            List of conflicting platform names, or empty list if none.
-        """
         if not cls._platform_metadata:
             cls._platform_metadata = cls._build_platform_metadata()
 
@@ -861,15 +586,6 @@ class PlatformRegistry:
 
     @classmethod
     def supports_mode(cls, platform_name: str, mode: str) -> bool:
-        """Check if platform supports a specific execution mode.
-
-        Args:
-            platform_name: Name of the platform
-            mode: Execution mode ('sql' or 'dataframe')
-
-        Returns:
-            True if platform supports the mode
-        """
         caps = cls.get_platform_capabilities(platform_name)
         if caps is None:
             return False
@@ -882,14 +598,6 @@ class PlatformRegistry:
 
     @classmethod
     def get_default_mode(cls, platform_name: str) -> str:
-        """Get default execution mode for a platform.
-
-        Args:
-            platform_name: Name of the platform
-
-        Returns:
-            Default mode ('sql' or 'dataframe'), defaults to 'sql' if unknown
-        """
         caps = cls.get_platform_capabilities(platform_name)
         if caps is None:
             return "sql"
@@ -897,65 +605,21 @@ class PlatformRegistry:
 
     @classmethod
     def get_unsupported_benchmarks(cls, platform_name: str) -> dict[str, str]:
-        """Get benchmarks gated for a platform, mapped to block reasons.
-
-        The mapping is derived from ``BENCHMARK_GATE`` rules in the sql_compat
-        registry (see ``get_platform_capabilities``), so support claims stay
-        explicit and testable instead of living in prose or stale metadata.
-
-        Args:
-            platform_name: Name of the platform (aliases are resolved automatically)
-
-        Returns:
-            Mapping of benchmark name to human-readable block reason.
-            Empty when the platform has no benchmark gates or is unknown.
-        """
         caps = cls.get_platform_capabilities(platform_name)
         if caps is None:
             return {}
-        # getattr-with-default: callers may substitute partial capability
-        # doubles that predate this field.
         return dict(getattr(caps, "unsupported_benchmarks", None) or {})
 
     @classmethod
     def get_benchmark_block_reason(cls, platform_name: str, benchmark: str) -> str | None:
-        """Get the reason a benchmark is blocked on a platform, if any.
-
-        Args:
-            platform_name: Name of the platform (aliases are resolved automatically)
-            benchmark: Benchmark name (e.g., 'tpch', 'vector_search')
-
-        Returns:
-            Block reason when the benchmark is gated for the platform,
-            otherwise None. Unknown platforms also return None; platform
-            availability remains a separate concern.
-        """
         return cls.get_unsupported_benchmarks(platform_name).get(benchmark)
 
     @classmethod
     def is_benchmark_supported(cls, platform_name: str, benchmark: str) -> bool:
-        """Check whether a benchmark may run on a platform.
-
-        "Supported" here means "not blocked by a benchmark gate". It does
-        not imply the platform is installed or available; use
-        ``is_platform_available`` for that orthogonal check.
-
-        Args:
-            platform_name: Name of the platform (aliases are resolved automatically)
-            benchmark: Benchmark name (e.g., 'tpch', 'vector_search')
-
-        Returns:
-            True when no benchmark gate blocks the combination.
-        """
         return cls.get_benchmark_block_reason(platform_name, benchmark) is None
 
     @classmethod
     def get_dual_mode_platforms(cls) -> list[str]:
-        """Get platforms that support both SQL and DataFrame modes.
-
-        Returns:
-            List of platform names with dual-mode support
-        """
         if not cls._platform_metadata:
             cls._platform_metadata = cls._build_platform_metadata()
 
@@ -968,17 +632,14 @@ class PlatformRegistry:
 
     @classmethod
     def get_sql_platforms(cls, *, include_deprecated: bool = False) -> list[str]:
-        """Return registry platforms that support SQL execution."""
         return cls._get_platforms_matching_capability("supports_sql", include_deprecated=include_deprecated)
 
     @classmethod
     def get_dataframe_platforms(cls, *, include_deprecated: bool = False) -> list[str]:
-        """Return registry platforms that support DataFrame execution."""
         return cls._get_platforms_matching_capability("supports_dataframe", include_deprecated=include_deprecated)
 
     @classmethod
     def get_self_hosted_platforms(cls, *, include_deprecated: bool = False) -> list[str]:
-        """Return platforms with at least one self-hosted deployment mode."""
         metadata = cls._get_cached_platform_metadata()
         out: list[str] = []
         for name, spec in metadata.items():
@@ -1007,15 +668,6 @@ class PlatformRegistry:
 
     @classmethod
     def get_deployment_capability(cls, platform_name: str, deployment_mode: str) -> Optional[DeploymentCapability]:
-        """Get deployment capability information for a specific deployment mode.
-
-        Args:
-            platform_name: Name of the platform (aliases are resolved automatically)
-            deployment_mode: Deployment mode name (e.g., 'local', 'server', 'cloud')
-
-        Returns:
-            DeploymentCapability object or None if deployment mode not found
-        """
         caps = cls.get_platform_capabilities(platform_name)
         if caps is None or not caps.deployment_modes:
             return None
@@ -1023,14 +675,6 @@ class PlatformRegistry:
 
     @classmethod
     def get_default_deployment(cls, platform_name: str) -> Optional[str]:
-        """Get default deployment mode for a platform.
-
-        Args:
-            platform_name: Name of the platform (aliases are resolved automatically)
-
-        Returns:
-            Default deployment mode name, or None if platform has no deployment modes
-        """
         caps = cls.get_platform_capabilities(platform_name)
         if caps is None or not caps.deployment_modes:
             return None
@@ -1038,20 +682,6 @@ class PlatformRegistry:
 
     @classmethod
     def get_platform_family(cls, platform_name: str) -> Optional[str]:
-        """Get platform family for dialect/configuration inheritance.
-
-        Platform families group related platforms that share SQL dialect,
-        benchmark compatibility, and data type mappings. For example:
-        - 'duckdb' family: duckdb, motherduck, ducklake
-        - 'clickhouse' family: clickhouse (local, server, cloud modes)
-        - 'trino' family: trino, starburst, athena
-
-        Args:
-            platform_name: Name of the platform (aliases are resolved automatically)
-
-        Returns:
-            Platform family name or None if no family defined
-        """
         caps = cls.get_platform_capabilities(platform_name)
         if caps is None:
             return None
@@ -1059,19 +689,6 @@ class PlatformRegistry:
 
     @classmethod
     def get_inherited_platform(cls, platform_name: str) -> Optional[str]:
-        """Get parent platform for configuration inheritance.
-
-        Child platforms inherit SQL dialect, benchmark compatibility, and
-        data type mappings from their parent. For example:
-        - motherduck, ducklake inherit from duckdb
-        - starburst inherits from trino
-
-        Args:
-            platform_name: Name of the platform (aliases are resolved automatically)
-
-        Returns:
-            Parent platform name or None if no inheritance defined
-        """
         caps = cls.get_platform_capabilities(platform_name)
         if caps is None:
             return None
@@ -1079,19 +696,9 @@ class PlatformRegistry:
 
     @classmethod
     def requires_cloud_storage_for_deployment(cls, platform_name: str, deployment_mode: Optional[str] = None) -> bool:
-        """Check if a specific deployment mode requires cloud storage.
-
-        Args:
-            platform_name: Name of the platform
-            deployment_mode: Specific deployment mode to check, or None for default
-
-        Returns:
-            True if deployment mode requires cloud storage staging location
-        """
         if deployment_mode is None:
             deployment_mode = cls.get_default_deployment(platform_name)
 
-        # If no deployment mode available, fallback to platform-level check
         if deployment_mode is None:
             return cls.requires_cloud_storage(platform_name)
 
@@ -1099,19 +706,10 @@ class PlatformRegistry:
         if dep_cap is not None:
             return dep_cap.requires_cloud_storage
 
-        # Fallback to existing requires_cloud_storage method
         return cls.requires_cloud_storage(platform_name)
 
     @classmethod
     def get_available_deployment_modes(cls, platform_name: str) -> list[str]:
-        """Get list of available deployment modes for a platform.
-
-        Args:
-            platform_name: Name of the platform (aliases are resolved automatically)
-
-        Returns:
-            List of deployment mode names, empty if none defined
-        """
         caps = cls.get_platform_capabilities(platform_name)
         if caps is None or not caps.deployment_modes:
             return []
@@ -1119,25 +717,12 @@ class PlatformRegistry:
 
     @classmethod
     def supports_deployment_mode(cls, platform_name: str, deployment_mode: str) -> bool:
-        """Check if platform supports a specific deployment mode.
-
-        Args:
-            platform_name: Name of the platform
-            deployment_mode: Deployment mode to check
-
-        Returns:
-            True if platform supports the deployment mode
-        """
         caps = cls.get_platform_capabilities(platform_name)
         if caps is None or not caps.deployment_modes:
-            # Platform has no deployment modes defined - only supports default
             return deployment_mode == "local"
         return deployment_mode in caps.deployment_modes
 
 
-# (name, module_path, class_name) - each entry becomes one optional import+register.
-# pg-mooncake historically co-registered questdb in the same try/except; that
-# coupling is now explicit (two separate entries).
 _OPTIONAL_ADAPTERS: tuple[tuple[str, str, str], ...] = get_adapter_imports()
 
 _OPTIONAL_ADAPTER_REGISTRATION_DIAGNOSTICS: dict[str, dict[str, Any]] = {}
@@ -1148,7 +733,6 @@ def _diagnose_optional_adapter_entry(
     module_path: str,
     class_name: str,
 ) -> OptionalAdapterDiagnostic:
-    """Import one optional adapter and return a structured diagnostic."""
     support_status = PlatformRegistry.get_platform_support_status(name)
     if support_status == "deprecated":
         return OptionalAdapterDiagnostic(
@@ -1204,11 +788,6 @@ def _diagnose_optional_adapter_entry(
 
 
 def _try_register_adapter(name: str, module_path: str, class_name: str) -> None:
-    """Import ``class_name`` from ``module_path`` and register as ``name``.
-
-    Missing optional dependencies are silently skipped - adapters whose driver
-    packages aren't installed simply don't appear in the registry.
-    """
     support_status = PlatformRegistry.get_platform_support_status(name)
     try:
         module = importlib.import_module(module_path)
@@ -1245,18 +824,5 @@ def _try_register_adapter(name: str, module_path: str, class_name: str) -> None:
 
 
 def auto_register_platforms() -> None:
-    """Automatically register all available platform adapters.
-
-    Platforms are registered if their dependencies can be successfully imported.
-    The BENCHBOX_ENABLE_EXPERIMENTAL environment variable is reserved for future
-    truly-experimental features but is not currently used.
-    """
     for name, module_path, class_name in _OPTIONAL_ADAPTERS:
         _try_register_adapter(name, module_path, class_name)
-
-
-# NOTE: auto_register_platforms() is no longer called at module level.
-# It is deferred to first access via PlatformRegistry._ensure_registered()
-# to avoid eagerly loading ~600 MB of native libraries (chdb, polars,
-# datafusion, duckdb, databend_driver) into every xdist worker process.
-# See: https://github.com/benchbox/benchbox/issues/XXXX

@@ -1,11 +1,3 @@
-"""CoffeeShop query variant rules for Phase.QUERY_SOURCE.
-
-SA4 and TM1 use SQL constructs that ClickHouse does not support natively.
-The SQL constants below are TEMPLATES - callers must apply default parameters
-via .format(**params) before executing.  The same constants are imported by
-CoffeeShopBenchmark.get_queries() as the legacy-path fallback (OFF/SHADOW modes).
-"""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.actions import CompatAction
@@ -21,8 +13,6 @@ from benchbox.sql_compat.registry import REGISTRY
 _B = "coffeeshop"
 _P = Phase.QUERY_SOURCE
 
-# SA4: SUM(SUM(x)) OVER () is a nested window aggregate unsupported in ClickHouse.
-# Replaced with a CROSS JOIN subquery that pre-computes the grand total.
 CLICKHOUSE_SA4_SQL = """\
 SELECT
     dl.region,
@@ -40,7 +30,6 @@ WHERE ol.order_date BETWEEN toDate('{start_date}') AND toDate('{end_date}')
 GROUP BY dl.region, totals.grand_total
 ORDER BY revenue DESC;"""
 
-# TM1: EXTRACT(HOUR FROM TIME column) fails on ClickHouse - toHour() requires DateTime.
 CLICKHOUSE_TM1_SQL = """\
 SELECT
     CASE

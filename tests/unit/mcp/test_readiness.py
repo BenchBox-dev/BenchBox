@@ -1,5 +1,3 @@
-"""Fail-closed tests for the remote MCP publication gate."""
-
 from __future__ import annotations
 
 import hashlib

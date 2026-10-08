@@ -1,10 +1,3 @@
-"""Live/loader shape regression for platform config extraction.
-
-Builder emits ``platform_name`` plus a double-nested ``configuration`` payload
-while the loader flattens exported config top-level under ``name``. Both must
-resolve without defaulting cloud/region metadata.
-"""
-
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -78,9 +71,7 @@ class TestSnowflakeNestedShapes:
         assert config["cloud"] == "aws"
         assert config["region"] == "us-east-1"
         assert config["warehouse_size"] == "MEDIUM"
-        # Live bundles carry no edition metadata, so normalized cost stays
-        # unavailable until the builder emits it; pin that contract here.
-        # Sizing from adapter configuration without observed provenance is also defaulted.
+
         assert config["_defaulted_fields"] == ["edition", "warehouse_size"]
 
     def test_padded_cloud_and_region_are_stripped(self) -> None:

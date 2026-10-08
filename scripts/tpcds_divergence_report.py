@@ -1,50 +1,9 @@
 #!/usr/bin/env python3
-"""Label every TPC-DS DataFrame-versus-SQL divergence by its likely cause.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This is a report, not a gate. It runs the same per-query comparison as the staged cross-surface
-gate (``benchbox.core.equivalence.cross_surface``) at one or more scale factors, and for every
-cell (query, DataFrame family) that diverges it records the cause and the full divergence
-text as evidence. It does not change a verdict, the comparator, or any gate.
+# TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council
 
-Causes:
-
-``parameter drift``
-    The cell matches when the implementation runs on the values dsqgen put in the SQL (the adapter
-    binding) but diverges on the defaults file. The gate already applies the binding for the queries
-    that have an adapter, so this shows up as a cell that the adapter fixed.
-``unbound (no adapter)``
-    The query has no adapter, so the DataFrame side runs on the defaults file while the SQL carries
-    dsqgen's values. A value or row-count difference cannot be told apart from drift until the query
-    has an adapter. The detail-based label is kept as the secondary cause.
-``null order``
-    An ORDER BY key is NULL on one side and a value on the other at the first mismatching position.
-``decimal/float``
-    A value or an ORDER BY key that differs only by float noise (relative difference under 1e-6).
-
-A tie between rows cannot be proved from the detail text, so no cell is labelled a tie here: a cell that
-looks like one (an ORDER BY or value mismatch between small integers, say) is ``unclassified``, and a tie
-that comes and goes between runs shows up as ``flaky`` with ``--repeat``. Tie canonicalization belongs to
-the comparator and only for causes shown to be ties.
-``row count/logic``
-    A different number of rows or columns, or a value that differs by more than noise.
-``flaky``
-    With ``--repeat N``, the cell did not give the same outcome on every run.
-``error``
-    The comparison raised.
-``unclassified``
-    The detail text fits none of the above.
-
-Usage::
-
-    uv run python scripts/tpcds_divergence_report.py --scale 0.03 --scale 0.1 --out report.md --json report.json
-    uv run python scripts/tpcds_divergence_report.py --scale 0.03 --repeat 5 --query 36
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -104,7 +63,6 @@ def _close(left: float, right: float) -> bool:
 
 
 def _key_cells(text: str) -> list[str]:
-    """Split a printed key tuple such as ``(None, 7008009)`` into its cell texts."""
     inner = text.strip()
     if inner.startswith("(") and inner.endswith(")"):
         inner = inner[1:-1]
@@ -302,7 +260,7 @@ def _run_cell(
                 validator=gate.build_validator(),
                 backends=(backend,),
             )
-    except Exception as exc:  # noqa: BLE001 - a comparison that raises is a result, not a crash
+    except Exception as exc:
         return "error", f"{type(exc).__name__}: {exc}"
     except BaseException as exc:
         if type(exc).__name__ != "PanicException":
@@ -310,7 +268,6 @@ def _run_cell(
         return "error", f"{type(exc).__name__}: {exc}"
     if divergences:
         detail = divergences[0].detail
-        # The harness catches execution failures itself and reports them as divergences with these prefixes.
         if detail.startswith(_HARNESS_FAILURES):
             return "error", detail
         return "divergent", detail
@@ -318,7 +275,6 @@ def _run_cell(
 
 
 def collect(scale: float, *, queries: Sequence[str] | None = None, repeat: int = 1) -> list[Cell]:
-    """Compare every query at ``scale`` and return a record for each divergent or drift-fixed cell."""
     from benchbox.core.equivalence import cross_surface as xs
     from benchbox.core.tpcds.dataframe_queries import TPCDS_DATAFRAME_QUERIES
     from benchbox.core.tpcds.dataframe_queries.parameter_adapters import adapter_query_ids
@@ -405,7 +361,9 @@ def render_markdown(cells: Sequence[Cell], scales: Sequence[float] = ()) -> str:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser = argparse.ArgumentParser(
+        description="Label every TPC-DS DataFrame-versus-SQL divergence by its likely cause."
+    )
     parser.add_argument("--scale", type=float, action="append", help="scale factor (repeatable; default 0.03 and 0.1)")
     parser.add_argument("--query", action="append", help="limit to a query number (repeatable)")
     parser.add_argument("--repeat", type=int, default=1, help="runs per cell; a cell that differs across runs is flaky")

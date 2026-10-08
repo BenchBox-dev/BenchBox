@@ -1,5 +1,3 @@
-"""Result dataclasses for the TPC-DI ETL pipeline."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -9,8 +7,6 @@ from typing import Any
 
 @dataclass
 class ETLBatchResult:
-    """Result of processing a single ETL batch."""
-
     batch_id: int
     batch_date: date
     start_time: datetime
@@ -27,8 +23,6 @@ class ETLBatchResult:
 
 @dataclass
 class ETLPhaseResult:
-    """Result of an ETL phase (Historical or Incremental)."""
-
     phase_name: str
     batches: list[ETLBatchResult] = field(default_factory=list)
     start_time: datetime | None = None
@@ -38,7 +32,6 @@ class ETLPhaseResult:
     success: bool = False
 
     def add_batch_result(self, batch: ETLBatchResult) -> None:
-        """Add a batch result to this phase."""
         self.batches.append(batch)
         self.total_records_processed += batch.records_processed
         if not batch.success:
@@ -47,8 +40,6 @@ class ETLPhaseResult:
 
 @dataclass
 class ETLResult:
-    """Overall ETL pipeline execution result."""
-
     historical_load: ETLPhaseResult | None = None
     incremental_loads: list[ETLPhaseResult] = field(default_factory=list)
     start_time: datetime | None = None

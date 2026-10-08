@@ -1,11 +1,3 @@
-"""Tests for MCP results and analytics tool handlers (consolidated API).
-
-Covers the consolidated tools:
-- benchbox/mcp/tools/results.py: get_results (replaces list_recent_runs, export_results, export_summary)
-- benchbox/mcp/tools/analytics.py: analyze_results (replaces compare_results, detect_regressions, get_performance_trends, aggregate_results)
-- benchbox/mcp/tools/benchmark.py: run_benchmark with dry_run/validate_only flags and mode='data_only'
-"""
-
 import json
 import sys
 from pathlib import Path
@@ -23,13 +15,7 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def _make_result_file(dir_path: Path, filename: str, data: dict) -> Path:
-    """Write a JSON result file to a directory."""
     file_path = dir_path / filename
     file_path.write_text(json.dumps(data))
     return file_path
@@ -44,7 +30,6 @@ def _make_benchmark_result(
     execution_id: str = "test_001",
     summary: dict | None = None,
 ) -> dict:
-    """Create a schema v2.1 benchmark result dict."""
     if queries is None:
         queries = [
             {"query_id": "Q1", "runtime_ms": 100, "status": "success"},
@@ -110,27 +95,18 @@ def _make_benchmark_result(
     }
 
 
-# ---------------------------------------------------------------------------
-# get_results tool (replaces list_recent_runs, export_results, export_summary)
-# ---------------------------------------------------------------------------
-
-
 class TestGetResultsList:
-    """Tests for get_results with result_file=None (list recent runs)."""
-
     def test_no_results_dir_returns_empty(self, tmp_path):
-        """Returns empty list when results directory doesn't exist."""
         from benchbox.mcp import create_server
 
         server = create_server(results_dir=tmp_path / "nonexistent")
         fn = get_tool(server, "get_results").fn
-        result = fn()  # result_file=None -> list mode
+        result = fn()
 
         assert result["runs"] == []
         assert result["count"] == 0
 
     def test_returns_runs_from_result_files(self, tmp_path):
-        """Returns parsed run metadata from result files."""
         from benchbox.mcp import create_server
 
         data = _make_benchmark_result(platform="duckdb", benchmark="tpch")
@@ -147,7 +123,6 @@ class TestGetResultsList:
         assert result["runs"][0]["file"] == "run1.json"
 
     def test_platform_filter(self, tmp_path):
-        """Platform filter limits results to matching runs."""
         from benchbox.mcp import create_server
 
         _make_result_file(tmp_path, "duckdb_run.json", _make_benchmark_result(platform="duckdb"))
@@ -162,7 +137,6 @@ class TestGetResultsList:
         assert result["runs"][0]["platform"] == "duckdb"
 
     def test_benchmark_filter(self, tmp_path):
-        """Benchmark filter limits results to matching runs."""
         from benchbox.mcp import create_server
 
         _make_result_file(tmp_path, "tpch_run.json", _make_benchmark_result(benchmark="tpch"))
@@ -177,7 +151,6 @@ class TestGetResultsList:
         assert result["runs"][0]["benchmark"] == "tpcds"
 
     def test_limit_parameter(self, tmp_path):
-        """Limit parameter restricts number of results returned."""
         from benchbox.mcp import create_server
 
         for i in range(5):
@@ -192,7 +165,6 @@ class TestGetResultsList:
         assert result["total_available"] == 5
 
     def test_summary_included_when_present(self, tmp_path):
-        """Run info includes summary metrics when available in result file."""
         from benchbox.mcp import create_server
 
         data = _make_benchmark_result(summary={"total_queries": 22, "total_runtime_ms": 5000})
@@ -207,7 +179,6 @@ class TestGetResultsList:
         assert result["runs"][0]["summary"]["total_runtime_ms"] == 5000
 
     def test_malformed_files_skipped(self, tmp_path):
-        """Malformed JSON files are silently skipped."""
         from benchbox.mcp import create_server
 
         (tmp_path / "bad.json").write_text("not json {{")
@@ -221,7 +192,6 @@ class TestGetResultsList:
         assert result["count"] == 1
 
     def test_filters_applied_in_response(self, tmp_path):
-        """Response includes applied filter information."""
         from benchbox.mcp import create_server
 
         _make_result_file(tmp_path, "run.json", _make_benchmark_result())
@@ -236,7 +206,6 @@ class TestGetResultsList:
         assert result["filters_applied"]["limit"] == 5
 
     def test_explicit_results_dir_override_takes_precedence(self, tmp_path, monkeypatch):
-        """Server-level results_dir override should be used by tools."""
         from benchbox.mcp import create_server
 
         override_dir = tmp_path / "override_results"
@@ -252,13 +221,9 @@ class TestGetResultsList:
 
 
 class TestGetResultsExport:
-    """Tests for get_results with format='json'/'csv'/'html' (export results)."""
-
     def test_invalid_format_returns_error(self, tmp_path):
-        """Invalid format returns validation error."""
         from benchbox.mcp import create_server
 
-        # Create a valid result file first
         data = _make_benchmark_result()
         _make_result_file(tmp_path, "run.json", data)
 
@@ -271,7 +236,6 @@ class TestGetResultsExport:
         assert result["error_code"] == "VALIDATION_INVALID_FORMAT"
 
     def test_details_preserves_query_run_type(self, tmp_path):
-        """Details mode should preserve per-query run_type tags in payloads."""
         from benchbox.mcp import create_server
 
         data = _make_benchmark_result(
@@ -293,7 +257,6 @@ class TestGetResultsExport:
         assert result["queries"][1]["run_type"] == "measurement"
 
     def test_details_excludes_queries_when_include_queries_false(self, tmp_path):
-        """include_queries=False should omit per-query rows from details output."""
         from benchbox.mcp import create_server
 
         data = _make_benchmark_result()
@@ -308,7 +271,6 @@ class TestGetResultsExport:
         assert "summary" in result
 
     def test_json_export(self, tmp_path):
-        """JSON export returns formatted JSON content."""
         from benchbox.mcp import create_server
 
         data = _make_benchmark_result()
@@ -325,7 +287,6 @@ class TestGetResultsExport:
         assert parsed["benchmark"]["id"] == "tpch"
 
     def test_csv_export_with_queries(self, tmp_path):
-        """CSV export produces proper header and rows from query data."""
         from benchbox.mcp import create_server
 
         data = _make_benchmark_result()
@@ -342,7 +303,6 @@ class TestGetResultsExport:
         assert "1" in result["content"]
 
     def test_csv_export_no_queries(self, tmp_path):
-        """CSV export with no queries returns header only."""
         from benchbox.mcp import create_server
 
         data = _make_benchmark_result(queries=[])
@@ -356,7 +316,6 @@ class TestGetResultsExport:
         assert result["content"] == "query_id,runtime_ms,status\n"
 
     def test_html_export(self, tmp_path):
-        """HTML export produces valid HTML with table."""
         from benchbox.mcp import create_server
 
         data = _make_benchmark_result(summary={"total_queries": 3, "total_runtime_ms": 350})
@@ -374,7 +333,6 @@ class TestGetResultsExport:
         assert "1" in result["content"]
 
     def test_write_to_output_path(self, tmp_path):
-        """output_path writes content to file and returns path info."""
         from benchbox.mcp import create_server
 
         data = _make_benchmark_result()
@@ -390,7 +348,6 @@ class TestGetResultsExport:
         assert (tmp_path / "export.json").exists()
 
     def test_path_traversal_rejected(self, tmp_path):
-        """Path traversal attempts are rejected."""
         from benchbox.mcp import create_server
 
         data = _make_benchmark_result()
@@ -405,7 +362,6 @@ class TestGetResultsExport:
         assert result["error_code"] == "VALIDATION_ERROR"
 
     def test_absolute_path_rejected(self, tmp_path):
-        """Absolute output paths are rejected."""
         from benchbox.mcp import create_server
 
         data = _make_benchmark_result()
@@ -419,7 +375,6 @@ class TestGetResultsExport:
         assert result["error"] is True
 
     def test_missing_source_file_returns_error(self, tmp_path):
-        """Missing source file propagates error."""
         from benchbox.mcp import create_server
 
         server = create_server(results_dir=tmp_path)
@@ -431,10 +386,7 @@ class TestGetResultsExport:
 
 
 class TestGetResultsSummary:
-    """Tests for get_results with format='text'/'markdown' (export summary)."""
-
     def test_markdown_format_returns_formatted_content(self, tmp_path):
-        """Markdown format returns formatted string with headers and tables."""
         from benchbox.mcp import create_server
 
         data = _make_benchmark_result(summary={"total_queries": 3, "total_runtime_ms": 350})
@@ -451,7 +403,6 @@ class TestGetResultsSummary:
         assert "| Query |" in result["content"]
 
     def test_text_format_returns_plain_text(self, tmp_path):
-        """Text format returns plain text summary."""
         from benchbox.mcp import create_server
 
         data = _make_benchmark_result(summary={"total_queries": 3, "total_runtime_ms": 350})
@@ -468,7 +419,6 @@ class TestGetResultsSummary:
         assert "Total Queries:" in result["content"]
 
     def test_missing_file_returns_error(self, tmp_path):
-        """Missing result file propagates error from _get_results_impl."""
         from benchbox.mcp import create_server
 
         server = create_server(results_dir=tmp_path)
@@ -479,16 +429,8 @@ class TestGetResultsSummary:
         assert result["error"] is True
 
 
-# ---------------------------------------------------------------------------
-# analyze_results tool (replaces compare_results, detect_regressions, trends, aggregate)
-# ---------------------------------------------------------------------------
-
-
 class TestAnalyzeResultsCompare:
-    """Tests for analyze_results with analysis='compare'."""
-
     def test_baseline_not_found(self, tmp_path):
-        """Returns error when baseline file doesn't exist."""
         from benchbox.mcp import create_server
 
         server = create_server(results_dir=tmp_path)
@@ -501,7 +443,6 @@ class TestAnalyzeResultsCompare:
         assert "baseline" in result["details"]["file_type"]
 
     def test_comparison_file_not_found(self, tmp_path):
-        """Returns error when comparison file doesn't exist but baseline does."""
         from benchbox.mcp import create_server
 
         _make_result_file(tmp_path, "baseline.json", _make_benchmark_result())
@@ -516,7 +457,6 @@ class TestAnalyzeResultsCompare:
         assert "comparison" in result["details"]["file_type"]
 
     def test_detects_regression(self, tmp_path):
-        """Identifies queries with runtime regression above threshold."""
         from benchbox.mcp import create_server
 
         baseline = _make_benchmark_result(
@@ -527,8 +467,8 @@ class TestAnalyzeResultsCompare:
         )
         comparison = _make_benchmark_result(
             queries=[
-                {"query_id": "Q1", "runtime_ms": 200, "status": "success"},  # 100% regression
-                {"query_id": "Q6", "runtime_ms": 55, "status": "success"},  # 10% - at threshold
+                {"query_id": "Q1", "runtime_ms": 200, "status": "success"},
+                {"query_id": "Q6", "runtime_ms": 55, "status": "success"},
             ]
         )
         _make_result_file(tmp_path, "baseline.json", baseline)
@@ -543,7 +483,6 @@ class TestAnalyzeResultsCompare:
         assert result["summary"]["regressions"] >= 1
 
     def test_detects_improvement(self, tmp_path):
-        """Identifies queries with runtime improvement below negative threshold."""
         from benchbox.mcp import create_server
 
         baseline = _make_benchmark_result(
@@ -553,7 +492,7 @@ class TestAnalyzeResultsCompare:
         )
         comparison = _make_benchmark_result(
             queries=[
-                {"query_id": "Q1", "runtime_ms": 50, "status": "success"},  # -75% improvement
+                {"query_id": "Q1", "runtime_ms": 50, "status": "success"},
             ]
         )
         _make_result_file(tmp_path, "baseline.json", baseline)
@@ -568,7 +507,6 @@ class TestAnalyzeResultsCompare:
         assert result["summary"]["improvements"] >= 1
 
     def test_stable_queries(self, tmp_path):
-        """Queries within threshold are marked stable."""
         from benchbox.mcp import create_server
 
         baseline = _make_benchmark_result(
@@ -578,7 +516,7 @@ class TestAnalyzeResultsCompare:
         )
         comparison = _make_benchmark_result(
             queries=[
-                {"query_id": "Q1", "runtime_ms": 105, "status": "success"},  # 5% - below 10% threshold
+                {"query_id": "Q1", "runtime_ms": 105, "status": "success"},
             ]
         )
         _make_result_file(tmp_path, "baseline.json", baseline)
@@ -592,7 +530,6 @@ class TestAnalyzeResultsCompare:
         assert result["summary"]["stable"] >= 1
 
     def test_response_structure(self, tmp_path):
-        """Response includes baseline, comparison, summary, and query_comparisons."""
         from benchbox.mcp import create_server
 
         baseline = _make_benchmark_result()
@@ -612,7 +549,6 @@ class TestAnalyzeResultsCompare:
         assert result["summary"]["threshold_percent"] == 10.0
 
     def test_auto_appends_json_extension(self, tmp_path):
-        """Files without .json extension get it appended for lookup."""
         from benchbox.mcp import create_server
 
         _make_result_file(tmp_path, "run1.json", _make_benchmark_result())
@@ -627,10 +563,7 @@ class TestAnalyzeResultsCompare:
 
 
 class TestAnalyzeResultsRegressions:
-    """Tests for analyze_results with analysis='regressions'."""
-
     def test_no_results_dir(self, tmp_path):
-        """Returns no_data when results directory doesn't exist."""
         from benchbox.mcp import create_server
 
         server = create_server(results_dir=tmp_path / "nonexistent")
@@ -642,7 +575,6 @@ class TestAnalyzeResultsRegressions:
         assert result["regressions"] == []
 
     def test_insufficient_files(self, tmp_path):
-        """Returns insufficient_data with fewer than 2 files."""
         from benchbox.mcp import create_server
 
         _make_result_file(tmp_path, "only_one.json", _make_benchmark_result())
@@ -655,7 +587,6 @@ class TestAnalyzeResultsRegressions:
         assert result["status"] == "insufficient_data"
 
     def test_detects_regression_between_runs(self, tmp_path):
-        """Detects performance regression between two recent runs."""
         from benchbox.mcp import create_server
 
         older = _make_benchmark_result(
@@ -667,7 +598,7 @@ class TestAnalyzeResultsRegressions:
 
         newer = _make_benchmark_result(
             queries=[
-                {"query_id": "Q1", "runtime_ms": 250, "status": "success"},  # 150% regression
+                {"query_id": "Q1", "runtime_ms": 250, "status": "success"},
             ]
         )
         newer_file = _make_result_file(tmp_path, "newer.json", newer)
@@ -684,7 +615,6 @@ class TestAnalyzeResultsRegressions:
         assert result["regressions"][0]["severity"] == "critical"
 
     def test_detects_improvements(self, tmp_path):
-        """Detects performance improvements between runs."""
         from benchbox.mcp import create_server
 
         older = _make_benchmark_result(
@@ -696,7 +626,7 @@ class TestAnalyzeResultsRegressions:
 
         newer = _make_benchmark_result(
             queries=[
-                {"query_id": "Q1", "runtime_ms": 50, "status": "success"},  # -75% improvement
+                {"query_id": "Q1", "runtime_ms": 50, "status": "success"},
             ]
         )
         newer_file = _make_result_file(tmp_path, "newer.json", newer)
@@ -710,7 +640,6 @@ class TestAnalyzeResultsRegressions:
         assert result["summary"]["improvements"] >= 1
 
     def test_platform_filter(self, tmp_path):
-        """Platform filter limits analysis to matching runs."""
         from benchbox.mcp import create_server
 
         sqlite_file = _make_result_file(tmp_path, "sqlite1.json", _make_benchmark_result(platform="sqlite"))
@@ -727,7 +656,6 @@ class TestAnalyzeResultsRegressions:
         assert result["comparison"]["baseline"]["platform"] == "duckdb"
 
     def test_recommendations_generated(self, tmp_path):
-        """Recommendations are generated based on regression severity."""
         from benchbox.mcp import create_server
 
         older = _make_benchmark_result(
@@ -739,7 +667,7 @@ class TestAnalyzeResultsRegressions:
 
         newer = _make_benchmark_result(
             queries=[
-                {"query_id": "Q1", "runtime_ms": 500, "status": "success"},  # 400% regression
+                {"query_id": "Q1", "runtime_ms": 500, "status": "success"},
             ]
         )
         newer_file = _make_result_file(tmp_path, "newer.json", newer)
@@ -750,15 +678,12 @@ class TestAnalyzeResultsRegressions:
 
         result = fn(analysis="regressions")
 
-        # Verify critical regressions are detected
         assert result["status"] == "completed"
         assert result["summary"]["regressions"] > 0
-        # Check that critical severity regressions are detected
         critical_regressions = [r for r in result["regressions"] if r.get("severity") == "critical"]
         assert len(critical_regressions) > 0
 
     def test_threshold_parameter(self, tmp_path):
-        """Custom threshold changes what counts as regression."""
         from benchbox.mcp import create_server
 
         older = _make_benchmark_result(
@@ -770,7 +695,7 @@ class TestAnalyzeResultsRegressions:
 
         newer = _make_benchmark_result(
             queries=[
-                {"query_id": "Q1", "runtime_ms": 108, "status": "success"},  # 8% increase
+                {"query_id": "Q1", "runtime_ms": 108, "status": "success"},
             ]
         )
         newer_file = _make_result_file(tmp_path, "newer.json", newer)
@@ -779,20 +704,15 @@ class TestAnalyzeResultsRegressions:
         server = create_server(results_dir=tmp_path)
         fn = get_tool(server, "analyze_results").fn
 
-        # At 10% threshold, 8% is stable
         result_10 = fn(analysis="regressions", threshold_percent=10.0)
         assert result_10["summary"]["regressions"] == 0
 
-        # At 5% threshold, 8% is a regression
         result_5 = fn(analysis="regressions", threshold_percent=5.0)
         assert result_5["summary"]["regressions"] == 1
 
 
 class TestAnalyzeResultsTrends:
-    """Tests for analyze_results with analysis='trends'."""
-
     def test_invalid_metric_returns_error(self, tmp_path):
-        """Invalid metric returns validation error."""
         from benchbox.mcp import create_server
 
         server = create_server(results_dir=tmp_path)
@@ -804,7 +724,6 @@ class TestAnalyzeResultsTrends:
         assert result["error_code"] == "VALIDATION_ERROR"
 
     def test_no_results_dir(self, tmp_path):
-        """Returns no_data when results directory doesn't exist."""
         from benchbox.mcp import create_server
 
         server = create_server(results_dir=tmp_path / "nonexistent")
@@ -815,7 +734,6 @@ class TestAnalyzeResultsTrends:
         assert result["status"] == "no_data"
 
     def test_returns_chronological_data_points(self, tmp_path):
-        """Returns data points in chronological order."""
         from benchbox.mcp import create_server
 
         files = []
@@ -834,11 +752,9 @@ class TestAnalyzeResultsTrends:
 
         assert result["status"] == "success"
         assert len(result["data_points"]) == 3
-        # Chronological: oldest first
         assert result["data_points"][0]["value"] <= result["data_points"][-1]["value"]
 
     def test_geometric_mean_metric(self, tmp_path):
-        """geometric_mean metric produces correct value."""
         from benchbox.mcp import create_server
 
         data = _make_benchmark_result(
@@ -849,7 +765,6 @@ class TestAnalyzeResultsTrends:
         )
         first = _make_result_file(tmp_path, "run.json", data)
 
-        # Add second run to get trend
         data2 = _make_benchmark_result(
             queries=[
                 {"query_id": "Q1", "runtime_ms": 100, "status": "success"},
@@ -864,12 +779,10 @@ class TestAnalyzeResultsTrends:
 
         result = fn(analysis="trends", metric="geometric_mean")
 
-        # Geometric mean of [100, 400] = sqrt(40000) = 200
         assert result["data_points"][0]["metric"] == "geometric_mean"
         assert abs(result["data_points"][0]["value"] - 200.0) < 1.0
 
     def test_total_time_metric(self, tmp_path):
-        """total_time metric sums all query runtimes."""
         from benchbox.mcp import create_server
 
         data = _make_benchmark_result(
@@ -890,7 +803,6 @@ class TestAnalyzeResultsTrends:
         assert result["data_points"][0]["value"] == 300.0
 
     def test_trend_direction_degrading(self, tmp_path):
-        """Identifies degrading trend when performance worsens."""
         from benchbox.mcp import create_server
 
         files = []
@@ -911,7 +823,6 @@ class TestAnalyzeResultsTrends:
         assert result["summary"]["trend_direction"] == "degrading"
 
     def test_trend_direction_improving(self, tmp_path):
-        """Identifies improving trend when performance gets better."""
         from benchbox.mcp import create_server
 
         files = []
@@ -932,7 +843,6 @@ class TestAnalyzeResultsTrends:
         assert result["summary"]["trend_direction"] == "improving"
 
     def test_limit_parameter(self, tmp_path):
-        """Limit parameter restricts data points returned."""
         from benchbox.mcp import create_server
 
         files = []
@@ -953,7 +863,6 @@ class TestAnalyzeResultsTrends:
         assert len(result["data_points"]) == 3
 
     def test_no_matching_data(self, tmp_path):
-        """Returns no_matching_data when filters exclude all runs."""
         from benchbox.mcp import create_server
 
         _make_result_file(tmp_path, "run.json", _make_benchmark_result(platform="duckdb"))
@@ -967,10 +876,7 @@ class TestAnalyzeResultsTrends:
 
 
 class TestAnalyzeResultsAggregate:
-    """Tests for analyze_results with analysis='aggregate'."""
-
     def test_invalid_group_by(self, tmp_path):
-        """Invalid group_by returns validation error."""
         from benchbox.mcp import create_server
 
         server = create_server(results_dir=tmp_path)
@@ -982,7 +888,6 @@ class TestAnalyzeResultsAggregate:
         assert result["error_code"] == "VALIDATION_ERROR"
 
     def test_no_results_dir(self, tmp_path):
-        """Returns no_data when results directory doesn't exist."""
         from benchbox.mcp import create_server
 
         server = create_server(results_dir=tmp_path / "nonexistent")
@@ -993,7 +898,6 @@ class TestAnalyzeResultsAggregate:
         assert result["status"] == "no_data"
 
     def test_group_by_platform(self, tmp_path):
-        """Groups results by platform with statistics."""
         from benchbox.mcp import create_server
 
         _make_result_file(tmp_path, "duckdb1.json", _make_benchmark_result(platform="duckdb"))
@@ -1012,7 +916,6 @@ class TestAnalyzeResultsAggregate:
         assert "mean_ms" in result["aggregates"]["duckdb"]["query_stats"]
 
     def test_group_by_benchmark(self, tmp_path):
-        """Groups results by benchmark name."""
         from benchbox.mcp import create_server
 
         _make_result_file(tmp_path, "tpch.json", _make_benchmark_result(benchmark="tpch"))
@@ -1027,7 +930,6 @@ class TestAnalyzeResultsAggregate:
         assert "tpcds" in result["aggregates"]
 
     def test_group_by_date(self, tmp_path):
-        """Groups results by date from timestamp."""
         from benchbox.mcp import create_server
 
         _make_result_file(tmp_path, "day1.json", _make_benchmark_result(timestamp="2026-01-15T10:00:00"))
@@ -1043,7 +945,6 @@ class TestAnalyzeResultsAggregate:
         assert "2026-01-16" in result["aggregates"]
 
     def test_statistics_calculated(self, tmp_path):
-        """Aggregates calculate correct statistical summaries."""
         from benchbox.mcp import create_server
 
         data = _make_benchmark_result(
@@ -1061,12 +962,11 @@ class TestAnalyzeResultsAggregate:
         result = fn(analysis="aggregate", group_by="platform")
 
         stats = result["aggregates"]["duckdb"]["query_stats"]
-        assert stats["mean_ms"] == 200.0  # (100+200+300)/3
+        assert stats["mean_ms"] == 200.0
         assert stats["min_ms"] == 100.0
         assert stats["max_ms"] == 300.0
 
     def test_platform_filter(self, tmp_path):
-        """Platform filter limits aggregation to matching runs."""
         from benchbox.mcp import create_server
 
         _make_result_file(tmp_path, "duckdb.json", _make_benchmark_result(platform="duckdb"))
@@ -1081,7 +981,6 @@ class TestAnalyzeResultsAggregate:
         assert "sqlite" not in result["aggregates"]
 
     def test_no_matching_data(self, tmp_path):
-        """Returns no_matching_data when filters exclude all runs."""
         from benchbox.mcp import create_server
 
         _make_result_file(tmp_path, "run.json", _make_benchmark_result(platform="duckdb"))
@@ -1094,7 +993,6 @@ class TestAnalyzeResultsAggregate:
         assert result["status"] == "no_matching_data"
 
     def test_summary_section(self, tmp_path):
-        """Response includes summary with total groups and runs."""
         from benchbox.mcp import create_server
 
         _make_result_file(tmp_path, "run1.json", _make_benchmark_result(platform="duckdb"))
@@ -1109,16 +1007,8 @@ class TestAnalyzeResultsAggregate:
         assert result["summary"]["total_runs"] == 2
 
 
-# ---------------------------------------------------------------------------
-# run_benchmark with dry_run=True (replaces dry_run tool)
-# ---------------------------------------------------------------------------
-
-
 class TestRunBenchmarkDryRun:
-    """Tests for run_benchmark with dry_run=True."""
-
     def test_unknown_benchmark_returns_error(self):
-        """Unknown benchmark returns not-found error."""
         from benchbox.mcp import create_server
 
         server = create_server()
@@ -1130,7 +1020,6 @@ class TestRunBenchmarkDryRun:
         assert result["error_code"] == "RESOURCE_NOT_FOUND"
 
     def test_successful_dry_run(self):
-        """Successful dry run returns execution plan and resource estimates."""
         from benchbox.mcp import create_server
 
         mock_result = MagicMock()
@@ -1165,7 +1054,6 @@ class TestRunBenchmarkDryRun:
         assert "resource_estimates" in result
 
     def test_query_subset_forwarded(self):
-        """Query subset string is parsed and included in config."""
         from benchbox.mcp import create_server
 
         mock_result = MagicMock()
@@ -1184,13 +1072,11 @@ class TestRunBenchmarkDryRun:
 
             fn(platform="duckdb", benchmark="tpch", scale_factor=0.01, queries="1,6", dry_run=True)
 
-            # Verify BenchmarkConfig was created with parsed queries
             call_args = mock_executor.execute_dry_run.call_args[0]
             benchmark_config = call_args[0]
             assert benchmark_config.queries == ["1", "6"]
 
     def test_exception_returns_internal_error(self):
-        """Exception during dry run returns INTERNAL_ERROR."""
         from benchbox.mcp import create_server
 
         server = create_server()
@@ -1205,16 +1091,8 @@ class TestRunBenchmarkDryRun:
         assert result["error_code"] == "INTERNAL_ERROR"
 
 
-# ---------------------------------------------------------------------------
-# run_benchmark with mode='data_only' (replaces generate_data tool)
-# ---------------------------------------------------------------------------
-
-
 class TestRunBenchmarkDataOnly:
-    """Tests for run_benchmark with mode='data_only'."""
-
     def test_unknown_benchmark_returns_error(self):
-        """Unknown benchmark returns RESOURCE_NOT_FOUND."""
         from benchbox.mcp import create_server
 
         server = create_server()
@@ -1226,93 +1104,72 @@ class TestRunBenchmarkDataOnly:
         assert result["error_code"] == "RESOURCE_NOT_FOUND"
 
 
-# ---------------------------------------------------------------------------
-# Helper function unit tests
-# ---------------------------------------------------------------------------
-
-
 class TestAnalyticsHelpers:
-    """Tests for analytics module helper functions."""
-
     def test_classify_regression_severity_critical(self):
-        """>=100% delta is critical."""
         from benchbox.core.results.regression_policy import classify_severity as _classify_regression_severity
 
         assert _classify_regression_severity(100.0) == "critical"
         assert _classify_regression_severity(200.0) == "critical"
 
     def test_classify_regression_severity_high(self):
-        """50-99% delta is high."""
         from benchbox.core.results.regression_policy import classify_severity as _classify_regression_severity
 
         assert _classify_regression_severity(50.0) == "high"
         assert _classify_regression_severity(99.0) == "high"
 
     def test_classify_regression_severity_medium(self):
-        """25-49% delta is medium."""
         from benchbox.core.results.regression_policy import classify_severity as _classify_regression_severity
 
         assert _classify_regression_severity(25.0) == "medium"
         assert _classify_regression_severity(49.0) == "medium"
 
     def test_classify_regression_severity_low(self):
-        """<25% delta is low."""
         from benchbox.core.results.regression_policy import classify_severity as _classify_regression_severity
 
         assert _classify_regression_severity(10.0) == "low"
         assert _classify_regression_severity(24.0) == "low"
 
     def test_calculate_metric_geometric_mean(self):
-        """geometric_mean calculates correctly."""
         from benchbox.core.results.metrics import calculate_named_metric
 
-        # geometric mean of [4, 9] = sqrt(36) = 6
         result = calculate_named_metric([4.0, 9.0], "geometric_mean")
         assert abs(result - 6.0) < 0.01
 
     def test_calculate_metric_p50(self):
-        """p50 returns the middle value for an odd count under nearest-rank."""
         from benchbox.core.results.metrics import calculate_named_metric
 
         result = calculate_named_metric([10.0, 20.0, 30.0, 40.0, 50.0], "p50")
         assert result == 30.0
 
     def test_calculate_metric_total_time(self):
-        """total_time returns sum."""
         from benchbox.core.results.metrics import calculate_named_metric
 
         result = calculate_named_metric([10.0, 20.0, 30.0], "total_time")
         assert result == 60.0
 
     def test_percentile_empty_list(self):
-        """Percentile of empty list returns 0."""
         from benchbox.core.results.metrics import percentile_ms
 
         assert percentile_ms([], 0.50) == 0
 
     def test_percentile_single_element(self):
-        """Percentile of single element returns that element."""
         from benchbox.core.results.metrics import percentile_ms
 
         assert percentile_ms([42.0], 0.50) == 42.0
         assert percentile_ms([42.0], 0.95) == 42.0
 
     def test_std_dev_single_element(self):
-        """Std dev of single element returns 0."""
         from benchbox.core.results.metrics import sample_stdev_ms
 
         assert sample_stdev_ms([42.0]) == 0
 
     def test_std_dev_known_values(self):
-        """Std dev of known values is correct."""
         from benchbox.core.results.metrics import sample_stdev_ms
 
-        # std dev of [2, 4, 4, 4, 5, 5, 7, 9] = 2.138...
         result = sample_stdev_ms([2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0])
         assert abs(result - 2.138) < 0.01
 
     def test_extract_plan_summary(self):
-        """Plan summary extracts operator, join, scan counts."""
         from benchbox.mcp.tools.analytics import _extract_plan_summary
 
         plan = {
@@ -1329,7 +1186,6 @@ class TestAnalyticsHelpers:
         assert summary["estimated_rows"] == 1000
 
     def test_format_plan_tree(self):
-        """Plan tree format produces readable output."""
         from benchbox.mcp.tools.analytics import _format_plan_tree
 
         plan = {

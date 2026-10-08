@@ -1,5 +1,3 @@
-"""Tests for _project/scripts/scan_explorer_stale_theme.py."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -62,8 +60,7 @@ def test_allow_marker_excludes_line(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     hits = scan.scan_file(sample)
-    # First line has the allow marker but no pattern; second has the pattern
-    # but no allow marker. The marker only excludes the line it appears on.
+
     assert len(hits) == 1
     assert hits[0][0] == 2
 

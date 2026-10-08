@@ -1,12 +1,6 @@
-"""Data validation utilities for benchmark data generation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides utilities for validating existing benchmark data
-and determining if regeneration is needed.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import json
 import logging
@@ -24,12 +18,10 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class DataValidationResult:
-    """Results from data validation."""
-
     valid: bool
     tables_validated: dict[str, bool]
     missing_tables: list[str]
-    row_count_mismatches: dict[str, tuple[int, int]]  # table: (expected, actual)
+    row_count_mismatches: dict[str, tuple[int, int]]
     file_size_info: dict[str, int]
     validation_timestamp: datetime
     issues: list[str]
@@ -37,32 +29,25 @@ class DataValidationResult:
 
 @dataclass
 class TableExpectation:
-    """Expected data characteristics for a table."""
-
     name: str
     expected_rows: int
     expected_files: list[str]
-    min_file_size: int = 0  # Minimum file size in bytes
+    min_file_size: int = 0
     allow_zero_rows: bool = False
 
 
 class BenchmarkDataValidator:
-    """Validates benchmark data and determines if regeneration is needed."""
-
-    # Standard TPC-H row counts for scale factor 1.0
-    # Note: nation and region tables have fixed sizes regardless of scale factor
     TPCH_TABLE_EXPECTATIONS = {
         "customer": TableExpectation("customer", 150000, ["customer.tbl"]),
         "lineitem": TableExpectation("lineitem", 6001215, ["lineitem.tbl"]),
-        "nation": TableExpectation("nation", 25, ["nation.tbl"]),  # Fixed size table
+        "nation": TableExpectation("nation", 25, ["nation.tbl"]),
         "orders": TableExpectation("orders", 1500000, ["orders.tbl"]),
         "part": TableExpectation("part", 200000, ["part.tbl"]),
         "partsupp": TableExpectation("partsupp", 800000, ["partsupp.tbl"]),
-        "region": TableExpectation("region", 5, ["region.tbl"]),  # Fixed size table
+        "region": TableExpectation("region", 5, ["region.tbl"]),
         "supplier": TableExpectation("supplier", 10000, ["supplier.tbl"]),
     }
 
-    # Standard TPC-DS row counts for scale factor 1.0 (approximate)
     TPCDS_TABLE_EXPECTATIONS = {
         "call_center": TableExpectation("call_center", 6, ["call_center.dat"]),
         "catalog_page": TableExpectation("catalog_page", 11718, ["catalog_page.dat"]),
@@ -91,35 +76,21 @@ class BenchmarkDataValidator:
     }
 
     def __init__(self, benchmark_name: str, scale_factor: float = 1.0):
-        """Initialize validator for a specific benchmark.
-
-        Args:
-            benchmark_name: Name of the benchmark (tpch, tpcds, etc.)
-            scale_factor: Scale factor for row count calculations
-        """
         self.benchmark_name = benchmark_name.lower()
         self.scale_factor = scale_factor
 
-        # Get table expectations based on benchmark type
         if self.benchmark_name == "tpch":
             self.table_expectations = self._scale_expectations(self.TPCH_TABLE_EXPECTATIONS)
         elif self.benchmark_name == "tpcds":
             self.table_expectations = self._scale_expectations(self.TPCDS_TABLE_EXPECTATIONS)
         else:
-            # For other benchmarks, we'll do basic file existence validation
             self.table_expectations = {}
 
     def _scale_expectations(self, base_expectations: dict[str, TableExpectation]) -> dict[str, TableExpectation]:
-        """Scale row count expectations based on scale factor."""
         scaled = {}
 
-        # TPC-H: nation and region are invariantly fixed (25 nations, 5 regions by spec)
-        # - these do not scale regardless of scale factor.
         tpch_invariant_fixed = {"nation", "region"}
 
-        # TPC-DS: these tables are "fixed" at official scale (sf >= 1.0) but scale
-        # proportionally with max(1, floor(sf1_baseline * sf)) at sf < 1.0.
-        # See _sources/tpcds-subscale-contract.md for the full data contract.
         tpcds_official_fixed = {
             "call_center",
             "reason",
@@ -132,15 +103,9 @@ class BenchmarkDataValidator:
         }
 
         for table_name, expectation in base_expectations.items():
-            if table_name in tpch_invariant_fixed:
-                # TPC-H dimension tables: always fixed regardless of scale factor
-                scaled_rows = expectation.expected_rows
-            elif table_name in tpcds_official_fixed and self.scale_factor >= 1.0:
-                # TPC-DS "fixed" tables: use baseline row count at official scale
+            if table_name in tpch_invariant_fixed or (table_name in tpcds_official_fixed and self.scale_factor >= 1.0):
                 scaled_rows = expectation.expected_rows
             else:
-                # All other tables (and TPC-DS "fixed" tables at subscale):
-                # scale proportionally with min-1 floor
                 scaled_rows = max(1, int(expectation.expected_rows * self.scale_factor))
 
             scaled[table_name] = TableExpectation(
@@ -153,14 +118,6 @@ class BenchmarkDataValidator:
         return scaled
 
     def validate_data_directory(self, data_dir: Union[str, Path]) -> DataValidationResult:
-        """Validate data in the specified directory.
-
-        Args:
-            data_dir: Path to the data directory to validate
-
-        Returns:
-            DataValidationResult with validation details
-        """
         data_path = Path(data_dir)
 
         if not data_path.exists():
@@ -174,12 +131,8 @@ class BenchmarkDataValidator:
                 issues=[f"Data directory does not exist: {data_path}"],
             )
 
-        # If a manifest exists and is valid for this benchmark/scale, use it for validation
         manifest = self._read_manifest(data_path)
         if manifest and self._manifest_matches_config(manifest):
-            # A stale datagen stamp fails validation even when the files are
-            # complete: the generator reuse boundary must regenerate rather
-            # than silently reuse data from an older generation.
             if not manifest_datagen_is_current(manifest):
                 reason = describe_datagen_staleness(manifest)
                 return DataValidationResult(
@@ -193,14 +146,12 @@ class BenchmarkDataValidator:
                 )
             return self._validate_with_manifest(data_path, manifest)
 
-        # Otherwise, check for expected tables/files by scanning and rebuild manifest
         tables_validated = {}
         missing_tables = []
         row_count_mismatches = {}
         file_size_info = {}
         issues = []
 
-        # If we have specific expectations for this benchmark
         if self.table_expectations:
             for table_name, expectation in self.table_expectations.items():
                 table_valid = self._validate_single_table(
@@ -208,7 +159,6 @@ class BenchmarkDataValidator:
                 )
                 tables_validated[table_name] = table_valid
         else:
-            # For unknown benchmarks, just check if directory has any data files
             data_files = (
                 list(data_path.glob("*.tbl"))
                 + list(data_path.glob("*.dat"))
@@ -225,7 +175,6 @@ class BenchmarkDataValidator:
                     if file_size == 0:
                         issues.append(f"Empty data file: {data_file.name}")
 
-        # Overall validation result
         all_valid = (
             not missing_tables and not row_count_mismatches and all(tables_validated.values())
             if tables_validated
@@ -242,7 +191,6 @@ class BenchmarkDataValidator:
             issues=issues,
         )
 
-        # Build a manifest from the scan for future runs (best-effort)
         try:
             self._write_manifest_from_scan(data_path)
         except Exception as e:
@@ -260,7 +208,6 @@ class BenchmarkDataValidator:
         file_size_info: dict[str, int],
         issues: list[str],
     ) -> bool:
-        """Validate a single table's data files. Returns True if valid."""
         table_valid = True
         resolved_files = self._resolve_table_files(data_path, table_name, expectation.expected_files)
 
@@ -269,7 +216,6 @@ class BenchmarkDataValidator:
             issues.append(f"Missing data files for table {table_name}")
             return False
 
-        # Record sizes and check empties
         for f in resolved_files:
             try:
                 size = f.stat().st_size
@@ -281,7 +227,6 @@ class BenchmarkDataValidator:
                 table_valid = False
                 issues.append(f"Failed to stat {f}: {e}")
 
-        # For TPC-H/TPC-DS, perform row count validation
         if table_valid and self.benchmark_name in ["tpch", "tpcds"]:
             try:
                 actual_rows = self._count_rows_paths(resolved_files)
@@ -297,14 +242,12 @@ class BenchmarkDataValidator:
         return table_valid
 
     def _count_rows_in_files(self, data_dir: Path, file_names: list[str]) -> int:
-        """Count total rows across multiple data files."""
         total_rows = 0
 
         for file_name in file_names:
             file_path = data_dir / file_name
             if file_path.exists():
                 try:
-                    # Fast line counting
                     with open(file_path, "rb") as f:
                         total_rows += sum(1 for _ in f)
                 except Exception as e:
@@ -313,7 +256,6 @@ class BenchmarkDataValidator:
         return total_rows
 
     def _count_rows_paths(self, files: list[Path]) -> int:
-        """Count rows across a list of file paths (supports .dat, .tbl, .csv with compression)."""
         total = 0
         for f in files:
             try:
@@ -325,7 +267,7 @@ class BenchmarkDataValidator:
                         total += sum(1 for _ in g)
                 elif compression == "zstd":
                     try:
-                        import zstandard as zstd  # type: ignore
+                        import zstandard as zstd
 
                         dctx = zstd.ZstdDecompressor()
                         with open(f, "rb") as fh, dctx.stream_reader(fh) as reader:
@@ -334,7 +276,6 @@ class BenchmarkDataValidator:
                             text = io.TextIOWrapper(reader, encoding="utf-8")
                             total += sum(1 for _ in text)
                     except Exception:
-                        # If zstandard is not available, skip row counting for this file
                         logger.debug(f"Skipping zstd row count for {f}")
                         continue
                 elif compression == "bzip2":
@@ -348,7 +289,6 @@ class BenchmarkDataValidator:
                     with lzma.open(f, "rt") as x:
                         total += sum(1 for _ in x)
                 else:
-                    # Uncompressed or unsupported compression (lz4, snappy)
                     with open(f, "rb") as fh:
                         total += sum(1 for _ in fh)
             except Exception as e:
@@ -357,20 +297,11 @@ class BenchmarkDataValidator:
         return total
 
     def _resolve_table_files(self, data_dir: Path, table_name: str, expected_files: list[str]) -> list[Path]:
-        """Resolve actual files for a table, considering compression and chunk patterns.
-
-        Supports:
-        - Exact files from expectations
-        - Compressed variants: .gz, .zst
-        - Chunked variants: table_N_M.dat[.ext]
-        """
         candidates: list[Path] = []
-        # 1) Direct expected files
         for ef in expected_files:
             p = data_dir / ef
             if p.exists():
                 candidates.append(p)
-            # Compressed variants
             gz = data_dir / f"{ef}.gz"
             zst = data_dir / f"{ef}.zst"
             if gz.exists():
@@ -378,20 +309,17 @@ class BenchmarkDataValidator:
             if zst.exists():
                 candidates.append(zst)
 
-        # 2) Chunked patterns: table_N_M.dat(.ext)
         for ext in [".dat", ".dat.gz", ".dat.zst"]:
             for pf in data_dir.glob(f"{table_name}_*.{ext.split('.')[-1]}"):
                 name = pf.name
-                # Use centralized suffix stripping for compression handling
                 stripped = strip_compression_suffix(Path(name))
-                stem = stripped.stem  # removes .dat
+                stem = stripped.stem
                 if stem.startswith(f"{table_name}_"):
                     suffix = stem[len(f"{table_name}_") :]
                     parts = suffix.split("_")
                     if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
                         candidates.append(pf)
 
-        # Ensure uniqueness
         uniq = []
         seen = set()
         for p in candidates:
@@ -403,15 +331,6 @@ class BenchmarkDataValidator:
     def should_regenerate_data(
         self, data_dir: Union[str, Path], force_regenerate: bool = False
     ) -> tuple[bool, DataValidationResult]:
-        """Determine if data should be regenerated.
-
-        Args:
-            data_dir: Path to the data directory
-            force_regenerate: If True, always regenerate regardless of validation
-
-        Returns:
-            Tuple of (should_regenerate, validation_result)
-        """
         if force_regenerate:
             return True, DataValidationResult(
                 valid=False,
@@ -427,7 +346,6 @@ class BenchmarkDataValidator:
         return not validation_result.valid, validation_result
 
     def print_validation_report(self, result: DataValidationResult, verbose: bool = True) -> None:
-        """Print a human-readable validation report."""
         if result.valid:
             emit("✅ Data validation PASSED")
             if verbose:
@@ -447,13 +365,12 @@ class BenchmarkDataValidator:
 
             if result.issues and verbose:
                 emit("   Issues:")
-                for issue in result.issues[:5]:  # Show first 5 issues
+                for issue in result.issues[:5]:
                     emit(f"     - {issue}")
                 if len(result.issues) > 5:
                     emit(f"     ... and {len(result.issues) - 5} more issues")
 
     def _format_bytes(self, size_bytes: int) -> str:
-        """Format bytes into human readable format."""
         if size_bytes == 0:
             return "0 B"
 
@@ -464,8 +381,6 @@ class BenchmarkDataValidator:
         p = math.pow(1024, i)
         s = round(size_bytes / p, 2)
         return f"{s} {size_names[i]}"
-
-    # ---------- Manifest helpers ----------
 
     def _manifest_path(self, data_dir: Path) -> Path:
         return Path(data_dir) / "_datagen_manifest.json"
@@ -485,7 +400,6 @@ class BenchmarkDataValidator:
         try:
             if str(manifest.get("benchmark", "")).lower() != self.benchmark_name:
                 return False
-            # Tolerate int/float types for scale factor
             return float(manifest.get("scale_factor", -1)) == float(self.scale_factor)
         except Exception:
             return False
@@ -498,10 +412,6 @@ class BenchmarkDataValidator:
         *,
         reject_empty: bool = False,
     ) -> tuple[bool, list[str], dict[str, int], int]:
-        """Validate manifest entries for a single table.
-
-        Returns (ok, issues, file_sizes, total_row_count).
-        """
         from benchbox.utils.datagen_manifest import compute_entry_size
 
         ok = True
@@ -590,9 +500,7 @@ class BenchmarkDataValidator:
         )
 
     def _write_manifest_from_scan(self, data_dir: Path) -> None:
-        """Create a manifest by scanning files in the directory (best-effort)."""
         tables: dict[str, list[Path]] = {}
-        # Discover data-like files
         candidates = []
         for pattern in [
             "*.tbl",
@@ -604,15 +512,11 @@ class BenchmarkDataValidator:
             "*.dat.zst",
         ]:
             candidates.extend(list(Path(data_dir).glob(pattern)))
-        # Group by table name (stem up to first dot for tbl/dat, handle chunk names)
         for fp in candidates:
             name = fp.name
-            # Remove compression suffix using centralized utility
             stripped = strip_compression_suffix(Path(name))
-            stem = stripped.stem  # removes .tbl/.dat/.csv
-            # Normalize chunked variants by table prefix
+            stem = stripped.stem
             table = stem
-            # For known patterns like table_N_M or table.tbl.N preserve table name before first underscore/dot-digit
             if "_" in stem:
                 prefix, rest = stem.split("_", 1)
                 if all(p.isdigit() for p in rest.split("_")):
@@ -623,11 +527,6 @@ class BenchmarkDataValidator:
                     table = parts[0]
             tables.setdefault(table, []).append(fp)
 
-        # A scan establishes file presence, not which generator inputs
-        # produced the files, so a rebuilt manifest deliberately carries no
-        # datagen stamp. Stamping it current would launder unknown-vintage
-        # data into apparently current provenance; leaving it unstamped means
-        # the next run honestly regenerates to establish provenance.
         manifest = {
             "benchmark": self.benchmark_name,
             "scale_factor": self.scale_factor,
@@ -638,16 +537,14 @@ class BenchmarkDataValidator:
             "tables": {},
         }
         for table, paths in tables.items():
-            # Sort for determinism
             paths = sorted(paths)
-            # Count rows across files
             rows = self._count_rows_paths(paths)
             for p in paths:
                 manifest["tables"].setdefault(table, []).append(
                     {
                         "path": p.name,
                         "size_bytes": p.stat().st_size if p.exists() else 0,
-                        "row_count": rows if len(paths) == 1 else 0,  # store total on single file entries
+                        "row_count": rows if len(paths) == 1 else 0,
                     }
                 )
         from benchbox.utils.datagen_manifest import require_manifest_files

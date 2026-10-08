@@ -1,28 +1,8 @@
-"""Parser for the substitution parameters that dsqgen records with ``-LOG``.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-dsqgen writes one block per stream and template::
+# TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council
 
-    BEGIN STREAM 0
-    Template: query39.tpl
-        YEAR.01 = 2002
-        MONTH.01 = 4
-        ...
-    END STREAM 0
-
-The values are the ones substituted into the generated SQL, so they are the
-authoritative source for DataFrame implementations that must use the same
-parameters as the SQL. The log records base variables only: an expression such
-as ``[MONTH]+1`` in a template appears as ``MONTH.01`` here.
-
-The per-stream query ordering in the same log is consumed by
-``benchbox.core.tpcds.streams``; this module reads the parameter lines.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -32,7 +12,6 @@ from typing import Optional
 
 from benchbox.core.tpcds.streams import _DSQGEN_BEGIN_STREAM_RE
 
-# dsqgen names a variant template by its path (``../query_variants/query5a.tpl``) and a base template by its file name.
 _TEMPLATE_RE = re.compile(r"^Template:\s*(?:\S*[/\\])?query(\d+)([ab]?)\.tpl\s*$", re.IGNORECASE)
 _END_STREAM_RE = re.compile(r"^END STREAM\s+(\d+)\s*$", re.IGNORECASE)
 _PARAMETER_RE = re.compile(r"^(\S+)\s*=\s*(.*)$")
@@ -40,13 +19,6 @@ _PARAMETER_RE = re.compile(r"^(\S+)\s*=\s*(.*)$")
 
 @dataclass(frozen=True)
 class TemplateParameters:
-    """Substituted parameters for one template in one dsqgen stream.
-
-    ``values`` maps each logged name (for example ``YEAR.01``) to its string
-    value, in log order. Names that start with an underscore are dsqgen's own
-    bookkeeping (``_LIMIT.01``, ``_END.01``); ``substitutions`` omits them.
-    """
-
     stream: int
     query_id: int
     variant: Optional[str]
@@ -54,17 +26,10 @@ class TemplateParameters:
 
     @property
     def substitutions(self) -> dict[str, str]:
-        """Template variables only, without dsqgen's underscore-prefixed bookkeeping."""
         return {name: value for name, value in self.values.items() if not name.startswith("_")}
 
 
 def parse_dsqgen_parameter_log(log_text: str) -> dict[int, list[TemplateParameters]]:
-    """Parse a dsqgen ``-LOG`` file into per-stream template parameters.
-
-    Returns a mapping from stream number to the templates of that stream in log
-    order. Malformed input raises ``ValueError`` rather than being skipped, so a
-    truncated or unexpected log cannot silently yield partial parameters.
-    """
     streams: dict[int, list[TemplateParameters]] = {}
     current_stream: Optional[int] = None
     current: Optional[TemplateParameters] = None

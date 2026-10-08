@@ -1,5 +1,3 @@
-"""BigQuery integration smoke tests using stubbed clients."""
-
 import pytest
 
 from .common import (

@@ -1,11 +1,3 @@
-"""
-Core benchmark lifecycle runner (generate → optional validate → load → execute).
-
-This module provides a reusable, CLI‑independent orchestration API that executes
-benchmark lifecycles using core types and platform adapters. It is designed to be
-used by both programmatic clients and the CLI wrapper.
-"""
-
 from __future__ import annotations
 
 import json
@@ -59,10 +51,10 @@ try:
     _MONITORING_AVAILABLE = True
 except ImportError:
     _MONITORING_AVAILABLE = False
-    PerformanceMonitor = None  # type: ignore[assignment,misc]
-    ResourceMonitor = None  # type: ignore[assignment,misc]
+    PerformanceMonitor = None
+    ResourceMonitor = None
 
-    def attach_snapshot_to_result(*_args: Any, **_kwargs: Any) -> None:  # type: ignore[misc]
+    def attach_snapshot_to_result(*_args: Any, **_kwargs: Any) -> None:
         pass
 
 
@@ -96,13 +88,9 @@ _STATUS_PRIORITY = {
 
 
 def _resolve_manifest_allowed_names(benchmark: Any, config: BenchmarkConfig) -> set[str]:
-    """Return acceptable benchmark identifiers for manifest validation."""
 
     allowed = {config.name.lower()}
 
-    # A benchmark that builds its own tables from the source data (tpcds_obt)
-    # must not accept the source manifest: reusing it loads the source tables
-    # instead of the benchmark's own.
     if getattr(benchmark, "GENERATES_OWN_OUTPUT", False) is True:
         return allowed
 
@@ -112,7 +100,7 @@ def _resolve_manifest_allowed_names(benchmark: Any, config: BenchmarkConfig) -> 
             alias = getter()
         except NotImplementedError:
             alias = None
-        except Exception as exc:  # pragma: no cover - defensive logging
+        except Exception as exc:  # pragma: no cover
             logger.warning(
                 "data sharing alias resolution failed for %s: %s",
                 getattr(benchmark, "__class__", type(benchmark)).__name__,
@@ -134,15 +122,6 @@ def _resolve_manifest_allowed_names(benchmark: Any, config: BenchmarkConfig) -> 
 
 
 def _resolve_output_dir_handler(benchmark: Any, output_root: str | None) -> Any | None:
-    """Resolve the benchmark output directory handler (compatibility shim).
-
-    The orchestrator resolves the final datagen root before construction and
-    injects it into the constructor (_resolve_construction_output_dir), so for
-    that path the benchmark already holds the right handler and no assignment
-    happens here. The shim remains for externally constructed instances and
-    callers that pass output_root directly (including cloud staging handlers,
-    which resolve only after platform config is known).
-    """
     from pathlib import Path
 
     existing = getattr(benchmark, "output_dir", None)
@@ -151,12 +130,6 @@ def _resolve_output_dir_handler(benchmark: Any, output_root: str | None) -> Any 
         return None
 
     handler = create_path_handler(target)
-    # Skip the redundant reassignment only for a plain local path already equal
-    # to the live one (the common case where the orchestrator injected the same
-    # managed root at construction). create_path_handler preserves cloud handler
-    # types that are not pathlib.Path subclasses (DatabricksPath, cloudpathlib
-    # CloudPath); their __eq__ to a plain Path ignores the cloud/dbfs target, so
-    # an equality-only skip would silently drop it — always assign those.
     if isinstance(handler, Path) and handler == existing:
         return handler
     benchmark.output_dir = handler
@@ -166,7 +139,6 @@ def _resolve_output_dir_handler(benchmark: Any, output_root: str | None) -> Any 
 def _run_preflight_validation(
     benchmark: Any, benchmark_config: BenchmarkConfig, output_dir_handler: Any
 ) -> ValidationResult:
-    """Execute preflight validation using benchmark helpers or core engine."""
 
     benchmark_name = getattr(benchmark_config, "name", getattr(benchmark, "name", "")).lower()
     scale_factor = getattr(benchmark_config, "scale_factor", getattr(benchmark, "scale_factor", 1.0))
@@ -183,7 +155,6 @@ def _run_preflight_validation(
 
 
 def _run_manifest_validation(benchmark: Any, benchmark_config: BenchmarkConfig) -> ValidationResult:
-    """Validate the generated data manifest if present."""
 
     if hasattr(benchmark, "validate_manifest"):
         return benchmark.validate_manifest(benchmark_name=benchmark_config.name)
@@ -209,7 +180,6 @@ def _run_postload_validation(
     benchmark_config: BenchmarkConfig,
     platform_config: dict[str, Any] | None,
 ) -> ValidationResult | None:
-    """Execute post-load validation using the core database validation engine."""
 
     if adapter is None:
         return None
@@ -225,7 +195,7 @@ def _run_postload_validation(
         connection = connection_lifecycle.create_connection(**(platform_config or {}))
         engine = DatabaseValidationEngine()
         return engine.validate_loaded_data(connection, benchmark_config.name.lower(), benchmark_config.scale_factor)
-    except Exception as exc:  # pragma: no cover - defensive safeguard
+    except Exception as exc:  # pragma: no cover
         return ValidationResult(
             is_valid=False,
             errors=[f"Post-load validation failed: {exc}"],
@@ -236,14 +206,13 @@ def _run_postload_validation(
         if connection is not None:
             try:
                 connection_lifecycle.close_connection(connection)
-            except Exception:  # pragma: no cover - defensive safeguard
+            except Exception:  # pragma: no cover
                 pass
 
 
 def _finalize_validation_metadata(
     result: BenchmarkResults, records: list[tuple[str, ValidationResult]]
 ) -> BenchmarkResults:
-    """Merge collected validation records into the final result object."""
 
     if not records:
         current_status = (result.validation_status or "UNKNOWN").upper()
@@ -299,7 +268,6 @@ def _finalize_validation_metadata(
 
 
 def _coerce_bool_option(value: Any) -> bool:
-    """Coerce CLI/config option values into booleans."""
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
@@ -308,7 +276,6 @@ def _coerce_bool_option(value: Any) -> bool:
 
 
 def _resolve_strict_translation_mode(options: Mapping[str, Any]) -> bool:
-    """Resolve strict SQL translation mode from benchmark or platform options."""
     for key in ("strict_translation", "translation_strict", "sql_translation_strict"):
         if key in options:
             return _coerce_bool_option(options[key])
@@ -329,16 +296,6 @@ def _resolve_strict_translation_mode(options: Mapping[str, Any]) -> bool:
 
 
 def _manifest_matches_result(manifest: Any, result: BenchmarkResults, benchmark: Any = None) -> bool:
-    """Check a manifest plausibly describes the dataset behind a result.
-
-    Compares benchmark identity (punctuation-insensitive) and scale factor,
-    but only on fields both sides provide; absent fields do not disqualify.
-    Benchmarks that intentionally reuse another benchmark's dataset (via
-    ``get_data_source_benchmark``) accept the shared manifest identity, mirroring
-    ``_resolve_manifest_allowed_names``. This is a tripwire against output dirs
-    pointing at another benchmark's data, not a proof that these exact files
-    were read.
-    """
     import re as _re
 
     if not isinstance(manifest, dict):
@@ -373,25 +330,10 @@ def _manifest_matches_result(manifest: Any, result: BenchmarkResults, benchmark:
 
 
 def _adapter_reused_database(adapter: Any) -> bool:
-    """Whether the adapter skipped loading by reusing an existing database.
-
-    Adapters record this on ``database_was_reused`` when a compatible
-    persistent database lets them skip schema creation and data loading even
-    though load was requested; results measured then describe the older
-    reused database, not the output-dir manifest. Adapters without the
-    attribute behave as before.
-    """
     return bool(getattr(adapter, "database_was_reused", False))
 
 
 def _collect_reused_table_stats(adapter: Any, benchmark: Any, connection: Any) -> dict[str, int]:
-    """Collect row counts for the tables of a reused database.
-
-    Mirrors the full-run reuse path (``_setup_reused_database_phases``): read
-    live row counts for every schema table instead of loading data. Best
-    effort per table -- adapters without a row-count API contribute nothing
-    rather than failing the run.
-    """
     table_stats: dict[str, int] = {}
     get_schema = getattr(benchmark, "get_schema", None)
     if not callable(get_schema):
@@ -423,16 +365,6 @@ def _collect_reused_table_stats(adapter: Any, benchmark: Any, connection: Any) -
 def _attach_datagen_version(
     result: BenchmarkResults, benchmark: Any = None, *, dataset_identity_established: bool = True
 ) -> BenchmarkResults:
-    """Stamp the result with the verified data-generation version behind it.
-
-    The version is read back from the benchmark's datagen manifest and
-    recorded only when that manifest's stamp is current and the manifest
-    plausibly describes this result's dataset (matching benchmark/scale).
-    Callers pass ``dataset_identity_established=False`` when this run did not
-    establish that link (execute-only runs against an existing database,
-    caller-supplied external tables); those paths leave the fields unset
-    rather than asserting unverified provenance.
-    """
     try:
         if not dataset_identity_established:
             return result
@@ -467,15 +399,6 @@ def _attach_datagen_version(
 
 
 def _attach_variant_comparability_metadata(result: BenchmarkResults, benchmark: Any) -> BenchmarkResults:
-    """Attach read_primitives variant comparability to execution metadata.
-
-    Reads the ``variant_comparability`` summary the benchmark exposes via
-    ``get_benchmark_info()`` (see
-    ``benchbox.core.read_primitives.variant_contracts``) and persists it on
-    ``execution_metadata["variant_comparability"]`` so CLI output and saved
-    result artifacts report which query variants were compared. Benchmarks
-    without the summary are untouched. Best-effort: never fails the run.
-    """
     try:
         info_getter = getattr(benchmark, "get_benchmark_info", None)
         if info_getter is None:
@@ -497,7 +420,6 @@ def _attach_translation_metadata(
     *,
     strict_mode: bool,
 ) -> BenchmarkResults:
-    """Attach SQL translation outcome metadata and mark fallback results uncertain."""
     summary = summarize_sql_translation_outcomes(outcomes, strict_mode=strict_mode)
     if not summary:
         return result
@@ -522,7 +444,6 @@ def _enrich_driver_runtime_metadata(
     adapter: Any | None,
     database_config: DatabaseConfig | None,
 ) -> BenchmarkResults:
-    """Attach resolved driver runtime metadata to result objects."""
     apply_driver_metadata(result, database_config=database_config, platform_adapter=adapter)
     return result
 
@@ -533,7 +454,6 @@ def _enrich_normalized_runtime_metadata(
     adapter: Any | None,
     platform_config: Mapping[str, Any] | None = None,
 ) -> BenchmarkResults:
-    """Attach normalized execution-environment metadata from optional adapter hooks."""
     if adapter is None:
         return result
     if _has_adapter_runtime_metadata(result):
@@ -551,7 +471,6 @@ def _enrich_normalized_runtime_metadata(
 
 
 def _has_adapter_runtime_metadata(result: BenchmarkResults) -> bool:
-    """Return True when a result already carries adapter-supplied normalized metadata."""
     environment = result.execution_environment if isinstance(result.execution_environment, Mapping) else {}
     runtime = environment.get("platform_runtime") if isinstance(environment.get("platform_runtime"), Mapping) else {}
     deployment = result.platform_deployment if isinstance(result.platform_deployment, Mapping) else {}
@@ -578,7 +497,6 @@ def _execute_load_only_mode(
     table_mode: str = "native",
     gather_statistics: bool = False,
 ) -> tuple[BenchmarkResults, ValidationResult | None]:
-    """Execute load-only workflow using the core runner primitives."""
 
     connection = None
     table_stats: dict[str, int] = {}
@@ -587,10 +505,6 @@ def _execute_load_only_mode(
     postload_result: ValidationResult | None = None
 
     connection_lifecycle = as_connection_lifecycle(adapter)
-    # New run: allow the existing-database decision to be made once below.
-    # Without this reset, a reused adapter instance would skip first-connection
-    # reuse/recreate handling for the load-only run.
-    # adapter is typed as object, so direct assignment would fail type checking.
     setattr(adapter, "_existing_db_decided", False)  # noqa: B010
     try:
         connection = connection_lifecycle.create_connection(**(platform_config or {}))
@@ -623,14 +537,6 @@ def _execute_load_only_mode(
             data_loading_phase_status = "COMPLETED"
             data_loading_phase_reason: str | None = None
         elif _adapter_reused_database(adapter):
-            # handle_existing_database() ran inside create_connection() above and
-            # deemed the existing database compatible with this run, so reuse it
-            # exactly like a full run does instead of re-issuing CREATE TABLE
-            # against tables that already exist (ClickHouse fails reruns with
-            # Code: 57 "Table ... already exists"). Nothing is dropped or
-            # overwritten here: an incompatible database was already recreated
-            # by handle_existing_database() before this point, so reaching this
-            # branch proves the contents are safe to keep.
             logger.info("Database being reused - skipping schema creation and data loading (load-only mode)")
             table_stats = _collect_reused_table_stats(adapter, benchmark, connection)
             load_time = 0.0
@@ -643,7 +549,6 @@ def _execute_load_only_mode(
             data_loading_phase_status = "SKIPPED"
             data_loading_phase_reason = "Reusing compatible existing database - data loading skipped"
         else:
-            # Create schema before loading data in native table mode.
             native_loader = as_native_table_loader(adapter)
             schema_time = native_loader.create_schema(benchmark, connection)
             table_stats, load_time, per_table_timings = native_loader.load_data(benchmark, connection, data_dir)
@@ -698,23 +603,13 @@ def _execute_load_only_mode(
                     "stats_mode": statistics_phase.stats_mode,
                     "tables_analyzed": statistics_phase.tables_analyzed,
                 }
-                # Opt-in reset/persist marker and per-table breakdown: both
-                # additive/omitted-when-empty so unmodified load-only runs
-                # stay byte-identical to the PR #980 payload.
                 if statistics_phase.stats_lifecycle:
                     phases["statistics"]["stats_lifecycle"] = statistics_phase.stats_lifecycle
                 if statistics_phase.per_table_ms:
                     phases["statistics"]["per_table_ms"] = statistics_phase.per_table_ms
-                # Fold the phase's own wall-clock into the load-only result's
-                # duration_seconds so it isn't underreported relative to the
-                # emitted phases.statistics.duration_ms (ANALYZE can be
-                # substantial; omitting it here would disagree with the phase
-                # block for exactly the runs this feature enables).
                 statistics_time_seconds = (statistics_phase.duration_ms or 0) / 1000.0
 
-        # Calculate total rows and data size
         total_rows = sum(table_stats.values()) if table_stats else 0
-        # Try to calculate data size from benchmark output_dir if available
         data_size_mb = 0.0
         if hasattr(benchmark, "output_dir") and hasattr(adapter, "_calculate_data_size"):
             try:
@@ -742,17 +637,6 @@ def _execute_load_only_mode(
 
 
 def _get_table_schemas_from_benchmark(benchmark: Any) -> dict[str, dict[str, Any]]:
-    """Extract table schemas from benchmark instance.
-
-    Args:
-        benchmark: Benchmark instance with get_schema() method
-
-    Returns:
-        Dictionary mapping table_name → schema dict with {"name": ..., "columns": [...]}
-
-    Raises:
-        RuntimeError: If schema cannot be extracted
-    """
     if not hasattr(benchmark, "get_schema"):
         raise RuntimeError(f"Benchmark {type(benchmark).__name__} does not provide get_schema() method")
 
@@ -761,12 +645,9 @@ def _get_table_schemas_from_benchmark(benchmark: Any) -> dict[str, dict[str, Any
     except Exception as e:
         raise RuntimeError(f"Failed to get schema from benchmark: {e}") from e
 
-    # Handle both dict and list return formats
     if isinstance(schema, dict):
-        # Already in expected format: {table_name: {name, columns}}
         return schema
     elif isinstance(schema, list):
-        # Convert list format to dict: [{name, columns}, ...] → {name: {name, columns}}
         return {table["name"].lower(): table for table in schema}
     else:
         raise RuntimeError(f"Unexpected schema format: {type(schema)}")
@@ -776,24 +657,12 @@ def _run_format_conversion(
     benchmark: Any,
     benchmark_config: BenchmarkConfig,
 ) -> dict[str, Any] | None:
-    """Run format conversion after data generation.
-
-    Args:
-        benchmark: Benchmark instance with output_dir and get_schema()
-        benchmark_config: Benchmark configuration with conversion settings in options
-
-    Returns:
-        Dictionary of conversion results by table name, or None if no conversion
-    """
-    # Extract conversion settings from benchmark_config.options
     options_dict = getattr(benchmark_config, "options", {}) or {}
     table_format = options_dict.get("table_format")
 
-    # Check if conversion is requested
     if not table_format:
         return None
 
-    # Validate format
     allowed_formats = {"parquet", "vortex", "delta", "iceberg"}
     if table_format.lower() not in allowed_formats:
         logger.error(f"Invalid format: {table_format}. Allowed: {allowed_formats}")
@@ -809,14 +678,12 @@ def _run_format_conversion(
         logger.warning(f"Cannot convert format: manifest not found at {manifest_path}")
         return None
 
-    # Get table schemas from benchmark
     try:
         schemas = _get_table_schemas_from_benchmark(benchmark)
     except RuntimeError as e:
         logger.error(f"Format conversion failed: {e}")
         return None
 
-    # Build conversion options from benchmark_config.options
     tf_compression = options_dict.get("table_format_compression", "snappy")
     tf_partition_cols = options_dict.get("table_format_partition_cols", [])
 
@@ -827,13 +694,10 @@ def _run_format_conversion(
         validate_row_count=True,
     )
 
-    # When targeting Vortex in external table mode, require the DuckDB extension writer
-    # so that generated files are compatible with DuckDB's read_vortex().
     table_mode = options_dict.get("table_mode", "native")
     if table_format == "vortex" and str(table_mode).lower() == "external":
         options.metadata["require_duckdb_writer"] = True
 
-    # Run conversion orchestration
     orchestrator = FormatConversionOrchestrator()
     logger.info(f"Converting benchmark data to {table_format} format (compression: {options.compression})")
 
@@ -857,8 +721,6 @@ class LifecyclePhases:
     generate: bool = True
     load: bool = True
     execute: bool = True
-    # Opt-in statistics phase between load and query (off by default so
-    # legacy benchmarks keep load-includes-stats semantics).
     statistics: bool = False
 
 
@@ -873,7 +735,6 @@ def _resolve_verbosity_settings(
     verbosity: VerbositySettings | None,
     options_map: Any,
 ) -> VerbositySettings:
-    """Pick an explicit VerbositySettings, fall back to stored or options-map values."""
     if verbosity is not None:
         return verbosity
     stored = options_map.get("verbosity_settings") if isinstance(options_map, Mapping) else None
@@ -885,7 +746,6 @@ def _resolve_verbosity_settings(
 
 
 def _parse_partition_cols(raw: Any) -> list[str]:
-    """Normalize a partition-cols option (str or iterable) into a list of non-empty strings."""
     if isinstance(raw, str):
         return [part.strip() for part in raw.split(",") if part.strip()]
     if isinstance(raw, (list, tuple)):
@@ -894,7 +754,6 @@ def _parse_partition_cols(raw: Any) -> list[str]:
 
 
 def _database_platform_options(database_config: DatabaseConfig | None) -> dict[str, Any]:
-    """Collect resolved platform options from DatabaseConfig options plus extra fields."""
     if database_config is None:
         return {}
 
@@ -927,7 +786,6 @@ def _build_run_config_from_options(
     table_format: str | None,
     gather_statistics: bool = False,
 ) -> RunConfig:
-    """Assemble the RunConfig passed to SQL adapters."""
     iterations = int(
         options.get("power_iterations", GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS)
         or GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS
@@ -973,14 +831,6 @@ def _build_run_config_from_options(
         stream_timeout_source=options.get("stream_timeout_source"),
         cancel_on_timeout=bool(options.get("cancel_on_timeout", False)),
         capture_plans=benchmark_config.capture_plans,
-        # --show-plans travels in DatabaseConfig.options via the CLI runtime
-        # overrides (direct path) or as a DatabaseConfig extra (interactive
-        # path); both are collected by _database_platform_options. Read from
-        # the merged database options, not BenchmarkConfig, which has no
-        # display-only field by design. Tri-state (mirroring analyze_plans):
-        # absent means the adapter keeps its own value (e.g. from
-        # platform_config or a preconfigured adapter); only an explicit
-        # True/False overrides it.
         show_query_plans=(
             bool(database_options.get("show_query_plans")) if "show_query_plans" in database_options else None
         ),
@@ -995,8 +845,6 @@ def _build_run_config_from_options(
         table_format_partition_cols=_parse_partition_cols(options.get("table_format_partition_cols")),
         client_region=getattr(benchmark_config, "client_region", None) or options.get("client_region"),
         client_cloud=getattr(benchmark_config, "client_cloud", None) or options.get("client_cloud"),
-        # BenchmarkConfig.link_probe defaults True, so the toggle always
-        # resolves from config; there is intentionally no options fallback.
         link_probe=is_probe_requested(getattr(benchmark_config, "link_probe", None)),
     )
 
@@ -1014,7 +862,6 @@ def _execute_via_adapter(
     output_root: str | None,
     is_dataframe_adapter: bool,
 ) -> BenchmarkResults:
-    """Dispatch benchmark execution to either the DataFrame or SQL adapter path."""
     if is_dataframe_adapter:
         from pathlib import Path
 
@@ -1043,10 +890,6 @@ def _execute_via_adapter(
             monitor=monitor,
         )
 
-    # SQL adapter: the positional arg is also named "benchmark" (the object),
-    # so we can't spread run_config.benchmark as a keyword arg. Pass the
-    # canonical slug via "benchmark_name" - the fallback _build_execution_metadata
-    # already checks - so the adapter never has to infer benchmark identity.
     kwargs = {k: v for k, v in run_config.__dict__.items() if k != "benchmark"}
     if run_config.benchmark is not None:
         kwargs.setdefault("benchmark_name", run_config.benchmark)
@@ -1062,12 +905,6 @@ def _run_data_generation_phase(
     monitor: Any,
     validation_records: list[tuple[str, ValidationResult]],
 ) -> tuple[float, bool, bool]:
-    """Run preflight+datagen+manifest-validation+format-conversion.
-
-    Returns ``(elapsed_seconds, freshly_generated, manifest_reused)`` so the
-    lifecycle can tell whether this run established the dataset identity
-    behind the output-dir manifest.
-    """
     datagen_start = time.monotonic()
 
     if phases.generate and validation_opts.enable_preflight_validation:
@@ -1105,7 +942,6 @@ def _build_data_only_result(
     validation_records: list[tuple[str, ValidationResult]],
     execution_context: ExecutionContext | None,
 ) -> BenchmarkResults:
-    """Assemble and finalize the BenchmarkResults returned for ``test_type == 'data_only'``."""
     execution_id = uuid.uuid4().hex[:8]
     datagen_phase = {
         "status": "COMPLETED",
@@ -1137,20 +973,7 @@ def _clickhouse_load_failure_details(
     adapter: Any,
     platform_config: Mapping[str, Any] | None,
 ) -> dict[str, Any] | None:
-    """Return a durable, credential-free payload for a ClickHouse load failure.
 
-    ClickHouse server streaming deliberately raises a typed
-    ``ClickHouseServerLoadError``.  Keep the structured fields at this
-    orchestration boundary instead of forcing UAT to reverse-engineer a
-    human-readable log line.  The payload reports rows handed to the driver as
-    ``rows_attempted``; the driver does not expose a commit count when an
-    INSERT fails, so claiming those rows were committed would be incorrect.
-    """
-
-    # Keep the core -> platform dependency one-way.  The platform loader's
-    # typed exception is intentionally recognized by its stable boundary
-    # contract rather than importing ``benchbox.platforms`` from core (the
-    # architecture lint forbids that reverse dependency).
     if type(exc).__name__ != "ClickHouseServerLoadError" or not all(
         hasattr(exc, attribute) for attribute in ("table_name", "source_files", "rows_attempted", "cause")
     ):
@@ -1181,8 +1004,6 @@ def _clickhouse_load_failure_details(
             "type": type(cause).__name__,
             "message": str(cause),
         },
-        # A load failure is not a result bundle.  This is intentionally null so
-        # consumers cannot mistake a failed/partial load for query evidence.
         "result_json": None,
     }
 
@@ -1197,7 +1018,6 @@ def _build_clickhouse_load_failure_result(
     exc: BaseException,
     execution_context: ExecutionContext | None,
 ) -> BenchmarkResults:
-    """Build a failed sentinel while retaining typed ClickHouse load diagnostics."""
 
     details = _clickhouse_load_failure_details(exc, adapter=adapter, platform_config=platform_config)
     if details is None:
@@ -1239,7 +1059,6 @@ def _build_setup_only_result(
     validation_records: list[tuple[str, ValidationResult]],
     execution_context: ExecutionContext | None,
 ) -> BenchmarkResults:
-    """Assemble and finalize the BenchmarkResults for the setup-only early return."""
     if phases.execute and adapter is None:
         raise RuntimeError(
             "Cannot execute benchmark: platform adapter not initialized. "
@@ -1281,7 +1100,6 @@ def _run_load_only_mode(
     validation_records: list[tuple[str, ValidationResult]],
     gather_statistics: bool = False,
 ) -> BenchmarkResults:
-    """Execute the load-only branch for DataFrame or SQL adapters and record postload results."""
     if adapter is None:
         raise RuntimeError("Load-only mode requires a platform adapter and database configuration")
 
@@ -1333,9 +1151,8 @@ def _setup_lifecycle_monitor(
     benchmark_config: BenchmarkConfig,
     database_config: DatabaseConfig | None,
 ) -> tuple[PerformanceMonitor | None, ResourceMonitor | None]:
-    """Create default monitor (if needed), start resource tracking, and record metadata."""
     if monitor is None and _MONITORING_AVAILABLE:
-        monitor = PerformanceMonitor()  # type: ignore[misc]
+        monitor = PerformanceMonitor()
 
     resource_monitor: ResourceMonitor | None = None
     if enable_resource_monitoring and monitor is not None:
@@ -1360,7 +1177,6 @@ def _configure_lifecycle_adapter(
     verbosity_settings: VerbositySettings | None,
     table_mode: str,
 ) -> tuple[Any | None, bool]:
-    """Acquire adapter (if needed), bind benchmark state, propagate table_mode/validation/verbosity."""
     if adapter is None and database_config is not None:
         adapter = get_platform_adapter(database_config.type, **(platform_config or {}))
 
@@ -1385,7 +1201,6 @@ def _configure_lifecycle_adapter(
 
 
 def _resolve_lifecycle_table_format(adapter: Any | None, options: dict[str, Any], table_mode: str) -> str | None:
-    """Resolve requested table format, propagate to adapter, and verify platform support."""
     table_format_raw = options.get("table_format")
     table_format: str | None = None
     if isinstance(table_format_raw, str) and table_format_raw.strip():
@@ -1423,7 +1238,6 @@ def _finalize_lifecycle_result(
     resource_monitor: ResourceMonitor | None,
     execution_context: ExecutionContext | None,
 ) -> BenchmarkResults:
-    """Stop resource monitor, attach validation/driver/monitor metadata and execution context."""
     if resource_monitor is not None:
         resource_monitor.stop()
 
@@ -1465,24 +1279,6 @@ def run_benchmark_lifecycle(
     enable_resource_monitoring: bool = True,
     execution_context: ExecutionContext | None = None,
 ) -> BenchmarkResults:
-    """Run the complete benchmark lifecycle in core, returning BenchmarkResults.
-
-    Args:
-        benchmark_config: Core benchmark configuration
-        database_config: Database configuration (None for data_only)
-        system_profile: System profile used for benchmark instantiation
-        platform_config: Platform adapter configuration (connection params, etc.)
-        phases: Which lifecycle phases to execute
-        validation_opts: Validation flags for pre/post generation and postload
-        output_root: Optional output directory/URI for data generation
-        benchmark_instance: Optional pre-constructed benchmark instance to use
-        monitor: Optional PerformanceMonitor to track metrics. If None and monitoring
-            not explicitly disabled, a default monitor will be created.
-        enable_resource_monitoring: Whether to track CPU/memory during execution (default: True)
-
-    Returns:
-        BenchmarkResults representing the full execution with performance metrics attached
-    """
     phases = phases or LifecyclePhases()
     validation_opts = validation_opts or ValidationOptions()
 
@@ -1497,7 +1293,7 @@ def run_benchmark_lifecycle(
     if benchmark_instance is None or get_benchmark_metadata(benchmark_config.name) is not None:
         validate_scale_factor(benchmark_config.name, benchmark_config.scale_factor)
     benchmark = benchmark_instance or get_benchmark_instance(benchmark_config, system_profile)
-    if isinstance(benchmark, VerbosityMixin):  # type: ignore[arg-type]
+    if isinstance(benchmark, VerbosityMixin):
         benchmark.apply_verbosity(verbosity_settings)
 
     output_dir_handler = _resolve_output_dir_handler(benchmark, output_root)
@@ -1519,14 +1315,6 @@ def run_benchmark_lifecycle(
             monitor=monitor,
             validation_records=validation_records,
         )
-    # Result provenance may only describe the output-dir manifest when this
-    # run established the dataset identity through the load path: a manifest
-    # reuse whose files the load phase reads, or a fresh generation the load
-    # phase then loads. Generate-plus-execute without load measures the
-    # pre-existing database, not the fresh files, and caller-supplied tables
-    # bypass the manifest entirely. (Adapter-level database reuse is folded
-    # in at the attach sites via _adapter_reused_database: the reuse flag is
-    # only final after the load decision, which happens later.)
     dataset_identity_established = bool(phases.load) and (freshly_generated or manifest_reused)
 
     if test_type == "data_only":
@@ -1681,12 +1469,6 @@ def run_benchmark_lifecycle(
 
 
 def _flatten_manifest_v2_entries(table_formats: Any, preferred_formats: list[str] | None = None) -> list[Any]:
-    """Select one v2 table format and return its file entries.
-
-    Manifests may contain multiple materializations per table (for example
-    `tbl` and `parquet`). For aggregate stats we should count one canonical
-    representation per table, not sum across all formats.
-    """
 
     formats = getattr(table_formats, "formats", {}) or {}
     if not isinstance(formats, dict) or not formats:
@@ -1711,11 +1493,6 @@ def _flatten_manifest_v2_entries(table_formats: Any, preferred_formats: list[str
 
 
 def _read_datagen_stats_from_manifest(benchmark: Any) -> dict[str, int]:
-    """Read aggregate datagen stats from manifest when available.
-
-    Returns non-critical stats used for data-only phase reporting. Any
-    parse/load failure returns an empty dict by design.
-    """
 
     try:
         output_dir = getattr(benchmark, "output_dir", None)
@@ -1766,32 +1543,23 @@ def _read_datagen_stats_from_manifest(benchmark: Any) -> dict[str, int]:
 
 
 def _run_ensure_auxiliary_hook(benchmark: Any) -> None:
-    """Run a benchmark's auxiliary-data hook, tolerating non-critical failures.
-
-    Shared by the manifest-reuse and populated-tables-reuse paths so stale
-    manifests are healed whenever data is reused, not only when the manifest
-    itself drives the reuse.
-    """
     ensure_auxiliary = getattr(benchmark, "ensure_auxiliary_data_files", None)
     if not callable(ensure_auxiliary):
         return
     try:
         ensure_auxiliary()
     except (OSError, PermissionError) as e:
-        # Critical system errors - re-raise (disk full, permissions, I/O failure)
         raise RuntimeError(
             f"Failed to generate auxiliary data files due to system error: {e}. "
             "Check disk space, permissions, and file system health."
         ) from e
     except ImportError as e:
-        # Missing optional dependency - log warning and continue
         logger = logging.getLogger("benchbox.core.runner")
         logger.warning(
             f"Failed to generate auxiliary data files due to missing dependency: {e}. "
             "Some benchmark operations may not be available."
         )
     except Exception as e:
-        # Other errors - log warning but continue (auxiliary files may not be critical)
         logger = logging.getLogger("benchbox.core.runner")
         logger.warning(
             f"Failed to generate auxiliary data files: {type(e).__name__}: {e}. Some benchmark operations may fail."
@@ -1799,33 +1567,14 @@ def _run_ensure_auxiliary_hook(benchmark: Any) -> None:
 
 
 def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> tuple[bool, bool]:
-    """Ensure data is generated, respecting manifest and generator validator.
-
-    Implements the idempotent behavior: reuse valid existing data when possible,
-    unless force_regenerate is requested; optionally fail when no_regenerate is set
-    and data is missing/invalid.
-
-    Returns:
-        ``(freshly_generated, manifest_reused)``: whether this call generated
-        data, and whether it reused a manifest validated on this run. Both
-        False means caller-supplied tables bypassed manifest reuse entirely.
-    """
     options = getattr(config, "options", {}) or {}
     force_regenerate_flag = bool(options.get("force_regenerate"))
     no_regenerate_flag = bool(options.get("no_regenerate"))
     populated_tables_invalid = False
 
-    # Validate populated tables too. Callers may provide stale or incomplete
-    # mappings, so truthiness alone must not bypass manifest and file checks.
     if getattr(benchmark, "tables", None) and not force_regenerate_flag:
         tables_usable, tables_reuse_manifest = _populated_tables_are_valid(benchmark, config)
         if tables_usable:
-            # Caller-supplied tables bypass manifest reuse, but stale manifests
-            # still need healing (e.g. FlightData dialect backfill). When the
-            # mapping exactly matches the current output-dir manifest, the
-            # manifest still describes this dataset, so reuse is reported and
-            # a later load establishes provenance; anything else stays
-            # unprovenanced.
             _run_ensure_auxiliary_hook(benchmark)
             return False, tables_reuse_manifest
         populated_tables_invalid = True
@@ -1847,8 +1596,6 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> tuple[boo
             if summary:
                 _emit_manifest_reuse_message(benchmark, summary)
 
-            # Allow benchmarks to ensure auxiliary files exist even when reusing data
-            # This is needed for benchmarks that generate additional test files beyond the main data
             _run_ensure_auxiliary_hook(benchmark)
 
             return False, True
@@ -1857,11 +1604,9 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> tuple[boo
         reason = "manifest is invalid or stale" if manifest_found else "manifest is missing"
         raise RuntimeError(f"no_regenerate is set but {reason}")
 
-    # If manifest existed but failed validation, warn before regenerating
     if manifest_found and not manifest_valid:
         emit("⚠️ Manifest validation failed; regenerating benchmark data")
 
-    # Perform generation (force_regenerate_flag is respected by skipping reuse)
     emit("Generating benchmark data...")
     _gen_start = time.monotonic()
     benchmark.generate_data()
@@ -1870,28 +1615,16 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> tuple[boo
 
 
 def _populated_tables_are_valid(benchmark: Any, config: BenchmarkConfig) -> tuple[bool, bool]:
-    """Check whether caller-provided table mappings are safe to reuse.
-
-    Returns ``(usable, reuse_manifest)``: usability, plus whether the mapping
-    exactly matches the current output-dir manifest (native mode only), in
-    which case the manifest still describes this dataset for provenance.
-    """
     tables = getattr(benchmark, "tables", None)
     table_mode = str((getattr(config, "options", {}) or {}).get("table_mode", "native") or "native").lower()
     if not tables or not _table_mapping_paths_exist(tables, allow_cloud_uris=table_mode == "external"):
         return False, False
 
     if table_mode == "external":
-        # External table mappings are supplied by the caller and may not have a
-        # local datagen manifest. Their paths are validated at the adapter
-        # boundary, so local manifest comparison would incorrectly regenerate
-        # otherwise usable external data.
         return True, False
 
     output_dir = getattr(benchmark, "output_dir", None)
     if not output_dir:
-        # External table mappings have no local manifest to compare against;
-        # existence is the strongest validation available at this boundary.
         return True, False
 
     manifest_valid, manifest_data, _manifest_found = _validate_manifest_if_present(benchmark, config, quiet=True)
@@ -1906,7 +1639,6 @@ def _populated_tables_are_valid(benchmark: Any, config: BenchmarkConfig) -> tupl
 
 
 def _table_mapping_paths_exist(value: Any, *, allow_cloud_uris: bool = False) -> bool:
-    """Recursively verify that every path in a table mapping exists."""
     if isinstance(value, Mapping):
         return bool(value) and all(
             _table_mapping_paths_exist(child, allow_cloud_uris=allow_cloud_uris) for child in value.values()
@@ -1924,7 +1656,6 @@ def _table_mapping_paths_exist(value: Any, *, allow_cloud_uris: bool = False) ->
 
 
 def _normalize_table_mapping(value: Any) -> Any:
-    """Normalize table mapping containers for stable path comparisons."""
     if isinstance(value, Mapping):
         return {str(key): _normalize_table_mapping(child) for key, child in sorted(value.items())}
     if isinstance(value, (list, tuple, set)):
@@ -1933,11 +1664,6 @@ def _normalize_table_mapping(value: Any) -> Any:
 
 
 def _populate_tables_from_manifest(benchmark: Any, manifest: dict | None = None) -> dict[str, Any] | None:
-    """Populate benchmark.tables from _datagen_manifest.json when available.
-
-    Returns a summary dictionary with table_count, file_count, created_at when manifest
-    data is loaded successfully. Returns None when manifest is missing or invalid.
-    """
     try:
         from benchbox.utils.datagen_manifest import get_table_files
 
@@ -1966,12 +1692,10 @@ def _populate_tables_from_manifest(benchmark: Any, manifest: dict | None = None)
             "created_at": manifest_data.get("created_at"),
         }
     except Exception:
-        # Non-fatal; leave tables as-is
         return None
 
 
 def _load_manifest_data(output_dir: Any, manifest: dict | None) -> dict | None:
-    """Load manifest data from disk unless it was supplied directly."""
     if manifest is not None:
         return manifest
     manifest_path = output_dir.joinpath("_datagen_manifest.json")
@@ -1982,7 +1706,6 @@ def _load_manifest_data(output_dir: Any, manifest: dict | None) -> dict | None:
 
 
 def _resolve_manifest_entry_paths(output_dir: Any, table: str, entries: list[dict[str, Any]]) -> list[Any]:
-    """Resolve manifest file entries to absolute paths with directory guards."""
     from pathlib import Path
 
     paths = []
@@ -2002,7 +1725,6 @@ def _resolve_manifest_entry_paths(output_dir: Any, table: str, entries: list[dic
 
 
 def _emit_manifest_reuse_message(benchmark: Any, summary: dict[str, Any]) -> None:
-    """Emit a concise console/log message when data reuse is triggered."""
 
     created_at = summary.get("created_at")
     table_count = summary.get("table_count", 0)
@@ -2014,7 +1736,6 @@ def _emit_manifest_reuse_message(benchmark: Any, summary: dict[str, Any]) -> Non
 
 
 def _validate_manifest_entry(entry: dict, output_dir: Any, table_name: str) -> bool:
-    """Check that a single manifest entry references a real file/dir of the expected size."""
     from pathlib import Path
 
     from benchbox.utils.datagen_manifest import compute_entry_size
@@ -2036,7 +1757,6 @@ def _validate_manifest_entry(entry: dict, output_dir: Any, table_name: str) -> b
             )
             return False
         return compute_entry_size(fp) == size
-    # Cloud paths: fall back to stat() (directories not expected)
     if hasattr(fp, "is_dir") and fp.is_dir():
         logger.warning("Cloud path %s is a directory; size check may be inaccurate", rel)
     if not hasattr(fp, "stat") or fp.stat().st_size != size:
@@ -2045,7 +1765,6 @@ def _validate_manifest_entry(entry: dict, output_dir: Any, table_name: str) -> b
 
 
 def _collect_all_entries(table_data: Any) -> list[dict]:
-    """Flatten every entry across all formats for V2 manifest tables (V1 returns [])."""
     if not isinstance(table_data, dict):
         return []
     formats_dict = table_data.get("formats", {})
@@ -2059,7 +1778,6 @@ def _collect_all_entries(table_data: Any) -> list[dict]:
 
 
 def _check_table_directory_collisions(output_dir: Any, tables: dict) -> bool:
-    """Return True if any unrecorded table-name directory collides with the manifest."""
     from pathlib import Path
 
     if isinstance(output_dir, CloudStagingPath):
@@ -2090,10 +1808,6 @@ def _check_table_directory_collisions(output_dir: Any, tables: dict) -> bool:
 def _validate_manifest_if_present(
     benchmark: Any, config: BenchmarkConfig, *, quiet: bool = False
 ) -> tuple[bool, dict | None, bool]:
-    """Validate manifest structure and referenced files.
-
-    Returns (valid, manifest_dict or None). Non-fatal; failures are signaled by return value.
-    """
     try:
         output_dir = getattr(benchmark, "output_dir", None)
         if not output_dir:

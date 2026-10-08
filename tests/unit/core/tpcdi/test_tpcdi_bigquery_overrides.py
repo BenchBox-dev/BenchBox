@@ -1,10 +1,3 @@
-"""Unit tests for TPC-DI BigQuery dialect overrides.
-
-Verifies that:
-- EQ7 uses the derived-table variant (BigQuery rejects cross-referencing
-  sibling subquery aliases)
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -22,7 +15,6 @@ def _bench():
 
 
 def test_eq7_bigquery_uses_derived_table_variant():
-    """EQ7 for BigQuery must use the derived-table rewrite."""
     q = _bench().get_queries(dialect="bigquery")["EQ7"]
     assert "quality_metrics" in q, f"EQ7 must alias the derived table as quality_metrics:\n{q}"
     assert "overall_quality_score" in q, f"EQ7 must project overall_quality_score:\n{q}"
@@ -30,7 +22,6 @@ def test_eq7_bigquery_uses_derived_table_variant():
 
 
 def test_get_query_bigquery_eq7_preserves_parameter_substitution():
-    """The derived EQ7 variant must retain caller-supplied quality thresholds."""
     q = _bench().get_query(
         "EQ7",
         params={
@@ -47,7 +38,6 @@ def test_get_query_bigquery_eq7_preserves_parameter_substitution():
 
 
 def test_non_overridden_queries_present_in_bigquery_dialect():
-    """BigQuery dialect must not drop or empty any queries."""
     bench = _bench()
     base = bench.get_queries()
     bigquery = bench.get_queries(dialect="bigquery")

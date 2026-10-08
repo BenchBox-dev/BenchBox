@@ -1,5 +1,3 @@
-"""Tests for the shrink-campaign ledger rollup script."""
-
 from __future__ import annotations
 
 import importlib.util
