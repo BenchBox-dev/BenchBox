@@ -88,12 +88,6 @@ def test_apply_phase_status_matches_ledger_overall_status() -> None:
 def test_introspector_override_delegates_to_gated_factory(
     adapter_cls, factory: str, attrs: dict, factory_args: tuple
 ) -> None:
-    """Each override must route through the gated ``tuning_trust`` factory.
-
-    Rebuilding the introspector inline (ignoring the factory) returns a real
-    object instead of the sentinel, so this fails if the override stops going
-    through the gated module.
-    """
     adapter = object.__new__(adapter_cls)
     for key, value in attrs.items():
         setattr(adapter, key, value)
@@ -234,13 +228,6 @@ def test_no_ledger_phase_literal_outside_closed_set() -> None:
 
 
 def test_run_enhanced_benchmark_routes_trust_through_tuning_trust() -> None:
-    """Pin the read-back (and apply-phase/failure-path) call sites.
-
-    If the read-back stops going through ``tuning_trust.read_back_applied_ledger``,
-    or the apply-phase status / failure-path attach stop going through the gated
-    module, the corresponding reference disappears from ``run_enhanced_benchmark``
-    and this fails.
-    """
     body = _run_enhanced_benchmark_source()
     assert "tuning_trust.read_back_applied_ledger(" in body
     assert "tuning_trust.apply_phase_status(" in body

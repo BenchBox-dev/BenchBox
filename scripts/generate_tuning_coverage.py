@@ -1,13 +1,3 @@
-"""Regenerate the checked-in tuned-template coverage matrix.
-
-Rebuilds ``tests/uat/data/tuning_coverage.tsv`` from the current template
-inventory using the same platform and benchmark sets as the UAT coverage
-test, so the checked-in matrix cannot drift from what the code derives.
-
-Usage:
-    uv run -- python scripts/generate_tuning_coverage.py
-"""
-
 from __future__ import annotations
 
 import sys
