@@ -1,3 +1,4 @@
+# TEMPLATE — canonical nightly-CI CedarDB throughput config; edited in
 name: "uat-throughput-cedardb-nightly"
 description: "Nightly: real multi-stream throughput phase on CedarDB TPC-H SF1 (run-official --streams 3, INDEPENDENT_CONNECTION)"
 
