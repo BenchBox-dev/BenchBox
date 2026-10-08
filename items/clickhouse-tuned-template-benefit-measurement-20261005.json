@@ -2,7 +2,7 @@
   "acceptance": [
     "Recorded tuned-vs-untuned timings for the three curated templates and for optimize_after_load, and a decision on each."
   ],
-  "context": "Source: PR #2677 close-out. Depends on a working ClickHouse engine for the machine used (see chdb-4x-native-load-and-old-engine-hang-20261005) or a server.",
+  "context": "Source: PR #2677 close-out. Depends on a working ClickHouse engine for the machine used (see chdb-4x-native-load-and-old-engine-hang-20261005) or a server.\n\nResult (2026-10-08), SF1 only, ClickHouse 25.8 server, 5.25 GiB container, seed 42. Fix and decisions merged in PR #2766 (squash 1ca8394665ed981fb8c7584566ea58172b456231); full record in the 2026-10-07 addendum of docs/development/tuning-adr-003-baseline-and-single-renderer.md.\n- TPC-H: tuned run was 1.6x to 4.5x slower than notuning. Cause was the tuned session pack (join_algorithm=grace_hash, 2.2x geo mean, Q3/Q5 out of memory) and post-load merges overlapping the timed phase, not the monthly partitioning. Fixed: grace_hash removed from the pack, partitioning removed from the template, merge wait after tuned server loads, Q21 statement-level join_algorithm=hash. Sort-only layout: 0.79x geo mean of untuned in the controlled interleaved study; slower queries Q18 (1.4x to 2.7x), Q3 and Q5 (about 1.5x). Decision: adjust. CLI cells (host load dependent): notuning 92.4 ms, tuned 115.0 ms, tuned+optimize 80.8 ms on a loaded host; 107.4 / 85.6 / 65.5 ms on a quieter host.\n- SSB (fresh server, 0 failures in all cells): geo mean 109.8 ms notuning, 61.2 ms tuned (0.56x), 64.1 ms tuned+optimize_after_load. Decision: keep.\n- TPC-DS: 80.9 ms notuning, 84.1 ms tuned, 76.4 ms tuned+optimize; the same 3 queries fail in every cell. Decision: keep unchanged.\n- optimize_after_load helped or was neutral in every benchmark measured.\nNot done: SF10 and larger (tracked in clickhouse-tpch-layout-study-sf10-plus); deciding templates for the other benchmarks (ClickBench, TPC-DI, TPC-DS inventory) was not part of this measurement.",
   "deferrals": [
     {
       "created_at": "2026-10-08T11:35:54Z",
@@ -78,6 +78,14 @@
       "generation": "af60f04530a544368d5e444d016c8b3a",
       "op": "take",
       "op_id": "9b5abc4bc9914919b66ead12fc417b6f",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T15:38:47Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "559be272df6c447f8a604b93b50c4bad",
       "session_id": "11344d8456c14298801d7c917bc4b4db"
     }
   ]
