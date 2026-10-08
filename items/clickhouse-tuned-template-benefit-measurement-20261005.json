@@ -97,6 +97,15 @@
       "op": "dismiss",
       "op_id": "edb7a6265c2f4fc2a2c51b979c30ebc6",
       "session_id": "11344d8456c14298801d7c917bc4b4db"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T15:38:59Z",
+      "client": "claude-code",
+      "generation": "af60f04530a544368d5e444d016c8b3a",
+      "op": "finish",
+      "op_id": "7a91e754a465481bb47ed116cba71831",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
     }
   ]
 }
