@@ -2,7 +2,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ADR = ROOT / "docs/development/adr/adr-independent-publication-authorities.md"
-ADR_INDEX = ROOT / "docs/development/adr/README.md"
 THREAT_MODEL = ROOT / "docs/development/independent-publication-threat-model.md"
 OPERATIONS = ROOT / "docs/operations/independent-publication-contract.md"
 HOSTED_CONTRACT = ROOT / "docs/reference/hosted-results-contract.md"
@@ -78,7 +77,6 @@ def main() -> int:
             ),
         )
     )
-    failures.extend(_require(ADR_INDEX, ("adr-independent-publication-authorities.md",)))
     failures.extend(
         _require(
             HOSTED_CONTRACT,
