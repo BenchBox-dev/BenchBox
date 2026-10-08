@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Harness output for untuned, sort-only and both composite-key arms is recorded (path in context), with CIs and all queries.",
+    "For Q3, Q5 and Q18, context records peak memory, join algorithm, rows and bytes read, and plan excerpts for each arm.",
+    "The cause is stated with evidence, or marked unproven with the hypotheses ruled out, and the ADR-3 addendum is updated to match.",
+    "If any arm beats the shipped layout under the benefit rule, a follow-up item is filed."
+  ],
+  "context": "Source: tuning-evidence plan (2026-10-08), plan step 7. Covers muse F9 and agy F-07. agy proposed (L_ORDERKEY, L_SHIPDATE) as the fix. It was rejected as a default because a secondary key column prunes poorly behind a high-cardinality leading column (from ClickHouse's primary-index docs, not re-checked this session), but it is kept here as a measured arm. Study data: /tmp/tpch-tuned-regression-tools-20261007/data/sf1_study4.json.",
+  "description": "## Problem\nWith the tuned date-first sort key at SF1, three queries run slower than `notuning`, and rows read does not explain it:\n\n| Query | Time | Rows read |\n|---|---|---|\n| Q3 | 1.43× | 0.54× |\n| Q5 | 1.49× | 0.84× |\n| Q18 | 1.77× | 2.15× |\n\nThe ADR blamed lost order-key ordering in `lineitem` (join locality), but that was never tested.\n\n## Change\n- Use the harness to compare untuned and sort-only. For each slow query, record peak memory, the join algorithm ClickHouse chose, rows and bytes read, `EXPLAIN indexes = 1` and `EXPLAIN PIPELINE`, and `system.query_log` ProfileEvents.\n- Add two layout arms: `(L_ORDERKEY, L_SHIPDATE)` and `(L_SHIPDATE, L_ORDERKEY)`. The expectation is that an order-key-first key loses the date pruning that made Q6, Q14 and Q15 faster. Measure that rather than assume it.\n- State the cause with evidence, or state \"unproven\" and list what was ruled out.\n\n## Decision gate\n- Any template change goes through the benefit rule (`tuning-evidence-benefit-rule-20261008`). This item produces findings only.\n\n## Guardrails (must preserve)\n- Report every query in each arm, not only the three slow ones.\n- No template edits in this item.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Stage explicit paths; never `git add -A`.\n- Re-read every file:line anchor before editing. Anchors are from develop 5ca12e6ca.",
+  "links": [
+    "benchbox/core/tuning/templates/clickhouse/tpch_tuned.yaml",
+    "docs/development/tuning-adr-003-baseline-and-single-renderer.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T23:32:46Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "9c0a9c5b03a24a7ba396ef52c9402cea",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
+    }
+  ]
+}
