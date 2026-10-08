@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Trusted state proves which workflow revision produced it (for example the workflow blob sha recorded in the state and checked against develop)",
+    "A test covers a retarget that happens before the run is created"
+  ],
+  "description": "github._pull_request_target_trusted accepts a run when the pull request's base is develop and its latest base_ref_changed event predates the run's created_at. That proves only the base when the run record was created, not which workflow file ran. A user with write access could retarget to a branch with a modified oracle-review-shadow.yml and back before the run is created (timestamps have one-second resolution), and the forged state artifact would be trusted. The run path carries no workflow ref. Deferred twice as Medium on #2769.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/pull/2769"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-08T23:30:29Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "65eac9a324e64abf83f928f7440e70ee",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}

@@ -13751,6 +13751,13 @@
       "status": "done",
       "title": "oracle map renders a staged gate's scale from the shared default and passes unknown provenance labels through"
     },
+    "oracle-pull-request-target-retarget-race-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "pull_request_target state trust has a retarget timing race"
+    },
     "oracle-read-evidence-tightening-20261008": {
       "claim": null,
       "needs": [],
