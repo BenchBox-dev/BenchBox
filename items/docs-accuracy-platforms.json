@@ -2,6 +2,7 @@
   "acceptance": [
     "Each platform page's commands and options match the code"
   ],
+  "context": "2026-10-08 owner decision: fix all findings in this effort; verify each against the code first, drop any that does not reproduce; one PR. Findings list: audit report https://claude.ai/artifact/GZbqAYm58ZmfPEsTLp4x9D (accuracy section).",
   "description": "A docs re-audit found nonexistent extras (athena-spark, glue, emr-serverless, dataproc, fabric-spark, quanton), invented flags (InfluxDB, DuckLake --driver-version), invented adapter kwargs (platform-selection-guide, quick-reference), psycopg2 vs psycopg 3, DuckDB/Polars described as base install, contradictory ClickHouse selector status, and similar.",
   "sessions": [
     {
@@ -11,6 +12,14 @@
       "op": "create",
       "op_id": "67fd6c7a82a84ceaaab242ed8cd905e4",
       "session_id": "43d3dfd590314e7ebb852ac2f70db5c9"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:667f75493d6fbd10b32fdee5",
+      "at": "2026-10-08T13:41:04Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "4898e8d6c45c43be97a41c3898bb758f",
+      "session_id": "bcebd139f88a4c38a6dc9549b9b03523"
     }
   ]
 }
