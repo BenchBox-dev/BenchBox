@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A release-canary run on a develop head with both fixes is green",
+    "Issue #2728 is closed by the workflow, or each remaining failure has its own tracker item"
+  ],
+  "context": "Dispatching a workflow is outward-facing; do it only with the owner's go-ahead. The 2026-10-05 scheduled canary was green, so the failures are recent regressions.",
+  "description": "Dispatch release-canary.yml on a develop head that contains both the compat-gate test fix and the chdb leak fix. The failing set has changed daily (4, 9 and 3 failing tests on 2026-10-06, 07 and 08), so treat any new failure as a new defect with its own item rather than extending this one. The canary incident issue closes on the next green run, which unblocks release PRs.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/issues/2728"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-08T23:55:44Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "9cf36afbde9a492eb9299dbfc8ffa952",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    }
+  ]
+}
