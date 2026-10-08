@@ -16849,7 +16849,7 @@
       "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "dropped",
       "title": "Replace personal identifiers in an incident record and the Explorer approver field"
     },
     "reproduce-postgres-integration-needs-a-live-postgres-inside": {
