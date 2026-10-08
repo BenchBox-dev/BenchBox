@@ -13973,10 +13973,15 @@
       "title": "Oracle read evidence still accepts reads that show none of the head file's content"
     },
     "oracle-review-codex-limit-fallback-20261006": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-09T23:51:42Z",
+        "generation": "0b57ceb44924484bb4728de862942623",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:f696675eed34999feaff728a"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "oracle-review has no fallback when Codex connector hits usage limits"
     },
     "oracle-review-quota-fallback": {
