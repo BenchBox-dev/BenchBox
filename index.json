@@ -4398,6 +4398,13 @@
       "status": "open",
       "title": "Remove comments and docstrings from Write primitives modules"
     },
+    "comment-policy-digest-and-base-exception-catch22-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Comment-policy exceptions keyed to a whole-file digest and read only from the base force a separate PR for any edit"
+    },
     "comment-policy-ratchet-wheel-upgrade": {
       "claim": null,
       "needs": [],
