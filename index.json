@@ -4405,6 +4405,13 @@
       "status": "open",
       "title": "Comment-policy exceptions keyed to a whole-file digest and read only from the base force a separate PR for any edit"
     },
+    "comment-policy-hook-saturates-shared-host": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Concurrent comment-policy runs keep the shared host above the quiet-machine threshold for timed benchmarks"
+    },
     "comment-policy-ratchet-wheel-upgrade": {
       "claim": null,
       "needs": [],

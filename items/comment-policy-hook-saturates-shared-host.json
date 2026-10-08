@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "The launcher of the benchbox-comment-policy-* processes is identified",
+    "Peak CPU and wall time of one comment-policy run are measured and recorded",
+    "Either the cost is reduced, for example by reusing the venv or serializing concurrent runs, or the measurement shows it is not the cause"
+  ],
+  "description": "On 2026-10-08 the host load average reached 13 while four `benchbox-comment-policy-*` Python processes, each running from its own freshly created temp venv, held about 80% CPU apiece. A timed benchmark run needs a 1-minute load below 2.0 and no other process above 50% CPU, so these runs repeatedly made the machine non-quiet; load was still 4 to 6 hours later. The processes' launcher was not identified, and the share of load they account for was not measured. Find what starts them (commit hooks, pre-flight, or CI-style wrappers), whether each run must build a venv, and whether concurrent runs can be serialized or the venv reused.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c",
+      "at": "2026-10-08T23:30:54Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "99b4c19d8aa14745bc5559255156c6ad",
+      "session_id": "1f74fac6df92445cbacc470514ed2645"
+    }
+  ]
+}
