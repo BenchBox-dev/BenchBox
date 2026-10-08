@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "The ADR-3 addendum with the rule is merged, and its merge commit is older than any evidence file that applies the rule.",
+    "Thresholds are numeric and traced to the A/A noise recorded in tuning-evidence-measurement-harness-20261008.",
+    "The owner's approval of the thresholds is recorded in context.",
+    "The rule has been applied, using the harness, to the ClickHouse SF1 TPC-H, SSB and TPC-DS evidence. The verdicts are recorded, and any verdict that differs from the 2026-10-07 decisions is filed as a follow-up item."
+  ],
+  "context": "Source: tuning-evidence plan (2026-10-08), plan step 5. Covers muse F2/F3/F4/F13/F14 and agy F-04/F-05. Rebutted: agy's claim that a ratio of total times should replace the geometric mean. The geometric mean of per-query ratios equals the ratio of geometric means over the same query set, and TPC Power is itself a geometric mean, so the rule keeps it and adds total elapsed time.",
+  "description": "## Problem\nTemplate decisions have used a rule written after the numbers were seen, and relaxed per benchmark (\"within about 10%\" for SSB and TPC-DS). The rule judged only the geometric mean, ignored load, settle time and cost, and never stated the scale it applied to.\n\n## Change\nAdd a dated ADR-3 addendum with one rule for all benchmarks and platforms. Merge it before any new measurement uses it. The rule must cover:\n1. **Keep** needs the geometric-mean ratio's confidence interval to lie below 1 by more than the noise measured by the harness's A/A runs. The rule names how many rounds and which confidence level.\n2. **No regression in correctness:** no query fails tuned that passes `notuning`, and the answers match.\n3. **Losers named:** every query slower than a noise-derived per-query bound (at most 1.5×) is listed with its measured cause, or marked \"unproven\".\n4. **Reported, not hidden:** total elapsed time, load time and settle time per arm; for cloud platforms, cost (credits or DBUs) and clustering state.\n5. **Scope:** each verdict records scale, memory rung and engine version, and applies only to that tier.\n6. **Outcomes:** keep, adjust (what changes) or disable (what the template reverts to), and how the template's evidence state changes.\n7. No per-benchmark relaxation, unless it is written into the rule before measuring and gives a reason.\n\n## Decision gate\n- The owner approves the thresholds before anyone uses them. Record the approval in context.\n\n## Guardrails (must preserve)\n- The rule governs template decisions. It is not a CI gate; a hard benefit gate is out of scope.\n- Do not change existing templates in this item.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`. Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- Re-read every file:line anchor before editing. Anchors are from develop 5ca12e6ca.",
+  "links": [
+    "docs/development/tuning-adr-003-baseline-and-single-renderer.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T23:32:06Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "9bbcf322bd954a48a6061f35a19ffcbc",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
+    }
+  ]
+}
