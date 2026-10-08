@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "No published doc, CLI output or Explorer string claims TPC compliance, certification or official status for a BenchBox run",
+    "The derived-results disclaimer appears with TPC results in docs, CLI reports and Explorer charts",
+    "Power@Size and Throughput@Size keep their names"
+  ],
+  "description": "BenchBox text claims more than an unaudited run supports. The TPC Fair Use Quick Reference (v1.0.0, 2019) requires derived results to be labelled \"Derived from <benchmark>\", carry a disclaimer that they \"do not comply with the <benchmark> Specification\", and never be compared with official results. Remove: \"certification-ready\" (docs/guides/tpc/tpc-h-official-guide.md ~12, ~643; tpc-ds-official-guide.md ~12, ~850); the \"TPC-H BENCHMARK CERTIFICATION REPORT ... ready for certification submission\" output (benchbox/core/tpch/reporting.py ~121-195); \"TPC-compliant\" and \"is compliant\" in the run-mode prompt (benchbox/cli/benchmarks.py ~855-901) and banners (run.py ~549-558, ~1117-1137); \"Official TPC-H/DS Metrics\" headings (docs/benchmarks/tpc-h.md ~112, tpc-ds.md ~333); \"Running TPC-H compliant benchmarks\"; and similar in docs/contributing-results.md, publish.py, submit.py, blog draft 18. Keep \"official\" only for the TPC's own spec, tools, website and audited results. Owner decision 2026-10-08: keep the Power@Size and Throughput@Size names, with the derived-results disclaimer. Add the disclaimer wherever results and charts are shown (docs, CLI reports, Explorer).",
+  "links": [
+    "docs/guides/tpc/",
+    "docs/benchmarks/tpc-h.md",
+    "docs/benchmarks/tpc-ds.md",
+    "benchbox/core/tpch/reporting.py",
+    "benchbox/cli/benchmarks.py",
+    "benchbox/cli/commands/run.py",
+    "results-explorer/src/components/TrustBadge.tsx"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:667f75493d6fbd10b32fdee5",
+      "at": "2026-10-08T12:44:45Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "292be1e2143548adaad59e5c75786b6d",
+      "session_id": "bcebd139f88a4c38a6dc9549b9b03523"
+    }
+  ]
+}

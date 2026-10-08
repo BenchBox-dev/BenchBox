@@ -21151,6 +21151,13 @@
       "status": "done",
       "title": "TPCHOfficialBenchmark and TPCDSOfficialBenchmark produce wrong or no throughput results"
     },
+    "tpc-remove-certification-and-compliance-claims": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Remove certification and compliance claims from TPC docs, CLI and Explorer text"
+    },
     "tpc-specification-compliance-issues-completed": {
       "claim": null,
       "needs": [],
