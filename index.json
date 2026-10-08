@@ -3483,13 +3483,18 @@
       "title": "Remove prose from first-party compilation scripts and framing tools"
     },
     "comment-cleanup-contracts-gate": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-09T23:54:10Z",
+        "generation": "0aeb46af56864a89b29137df94ae19ff",
+        "renewals": 0,
+        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:8dff0892e031f17231e04e2e"
+      },
       "needs": [
         "comment-cleanup-scope-policy",
         "comment-cleanup-checker"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Replace docstring presence coverage with explicit API contracts and content checks"
     },
     "comment-cleanup-core-bootstrap": {
