@@ -1,5 +1,3 @@
-"""Validation for workload tuning profiles and checked-in tuning templates."""
-
 from __future__ import annotations
 
 import hashlib
@@ -40,8 +38,6 @@ ERROR = "error"
 
 @dataclass(frozen=True)
 class TuningProfileValidationIssue:
-    """One profile/template validation finding."""
-
     severity: str
     candidate_key: str
     message: str
@@ -60,8 +56,6 @@ class TuningProfileValidationIssue:
 
 @dataclass(frozen=True)
 class CandidateTemplateMapping:
-    """How one logical candidate was represented for a platform template."""
-
     candidate: WorkloadTuningCandidate
     platform_mapping: PlatformTuningMapping
     mapped_tuning_types: tuple[str, ...]
@@ -77,7 +71,6 @@ class CandidateTemplateMapping:
 
     @property
     def capped(self) -> bool:
-        """Whether a platform cap accounts for every missing mechanism."""
         missing = set(self.missing_tuning_types)
         return bool(missing) and missing.issubset(self.capped_tuning_types)
 
@@ -101,8 +94,6 @@ class CandidateTemplateMapping:
 
 @dataclass(frozen=True)
 class TuningProfileValidationResult:
-    """Profile/template validation result and compact metadata view."""
-
     profile_id: str
     profile_version: str
     benchmark: str
@@ -128,7 +119,6 @@ class TuningProfileValidationResult:
 
     @property
     def capped_count(self) -> int:
-        """Candidates excluded by a platform column cap rather than omission."""
         return sum(1 for mapping in self.mappings if mapping.capped)
 
     @property
@@ -198,7 +188,6 @@ def validate_tuning_template(
     platform: str,
     tuning_config: Any,
 ) -> TuningProfileValidationResult:
-    """Validate a concrete tuning template against a logical workload profile."""
     benchmark_key = _normalize_profile_benchmark(benchmark)
     platform_key = platform.lower().replace("_", "-")
     template_columns = extract_template_columns(tuning_config)
@@ -240,14 +229,6 @@ def validate_tuning_template(
             for tuning_type in platform_mapping.tuning_types
             if candidate.column in template_columns.get(candidate.table, {}).get(tuning_type, set())
         )
-        # Platforms with a per-table column cap (BigQuery clustering <= 4,
-        # Redshift DISTKEY <= 1) cannot carry every mapped candidate. The
-        # template holds the first N profile-order candidates per table and
-        # tuning type; overflow candidates are reported as capped, not
-        # missing. A cap applies only to the tuning types named in the
-        # mapping's capped_tuning_types (Redshift's single-key limit governs
-        # DISTKEY alone; its compound SORTKEY list is unbounded), defaulting
-        # to every mapped tuning type when the mapping names none.
         capped_types: list[str] = []
         if platform_mapping.max_columns is not None:
             capped_scope = platform_mapping.capped_tuning_types
@@ -275,9 +256,6 @@ def validate_tuning_template(
         )
 
         missing_tuning_types = tuple(t for t in mappings[-1].missing_tuning_types if t not in capped_types)
-        # Upper-bound enforcement honors the mapping's cap scope: Redshift's
-        # single-key limit governs DISTKEY alone, so its unbounded compound
-        # SORTKEY lists must never trip this check.
         cap_scope = platform_mapping.capped_tuning_types
         if cap_scope is None:
             cap_scope = platform_mapping.tuning_types
@@ -348,7 +326,6 @@ def build_tuning_profile_metadata(
     tuning_config: Any | None,
     profile: WorkloadTuningProfile | None = None,
 ) -> dict[str, Any] | None:
-    """Build compact result metadata for TPC tuning profile coverage."""
     if not benchmark or not platform or tuning_config is None:
         return None
     if not _get_value(tuning_config, "table_tunings") and (
@@ -370,7 +347,6 @@ def build_tuning_profile_metadata(
 
 
 def extract_template_columns(tuning_config: Any) -> dict[str, dict[str, set[str]]]:
-    """Return table -> tuning type -> column names from a tuning configuration."""
     table_tunings = _get_value(tuning_config, "table_tunings") or {}
     extracted: dict[str, dict[str, set[str]]] = {}
 
@@ -388,7 +364,6 @@ def extract_template_columns(tuning_config: Any) -> dict[str, dict[str, set[str]
 
 
 def resolve_physical_rendering_id(platform: str, tuning_config: Any | None) -> str:
-    """Resolve the physical rendering id used for logical profile validation."""
     platform_key = platform.lower().replace("_", "-")
     if platform_key != "databricks":
         return platform_key
@@ -410,7 +385,6 @@ def resolve_physical_rendering_id(platform: str, tuning_config: Any | None) -> s
 
 
 def hash_tuning_template(tuning_config: Any) -> str:
-    """Return a stable compact hash for a tuning configuration."""
     if hasattr(tuning_config, "to_dict"):
         payload = tuning_config.to_dict()
     elif isinstance(tuning_config, Mapping):
@@ -430,26 +404,6 @@ def _normalize_profile_benchmark(benchmark: str) -> str:
 
 
 def _rendering_verified_tuning_types(platform: str, tuning_config: Any) -> frozenset[str]:
-    """Return the tuning types with an executed (non-preview) rendering path.
-
-    Logical candidates are only certified when their mapped template columns
-    reach the physical layout at execution time. The capability registry
-    records which tuning types render for real and which exist only as
-    dry-run preview or inspect-and-log hooks. This gate applies to the
-    platforms whose tuned templates are generated from the logical profile
-    (BigQuery, Redshift, Snowflake); the longer-standing DuckDB and
-    Databricks templates keep their existing membership-based certification.
-
-    - BigQuery partitioning/clustering are preview-only: the adapter's
-      post-load hook only inspects the table and logs a recreation hint.
-    - Redshift distribution is preview-only: the adapter only logs the
-      mismatch because changing keys requires table recreation.
-    - Redshift sorting renders only when sorted ingestion is enabled; the
-      generated cloud templates leave it off, so it is unverified here.
-    - Snowflake clustering renders post-load via ALTER TABLE ... CLUSTER BY,
-      and partitioning folds into that same statement when no clustering
-      columns are configured.
-    """
     if platform not in {"bigquery", "redshift", "snowflake"}:
         return frozenset(TUNING_TYPES)
     verified: set[str] = set()

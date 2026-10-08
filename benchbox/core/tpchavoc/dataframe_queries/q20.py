@@ -1,12 +1,3 @@
-"""TPC-Havoc DataFrame variants for Q20.
-
-Q20 is a semi-join promotion query: parts matching a color prefix, a
-per-(part,supplier) shipped-quantity threshold, and suppliers with stock
-above that threshold. The variants keep the canonical output while
-varying the semi-join structure around threshold-first ordering,
-join-order swaps, semi-vs-inner formulations, and filter pushdown.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -343,7 +334,6 @@ def _make_q20_pandas_impl(variant: int) -> VariantImpl:
             forest_ps = partsupp[partsupp["ps_partkey"].isin(forest_keys)]
             return _main(_excess(forest_ps, totals))
 
-        # variant 10: distinct-via-groupby
         shipped_qty = _q20_pandas_threshold(lineitem, start_date, end_date)
         forest_ps = partsupp[partsupp["ps_partkey"].isin(forest_keys)]
         joined = forest_ps.merge(shipped_qty, left_on=["ps_partkey", "ps_suppkey"], right_on=["l_partkey", "l_suppkey"])

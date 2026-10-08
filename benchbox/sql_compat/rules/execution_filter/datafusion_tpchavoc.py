@@ -1,28 +1,3 @@
-"""DataFusion execution-filter rules for unsupported TPC-Havoc variants.
-
-DataFusion is the THIRD engine sampled by the TPC-Havoc cross-dialect
-equivalence oracle (after DuckDB, the hard gate, and PostgreSQL, the second
-engine). Unlike PostgreSQL, DataFusion's gaps are concentrated in *physical
-planning* of correlated sub-queries (EXISTS / IN / scalar sub-queries in
-positions its planner cannot lower), the missing ``LIST`` aggregate, and a
-parser limitation on the generated empty-tuple sub-query syntax - a DIFFERENT
-gap profile from PostgreSQL's HAVING/WHERE select-list-alias and
-aggregate-in-window restrictions.
-
-Every entry below is a variant DataFusion cannot *execute* (it raises a planning
-or feature-not-implemented error), NOT a result divergence: the same SQL passes
-the DuckDB equivalence gate, so the variant is valid and DataFusion's residual
-equivalence surface is empty. These are excluded from the equivalence sample
-(``DATAFUSION_TPCHAVOC_SKIPS``), never marked equivalent. Result-equivalence
-exceptions, if any were ever needed, live in
-``benchbox/core/tpchavoc/equivalence.py:DATAFUSION_KNOWN_DIVERGENCES`` (empty).
-
-This skip set is a strict subset of ``LAKESAIL_TPCHAVOC_SKIPS``: Apache Sail
-(LakeSail) is itself DataFusion-based, so it shares these physical-planning
-limitations and adds further ones of its own - corroborating that these are
-genuine engine limitations rather than translation artifacts.
-"""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.actions import CompatAction

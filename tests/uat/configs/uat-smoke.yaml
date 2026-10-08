@@ -1,6 +1,4 @@
 # TEMPLATE — bounded native-only UAT matrix loop for routine operator feedback.
-# Target wall clock: <= 2 hours on the native UAT host; keep this TPCH-only
-# SF 0.01 matrix small enough to remain a smoke loop rather than a campaign.
 name: "uat-smoke"
 description: "Native TPCH smoke loop: six local platforms at SF 0.01"
 

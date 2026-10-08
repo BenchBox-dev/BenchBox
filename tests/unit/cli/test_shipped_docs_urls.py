@@ -1,10 +1,3 @@
-"""Guardrail: shipped CLI strings must not cite a dead BenchBox hostname.
-
-`docs.benchbox.dev` is NXDOMAIN. Live docs are served from
-https://benchbox.dev/docs/. The top-level `--help` epilog, onboarding banner,
-and submit contributing text used to send first-run users to the dead host.
-"""
-
 from __future__ import annotations
 
 import re
@@ -23,8 +16,6 @@ pytestmark = [
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BENCHBOX_ROOT = REPO_ROOT / "benchbox"
 
-# Hostnames that may appear in shipped package text. `staging.benchbox.dev` is
-# only an example non-default service URL in `benchbox submit --help`.
 _ALLOWED_HOSTS = frozenset(
     {
         "benchbox.dev",
@@ -42,7 +33,6 @@ def _shipped_text_files() -> list[Path]:
 
 
 def test_shipped_package_does_not_cite_dead_docs_host() -> None:
-    """Fail if any shipped text file mentions docs.benchbox.dev (NXDOMAIN)."""
     hits: list[str] = []
     for path in _shipped_text_files():
         text = path.read_text(encoding="utf-8")
@@ -55,7 +45,6 @@ def test_shipped_package_does_not_cite_dead_docs_host() -> None:
 
 
 def test_shipped_package_benchbox_hosts_are_allowlisted() -> None:
-    """Catch a newly invented *.benchbox.dev hostname before it ships in help text."""
     unknown: list[str] = []
     for path in _shipped_text_files():
         text = path.read_text(encoding="utf-8")

@@ -1,31 +1,4 @@
 #!/usr/bin/env python3
-"""Fail when active source revives the retired mixed-theme Results Explorer contract.
-
-The current product contract is the shared BenchBox `system` / `light` / `dark`
-theme. Earlier planning evidence described a retired "dark BenchBox shell +
-light analytical data panels" contract; if those phrases re-enter active source
-or active test/spec names, future implementers can silently restore the wrong
-contract.
-
-This scan looks for the retired phrases in:
-  * results-explorer/src (production source and unit tests)
-  * results-explorer/e2e (route specs)
-  * _project/analysis  (planning evidence)
-
-It allows two escape hatches:
-  * Inline marker `allow-stale-theme: <reason>` on the same line.
-  * For `_project/analysis/*` files, an early supersession note within the
-    first 40 lines that mentions one of: superseded, supersedes, supersede,
-    supersession.
-
-Historical evidence under `_project/DONE/` is intentionally excluded - the
-project rule is to add supersession notes to active analysis, not to rewrite
-completed work.
-
-Exit status:
-  0 - no unallowlisted references found
-  1 - one or more references found (printed to stderr)
-"""
 
 from __future__ import annotations
 
@@ -52,6 +25,36 @@ DEFAULT_PATHS = (
 )
 DEFAULT_EXTENSIONS = (".tsx", ".ts", ".jsx", ".js", ".css", ".md", ".html")
 SUPERSESSION_HEADER_LINES = 40
+
+
+CLI_DESCRIPTION = (
+    "Fail when active source revives the retired mixed-theme Results Explorer contract.\n"
+    "\n"
+    "The current product contract is the shared BenchBox `system` / `light` / `dark`\n"
+    'theme. Earlier planning evidence described a retired "dark BenchBox shell +\n'
+    'light analytical data panels" contract; if those phrases re-enter active source\n'
+    "or active test/spec names, future implementers can silently restore the wrong\n"
+    "contract.\n"
+    "\n"
+    "This scan looks for the retired phrases in:\n"
+    "  * results-explorer/src (production source and unit tests)\n"
+    "  * results-explorer/e2e (route specs)\n"
+    "  * _project/analysis  (planning evidence)\n"
+    "\n"
+    "It allows two escape hatches:\n"
+    "  * Inline marker `allow-stale-theme: <reason>` on the same line.\n"
+    "  * For `_project/analysis/*` files, an early supersession note within the\n"
+    "    first 40 lines that mentions one of: superseded, supersedes, supersede,\n"
+    "    supersession.\n"
+    "\n"
+    "Historical evidence under `_project/DONE/` is intentionally excluded - the\n"
+    "project rule is to add supersession notes to active analysis, not to rewrite\n"
+    "completed work.\n"
+    "\n"
+    "Exit status:\n"
+    "  0 - no unallowlisted references found\n"
+    "  1 - one or more references found (printed to stderr)\n"
+)
 
 
 def has_supersession_header(path: Path) -> bool:
@@ -97,7 +100,7 @@ def scan_file(path: Path) -> list[tuple[int, str, list[str]]]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument(
         "paths",
         nargs="*",

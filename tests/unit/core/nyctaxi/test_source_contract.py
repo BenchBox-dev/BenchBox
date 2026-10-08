@@ -1,10 +1,3 @@
-"""Pinned reproducible external-source contracts for NYC Taxi.
-
-The default benchmark dataset is exactly the pinned TLC file set: bumping the
-pin is an explicit, reviewed change, never a silent slide with newly published
-TLC data. All tests are offline (no downloads).
-"""
-
 from __future__ import annotations
 
 from pathlib import Path

@@ -1,5 +1,3 @@
-"""Resource-heavy Snowflake adapter tests."""
-
 from __future__ import annotations
 
 import json
@@ -17,7 +15,6 @@ pytestmark = [
 
 
 def _parse_snowflake_cli_args(argv: list[str]) -> dict[str, object]:
-    """Parse Snowflake CLI args in a clean Python process."""
 
     script = """
 import argparse
@@ -39,10 +36,8 @@ print(json.dumps(vars(parser.parse_args(ARGV))))
 
 
 class TestSnowflakeAddCliArguments:
-    """Test add_cli_arguments setup."""
-
     def test_adds_snowflake_arguments(self):
-        """Snowflake CLI parser should expose the expected defaults."""
+
         args = _parse_snowflake_cli_args([])
 
         assert args["warehouse"] == "COMPUTE_WH"
@@ -53,11 +48,11 @@ class TestSnowflakeAddCliArguments:
         assert args["disable_result_cache"] is True
 
     def test_cli_no_disable_result_cache_flag(self):
-        """Result-cache opt-out flag should set disable_result_cache to False."""
+
         args = _parse_snowflake_cli_args(["--no-disable-result-cache"])
         assert args["disable_result_cache"] is False
 
     def test_cli_modify_warehouse_settings_flag(self):
-        """Warehouse-settings flag should set the boolean to True."""
+
         args = _parse_snowflake_cli_args(["--modify-warehouse-settings"])
         assert args["modify_warehouse_settings"] is True

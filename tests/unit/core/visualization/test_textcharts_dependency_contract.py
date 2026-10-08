@@ -1,5 +1,3 @@
-"""Package-install and compatibility contract for the retained textcharts dependency."""
-
 from __future__ import annotations
 
 import importlib

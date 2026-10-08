@@ -1,5 +1,3 @@
-"""TPC-DS benchmark orchestrator implementation."""
-
 import dataclasses
 import logging
 import re
@@ -54,7 +52,6 @@ def _execute_single_stream(stream_id: int, stream_file: Path) -> dict[str, Any]:
 
 
 def _aggregate_stream_results(stream_results: list[dict[str, Any]], start_time: float) -> dict[str, Any]:
-    """Aggregate individual stream results into a summary dict."""
     import time
 
     end_time = time.time()
@@ -76,19 +73,6 @@ def _aggregate_stream_results(stream_results: list[dict[str, Any]], start_time: 
 
 
 class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
-    """TPC-DS benchmark implementation.
-
-    This class provides a complete implementation of the TPC-DS benchmark,
-    including data generation, query execution, and result validation.
-
-    Attributes:
-        scale_factor: The scale factor for the benchmark (1.0 = ~1GB)
-        output_dir: Directory to output generated data and results
-        query_manager: The TPC-DS query manager
-        data_generator: The TPC-DS data generator
-        tables: Dictionary mapping table names to paths of generated data files
-    """
-
     _MONTH_ALIASES: tuple[tuple[str, int], ...] = (
         ("jan", 1),
         ("feb", 2),
@@ -114,37 +98,16 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         official: bool = False,
         **kwargs: Any,
     ) -> None:
-        """Initialize a TPC-DS benchmark instance.
-
-        Args:
-            scale_factor: Scale factor for the benchmark (1.0 = ~1GB).
-            output_dir: Directory to output generated data files
-            verbose: Whether to print verbose output during operations
-            parallel: Number of parallel processes for data generation
-            force_regenerate: Force data regeneration even if valid data exists
-            official: True for a ``--official`` run. Required for the run to
-                classify as ``official`` and therefore to be submittable; see
-                :func:`benchbox.core.tpcds.compliance.classify_tpcds_run`.
-            **kwargs: Additional implementation-specific options
-
-        Raises:
-            ValueError: If scale_factor is invalid or below the supported
-                subscale floor.
-            TypeError: If scale_factor is not a number or parallel is not an integer
-        """
         if not isinstance(scale_factor, (int, float)):
             raise TypeError(f"scale_factor must be a number, got {type(scale_factor).__name__}")
 
-        # Single shared validator - no silent rounding.
         self.compliance_class = validate_tpcds_scale(scale_factor, official=official)
 
-        # Validate parallel parameter
         if not isinstance(parallel, int):
             raise TypeError(f"parallel must be an integer, got {type(parallel).__name__}")
         if parallel < 1:
             raise ValueError(f"parallel must be positive, got {parallel}")
 
-        # Extract quiet from kwargs to prevent duplicate kwarg error
         kwargs = dict(kwargs)
         quiet = kwargs.pop("quiet", False)
 
@@ -160,50 +123,31 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             verbose=verbose,
             quiet=quiet,
             force_regenerate=force_regenerate,
-            **kwargs,  # Pass through compression parameters
+            **kwargs,
         )
         self.c_tools = TPCDSCTools()
         self.tables: dict[str, Path] = {}
 
-        # Initialize validation engines
         self._data_validation_engine = DataValidationEngine()
         self._db_validation_engine = DatabaseValidationEngine()
         self.enable_validation = kwargs.get("enable_validation", False)
 
     @property
     def queries(self) -> TPCDSQueryManager:
-        """Access to the query manager.
-
-        Returns:
-            The query manager instance
-        """
         return self.query_manager
 
     @property
     def generator(self) -> TPCDSDataGenerator:
-        """Access to the data generator.
-
-        Returns:
-            The data generator instance
-        """
         return self.data_generator
 
     def generate_data(self) -> list[Union[str, Path]]:
-        """Generate TPC-DS benchmark data.
-
-        Returns:
-            A list of paths to the generated data files
-        """
-        # Ensure output directory exists
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Configure data generator output directory to match benchmark output directory
         self.data_generator.output_dir = self.output_dir
 
         self.log_verbose(f"Generating TPC-DS data at scale factor {self.scale_factor}...")
         self.log_verbose(f"Output directory: {self.output_dir}")
 
-        # Use the data generator to create TPC-DS tables
         self.tables = self.data_generator.generate()
 
         if self.verbose_enabled:
@@ -214,27 +158,12 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return list(self.tables.values())
 
     def get_queries(self, dialect: Optional[str] = None, base_dialect: Optional[str] = None) -> dict[str, str]:
-        """Get all TPC-DS benchmark queries.
-
-        Parameters are rendered at the data's scale factor, as get_query() does: dsqgen derives some
-        values from the scale (for example row-count thresholds), so SQL rendered at a different scale
-        would not match the generated data.
-
-        Args:
-            dialect: Target SQL dialect for translation (e.g., 'duckdb', 'postgres')
-
-        Returns:
-            A dictionary mapping query IDs (1-99) to query strings
-        """
-        # Determine base and target dialects
         src = (base_dialect or "netezza").lower()
         tgt = (dialect or src).lower()
 
-        # Generate queries using dsqgen in the base dialect, at the data's scale factor
         int_queries = self.query_manager.get_all_queries(dialect=src, scale_factor=self.data_generator.scale_factor)
         base_queries = {str(k): v for k, v in int_queries.items()}
 
-        # Always pass through SQLGlot from base to target for consistency
         translated_queries = {}
         for query_id, query_text in base_queries.items():
             translated = self.translate_query_text(query_text, src, tgt)
@@ -253,23 +182,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         variant: Optional[str] = None,
         **kwargs,
     ) -> str:
-        """Get a specific TPC-DS benchmark query.
-
-        Args:
-            query_id: The ID of the query to retrieve (1-99)
-            params: Optional parameters to customize the query (legacy parameter, mostly ignored)
-            seed: Random number generator seed for parameter generation
-            scale_factor: Scale factor for parameter calculations
-            dialect: Target SQL dialect
-            **kwargs: Additional parameters
-
-        Returns:
-            The fully prepared query string
-
-        Raises:
-            ValueError: If the query_id is invalid
-            TypeError: If query_id is not an integer
-        """
         self._validate_get_query_args(query_id, scale_factor, seed, id_range=(1, 99))
 
         if params is None:
@@ -298,7 +210,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         *,
         variant: str | None = None,
     ) -> str:
-        """Apply benchmark-local overrides after dialect translation."""
         target = target_dialect.lower()
 
         if query_id in {36, 70, 86} and target == "postgres":
@@ -326,7 +237,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
     @staticmethod
     def _rewrite_spark_q90_zero_denominator(query: str) -> str:
-        """Guard Q90's PM count denominator for ANSI Spark-compatible engines."""
         return re.sub(
             r"/\s+CAST\(`pmc`\s+AS\s+DECIMAL\(15,\s*4\)\)",
             "/ NULLIF(CAST(`pmc` AS DECIMAL(15, 4)), 0)",
@@ -337,7 +247,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
     @staticmethod
     def _rewrite_postgres_q90_zero_denominator(query: str) -> str:
-        """Guard Q90's PM count denominator for PostgreSQL-family engines."""
         return re.sub(
             r"/\s+CAST\(pmc\s+AS\s+DECIMAL\(15,\s*4\)\)",
             "/ NULLIF(CAST(pmc AS DECIMAL(15, 4)), 0)",
@@ -348,13 +257,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
     @staticmethod
     def _rewrite_default_q90_zero_denominator(query: str) -> str:
-        """Guard Q90's PM count denominator on all other dialects.
-
-        The canonical TPC-DS template divides by ``pmc`` with no zero guard, so
-        an empty PM bucket is engine-defined (DuckDB yields NaN, Postgres-style
-        engines error). Default every remaining dialect to NULLIF(pmc, 0) so the
-        zero-denominator result is consistently SQL NULL.
-        """
         return re.sub(
             r'/\s*CAST\(\s*(?P<denominator>pmc|`pmc`|"pmc"|\[pmc\])\s+AS\s+'
             r"(?P<type>(?:DECIMAL|NUMERIC)\s*\(\s*15\s*,\s*4\s*\))\s*\)",
@@ -366,11 +268,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
     @staticmethod
     def _rewrite_postgres_rollup_order_aliases(query_id: int, query: str) -> str:
-        """Replace TPC-DS rollup ORDER BY alias references inside expressions.
-
-        PostgreSQL allows select-list aliases as standalone ORDER BY items, but not
-        inside another expression such as ``CASE WHEN lochierarchy = 0``.
-        """
         rollup_columns_by_query = {
             36: ("i_category", "i_class", "i_category"),
             70: ("s_state", "s_county", "s_state"),
@@ -392,7 +289,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
     @classmethod
     def _rewrite_clickhouse_monthly_avg_query(cls, query_id: int, query: str) -> str:
-        """Rewrite Q47/Q57 to avoid AVG(SUM(...)) OVER (...) under the new analyzer."""
         if "AVG(SUM(" not in query.upper():
             return query
 
@@ -431,7 +327,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
     @staticmethod
     def _alias_clickhouse_rank_neighbor_projections(suffix: str) -> str:
-        """Alias plain v1.<col> projections in the v2 CTE back to bare column names."""
         pattern = r"(,\s*v2\s+AS\s+\(SELECT\s+)(.*?)(\s+FROM\s+v1,\s+v1\s+AS\s+v1_lag,\s+v1\s+AS\s+v1_lead)"
 
         def alias_projection(match: re.Match[str]) -> str:
@@ -450,7 +345,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
     @classmethod
     def _rewrite_clickhouse_q66(cls, query: str) -> str:
-        """Rewrite Q66 to aggregate once over a stable UNION ALL relation."""
         if "SUM(jan_sales)" not in query and "SUM(jan_net)" not in query:
             return query
 
@@ -524,7 +418,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
     @classmethod
     def _parse_clickhouse_q66_branch(cls, branch: str) -> dict[str, str]:
-        """Parse one side of the Q66 UNION ALL into reusable row-level pieces."""
         sales_patterns = []
         net_patterns = []
         for month_name, month_num in cls._MONTH_ALIASES:
@@ -556,12 +449,10 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
     @staticmethod
     def _find_matching_parenthesis(text: str, open_index: int) -> int:
-        """Return the index of the closing parenthesis paired with open_index."""
         return find_matching_parenthesis(text, open_index)
 
     @classmethod
     def _split_top_level_union_all(cls, query: str) -> tuple[str, str]:
-        """Split a UNION ALL expression at the top SQL nesting level."""
         marker = " UNION ALL "
         depth = 0
         in_single_quote = False
@@ -589,7 +480,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
     def _validate_get_query_args(
         query_id: int, scale_factor: Optional[float], seed: Optional[int], *, id_range: tuple[int, int]
     ) -> None:
-        """Validate common get_query arguments."""
         if not isinstance(query_id, int):
             raise TypeError(f"query_id must be an integer, got {type(query_id).__name__}")
         lo, hi = id_range
@@ -607,7 +497,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
     def _resolve_seed_from_stream_or_permutation(
         actual_seed: Optional[int], query_id: int, stream_id: Optional[int], permutation: Optional[list]
     ) -> Optional[int]:
-        """Derive seed from stream_id or permutation if no explicit seed is set."""
         if stream_id is not None:
             if actual_seed is None:
                 return stream_id
@@ -626,11 +515,10 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         actual_scale_factor: float,
         src: str,
     ) -> str:
-        """Generate a TPC-DS query, optionally for a specific variant."""
         if variant is not None:
             composite_id = f"{query_id}{variant}"
             try:
-                return self.query_manager.dsqgen.generate(  # type: ignore[attr-defined]
+                return self.query_manager.dsqgen.generate(
                     composite_id,
                     seed=actual_seed,
                     scale_factor=actual_scale_factor,
@@ -651,61 +539,24 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         )
 
     def _normalize_interval_syntax(self, query: str) -> str:
-        """Convert Netezza interval syntax to standard SQL INTERVAL syntax.
-
-        Netezza and PostgreSQL allow shorthand interval syntax like:
-            cast('2000-01-01' as date) + 60 days
-            cast('2000-01-01' as date) - 30 days
-
-        This converts to standard SQL INTERVAL syntax that SQLGlot can parse
-        and that works across all databases:
-            CAST('2000-01-01' AS DATE) + INTERVAL 60 DAY
-            CAST('2000-01-01' AS DATE) - INTERVAL 30 DAY
-
-        Args:
-            query: SQL query string possibly containing Netezza interval syntax
-
-        Returns:
-            Query with normalized INTERVAL syntax
-        """
         import re
 
-        # Pattern matches: [+ or -] [whitespace] [number] [whitespace] days
-        # Examples: "+ 60 days", "- 30 days", "+60 days"
         pattern = r"([+\-])\s+(\d+)\s+days"
 
-        # Replace with standard INTERVAL syntax
-        # \1 = operator (+ or -), \2 = number
         replacement = r"\1 INTERVAL \2 DAY"
 
         return re.sub(pattern, replacement, query, flags=re.IGNORECASE)
 
     def _fix_query58_ambiguity(self, query: str) -> str:
-        """Fix ambiguous column reference in TPC-DS Query 58 ORDER BY clause.
-
-        Query 58 has CTEs ss_items, cs_items, ws_items all with 'item_id' column.
-        The ORDER BY references 'item_id' without table qualification, causing ambiguity.
-        This post-processor qualifies it as ss_items.item_id.
-
-        Args:
-            query: SQL query string (already translated by SQLGlot)
-
-        Returns:
-            Query with qualified item_id in ORDER BY clause
-        """
-        # Only apply to Query 58 (check for presence of all three CTEs)
         if "ss_items" not in query.lower() or "cs_items" not in query.lower() or "ws_items" not in query.lower():
             return query
 
         import re
 
-        # Since we use identify=True, identifiers are quoted: ORDER BY "item_id", "ss_item_rev"
-        # We need to replace "item_id" with "ss_items"."item_id"
         pattern = r'(ORDER\s+BY\s+)"item_id"'
         replacement = r'\1"ss_items"."item_id"'
         query = re.sub(pattern, replacement, query, flags=re.IGNORECASE)
 
-        # Also handle unquoted case (in case identify=True was not used)
         pattern_unquoted = r"(ORDER\s+BY\s+)item_id\b(?!\.)"
         replacement_unquoted = r"\1ss_items.item_id"
         query = re.sub(pattern_unquoted, replacement_unquoted, query, flags=re.IGNORECASE)
@@ -713,26 +564,12 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return query
 
     def translate_query_text(self, query: str, source_dialect: str, target_dialect: str) -> str:
-        """Translate a query string via SQLGlot from source to target dialect.
-
-        Uses the centralized translation function with TPC-DS-specific pre/post processors.
-
-        Args:
-            query: SQL query text to translate
-            source_dialect: Source SQL dialect (e.g., 'netezza')
-            target_dialect: Target SQL dialect (e.g., 'duckdb', 'bigquery')
-
-        Returns:
-            Translated SQL query text
-        """
         from benchbox.utils.dialect_utils import fix_postgres_date_arithmetic, translate_sql_query
 
         src = (source_dialect or "netezza").lower()
         tgt = (target_dialect or src).lower()
 
-        # Build post-processors list
         post_procs = [self._fix_query58_ambiguity]
-        # Add date arithmetic fix for PostgreSQL/DataFusion
         if tgt == "postgres":
             post_procs.append(fix_postgres_date_arithmetic)
 
@@ -746,53 +583,32 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         )
 
     def generate_table_data(self, table_name: str, output_dir: Optional[str] = None) -> Iterator[str]:
-        """Generate data for a specific table (legacy method)."""
         if output_dir:
-            # Generate to file using C tools directly
             return self.c_tools.generate_data_table(table_name, self.scale_factor, output_dir=output_dir)
         else:
             return self.generator.generate_table(table_name, self.scale_factor)
 
     def get_available_tables(self) -> list[str]:
-        """Get list of available tables."""
         from benchbox.core.tpcds.constants import TPCDS_TABLE_NAMES
 
         return list(TPCDS_TABLE_NAMES)
 
     def get_table_loading_order(self, available_tables: list[str]) -> list[str]:
-        """Get the correct order for loading TPC-DS tables to respect foreign key dependencies.
-
-        Args:
-            available_tables: List of table names that are actually available
-
-        Returns:
-            List of table names in the correct loading order
-        """
         from benchbox.core.tpcds.constants import TPCDS_TABLE_LOADING_ORDER
 
         tpcds_loading_order = TPCDS_TABLE_LOADING_ORDER
 
-        # Filter to only include tables that actually exist in available_tables
         ordered_tables = [t for t in tpcds_loading_order if t in available_tables]
 
-        # Add any remaining tables not in the specified order
         remaining_tables = [t for t in available_tables if t not in ordered_tables]
         ordered_tables.extend(remaining_tables)
 
         return ordered_tables
 
     def get_available_queries(self) -> list[int]:
-        """Get list of available query IDs."""
-        # TPC-DS has 99 standard queries
         return list(range(1, 100))
 
     def get_schema(self) -> dict[str, dict[str, Any]]:
-        """Get the TPC-DS schema.
-
-        Returns:
-            Dictionary mapping table names (lowercase) to table definitions.
-            Each table definition contains 'name' and 'columns' keys.
-        """
         schema = {}
         for table in TABLES:
             table_schema = {
@@ -816,18 +632,8 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         dialect: str = "standard",
         tuning_config: Optional["UnifiedTuningConfiguration"] = None,
     ) -> str:
-        """Get SQL to create all TPC-DS tables.
-
-        Args:
-            dialect: SQL dialect to use (currently ignored, TPC-DS uses standard SQL)
-            tuning_config: Unified tuning configuration for constraint settings
-
-        Returns:
-            SQL script for creating all tables
-        """
         from benchbox.core.tpcds.schema import get_create_all_tables_sql
 
-        # Extract constraint settings from tuning configuration
         enable_primary_keys = tuning_config.primary_keys.enabled if tuning_config else False
         enable_foreign_keys = tuning_config.foreign_keys.enabled if tuning_config else False
 
@@ -842,34 +648,20 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         rng_seed: Optional[int] = None,
         streams_output_dir: Optional[Union[str, Path]] = None,
     ) -> list[Path]:
-        """Generate TPC-DS query streams.
-
-        Args:
-            num_streams: Number of concurrent streams to generate
-            rng_seed: Random number generator seed for parameter generation
-            streams_output_dir: Directory to output stream files
-
-        Returns:
-            List of paths to generated stream files
-        """
         from benchbox.core.tpcds.streams import create_standard_streams
 
         streams_output_dir = self.output_dir / "streams" if streams_output_dir is None else Path(streams_output_dir)
 
-        # Ensure output directory exists
         streams_output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Use existing streams infrastructure
         stream_manager = create_standard_streams(
             query_manager=self.query_manager,
             num_streams=num_streams,
             base_seed=rng_seed or 42,
         )
 
-        # Generate the streams
         streams = stream_manager.generate_streams()
 
-        # Write stream files
         stream_files = []
         for stream_id, stream_queries in streams.items():
             stream_file = streams_output_dir / f"stream_{stream_id}.sql"
@@ -897,21 +689,9 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return stream_files
 
     def get_stream_info(self, stream_id: int) -> dict[str, Any]:
-        """Get information about a specific stream.
-
-        Args:
-            stream_id: Stream identifier (must be non-negative and reasonable)
-
-        Returns:
-            Dictionary containing stream information
-
-        Raises:
-            ValueError: If stream_id is negative or exceeds reasonable limit
-        """
         from benchbox.core.tpcds.streams import create_standard_streams
 
-        # Validate stream_id upfront to avoid creating excessive streams
-        max_reasonable_streams = 100  # TPC-DS spec allows arbitrary streams but we cap at 100
+        max_reasonable_streams = 100
         if stream_id < 0:
             raise ValueError(f"Invalid stream ID: {stream_id}. Stream ID must be non-negative.")
         if stream_id >= max_reasonable_streams:
@@ -921,14 +701,12 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 f"Use generate_streams() with num_streams parameter for custom stream counts."
             )
 
-        # Create a temporary stream manager to get info
         stream_manager = create_standard_streams(
             query_manager=self.query_manager,
-            num_streams=stream_id + 1,  # Ensure we have this stream
+            num_streams=stream_id + 1,
             base_seed=42,
         )
 
-        # Generate streams to get the information
         streams = stream_manager.generate_streams()
 
         if stream_id not in streams:
@@ -936,7 +714,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         stream_queries = streams[stream_id]
 
-        # Count unique queries and handle variants
         unique_queries = set()
         total_queries = 0
         for query in stream_queries:
@@ -944,7 +721,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             unique_queries.add(query_key)
             total_queries += 1
 
-        # Build query_order list (query IDs in stream order for permutation verification)
         query_order = [q.query_id for q in stream_queries]
 
         return {
@@ -954,27 +730,18 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             "unique_query_count": len(unique_queries),
             "rng_seed": 42 + stream_id,
             "parameter_seed": 42 + stream_id + 1000,
-            "query_order": query_order,  # Query IDs in execution order (for permutation tests)
-            "query_list": [f"{q.query_id}{q.variant or ''}" for q in stream_queries],  # With variants
+            "query_order": query_order,
+            "query_list": [f"{q.query_id}{q.variant or ''}" for q in stream_queries],
             "permutation_mode": "tpcds_standard",
         }
 
     def get_all_streams_info(self, num_streams: int = 2) -> list[dict[str, Any]]:
-        """Get information about all streams.
-
-        Args:
-            num_streams: Number of streams to generate and get info for (default: 2)
-
-        Returns:
-            List of dictionaries containing stream information for all successfully generated streams
-        """
         all_info = []
         for stream_id in range(num_streams):
             try:
                 stream_info = self.get_stream_info(stream_id)
                 all_info.append(stream_info)
             except (ValueError, KeyError) as e:
-                # Stream doesn't exist or can't be generated - skip it
                 if self.verbose:
                     emit(f"Warning: Could not get info for stream {stream_id}: {e}")
                 continue
@@ -996,37 +763,20 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         )
 
     def _load_data(self, connection: _DatabaseConnection) -> None:
-        """Load TPC-DS data into the database.
-
-        This method loads the generated TPC-DS data files (.dat/.csv format) into the database
-        using a simple, database-agnostic approach with INSERT statements.
-
-        Args:
-            connection: DatabaseConnection wrapper for database operations
-
-        Raises:
-            ValueError: If data hasn't been generated yet
-            Exception: If data loading fails
-        """
         import logging
 
         logger = logging.getLogger(__name__)
 
-        # Check if data has been generated
         if not self.tables:
             raise ValueError("No data has been generated. Call generate_data() first.")
 
         logger.info("Loading TPC-DS data into database...")
 
-        # Get the schema for table creation
         schema_sql = self.get_create_tables_sql()
 
-        # Create tables first
         logger.info("Creating TPC-DS tables...")
         try:
-            # Handle databases that don't support multiple statements at once
             if ";" in schema_sql:
-                # Split by semicolons and execute each statement separately
                 statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
                 for statement in statements:
                     connection.execute(statement)
@@ -1038,13 +788,11 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             logger.error(f"Failed to create tables: {e}")
             raise
 
-        # Load data for each table
         total_rows = 0
         loaded_tables = 0
 
         from benchbox.core.tpcds.constants import TPCDS_TABLE_LOADING_ORDER
 
-        # Use canonical loading order (excludes dbgen_version metadata table)
         table_load_order = [t for t in TPCDS_TABLE_LOADING_ORDER if t != "dbgen_version"]
 
         for table_name in table_load_order:
@@ -1054,7 +802,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
             data_file = self.tables[table_name]
 
-            # Check if file exists and has data
             if not data_file.exists() or data_file.stat().st_size == 0:
                 logger.warning(f"Data file {data_file} is empty or missing, skipping {table_name}...")
                 continue
@@ -1062,7 +809,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             logger.info(f"Loading {table_name.upper()} from {data_file.name}...")
 
             try:
-                # Load data using simple database-agnostic approach
                 rows_loaded = self._load_table_data(connection, table_name, data_file)
 
                 total_rows += rows_loaded
@@ -1073,7 +819,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 logger.error(f"Failed to load data for {table_name}: {e}")
                 raise
 
-        # Commit all changes
         try:
             connection.commit()
             logger.info(f"✅ Successfully loaded {total_rows:,} total rows across {loaded_tables} tables")
@@ -1082,55 +827,36 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             raise
 
     def _load_table_data(self, connection: _DatabaseConnection, table_name: str, data_file: Path) -> int:
-        """Load data into a database table using simple INSERT statements.
-
-        Args:
-            connection: DatabaseConnection wrapper
-            table_name: Name of the table to load data into
-            data_file: Path to the data file
-
-        Returns:
-            Number of rows loaded
-        """
         import csv
 
         normalized_table_name = table_name.lower()
         table_name_upper = table_name.upper()
 
-        # Get table schema to determine column count and types
         table_schema = next((table for table in TABLES if table.name.lower() == normalized_table_name), None)
         if not table_schema:
             raise ValueError(f"Unknown table: {table_name}")
 
         num_columns = len(table_schema.columns)
 
-        # Prepare INSERT statement
         placeholders = ", ".join(["?" for _ in range(num_columns)])
         insert_sql = f"INSERT INTO {table_name_upper} VALUES ({placeholders})"
 
         rows_loaded = 0
 
-        # Determine the delimiter based on file format (handles compression)
         delimiter = get_delimiter_for_file(data_file)
 
-        # Read and process the delimited file
         with open(data_file, encoding="utf-8") as f:
-            # Use csv.reader with appropriate delimiter
             reader = csv.reader(f, delimiter=delimiter)
 
             for row in reader:
-                # Skip empty rows
                 if not row or (len(row) == 1 and row[0] == ""):
                     continue
 
-                # TPC-DS files may have a trailing delimiter, so we need to handle the extra empty column
                 if len(row) > num_columns:
                     row = row[:num_columns]
                 elif len(row) < num_columns:
-                    # Pad with None values if row is too short
                     row.extend([None] * (num_columns - len(row)))
 
-                # Convert empty strings to None for nullable columns
                 processed_row = []
                 for _i, value in enumerate(row):
                     if value == "":
@@ -1138,7 +864,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                     else:
                         processed_row.append(value)
 
-                # Execute individual INSERT
                 connection.execute(insert_sql, processed_row)
                 rows_loaded += 1
 
@@ -1159,33 +884,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         *,
         adapter: Any = None,
     ) -> dict[str, Any]:
-        """Run the TPC-DS benchmark phases and report Power@Size and Throughput@Size.
-
-        This method executes the full TPC-DS benchmark specification including:
-        - Power Test (single stream sequential execution)
-        - Throughput Test (multi-stream concurrent execution)
-        - Maintenance Test (refresh functions)
-
-        The composite QphDS@Size is not computed.
-
-        Args:
-            connection: Database connection object
-            num_streams: Number of concurrent streams for throughput test
-            power_test: Whether to run Power Test
-            throughput_test: Whether to run Throughput Test
-            maintenance_test: Whether to run Maintenance Test
-            refresh_functions: List of refresh functions to execute
-            data_maintenance: Whether to perform data maintenance operations
-            result_validation: Whether to validate query results
-            dialect: SQL dialect (standard, postgres, mysql, etc.)
-            output_dir: Directory to output benchmark results
-
-        Returns:
-            Complete benchmark results
-
-        Raises:
-            ValueError: If benchmark configuration is invalid
-        """
         warn_legacy_throughput_api("TPCDSBenchmark.run_official_benchmark", "tpcds")
         if throughput_test:
             require_adapter("TPCDSBenchmark.run_official_benchmark", adapter)
@@ -1200,7 +898,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         benchmark_start_time = time.time()
 
-        # Initialize result structure
         result = {
             "scale_factor": self.scale_factor,
             "num_streams": num_streams,
@@ -1217,17 +914,12 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         }
 
         try:
-            # Phase 1: Power Test
             if power_test:
                 self._run_power_phase(connection, dialect, logger, result)
 
-            # Phase 2: Throughput Test
             if throughput_test:
                 self._run_throughput_phase(num_streams, logger, result, adapter, connection, dialect)
 
-            # Phase 3: Maintenance Test -- refused while throughput work is
-            # outstanding, so maintenance never overlaps leaked streams or
-            # reuses their still-owned resources for measured work.
             if maintenance_test:
                 boundary = check_phase_boundary(result["throughput_test_result"])
                 if not boundary.proceed:
@@ -1260,7 +952,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             return result
 
     def _run_power_phase(self, connection: Any, dialect: str, logger: logging.Logger, result: dict[str, Any]) -> None:
-        """Execute the Power Test phase of the official benchmark."""
         if self.verbose:
             logger.info("Running Power Test...")
         try:
@@ -1293,7 +984,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         connection: Any = None,
         dialect: str = "standard",
     ) -> None:
-        """Execute the Throughput Test phase of the official benchmark."""
         if self.verbose:
             logger.info("Running Throughput Test...")
         try:
@@ -1322,7 +1012,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
     def _run_maintenance_phase(
         self, connection: Any, dialect: str, logger: logging.Logger, result: dict[str, Any]
     ) -> None:
-        """Execute the Maintenance Test phase of the official benchmark."""
         if self.verbose:
             logger.info("Running Maintenance Test...")
         try:
@@ -1347,7 +1036,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
     def _finalize_benchmark_result(
         self, result: dict[str, Any], benchmark_start_time: float, logger: logging.Logger
     ) -> None:
-        """Finalize benchmark result with timing and summary logging."""
         benchmark_end_time = time.time()
         result["total_time"] = benchmark_end_time - benchmark_start_time
         result["end_time"] = datetime.now().isoformat()
@@ -1460,43 +1148,13 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         warm_up: bool = True,
         validation: bool = True,
     ) -> dict[str, Any]:
-        """Run the TPC-DS Power Test.
-
-        The Power Test executes all 99 TPC-DS queries (including variants like Q14a/Q14b)
-        sequentially in a single stream and measures the total execution time to calculate
-        the Power@Size metric according to TPC-DS specification section 5.2.
-
-        Args:
-            connection: Database connection object
-            seed: Random seed for parameter generation (default: 1)
-            dialect: SQL dialect (standard, postgres, mysql, etc.)
-            verbose: Whether to print verbose output (default: self.verbose)
-            timeout: Optional timeout for individual queries in seconds
-            warm_up: Whether to perform database warm-up procedures
-            validation: Whether to validate results according to TPC-DS spec
-
-        Returns:
-            Dictionary containing Power Test results including:
-            - scale_factor: Scale factor used
-            - total_time: Total execution time in seconds
-            - power_at_size: Power@Size metric
-            - query_results: Individual query execution results
-            - errors: List of any errors encountered
-            - database_info: Database system information
-
-        Raises:
-            RuntimeError: If Power Test fails to execute
-            ValueError: If parameters are invalid
-        """
         import logging
         import time
         from datetime import datetime
 
-        # Use benchmark's verbose setting if not specified
         if verbose is None:
             verbose = self.verbose
 
-        # Validate inputs
         if seed is None:
             seed = 1
 
@@ -1504,7 +1162,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if verbose:
             logger.setLevel(logging.INFO)
 
-        # Initialize result structure
         result = {
             "scale_factor": self.scale_factor,
             "total_time": 0.0,
@@ -1520,7 +1177,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             },
         }
 
-        # Use provided connection object
         try:
             if verbose:
                 logger.info(f"Starting TPC-DS Power Test (scale factor: {self.scale_factor})")
@@ -1528,7 +1184,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             if warm_up:
                 self._run_power_test_warmup(connection, seed, dialect, verbose, logger)
 
-            # Execute all 99 queries sequentially
             test_start_time = time.time()
 
             for query_id in range(1, 100):
@@ -1541,7 +1196,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                     result["errors"].append(f"Query {query_id} failed: {query_result['error']}")
                 result["query_results"][query_id] = query_result
 
-            # Calculate total time and metrics
             test_end_time = time.time()
             result["total_time"] = test_end_time - test_start_time
             result["end_time"] = datetime.now().isoformat()
@@ -1549,7 +1203,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             successful_queries = sum(1 for qr in result["query_results"].values() if qr["status"] == "success")
             result["success"] = successful_queries == len(result["query_results"])
 
-            # Calculate Power@Size metric: 3600 × Scale_Factor / Power_Test_Time
             if result["success"] and result["total_time"] > 0:
                 result["power_at_size"] = (3600.0 * self.scale_factor) / result["total_time"]
 
@@ -1575,12 +1228,11 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         finally:
             if connection:
                 try:
-                    pass  # Connection lifecycle managed by platform adapter
+                    pass
                 except Exception:
                     pass
 
     def _run_power_test_warmup(self, connection: Any, seed: int, dialect: str, verbose: bool, logger) -> None:
-        """Execute 3 warm-up queries to prime the database before the power test."""
         if verbose:
             logger.info("Performing database warm-up...")
         for warm_query_id in [1, 19, 42]:
@@ -1602,7 +1254,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         verbose: bool,
         logger,
     ) -> dict[str, Any]:
-        """Execute a single query in the power test; returns a query-result dict."""
         import time
 
         query_start = time.time()
@@ -1646,50 +1297,14 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         stream_executor: Optional[Any] = None,
         dialect: str = "standard",
     ) -> MaintenanceTestResult:
-        """
-        Run the TPC-DS Maintenance Test according to TPC-DS specification section 5.4.
-
-        This method delegates to TPCDSMaintenanceTest for executing real database operations
-        including INSERT, UPDATE, and DELETE operations on TPC-DS tables. The implementation
-        executes actual SQL statements against the database and returns real metrics.
-
-        Operations include:
-        - INSERT operations on fact and dimension tables
-        - UPDATE operations to modify existing data
-        - DELETE operations to remove obsolete records
-        - Transaction management with commit/rollback support
-        - Error handling and recovery
-        - Data integrity validation
-
-        Args:
-            connection: Database connection object
-            config: Optional maintenance test configuration
-            stream_executor: Optional function to execute query streams concurrently (not currently used)
-            dialect: SQL dialect for database operations (e.g., 'duckdb', 'postgres', 'sqlite')
-
-        Returns:
-            MaintenanceTestResult: Complete test results and metrics including:
-                - test_duration: Total execution time in seconds
-                - total_operations: Number of operations attempted
-                - successful_operations: Number of operations completed successfully
-                - failed_operations: Number of operations that failed
-                - overall_throughput: Operations per second
-                - maintenance_operations: List of individual operation results
-                - error_details: List of error messages if any
-
-        Raises:
-            ValueError: If connection object is None
-        """
         from benchbox.core.tpcds.maintenance_test import (
             TPCDSMaintenanceTest,
             TPCDSMaintenanceTestConfig,
         )
 
-        # Validate connection object
         if connection is None:
             raise ValueError("connection object cannot be None")
 
-        # Use default config if none provided or ensure it has required attributes
         if config is None or not hasattr(config, "verbose"):
             config = MaintenanceTestConfig(
                 scale_factor=self.scale_factor,
@@ -1697,10 +1312,8 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 output_dir=self.output_dir,
             )
 
-        # Create connection factory that returns the provided connection
         connection_factory = lambda: connection
 
-        # Create TPCDSMaintenanceTest instance
         maintenance_test = TPCDSMaintenanceTest(
             benchmark=self,
             connection_factory=connection_factory,
@@ -1710,25 +1323,20 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             dialect=dialect,
         )
 
-        # Convert MaintenanceTestConfig to TPCDSMaintenanceTestConfig
-        # Use config attributes if available, otherwise use defaults
         maintenance_operations = getattr(config, "maintenance_operations", 4)
 
         tpcds_config = TPCDSMaintenanceTestConfig(
             scale_factor=config.scale_factor,
             maintenance_operations=maintenance_operations,
-            operation_interval=0.0,  # No interval for benchmark runner
-            concurrent_with_queries=False,  # Not supported in this context
+            operation_interval=0.0,
+            concurrent_with_queries=False,
             validate_integrity=True,
             verbose=config.verbose,
             output_dir=config.output_dir,
         )
 
-        # Execute the maintenance test
         result_dict = maintenance_test.run(config=tpcds_config)
 
-        # Convert the result dictionary to MaintenanceTestResult format
-        # Map the TPCDSMaintenanceTest operations to the expected format
         maintenance_operations = []
         for operation in result_dict["operations"]:
             maintenance_operations.append(
@@ -1743,7 +1351,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 }
             )
 
-        # Create MaintenanceTestResult from the dictionary result
         result = MaintenanceTestResult(
             test_duration=result_dict["total_time"],
             total_operations=result_dict["total_operations"],
@@ -1757,26 +1364,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return result
 
     def validate_maintenance_data_integrity(self, connection: Any, dialect: str = "standard") -> dict[str, Any]:
-        """
-        Validate data integrity after maintenance operations.
-
-        This method performs comprehensive data integrity validation including:
-        - Referential integrity constraint checking
-        - Data consistency validation
-        - Constraint violation detection
-        - Performance impact assessment
-
-        Args:
-            connection: Database connection object
-            dialect: SQL dialect for database operations
-
-        Returns:
-            Dictionary with validation results
-
-        Raises:
-            ValueError: If connection_string is invalid
-        """
-        # Validate connection object
         if connection is None:
             raise ValueError("connection object cannot be None")
 
@@ -1793,9 +1380,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         }
 
         try:
-            # Use provided connection object
-
-            # Basic integrity checks for TPC-DS tables
             checks = [
                 {
                     "name": "Primary key uniqueness",
@@ -1856,7 +1440,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                     if self.verbose:
                         logger.error(error_msg)
 
-            # Calculate integrity score
             total_checks = len(checks)
             validation_results["integrity_score"] = passed_checks / total_checks if total_checks > 0 else 0.0
 
@@ -1875,7 +1458,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return validation_results
 
     def get_benchmark_info(self) -> dict[str, Any]:
-        """Get benchmark information."""
         return {
             "name": "TPC-DS",
             "scale_factor": self.scale_factor,
@@ -1886,12 +1468,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         }
 
     def validate_preflight_conditions(self) -> ValidationResult:
-        """
-        Validate conditions before data generation.
-
-        Returns:
-            ValidationResult with preflight validation status
-        """
         return self._data_validation_engine.validate_preflight_conditions(
             benchmark_type="tpcds",
             scale_factor=self.scale_factor,
@@ -1899,25 +1475,10 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         )
 
     def validate_generated_data(self) -> ValidationResult:
-        """
-        Validate generated benchmark data using manifest.
-
-        Returns:
-            ValidationResult with data validation status
-        """
         manifest_path = self.output_dir / "_datagen_manifest.json"
         return self._data_validation_engine.validate_generated_data(manifest_path)
 
     def validate_loaded_data(self, connection: Any) -> ValidationResult:
-        """
-        Validate database state after data loading.
-
-        Args:
-            connection: Database connection object
-
-        Returns:
-            ValidationResult with database validation status
-        """
         return self._db_validation_engine.validate_loaded_data(
             connection=connection,
             benchmark_type="tpcds",
@@ -1925,29 +1486,13 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         )
 
     def validate_data_integrity(self, connection: Optional[Any] = None) -> ValidationResult:
-        """
-        Perform comprehensive data integrity validation.
-
-        This method validates both generated data files and, if provided,
-        the loaded database state.
-
-        Args:
-            connection: Optional database connection for database validation
-
-        Returns:
-            ValidationResult with comprehensive validation status
-        """
-        # Always validate generated data
         file_result = self.validate_generated_data()
 
         if connection is None:
-            # Only file validation
             return file_result
 
-        # Both file and database validation
         db_result = self.validate_loaded_data(connection)
 
-        # Combine results
         all_errors = file_result.errors + db_result.errors
         all_warnings = file_result.warnings + db_result.warnings
 

@@ -1,5 +1,3 @@
-"""Contract tests for the release isolation rehearsal verifier."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -25,7 +23,6 @@ spec.loader.exec_module(verify_release_isolation)
 
 REF = "origin/release"
 
-# Non-deploy peer workflows that are always present in the tree.
 PEER_WORKFLOWS = ["release.yml", "lint.yml"]
 INTENDED = "publication-deploy.yml"
 LEGACY = "docs.yml"
@@ -36,7 +33,6 @@ def _wf_yaml(jobs: dict, name: str = "Test Workflow") -> str:
 
 
 def _isolated_deploy_workflow() -> str:
-    """publication-deploy.yml shape: separate build job feeds a separate deploy job."""
     return _wf_yaml(
         {
             "build": {
@@ -57,11 +53,6 @@ def _isolated_deploy_workflow() -> str:
 
 
 def _legacy_two_job_deploy_workflow() -> str:
-    """Realistic docs.yml: a build job AND a separate release-only deploy job.
-
-    This is the exact shape the old detector whitelisted as 'correct' — it is
-    a *second* deploy source and must fail isolation.
-    """
     return _wf_yaml(
         {
             "build": {
@@ -83,7 +74,6 @@ def _legacy_two_job_deploy_workflow() -> str:
 
 
 def _coupled_workflow() -> str:
-    """A single job that both builds and deploys."""
     return _wf_yaml(
         {
             "build-and-deploy": {
@@ -122,8 +112,6 @@ def _show(content: str) -> subprocess.CompletedProcess[str]:
 
 
 def _git_effects(wf_contents: dict[str, str]) -> list:
-    """One ls-tree result, then one `git show` per workflow file (sorted, as the
-    verifier reads them)."""
     effects: list = [_ls_tree(list(wf_contents))]
     for name in sorted(wf_contents):
         effects.append(_show(wf_contents[name]))
@@ -175,8 +163,6 @@ class TestSecondDeploySourceFails:
         assert any("docs.yml" in e and "still contains a Pages deploy" in e for e in payload["errors"])
 
     def test_legacy_two_job_shape_is_not_whitelisted(self, capsys):
-        """The old detector treated a separate build-job/deploy-job docs.yml as
-        'the correct pattern'. It is a second deploy source and must fail."""
         contents = {**_empty_peers(), LEGACY: _legacy_two_job_deploy_workflow()}
         exit_code = _run_main(["--ref", REF, "--mode", "rehearsal", "--json"], _git_effects(contents))
         assert exit_code != 0
@@ -198,8 +184,6 @@ class TestHiddenCoupling:
 class TestFailOpenDeployDetection:
     def test_sha_pinned_deploy_pages_is_detected(self, capsys):
         contents = {**_empty_peers(), INTENDED: _sha_pinned_deploy_workflow()}
-        # Only source + intended present, but this fixture has no build job, so
-        # it still counts as the single deploy source and passes.
         exit_code = _run_main(["--ref", REF, "--mode", "rehearsal", "--json"], _git_effects(contents))
         payload = json.loads(capsys.readouterr().out)
         assert payload["deploy_source_count"] == 1
@@ -280,8 +264,6 @@ class TestNoDeploySource:
 
 
 class TestLiveTreeIntegration:
-    """Run the verifier against the real .github/workflows tree at HEAD."""
-
     def test_docs_yml_is_not_a_pages_deploy_source(self):
         report = verify_release_isolation.verify_release_isolation(ref="HEAD", mode="rehearsal")
         assert report.legacy_deploy_workflow_deploys is False

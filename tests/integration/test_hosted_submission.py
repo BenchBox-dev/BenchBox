@@ -1,5 +1,3 @@
-"""Hosted submission integration tests against a local mock service."""
-
 from __future__ import annotations
 
 import json
@@ -25,9 +23,7 @@ pytestmark = [
 
 @pytest.fixture(autouse=True)
 def _community_publish_salt(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Every test here exercises `--service` (hosted/community submit), which
-    now hard-refuses without a deployment salt. Mirrors the autouse fixture in
-    tests/unit/cli/commands/test_submit.py."""
+
     monkeypatch.setenv("BENCHBOX_MACHINE_ID_SALT", "integration-test-community-publish-salt")
 
 
@@ -136,9 +132,7 @@ def hosted_service():
 
 @pytest.fixture
 def result_file(tmp_path: Path) -> Path:
-    # Full canonical TPC-H coverage: submit runs the bundle validator on
-    # every path (including real hosted uploads), and short query sets or
-    # missing benchmark ids are refused before anything is sent.
+
     path = tmp_path / "tpch_duckdb.json"
     path.write_text(
         json.dumps(

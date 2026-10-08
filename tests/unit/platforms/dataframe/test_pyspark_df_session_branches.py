@@ -1,14 +1,6 @@
-"""Session-backed branch tests for PySparkDataFrameAdapter miss clusters.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Exercises the paths that mocked fast tests cannot reach against a real
-local Spark session: the TPC-style trailing-delimiter CSV branch with
-empty-string restore, COUNT(*) windows, to_polars conversion, and the
-version-reporting branch of get_platform_info.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -35,13 +27,11 @@ _SKIP_REASON = pyspark_skip_reason() or "PySpark is usable"
 if PYSPARK_AVAILABLE:
     from benchbox.platforms.dataframe.pyspark_df import PySparkDataFrameAdapter
 else:
-    PySparkDataFrameAdapter = None  # type: ignore[assignment,misc]
+    PySparkDataFrameAdapter = None
 
 
 @pytest.mark.skipif(_SKIP_PYSPARK, reason=_SKIP_REASON)
 class TestPySparkSessionBranches:
-    """Real-session coverage for trailing-delimiter CSV, COUNT(*), to_polars."""
-
     @pytest.fixture(scope="class")
     def adapter(self, pyspark_test_environment):
         adapter = PySparkDataFrameAdapter(
@@ -55,7 +45,7 @@ class TestPySparkSessionBranches:
         adapter.close()
 
     def test_read_csv_trailing_delimiter_drops_dummy(self, adapter, tmp_path):
-        """TPC-style rows ending with a spurious delimiter lose the dummy column."""
+
         csv_path = tmp_path / "region.tbl"
         csv_path.write_text("r_regionkey|r_name|\n1|AFRICA|\n2|AMERICA|\n")
 
@@ -71,7 +61,7 @@ class TestPySparkSessionBranches:
         assert adapter.get_row_count(df) == 2
 
     def test_read_csv_restores_empty_strings(self, adapter, tmp_path):
-        """Empty fields in declared string columns come back as ''."""
+
         csv_path = tmp_path / "strings.tbl"
         csv_path.write_text("a|b|\n1|x|\n2||\n")
 
@@ -88,14 +78,14 @@ class TestPySparkSessionBranches:
         assert rows == [("1", "x"), ("2", "")]
 
     def test_window_count_star(self, adapter):
-        """COUNT(*) windows count every row in the partition."""
+
         df = adapter.spark.createDataFrame([(1, "x"), (1, "y"), (2, "z")], ["g", "v"])
         expr = adapter.window_count(None, partition_by=["g"])
         out = sorted(r["n"] for r in df.withColumn("n", expr).collect())
         assert out == [1, 2, 2]
 
     def test_to_polars_via_arrow(self, adapter):
-        """Spark 4 toArrow() path converts without touching pandas."""
+
         pl = pytest.importorskip("polars")
         df = adapter.spark.createDataFrame([(1, "a"), (2, "b")], ["id", "name"])
         out = adapter.to_polars(df)
@@ -103,7 +93,7 @@ class TestPySparkSessionBranches:
         assert out.sort("id").to_dicts() == [{"id": 1, "name": "a"}, {"id": 2, "name": "b"}]
 
     def test_get_platform_info_reports_version(self, adapter):
-        """Version branch reports the module-level PySpark version."""
+
         from benchbox.platforms.pyspark import PYSPARK_VERSION
 
         assert adapter.get_platform_info()["version"] == PYSPARK_VERSION

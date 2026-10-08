@@ -14,31 +14,27 @@ pytestmark = [
 
 
 class FakeCursor:
-    """Mock cursor that supports fetchall() for returns operations."""
-
     def __init__(self, sales_records=None, rowcount=0):
         self.sales_records = sales_records or []
         self.rowcount = rowcount
 
     def fetchall(self):
-        """Return mock sales records for returns operations."""
         return self.sales_records
 
     def fetchone(self):
-        """Return mock single row for MIN/MAX queries."""
         return (1, 100) if self.sales_records else None
 
 
 class FakeConn:
     def __init__(self):
         self.executed = []
-        # Mock sales records for store_returns (8 fields)
+
         self.store_sales_records = [
-            (12345, 1, 1, 1, 1, 1, 1, 10),  # ticket_num, item_sk, cust_sk, cdemo, hdemo, addr, store, qty
+            (12345, 1, 1, 1, 1, 1, 1, 10),
             (12346, 2, 2, 2, 2, 2, 2, 5),
             (12347, 3, 3, 3, 3, 3, 3, 8),
         ]
-        # Mock sales records for catalog_returns (11 fields)
+
         self.catalog_sales_records = [
             (
                 12345,
@@ -52,30 +48,30 @@ class FakeConn:
                 1,
                 1,
                 10,
-            ),  # order_num, item, cust, cdemo, hdemo, addr, call_ctr, cat_page, ship_mode, warehouse, qty
+            ),
             (12346, 2, 2, 2, 2, 2, 2, 2, 2, 2, 5),
             (12347, 3, 3, 3, 3, 3, 3, 3, 3, 3, 8),
         ]
-        # Mock sales records for web_returns (8 fields)
+
         self.web_sales_records = [
-            (12345, 1, 1, 1, 1, 1, 1, 10),  # order_num, item, cust, cdemo, hdemo, addr, web_page, qty
+            (12345, 1, 1, 1, 1, 1, 1, 10),
             (12346, 2, 2, 2, 2, 2, 2, 5),
             (12347, 3, 3, 3, 3, 3, 3, 8),
         ]
 
     def execute(self, sql, params=None):
         self.executed.append((sql, params))
-        # If query is for dimension ranges (MIN/MAX), return range cursor
+
         if "MIN(" in sql.upper() and "MAX(" in sql.upper():
             return FakeCursor(sales_records=None, rowcount=0)
-        # Return appropriate sales records based on table being queried
+
         elif "FROM STORE_SALES" in sql.upper():
             return FakeCursor(sales_records=self.store_sales_records[:3], rowcount=3)
         elif "FROM CATALOG_SALES" in sql.upper():
             return FakeCursor(sales_records=self.catalog_sales_records[:3], rowcount=3)
         elif "FROM WEB_SALES" in sql.upper():
             return FakeCursor(sales_records=self.web_sales_records[:3], rowcount=3)
-        # For INSERT/UPDATE/DELETE, return empty cursor
+
         else:
             return FakeCursor(sales_records=[], rowcount=1)
 
@@ -88,12 +84,12 @@ def test_execute_operation_insert_store_sales_success():
 
     assert result.success is True
     assert result.rows_affected == 5
-    # ensure some SQL was executed
+
     assert len(conn.executed) >= 1
 
 
 def test_execute_operation_unsupported_returns_failure():
-    # Create an enum not in the handlers mapping
+
     Unknown = Enum("Unknown", "FOO")
     ops = MaintenanceOperations()
     conn = FakeConn()
@@ -145,7 +141,6 @@ def test_delete_queries_rowcount_branch():
     ops = MaintenanceOperations()
     conn = FakeConnWithRowcount()
 
-    # exercise rowcount path in deletes
     deleted_sales = ops._delete_old_sales(conn, estimated_rows=9)
     deleted_returns = ops._delete_old_returns(conn, estimated_rows=9)
     assert deleted_sales > 0

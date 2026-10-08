@@ -1,9 +1,6 @@
-"""BenchBox - Embedded benchmark datasets and queries for databases.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import logging
 from dataclasses import dataclass
@@ -23,7 +20,6 @@ from benchbox.tsbs_devops import TSBSDevOps
 
 from . import platforms
 
-# Perform version consistency check on import (but don't fail - just warn)
 try:
     from benchbox.utils.version import validate_version_consistency
 
@@ -38,7 +34,6 @@ try:
             stacklevel=2,
         )
 except ImportError:
-    # Fallback gracefully if version utilities not available
     pass
 
 if TYPE_CHECKING:
@@ -56,15 +51,12 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class _BenchmarkSpec:
-    """Configuration describing how to import a benchmark lazily."""
-
     module: str
     class_name: str
     optional_dependencies: tuple[str, ...] = ()
     store_errors: bool = True
 
 
-# Registry of lazily imported benchmarks (name -> import specification)
 _BENCHMARK_REGISTRY: dict[str, _BenchmarkSpec] = {
     "TPCDI": _BenchmarkSpec("tpcdi", "TPCDI", ("tpcdi",)),
     "SSB": _BenchmarkSpec("ssb", "SSB", ("ssb",)),
@@ -84,26 +76,21 @@ _BENCHMARK_REGISTRY: dict[str, _BenchmarkSpec] = {
 }
 
 
-# Public re-exports for MCP and external consumers - resolved lazily in
-# __getattr__ to avoid importing heavy registry modules at package load time.
 _PUBLIC_REEXPORTS: dict[str, tuple[str, str]] = {
     "TPCH_DATAFRAME_QUERIES": ("benchbox.core.tpch.dataframe_queries", "TPCH_DATAFRAME_QUERIES"),
     "TPCDS_DATAFRAME_QUERIES": ("benchbox.core.tpcds.dataframe_queries", "TPCDS_DATAFRAME_QUERIES"),
     "DATAFRAME_PLATFORMS": ("benchbox.platforms.dataframe.platform_checker", "DATAFRAME_PLATFORMS"),
 }
 
-# Lazy import cache for benchmark classes (stores class or ImportError/None)
 _lazy_cache: dict[str, Union[type[BaseBenchmark], ImportError, None]] = {}
 
 
 def _import_module(module_path: str):
-    """Wrapper for importlib.import_module to allow monkeypatching in tests."""
 
     return import_module(module_path)
 
 
 def _load_benchmark_class(name: str) -> tuple[Optional[type[BaseBenchmark]], Optional[ImportError]]:
-    """Load a benchmark class from the registry, caching the result."""
 
     cached = _lazy_cache.get(name)
     if isinstance(cached, ImportError):
@@ -122,7 +109,6 @@ def _load_benchmark_class(name: str) -> tuple[Optional[type[BaseBenchmark]], Opt
         logger.debug("Successfully lazy-loaded %s from %s", spec.class_name, module_path)
         return benchmark_class, None
     except ImportError as exc:
-        # Store ImportError for enhanced error reporting if requested
         if spec.store_errors:
             _lazy_cache[name] = exc
         else:
@@ -132,21 +118,16 @@ def _load_benchmark_class(name: str) -> tuple[Optional[type[BaseBenchmark]], Opt
 
 
 def _clear_lazy_cache() -> None:
-    """Clear the lazy import cache (used in tests)."""
 
     _lazy_cache.clear()
 
 
-# Expose lazy-loaded classes as module attributes
 def __getattr__(name: str) -> Any:
-    """Module-level __getattr__ for lazy loading with enhanced error reporting."""
-    # Import here to avoid circular imports
     try:
         from benchbox.utils.version import create_import_error
     except ImportError:
-        # Fallback to simple error if version utils not available
+
         def create_import_error(benchmark_name, missing_dependencies=None, original_error=None):
-            """Create a minimal import error when rich dependency reporting is unavailable."""
             return ImportError(f"Could not import {benchmark_name}")
 
     if name == "platforms":
@@ -156,7 +137,6 @@ def __getattr__(name: str) -> Any:
         module_path, attr = _PUBLIC_REEXPORTS[name]
         return getattr(import_module(module_path), attr)
 
-    # Map benchmark names to their lazy importers and potential missing dependencies
     if name in _BENCHMARK_REGISTRY:
         spec = _BENCHMARK_REGISTRY[name]
         cls, original_error = _load_benchmark_class(name)
@@ -171,7 +151,6 @@ def __getattr__(name: str) -> Any:
         raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 
-# Define __all__ for explicit imports
 __all__ = [
     "platforms",
     "BaseBenchmark",
@@ -196,7 +175,6 @@ __all__ = [
     "DataVault",
     "TPCDSOBT",
     "VectorSearch",
-    # Public re-exports (MCP / external consumers)
     "TPCH_DATAFRAME_QUERIES",
     "TPCDS_DATAFRAME_QUERIES",
     "DATAFRAME_PLATFORMS",

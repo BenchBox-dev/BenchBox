@@ -1,5 +1,3 @@
-"""Coverage-focused execution tests for TPC-H DataFrame query implementations."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -7,7 +5,7 @@ from dataclasses import dataclass
 import pandas as pd
 import pytest
 
-from benchbox.core.dataframe.query import DataFrameQuery  # noqa: F401
+from benchbox.core.dataframe.query import DataFrameQuery
 from benchbox.core.tpch.dataframe_queries import get_query, list_query_ids, set_parameter_overrides
 
 pytestmark = [

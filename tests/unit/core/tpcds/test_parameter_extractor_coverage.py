@@ -1,5 +1,3 @@
-"""Coverage tests for TPC-DS parameter extraction helpers."""
-
 from __future__ import annotations
 
 import pytest
@@ -135,7 +133,7 @@ def test_extract_tpcds_parameters_filters_and_collects(monkeypatch: pytest.Monke
             if query_id == 1:
                 return "where d_year = 2000 and d_moy = 2"
             if query_id == 2:
-                return "select 1"  # no extractable params
+                return "select 1"
             raise RuntimeError("boom")
 
     monkeypatch.setattr("benchbox.core.tpcds.c_tools.DSQGenBinary", FakeDSQGen)
@@ -145,7 +143,7 @@ def test_extract_tpcds_parameters_filters_and_collects(monkeypatch: pytest.Monke
             1: {"year": 1998, "month": 1},
             2: {"state": "TX"},
             3: {"year": 1997},
-            4: {},  # skipped empty defaults
+            4: {},
         },
         raising=False,
     )

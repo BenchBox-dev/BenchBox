@@ -1,6 +1,6 @@
 # Calibrated SF=1 Uncompressed Source-Data Sizes
 
-Measured 2026-09-26 with `scripts/measure_sf1_sizes.py`: each benchmark's
+Measured with `scripts/measure_sf1_sizes.py`: each benchmark's
 generator ran at `scale_factor=1.0` with compression disabled, and the
 generator's own outputs were summed (returned table paths plus auxiliary
 corpora such as the primitives bulk-load files). Upstream staging caches
@@ -49,7 +49,7 @@ where available; otherwise the generator baseline.
 | clickbench | 552,136,075 | 0.514 | ~0.6 GB | generated |
 | nyctaxi | 863,567,123 | 0.804 | ~0.9 GB | decompressed SF=1 cache |
 | flightdata | 2,750,362,238 | 2.561 | ~2.8 GB | decompressed SF=1 cache |
-| tpcds_obt | 2,406,484,046 | 2.241 | ~2.4 GB | legacy total incl. TPC-DS source (method superseded; derived-only remeasure pending scratch) |
+| tpcds_obt | 2,406,484,046 | 2.241 | ~2.4 GB | total includes the staged TPC-DS source (not a derived-only measurement) |
 | datavault | 3,703,681,239 | 3.449 | ~3.7 GB | generated (derived tables only) |
 
 ## Notes
@@ -75,10 +75,3 @@ where available; otherwise the generator baseline.
   incremental derived bytes.
 - `nyctaxi` at SF=1 samples the 2019 corpus at rate 0.1 (one month slice);
   `flightdata` at SF=1 spans ~41 months of BTS data.
-- Regenerate with `uv run -- python scripts/measure_sf1_sizes.py --output <path>`
-  (add `--jobs N` for bounded parallel runs with ample scratch space).
-  The full run needs roughly 20 GB of scratch space and 30-45 minutes
-  sequential; `flightdata` downloads its BTS slice and dominates wall time.
-  Copy changed byte counts into
-  `tests/unit/generators/sf1_size_baseline.json` in the same commit so the
-  baseline test keeps mirroring this table.

@@ -1,5 +1,3 @@
-"""Data Vault cross-surface gate builder."""
-
 from __future__ import annotations
 
 import logging
@@ -11,13 +9,6 @@ logger = logging.getLogger(__name__)
 
 
 def build_datavault_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
-    """Generate Data Vault data, load it into in-memory DuckDB, and wire both surfaces.
-
-    Regeneration is forced on every build: probes must never pass on a stale
-    manifest from a previous run. The datagen manifest written by this exact
-    generation is logged, so every gate run records which probe manifest its
-    cell came from.
-    """
     from benchbox.core.datavault.benchmark import DataVaultBenchmark
     from benchbox.core.datavault.dataframe_queries import DATAVAULT_DATAFRAME_QUERIES
     from benchbox.core.datavault.schema import LOADING_ORDER

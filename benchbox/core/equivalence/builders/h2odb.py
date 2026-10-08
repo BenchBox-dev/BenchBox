@@ -1,5 +1,3 @@
-"""H2O-DB cross-surface gate builder."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,7 +6,6 @@ from benchbox.core.equivalence.builders.base import CrossSurfaceData, _load_duck
 
 
 def build_h2odb_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
-    """Generate H2O-DB data, load it into in-memory DuckDB, and wire both surfaces."""
     from benchbox.core.h2odb.benchmark import H2OBenchmark
     from benchbox.core.h2odb.dataframe_queries import H2ODB_DATAFRAME_QUERIES
     from benchbox.core.h2odb.generator import H2ODataGenerator

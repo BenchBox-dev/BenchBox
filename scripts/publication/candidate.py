@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-"""Validate the immutable artifact selected for a publication.
-
-The GitHub artifact ID is the operator-facing selector.  This module validates
-the producing workflow, manifest, complete required route coverage, and the
-unpacked site tree before the approval gate or journal writer is reached.
-"""
 
 from __future__ import annotations
 
@@ -27,19 +21,23 @@ from scripts.publication.assembler import compute_tree_digest
 from scripts.publication.manifest import validate_manifest_dict
 from scripts.publication.verify_live import REQUIRED_ROUTE_CHECKSUMS
 
+CLI_DESCRIPTION = (
+    "Validate the immutable artifact selected for a publication.\n"
+    "\n"
+    "The GitHub artifact ID is the operator-facing selector.  This module validates\n"
+    "the producing workflow, manifest, complete required route coverage, and the\n"
+    "unpacked site tree before the approval gate or journal writer is reached.\n"
+)
+
 EXPECTED_WORKFLOW_NAME = "Publication Control Plane Deployment"
 EXPECTED_WORKFLOW_PATH = ".github/workflows/publication-deploy.yml"
 MAX_CANDIDATE_MEMBERS = 100_000
 MAX_CANDIDATE_UNCOMPRESSED_BYTES = 4 * 1024 * 1024 * 1024
-# A candidate stays promotable while its develop commit is an ancestor of the
-# protected tip and no more than this many develop commits behind it. The
-# bound keeps a queued approval usable across merge-queue landings while still
-# rejecting pathologically stale bundles.
 DEFAULT_DEVELOP_MAX_BEHIND_COMMITS = 50
 
 
 class CandidateValidationError(ValueError):
-    """Raised when a selected artifact cannot be trusted as a candidate."""
+    pass
 
 
 def _sha256(value: str) -> bool:
@@ -60,14 +58,12 @@ def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
 
 
 def is_ancestor_commit(repo: Path, ancestor: str, descendant: str) -> bool:
-    """Return True when ancestor is reachable from descendant in repo."""
     if not _commit_sha(ancestor) or not _commit_sha(descendant):
         return False
     return _git(repo, "merge-base", "--is-ancestor", ancestor, descendant).returncode == 0
 
 
 def commits_behind(repo: Path, ancestor: str, descendant: str) -> int:
-    """Count commits descendant is ahead of ancestor; -1 when unmeasurable."""
     result = _git(repo, "rev-list", "--count", f"{ancestor}..{descendant}")
     if result.returncode != 0:
         return -1
@@ -84,13 +80,6 @@ def check_develop_freshness(
     max_behind_commits: int = DEFAULT_DEVELOP_MAX_BEHIND_COMMITS,
     repo: Path = ROOT,
 ) -> None:
-    """Accept a candidate built from the tip or a recent ancestor of it.
-
-    Raises CandidateValidationError when the candidate's develop commit is
-    not reachable from the protected tip, when either SHA is malformed or
-    unknown to the repository, or when the candidate trails the tip by more
-    than max_behind_commits commits.
-    """
     if not _commit_sha(develop_sha) or not _commit_sha(expected_develop_sha):
         raise CandidateValidationError("candidate develop SHA is stale")
     if develop_sha == expected_develop_sha:
@@ -123,14 +112,12 @@ def _load_object(path: Path) -> dict[str, Any]:
 
 
 def manifest_digest(manifest: dict[str, Any]) -> str:
-    """Compute the digest used by publication manifests."""
     payload = dict(manifest)
     payload.pop("manifest_digest", None)
     return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
 
 def validate_route_checksums(manifest: dict[str, Any]) -> dict[str, str]:
-    """Require every public route used by the publication contract."""
     checksums = manifest.get("checksums")
     if not isinstance(checksums, dict):
         raise CandidateValidationError("candidate manifest must contain a checksums object")
@@ -154,7 +141,6 @@ def _validate_zip_member(name: str) -> None:
 
 
 def extract_candidate_archive(archive: Path, output_dir: Path) -> Path:
-    """Safely extract a candidate archive and return its root directory."""
     if output_dir.exists():
         shutil.rmtree(output_dir)
     output_dir.mkdir(parents=True)
@@ -172,8 +158,6 @@ def extract_candidate_archive(archive: Path, output_dir: Path) -> Path:
                 if normalized_name in seen_names:
                     raise CandidateValidationError(f"candidate archive contains a duplicate path: {member.filename!r}")
                 seen_names.add(normalized_name)
-                # Unix mode 0120000 denotes a symlink.  Reject links before
-                # extraction so an untrusted artifact cannot escape the root.
                 if (member.external_attr >> 16) & 0o170000 == 0o120000:
                     raise CandidateValidationError(f"candidate archive contains a symlink: {member.filename!r}")
             bundle.extractall(output_dir)
@@ -207,7 +191,7 @@ class CandidateSummary:
         return asdict(self)
 
 
-def validate_candidate_directory(  # noqa: C901 - this is one fail-closed validation boundary
+def validate_candidate_directory(  # noqa: C901
     root: Path,
     *,
     artifact_id: int,
@@ -221,7 +205,6 @@ def validate_candidate_directory(  # noqa: C901 - this is one fail-closed valida
     expected_parent_sha: str | None = None,
     expected_parent_generation: int | None = None,
 ) -> CandidateSummary:
-    """Validate an extracted candidate bundle and its GitHub provenance."""
     if artifact_metadata.get("expired") is True:
         raise CandidateValidationError("candidate artifact has expired")
     try:
@@ -361,7 +344,6 @@ def create_candidate_metadata(
     producer_workflow_path: str = EXPECTED_WORKFLOW_PATH,
     output: Path,
 ) -> CandidateSummary:
-    """Create the metadata file included in a candidate bundle."""
     manifest = _load_object(manifest_path)
     assembly = _load_object(assembly_path)
     errors = validate_manifest_dict(manifest)
@@ -410,7 +392,7 @@ def create_candidate_metadata(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     sub = parser.add_subparsers(dest="command", required=True)
 
     create = sub.add_parser("create")
@@ -471,8 +453,6 @@ def main(argv: list[str] | None = None) -> int:
                 expected_parent_generation=args.expected_parent_generation,
             )
             summary = replace(summary, archive_sha256=archive_sha256(args.archive))
-        # Only `validate` defines --output-summary; `create` records the
-        # candidate through --output instead.
         if args.command == "validate":
             args.output_summary.write_text(
                 json.dumps(summary.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8"

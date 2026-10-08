@@ -1,25 +1,7 @@
 # ruff: noqa: SIM905
-"""Apache Doris platform adapter for BenchBox benchmarking.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides Apache Doris-specific functionality including:
-- MySQL protocol connectivity via PyMySQL (port 9030)
-- Stream Load HTTP API for efficient bulk data loading (with chunked support)
-- Doris-specific DDL with table models (DUPLICATE/AGGREGATE/UNIQUE KEY)
-- DISTRIBUTED BY HASH clause generation with configurable bucket counts
-- PARTITION BY RANGE for large tables on date columns
-- Bloom filter and Bitmap index creation
-- Cache disable validation
-- EXPLAIN for query plan capture
-- SQLGlot 'doris' dialect for SQL transpilation
-
-Apache Doris is a high-performance real-time analytical database based on
-MPP architecture, supporting both high-concurrency point queries and
-high-throughput complex analysis.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -30,7 +12,7 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, cast
 from urllib.parse import urlparse, urlunparse
 
 from benchbox.platforms.base.ddl_helpers import strip_foreign_keys
@@ -43,7 +25,7 @@ from ..utils.file_format import get_data_extension
 from .base import DriverIsolationCapability, PlatformAdapter
 from .base.data_loading import (
     CsvDialect,
-    DataSourceResolver,  # noqa: F401 - tests patch this module-local name; shared loader resolves it dynamically.
+    DataSourceResolver,  # noqa: F401
     FileFormatRegistry,
     GzipHandler,
     NoCompressionHandler,
@@ -57,7 +39,6 @@ from .base.mysql_wire import (
     build_database_config,
 )
 
-# Doris dialect for SQLGlot
 DORIS_DIALECT = "doris"
 
 try:
@@ -71,24 +52,11 @@ try:
 except ImportError:
     _requests = None
 
-# Default chunk size for Stream Load: 10MB.
-# Smaller chunks ensure each stream load request completes within the timeout,
-# especially for Docker deployments on macOS where BE disk I/O is slow.
 _DEFAULT_STREAM_LOAD_CHUNK_SIZE = 10 * 1024 * 1024
 _DEFAULT_STREAM_LOAD_MAX_FILTER_RATIO = "0"
 
-# Default bucket count for DISTRIBUTED BY HASH
 _DEFAULT_BUCKETS = 10
 
-# TPC-DS nullable DECIMAL column positions (0-based) per table.
-# dsdgen emits empty string for NULL DECIMAL values; Doris strict mode rejects
-# those rows as type-conversion errors. Preprocessing replaces "" with \N at
-# these positions so NULL is expressed in the format Doris expects.
-# Positions are exact schema column indices from tables.py - trailing-separator
-# artifacts (the empty field produced by dsdgen's always-present row-terminating |)
-# are intentionally excluded; Doris's CSV parser treats a trailing | as a terminator
-# and discards the resulting empty field without a column-count error.
-# Derived from benchbox/core/tpcds/schema/tables.py - update if the schema changes.
 _TPCDS_DECIMAL_NULL_POSITIONS: dict[str, list[int]] = dict(  # noqa: C408
     call_center=[29, 30],
     catalog_returns=list(range(18, 27)),
@@ -107,12 +75,6 @@ _TPCDS_DECIMAL_NULL_POSITIONS: dict[str, list[int]] = dict(  # noqa: C408
 
 
 def _fix_tpcds_decimal_nulls(line: str, delimiter: str, positions: list[int]) -> str:
-    """Replace empty strings at DECIMAL nullable positions with \\N.
-
-    dsdgen emits ``""`` for NULL DECIMAL values. Doris strict mode rejects
-    empty-to-DECIMAL coercions; ``\\N`` is the default Doris null_format
-    and is accepted by strict mode for nullable columns.
-    """
     fields = line.split(delimiter)
     for pos in positions:
         if pos < len(fields) and fields[pos] == "":
@@ -121,7 +83,6 @@ def _fix_tpcds_decimal_nulls(line: str, delimiter: str, positions: list[int]) ->
 
 
 def _format_filter_ratio(value: Any) -> str:
-    """Normalize a Doris ``max_filter_ratio`` value."""
     ratio = float(value)
     if math.isnan(ratio) or math.isinf(ratio) or ratio < 0 or ratio > 1:
         raise ValueError(f"stream_load_max_filter_ratio must be between 0 and 1 inclusive, got {value!r}")
@@ -130,22 +91,18 @@ def _format_filter_ratio(value: Any) -> str:
     return format(ratio, "g")
 
 
-# Regexes for DDL clause injection (_inject_doris_ddl_clauses)
 _CREATE_TABLE_RE = re.compile(
     r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`\"]?(\w+)[`\"]?\s*\(",
     re.IGNORECASE,
 )
-# Column definition parser: matches (name, type); known SQL types filter out constraint lines.
-_KNOWN_SQL_TYPES = frozenset(  # noqa: SIM905
+_KNOWN_SQL_TYPES = frozenset(
     "int integer bigint smallint tinyint largeint float double decimal numeric string text varchar char boolean "
-    "bool date datetime timestamp time json jsonb array map struct bitmap hll blob binary varbinary".split()  # noqa: SIM905
+    "bool date datetime timestamp time json jsonb array map struct bitmap hll blob binary varbinary".split()
 )
 _COL_DEF_RE = re.compile(r'[`"]?(\w+)[`"]?\s+(\w+)', re.MULTILINE)
-# Types Doris rejects as key columns (unbounded or unsupported key types)
 _NON_KEY_DORIS_TYPES = frozenset({"time", "json", "jsonb", "blob", "binary", "hll", "bitmap"})
 _DORIS_ENGINE_VERSION_RE = re.compile(r"doris[-\s]v?(\d+\.\d+\.\d+(?:-[A-Za-z0-9]+)?)", re.IGNORECASE)
 
-# TPC-H table key columns for DUPLICATE KEY model
 _TPCH_TABLE_KEYS: dict[str, list[str]] = dict(  # noqa: C408
     lineitem=["l_orderkey", "l_linenumber"],
     orders=["o_orderkey"],
@@ -157,27 +114,22 @@ _TPCH_TABLE_KEYS: dict[str, list[str]] = dict(  # noqa: C408
     region=["r_regionkey"],
 )
 
-# TPC-H distribution keys (hash distribution column per table)
 _TPCH_DISTRIBUTION_KEYS: dict[str, str] = {
     table: keys[0] for table, keys in _TPCH_TABLE_KEYS.items() if table != "partsupp"
 } | {"partsupp": "ps_partkey"}
 
-# TPC-H partition columns (date columns for PARTITION BY RANGE on large tables)
 _TPCH_PARTITION_TABLES: dict[str, str] = dict(lineitem="l_shipdate", orders="o_orderdate")  # noqa: C408
 
-# TPC-H partition date ranges
 _TPCH_YEAR_PARTITIONS = [(f"p{year}", f"{year}-01-01", f"{year + 1}-01-01") for year in range(1992, 1999)]
 _TPCH_PARTITION_RANGES: dict[str, list[tuple[str, str, str]]] = {
     "lineitem": _TPCH_YEAR_PARTITIONS,
     "orders": _TPCH_YEAR_PARTITIONS,
 }
 
-# Bloom filter index targets: high-cardinality key columns
 _TPCH_BLOOM_FILTER_COLUMNS: dict[str, list[str]] = {
     table: [key] for table, key in _TPCH_DISTRIBUTION_KEYS.items() if table not in {"nation", "region"}
 }
 
-# Bitmap index targets: low-cardinality columns
 _TPCH_BITMAP_COLUMNS: dict[str, list[str]] = dict(  # noqa: C408
     lineitem=["l_returnflag", "l_linestatus"], orders=["o_orderstatus"], part=["p_type"]
 )
@@ -187,7 +139,6 @@ def _normalize_doris_engine_version(
     mysql_protocol_version: object | None,
     version_comment: object | None,
 ) -> str | None:
-    """Prefer Doris engine version metadata over the MySQL compatibility version."""
     if version_comment is not None:
         comment = str(version_comment).strip()
         match = _DORIS_ENGINE_VERSION_RE.search(comment)
@@ -204,7 +155,6 @@ def _normalize_doris_engine_version(
 
 
 def _read_doris_version_details(cursor: Any) -> tuple[str | None, str | None, str | None]:
-    """Read Doris engine and protocol version details from a live connection."""
     mysql_protocol_version = None
     version_comment = None
 
@@ -231,43 +181,10 @@ def _read_doris_version_details(cursor: Any) -> tuple[str | None, str | None, st
 
 
 class _DorisConnectionWrapper(MySqlWireConnectionWrapper):
-    """Thin adapter that adds a DuckDB-compatible execute() to a PyMySQL connection.
-
-    PyMySQL exposes execute() only on cursors; BenchBox benchmarks (write_primitives,
-    transaction_primitives, metadata_primitives) call connection.execute(sql) directly.
-    This wrapper intercepts that call and delegates to a fresh cursor.
-
-    When ddl_optimizer is provided, CREATE TABLE statements are automatically transformed
-    into Doris-compatible DDL (DUPLICATE KEY + DISTRIBUTED BY HASH + PROPERTIES) before
-    execution, so staging tables created by benchmark setup code get valid Doris DDL.
-    """
-
     optimize_contains_create = True
 
 
 class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapter):
-    """Apache Doris platform adapter with Stream Load data loading.
-
-    Supports Apache Doris 2.0+ with vectorized execution engine.
-    Uses PyMySQL for MySQL protocol connectivity (port 9030) and
-    HTTP Stream Load API for efficient bulk data loading.
-
-    Connection Configuration:
-    - Host: Doris FE node hostname
-    - Port: 9030 (MySQL protocol, default)
-    - HTTP Port: 8030 (Stream Load API, default)
-    - Username: Doris user (default: 'root')
-    - Password: Doris password (default: empty)
-
-    Environment Variables:
-    - DORIS_HOST: FE node hostname
-    - DORIS_PORT: MySQL protocol port
-    - DORIS_HTTP_PORT: Stream Load HTTP port
-    - DORIS_USER or DORIS_USERNAME: Username
-    - DORIS_PASSWORD: Password
-    - DORIS_DATABASE: Default database name
-    """
-
     plan_capture_phase_eligible = True
     default_service_port = 9030
 
@@ -280,12 +197,10 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         return "Apache Doris"
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for Apache Doris."""
         return DORIS_DIALECT
 
     @staticmethod
     def add_cli_arguments(parser) -> None:
-        """Add Doris-specific CLI arguments."""
         if not hasattr(parser, "add_argument"):
             return
         try:
@@ -337,19 +252,8 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> DorisAdapter:
-        """Create Doris adapter from unified configuration.
-
-        Standard connection parameters (host/port/credentials) are resolved
-        once by the config builder (_build_doris_config) before this method
-        is called.  from_config() passes those resolved values through and
-        handles benchmark-derived database naming, which requires the
-        benchmark + scale_factor context that the builder carries forward.
-        """
         adapter_config = {}
 
-        # Pass through connection parameters already resolved by the config builder.
-        # Simple Python defaults cover direct-construction paths (e.g. tests)
-        # where no builder ran.
         adapter_config["host"] = config.get("host", "localhost")
         adapter_config["port"] = config.get("port", 9030)
         adapter_config["http_port"] = config.get("http_port", 8030)
@@ -357,7 +261,6 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         adapter_config["username"] = config.get("username", "root")
         adapter_config["password"] = config.get("password", "")
 
-        # Database name - use provided or generate from benchmark config
         if config.get("database"):
             adapter_config["database"] = config["database"]
         elif db_env := os.environ.get("DORIS_DATABASE"):
@@ -370,13 +273,10 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         else:
             adapter_config["database"] = "benchbox"
 
-        # TLS for Stream Load HTTP API
         adapter_config["use_tls"] = config.get("use_tls", False)
 
-        # Force recreate
         adapter_config["force_recreate"] = config.get("force", False)
 
-        # Doris-specific feature config
         for key in [
             "stream_load_chunk_size",
             "stream_load_max_filter_ratio",
@@ -392,7 +292,6 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
             if key in config:
                 adapter_config[key] = config[key]
 
-        # Pass through other config
         for key in [
             "tuning_config",
             "tuning_enabled",
@@ -410,7 +309,6 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
     def __init__(self, **config):
         super().__init__(**config)
 
-        # Check dependencies
         if pymysql is None:
             available, missing = check_platform_dependencies("doris")
             if not available:
@@ -419,10 +317,6 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
 
         self._dialect = DORIS_DIALECT
 
-        # Connection configuration.
-        # from_config() (and the config builder before it) have already resolved
-        # env vars and defaults, so __init__ just consumes what it receives.
-        # Simple Python defaults handle the direct-construction path (tests, etc.)
         self.host = config.get("host", "localhost")
         self.port = config.get("port", 9030)
         self.http_port = config.get("http_port", 8030)
@@ -434,36 +328,28 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         self.verify_ssl = config.get("verify_ssl") if config.get("verify_ssl") is not None else True
         self.ca_cert_path = config.get("ca_cert_path")
 
-        # Chunked loading config (w8)
         self.stream_load_chunk_size: int = config.get("stream_load_chunk_size", _DEFAULT_STREAM_LOAD_CHUNK_SIZE)
         self.stream_load_max_filter_ratio = _format_filter_ratio(
             config.get("stream_load_max_filter_ratio", _DEFAULT_STREAM_LOAD_MAX_FILTER_RATIO)
         )
 
-        # Table model config (w11): "duplicate", "aggregate", or "unique"
         self.table_model: str = config.get("table_model", "duplicate").lower()
         if self.table_model not in ("duplicate", "aggregate", "unique"):
             raise ValueError(f"Invalid table_model '{self.table_model}': must be 'duplicate', 'aggregate', or 'unique'")
 
-        # Distribution config (w12)
         self.default_buckets: int = config.get("default_buckets", _DEFAULT_BUCKETS)
 
-        # Partitioning config (w13)
         self.enable_partitioning: bool = config.get("enable_partitioning", False)
 
-        # Replication factor for table PROPERTIES; default 1 for single-backend Docker environments
         self.replication_num: int = int(config.get("replication_num", 1))
 
-        # Index configs (w20, w21)
         self.enable_bloom_filter: bool = config.get("enable_bloom_filter", False)
         self.enable_bitmap_index: bool = config.get("enable_bitmap_index", False)
 
-        # Validate database at init time - it's used in Stream Load URLs and SQL
         if not self._validate_identifier(self.database):
             raise ValueError(f"Invalid database identifier: {self.database}")
 
     def _admin_connect(self) -> Any:
-        """Create an admin connection (no database selected)."""
         return pymysql.connect(
             host=self.host,
             port=self.port,
@@ -507,29 +393,13 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         return self._insert_load_file(connection, table_name, data_file, dialect)
 
     def _stream_load_file(self, table_name: str, data_file: Path, dialect: CsvDialect) -> int:
-        """Load a file into Doris using Stream Load HTTP API.
-
-        Stream Load sends data via HTTP PUT to the FE node, which routes
-        it to the appropriate BE nodes for ingestion. Large files are
-        automatically split into chunks based on stream_load_chunk_size.
-
-        Args:
-            table_name: Target table name (pre-validated)
-            data_file: Path to the data file
-            dialect: CSV dialect describing delimiter, null handling, etc.
-
-        Returns:
-            Number of rows loaded
-        """
         data_file = Path(data_file)
 
-        # Parquet files must be sent binary with format=parquet; CSV chunking is invalid.
         if get_data_extension(data_file) == ".parquet":
             return self._stream_load_parquet(table_name, data_file)
 
         file_size = data_file.stat().st_size
 
-        # Use chunked loading for large files
         if file_size > self.stream_load_chunk_size:
             return self._stream_load_file_chunked(table_name, data_file, dialect)
 
@@ -537,16 +407,6 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
 
     @staticmethod
     def _open_data_file_text(path: Path):
-        """Open a data file as text, decompressing zstd/gzip if needed.
-
-        Uses latin-1 encoding to handle non-ASCII bytes common in TPC data
-        generated by dbgen (e.g., accented characters in customer names).
-
-        Compression is detected via ``FileFormatRegistry.get_compression_handler``
-        rather than suffix string compare — but the framework handlers force
-        UTF-8 text mode, so we dispatch on handler type and use python-zstandard
-        + ``gzip`` directly to preserve latin-1 encoding.
-        """
         import contextlib
 
         handler = FileFormatRegistry.get_compression_handler(path)
@@ -570,11 +430,6 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
 
     @staticmethod
     def _open_data_file_binary(path: Path):
-        """Open a data file as a binary stream, decompressing zstd/gzip if needed.
-
-        Returns a file-like object suitable for streaming to Doris stream load.
-        Re-openable so ``_stream_load_put`` retries can pull a fresh stream.
-        """
         import contextlib
 
         handler = FileFormatRegistry.get_compression_handler(path)
@@ -597,23 +452,8 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         return _ctx()
 
     def _stream_load_put(self, url: str, data: bytes | Callable[[], Any], headers: dict):
-        """Issue a stream load PUT request, handling FE→BE redirect and retrying
-        transient connection errors with exponential backoff.
-
-        Doris FE may redirect stream load requests to the BE node. In Docker
-        deployments the BE's internal port is not always mapped, so we intercept
-        the redirect and rewrite the URL back to the FE host:port.
-
-        The ``Expect: 100-continue`` header prevents the request body from being
-        sent before the server acknowledges headers, making redirect retries safe.
-        ``data`` may be bytes or a callable returning a fresh binary context
-        manager so retries can re-open the source stream safely.
-        """
         kwargs = {
             "auth": (self.username, self.password),
-            # Large fact tables (e.g. TPC-DS catalog_sales at SF=1 in Docker on macOS)
-            # can take several minutes to ingest due to Docker volume I/O overhead.
-            # 1800s (30 min) per chunk is generous but avoids spurious timeout failures.
             "timeout": 1800,
             "verify": self.ca_cert_path if self.ca_cert_path else self.verify_ssl,
             "allow_redirects": False,
@@ -624,7 +464,7 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
 
         def _put_once(target_url: str):
             if callable(data):
-                with data() as body:  # ty: ignore[call-top-callable]
+                with cast(Any, data)() as body:
                     return _requests.put(target_url, data=body, headers=headers, **kwargs)
             return _requests.put(target_url, data=data, headers=headers, **kwargs)
 
@@ -665,7 +505,6 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         delimiter: str | None = None,
         is_tpc: bool = False,
     ) -> dict[str, str]:
-        """Build consistent Stream Load headers for Doris imports."""
         headers = {
             "Expect": "100-continue",
             "format": format_name,
@@ -678,7 +517,6 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         return headers
 
     def _handle_stream_load_response(self, resp: Any, *, context: str) -> dict[str, Any]:
-        """Validate a Doris Stream Load response and reject silent partial loads."""
         if resp.status_code != 200:
             raise RuntimeError(f"{context} failed with status {resp.status_code}: {resp.text}")
 
@@ -711,45 +549,23 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         return result
 
     def _stream_load_single(self, table_name: str, data_file: Path, dialect: CsvDialect) -> int:
-        """Execute a single Stream Load request for the entire file.
-
-        Args:
-            table_name: Target table name (pre-validated)
-            data_file: Path to the data file
-            dialect: CSV dialect describing delimiter, null handling, etc.
-
-        Returns:
-            Number of rows loaded
-        """
         delimiter = dialect.delimiter
         is_tpc = dialect.null_marker is not None
 
         scheme = "https" if self.use_tls else "http"
-        # Use the FE HTTP port (http_port) as the Stream Load entry point.
-        # Doris FE handles routing and redirects to the BE; _stream_load_put rewrites
-        # the redirect Location to the external be_http_port for Docker deployments.
         url = f"{scheme}://{self.host}:{self.http_port}/api/{self.database}/{table_name}/_stream_load"
 
-        # strict_mode=true is intentionally omitted: TPC-DS/DI generators produce
-        # empty strings for nullable INTEGER columns (e.g. date surrogate keys,
-        # ManagerID). strict_mode=true rejects these rows as type-conversion errors.
-        # With strict_mode=false (default), empty → NULL for nullable columns, which
-        # is the correct semantic. _fix_tpcds_decimal_nulls handles DECIMAL nulls
-        # explicitly so they aren't silently coerced to 0.
         headers = self._stream_load_headers(format_name="csv", delimiter=delimiter, is_tpc=is_tpc)
 
         decimal_positions = _TPCDS_DECIMAL_NULL_POSITIONS.get(table_name, [])
 
         if is_tpc:
-            # TPC format: read all lines, apply DECIMAL-null preprocessing if
-            # needed, then send as bytes. Decompresses zstd/gzip if present.
             with self._open_data_file_text(data_file) as f:
                 lines = f.read().splitlines()
             if decimal_positions:
                 lines = [_fix_tpcds_decimal_nulls(line, delimiter, decimal_positions) for line in lines]
             data = "\n".join(lines).encode("utf-8")
         else:
-            # Non-TPC: buffer into memory so retry is safe on transient failures.
             with self._open_data_file_binary(data_file) as f:
                 data = f.read()
 
@@ -758,20 +574,6 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         return int(result.get("NumberLoadedRows", 0))
 
     def _stream_load_parquet(self, table_name: str, data_file: Path) -> int:
-        """Load a Parquet file into Doris using Stream Load with format=parquet.
-
-        Parquet files cannot be split at arbitrary byte boundaries, so the file
-        is streamed as a single request. The stream is reopenable across retries
-        and FE→BE redirects, so compressed outer containers such as
-        ``.parquet.zst`` are decompressed client-side before upload.
-
-        Args:
-            table_name: Target table name
-            data_file: Path to the .parquet file
-
-        Returns:
-            Number of rows loaded
-        """
         scheme = "https" if self.use_tls else "http"
         url = f"{scheme}://{self.host}:{self.http_port}/api/{self.database}/{table_name}/_stream_load"
 
@@ -781,25 +583,10 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         return int(result.get("NumberLoadedRows", 0))
 
     def _stream_load_file_chunked(self, table_name: str, data_file: Path, dialect: CsvDialect) -> int:
-        """Load a large file into Doris using chunked Stream Load requests.
-
-        Splits the file into chunks of approximately stream_load_chunk_size
-        bytes at line boundaries and submits each chunk as a separate
-        Stream Load request.
-
-        Args:
-            table_name: Target table name (pre-validated)
-            data_file: Path to the data file
-            dialect: CSV dialect describing delimiter, null handling, etc.
-
-        Returns:
-            Total number of rows loaded across all chunks
-        """
         delimiter = dialect.delimiter
         is_tpc = dialect.null_marker is not None
 
         scheme = "https" if self.use_tls else "http"
-        # Use the FE HTTP port for Stream Load entry (same as _stream_load_single).
         url = f"{scheme}://{self.host}:{self.http_port}/api/{self.database}/{table_name}/_stream_load"
 
         headers = self._stream_load_headers(format_name="csv", delimiter=delimiter, is_tpc=is_tpc)
@@ -809,7 +596,6 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         total_rows = 0
         chunk_num = 0
 
-        # Open file with decompression support; use latin-1 to handle non-ASCII TPC data.
         with self._open_data_file_text(data_file) as f:
             while True:
                 chunk_lines: list[str] = []
@@ -849,19 +635,6 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         return total_rows
 
     def _insert_load_file(self, connection: Any, table_name: str, data_file: Path, dialect: CsvDialect) -> int:
-        """Fallback: load data via batch INSERT statements.
-
-        Used when the requests library is not available for Stream Load.
-
-        Args:
-            connection: PyMySQL connection
-            table_name: Target table name (pre-validated)
-            data_file: Path to the data file
-            dialect: CSV dialect describing delimiter, null handling, etc.
-
-        Returns:
-            Number of rows loaded
-        """
         delimiter = dialect.delimiter
         is_tpc = dialect.null_marker is not None
         row_count = 0
@@ -876,10 +649,6 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
                 if not line:
                     continue
 
-                # INSERT requires exactly N column values, so strip the trailing
-                # field separator that dsdgen appends to every row. Stream Load
-                # sends data verbatim and relies on Doris's CSV parser to treat
-                # the trailing | as a row terminator rather than a column separator.
                 if is_tpc and line.endswith(delimiter):
                     line = line[: -len(delimiter)]
 
@@ -901,34 +670,23 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         return row_count
 
     def _execute_batch_insert(self, cursor: Any, table_name: str, rows: list[list[str]]) -> None:
-        """Execute a batch INSERT statement.
-
-        Args:
-            cursor: PyMySQL cursor
-            table_name: Target table name (pre-validated by caller)
-            rows: List of row value lists
-        """
         if not rows:
             return
 
         num_cols = len(rows[0])
         placeholders = ", ".join(["%s"] * num_cols)
-        # Safety: table_name is pre-validated by _validate_identifier() in caller
         sql = f"INSERT INTO `{table_name}` VALUES ({placeholders})"
 
         cursor.executemany(sql, rows)
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
-        """Apply Doris optimizations for benchmark type."""
         cursor = connection.cursor()
 
         try:
-            # Disable query cache for consistent benchmark results (session-level)
             cursor.execute("SET enable_sql_cache = false")
         except Exception as e:
             self.logger.debug(f"Could not disable SQL cache: {e}")
 
-        # w18: Validate cache is actually disabled
         try:
             cursor.execute("SHOW VARIABLES LIKE 'enable_sql_cache'")
             row = cursor.fetchone()
@@ -943,14 +701,13 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
             self.logger.debug(f"Could not validate cache setting: {e}")
 
         try:
-            # Set parallel execution for OLAP workloads (session-level)
             cursor.execute("SET parallel_fragment_exec_instance_num = 8")
         except Exception as e:
             self.logger.debug(f"Could not set parallel execution: {e}")
 
         if benchmark_type == "olap":
             try:
-                cursor.execute("SET exec_mem_limit = 5368709120")  # 5GB - stays within BE mem_limit=6GB
+                cursor.execute("SET exec_mem_limit = 5368709120")
             except Exception as e:
                 self.logger.debug(f"Could not set exec_mem_limit: {e}")
 
@@ -958,16 +715,12 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
 
     def _explain_query_prefix(self, explain_options: dict[str, Any] | None = None) -> str:
         verbose = explain_options.get("verbose", False) if explain_options else False
-        # SHAPE PLAN (Nereids planner) emits a stable dash-indented Physical*
-        # operator tree that DorisQueryPlanParser consumes; it is preferred over
-        # the fragment-oriented default EXPLAIN for structured plan capture.
         return "EXPLAIN VERBOSE" if verbose else "EXPLAIN SHAPE PLAN"
 
     def _format_query_plan_rows(self, rows: Any) -> str:
         return "\n".join(str(row[0]) for row in rows)
 
     def get_query_plan_parser(self):
-        """Get the Doris query plan parser."""
         from benchbox.core.query_plans.parsers.doris import DorisQueryPlanParser
 
         return DorisQueryPlanParser()
@@ -982,13 +735,6 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute a query and capture its structured plan when enabled.
-
-        Delegates execution to the shared MySQL-wire path, then merges plan
-        capture (SUCCESS-guarded; no EXPLAIN issued when capture_plans is off).
-        Kept outside the execution path so a strict_plan_capture PlanCaptureError
-        propagates rather than being mislabeled as a failed query.
-        """
         return self.execute_query_with_plan_capture(
             super().execute_query,
             connection,
@@ -1001,7 +747,6 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         )
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get Doris platform information."""
         platform_info = {
             "platform_type": "doris",
             "platform_name": "Apache Doris",
@@ -1034,7 +779,6 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
                 if version_comment:
                     platform_info["configuration"]["version_comment"] = version_comment
 
-                # Get current database
                 cursor.execute("SELECT database()")
                 db_row = cursor.fetchone()
                 if db_row:
@@ -1045,52 +789,21 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
             except Exception as e:
                 self.logger.debug(f"Error getting platform info: {e}")
 
-        # Add client library version
         if pymysql:
             platform_info["client_library_version"] = pymysql.__version__
 
         return platform_info
 
-    # ------------------------------------------------------------------ #
-    # DDL clause injection
-    # ------------------------------------------------------------------ #
-
     def _inject_doris_ddl_clauses(self, stmt: str, scale_factor: float | None = None) -> str:
-        """Post-process a CREATE TABLE statement to be valid Doris OLAP DDL.
-
-        Handles five incompatibilities between standard SQL and Doris OLAP:
-        1. Strip inline PRIMARY KEY constraints (parse error in Doris)
-        2. Translate TIME column type to VARCHAR(8) (unsupported in OLAP)
-        3. Inject DUPLICATE/AGGREGATE/UNIQUE KEY clause (required)
-        4. Inject DISTRIBUTED BY HASH clause (required)
-        5. Inject PROPERTIES("replication_num"="N") (avoids replication error
-           when available backends < default replication factor of 3)
-
-        Key columns are derived from the actual schema column order to satisfy
-        Doris's requirement that key columns form a prefix of the schema.
-        STRING/TEXT columns are excluded from key selection.
-        """
         stripped = stmt.strip()
-        # Use regex search (not startswith) so statements with SQL comment preambles
-        # (e.g., from build_tpch_staging_tables_sql comment separators) are still processed.
         if not _CREATE_TABLE_RE.search(stripped):
             return stmt
 
-        # Fix 1: strip table-level FOREIGN KEY constraints (shared helper) and PRIMARY KEY.
         stripped = strip_foreign_keys(stripped)
-        # Optional leading comma: covers both "col INT, PRIMARY KEY (col)" and
-        # bare-form "(PRIMARY KEY (col), col INT)" where PK is the first clause.
         stripped = re.sub(r",?\s*PRIMARY\s+KEY\s*\([^)]*\)", "", stripped, flags=re.IGNORECASE)
-        # Column-level: "col TYPE PRIMARY KEY" (no opening paren follows KEY)
         stripped = re.sub(r"\bPRIMARY\s+KEY\b(?!\s*\()", "", stripped, flags=re.IGNORECASE)
-        # Clean up any leading comma left by stripping a first-position table-level PK clause.
         stripped = re.sub(r"\(\s*,", "(", stripped)
 
-        # Fix 2: translate TIME column type → VARCHAR(8)
-        # Use a positive lookahead to match TIME only in type position (followed by a column
-        # definition terminator), not when it is a column name (followed by another type word).
-        # This prevents `time DATETIME` from becoming `VARCHAR(8) DATETIME` when SQLGlot
-        # quotes the column name `time` as `\`time\`` and the regex then replaces the name.
         stripped = re.sub(
             r"\bTIME\b(?!STAMP)(?=\s*(?:[,\)]|$|NOT\s+NULL|NULL\b|DEFAULT\b|\Z))",
             "VARCHAR(8)",
@@ -1102,14 +815,9 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         if not name_match:
             return stripped
 
-        # Preserve the original table name in DDL - Doris has lower_case_table_names=0
-        # (case-sensitive) by default, so CREATE TABLE DimCustomer creates "DimCustomer".
-        # Queries reference the original-case name; stream load URLs must match too.
         table_name = name_match.group(1)
-        table_name_key = table_name.lower()  # lowercase for dict lookups only
+        table_name_key = table_name.lower()
 
-        # Find matching ')' of the column-definition block.
-        # The regex ends with \( so name_match.end()-1 is the opening paren.
         open_pos = name_match.end() - 1
         depth = 0
         close_pos = -1
@@ -1127,33 +835,21 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
 
         col_body = stripped[open_pos + 1 : close_pos]
 
-        # Fix 2b: SQLGlot translates VARCHAR(N) → STRING for Doris dialect, but Doris OLAP
-        # rejects STRING as a key column type (VARCHAR is allowed). Convert STRING/TEXT back
-        # to VARCHAR(65533) so these columns can participate in the key prefix.
         col_body_fixed = re.sub(r"\bSTRING\b", "VARCHAR(65533)", col_body, flags=re.IGNORECASE)
         col_body_fixed = re.sub(r"\bTEXT\b", "VARCHAR(65533)", col_body_fixed, flags=re.IGNORECASE)
-        # Fix 2c: Doris SMALLINT is signed 16-bit (−32768..32767). Benchmarks like ClickBench
-        # use UInt16 columns (0..65535) that overflow SMALLINT; Doris treats out-of-range
-        # integers as NULL in non-strict mode, which then violates NOT NULL and filters the row.
-        # Widen SMALLINT → INT (signed 32-bit, covers full UInt16 range). Type-safe widening.
         col_body_fixed = re.sub(r"\bSMALLINT\b", "INT", col_body_fixed, flags=re.IGNORECASE)
-        # Fix 2d: SQLGlot translates DuckDB FLOAT[N] (fixed-size array) to ARRAY<FLOAT>[N] for
-        # Doris/MySQL dialect. Doris only supports ARRAY<TYPE> without dimension size - the [N]
-        # suffix causes a parse error. Strip it.
         col_body_fixed = re.sub(r"(ARRAY<[^>]+>)\[\d+\]", r"\1", col_body_fixed, flags=re.IGNORECASE)
         if col_body_fixed != col_body:
             col_body = col_body_fixed
             stripped = stripped[: open_pos + 1] + col_body + stripped[close_pos:]
             close_pos = open_pos + 1 + len(col_body)
 
-        # Parse (name, type) pairs - filter by known SQL types to skip constraint lines.
         schema_cols: list[tuple[str, str]] = [
             (m.group(1).lower(), m.group(2).lower())
             for m in _COL_DEF_RE.finditer(col_body)
             if m.group(2).lower() in _KNOWN_SQL_TYPES
         ]
 
-        # Key-eligible columns: exclude types Doris rejects as key columns.
         keyable_cols = [name for name, typ in schema_cols if typ not in _NON_KEY_DORIS_TYPES]
 
         model_keyword = {
@@ -1162,7 +858,6 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
             "unique": "UNIQUE KEY",
         }.get(self.table_model, "DUPLICATE KEY")
 
-        # Fix 3: KEY clause - use longest valid schema prefix from desired keys.
         desired_keys = [k.lower() for k in _TPCH_TABLE_KEYS.get(table_name_key, [])]
         if desired_keys:
             desired_set = set(desired_keys)
@@ -1171,7 +866,7 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
                 if col_name in desired_set and col_type not in _NON_KEY_DORIS_TYPES:
                     prefix_keys.append(col_name)
                 else:
-                    break  # prefix must be contiguous from position 0
+                    break
             key_cols = prefix_keys or (keyable_cols[:1] if keyable_cols else None)
         else:
             key_cols = keyable_cols[:1] if keyable_cols else None
@@ -1182,15 +877,10 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
             cols_str = ", ".join(f"`{c}`" for c in key_cols)
             clauses.append(f"{model_keyword}({cols_str})")
 
-        # PARTITION BY RANGE (optional)
         partition_clause = self.get_partition_clause(table_name_key)
         if partition_clause:
             clauses.append(partition_clause)
 
-        # Fix 4: DISTRIBUTED BY HASH (required).
-        # Validate the candidate distribution key exists in the actual schema to prevent
-        # cross-contamination when TPC-H key names are applied to non-TPC-H tables
-        # (e.g., TPC-DS "customer" table doesn't have "c_custkey").
         schema_col_names = {col_name for col_name, _ in schema_cols}
         dist_key_candidate = _TPCH_DISTRIBUTION_KEYS.get(table_name_key)
         dist_key = (
@@ -1204,30 +894,12 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         else:
             clauses.append(f"DISTRIBUTED BY RANDOM BUCKETS {buckets}")
 
-        # Fix 5: PROPERTIES with replication_num and HDD storage medium.
-        # storage_medium = HDD prevents "Failed to find enough backend" errors on Docker
-        # deployments where Doris defaults to requesting SSD-labeled storage backends.
         clauses.append(f'PROPERTIES ("replication_num" = "{self.replication_num}", "storage_medium" = "HDD")')
 
         suffix = "\n" + "\n".join(clauses)
         return stripped[: close_pos + 1] + suffix + stripped[close_pos + 1 :]
 
-    # ------------------------------------------------------------------ #
-    # w11/w12/w13: DDL generation for table model, distribution, partitions
-    # ------------------------------------------------------------------ #
-
     def get_table_model_clause(self, table_name: str) -> str:
-        """Generate the table model clause (DUPLICATE/AGGREGATE/UNIQUE KEY).
-
-        For TPC-H tables, selects appropriate key columns per table.
-        For unknown tables, uses the first column as key.
-
-        Args:
-            table_name: Lowercase table name
-
-        Returns:
-            DDL clause string, e.g. ``DUPLICATE KEY(l_orderkey, l_linenumber)``
-        """
         model_keyword = {
             "duplicate": "DUPLICATE KEY",
             "aggregate": "AGGREGATE KEY",
@@ -1239,22 +911,9 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
             cols_str = ", ".join(key_cols)
             return f"{model_keyword}({cols_str})"
 
-        # Fallback: caller should provide a column name
         return ""
 
     def get_distribution_clause(self, table_name: str, scale_factor: float | None = None) -> str:
-        """Generate DISTRIBUTED BY HASH clause for a table.
-
-        Selects distribution key per table (usually the primary/join column)
-        and computes bucket count based on data size.
-
-        Args:
-            table_name: Lowercase table name
-            scale_factor: Benchmark scale factor for bucket sizing
-
-        Returns:
-            DDL clause string, e.g. ``DISTRIBUTED BY HASH(l_orderkey) BUCKETS 16``
-        """
         dist_key = _TPCH_DISTRIBUTION_KEYS.get(table_name)
         if not dist_key:
             return f"DISTRIBUTED BY HASH(`{table_name}`) BUCKETS {self.default_buckets}"
@@ -1263,15 +922,9 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         return f"DISTRIBUTED BY HASH({dist_key}) BUCKETS {buckets}"
 
     def _compute_bucket_count(self, table_name: str, scale_factor: float | None = None) -> int:
-        """Compute bucket count based on table size and scale factor.
-
-        Uses a heuristic: larger tables at higher scale factors get more buckets.
-        Minimum is 1, maximum is capped at 128.
-        """
         if not isinstance(scale_factor, (int, float)) or scale_factor <= 0:
             return self.default_buckets
 
-        # Row count multipliers for TPC-H tables at SF=1
         sf1_rows = {
             "lineitem": 6_000_000,
             "orders": 1_500_000,
@@ -1284,22 +937,10 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         }
         base_rows = sf1_rows.get(table_name, 100_000)
         estimated_rows = base_rows * scale_factor
-        # Roughly 1 bucket per 500K rows, minimum default_buckets
         computed = max(self.default_buckets, int(math.ceil(estimated_rows / 500_000)))
         return min(computed, 128)
 
     def get_partition_clause(self, table_name: str) -> str:
-        """Generate PARTITION BY RANGE clause for large tables.
-
-        Only generates partitions when enable_partitioning is True and
-        the table has a known date column for range partitioning.
-
-        Args:
-            table_name: Lowercase table name
-
-        Returns:
-            DDL clause string or empty string if not applicable
-        """
         if not self.enable_partitioning:
             return ""
 
@@ -1317,10 +958,6 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
 
         partitions_str = ",\n    ".join(partition_defs)
         return f"PARTITION BY RANGE({partition_col}) (\n    {partitions_str}\n)"
-
-    # ------------------------------------------------------------------ #
-    # w20/w21: Bloom filter and Bitmap index creation
-    # ------------------------------------------------------------------ #
 
     def _create_secondary_indexes(
         self,
@@ -1351,31 +988,12 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         return executed_stmts
 
     def create_bloom_filter_indexes(self, connection: Any, tables: list[str] | None = None) -> list[str]:
-        """Create Bloom filter indexes on high-cardinality columns.
-
-        Args:
-            connection: Active Doris connection
-            tables: List of table names; if None, uses all known TPC-H tables
-
-        Returns:
-            List of SQL statements executed
-        """
         return self._create_secondary_indexes(connection, _TPCH_BLOOM_FILTER_COLUMNS, "BLOOM_FILTER", "bloom", tables)
 
     def create_bitmap_indexes(self, connection: Any, tables: list[str] | None = None) -> list[str]:
-        """Create Bitmap indexes on low-cardinality columns.
-
-        Args:
-            connection: Active Doris connection
-            tables: List of table names; if None, uses all known TPC-H tables
-
-        Returns:
-            List of SQL statements executed
-        """
         return self._create_secondary_indexes(connection, _TPCH_BITMAP_COLUMNS, "BITMAP", "bitmap", tables)
 
     def validate_platform_capabilities(self, benchmark_type: str):
-        """Validate Doris-specific capabilities for the benchmark."""
         errors = []
         warnings = []
 
@@ -1441,12 +1059,6 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
             connection_info["version_comment"] = version_comment
 
     def _validate_data_integrity(self, benchmark, connection, table_stats: dict) -> tuple:
-        """Doris override: backtick-quote table names to preserve case and reserved words.
-
-        Doris treats several common table names (e.g. ``disk``, ``net``) as reserved
-        keywords, and mixed-case identifiers such as ``DimCustomer`` only resolve
-        reliably when quoted. The base class implementation does not quote identifiers.
-        """
 
         validation_details: dict[str, Any] = {}
         try:

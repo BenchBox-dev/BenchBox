@@ -1,5 +1,3 @@
-"""Runtime contract coverage for loader-resolved benchmark classes."""
-
 from __future__ import annotations
 
 import pytest
@@ -19,26 +17,23 @@ pytestmark = [
 ]
 
 
-# Benchmarks resolved by benchbox.core.benchmark_loader.
 LOADER_RESOLVED_BENCHMARK_IDS: tuple[str, ...] = tuple(list_loader_benchmark_ids())
 
-# Current known non-conformers for the minimum runtime contract.
+
 EXPECTED_REQUIRED_CONTRACT_GAPS: set[str] = set()
 
-# Current known non-conformers for the extended contract.
+
 EXPECTED_EXTENDED_CONTRACT_GAPS: set[str] = set()
 
 
 def _instantiate_loader_benchmark(benchmark_id: str):
-    """Construct a benchmark instance with safe init defaults for contract tests."""
 
     benchmark_class = get_benchmark_class(benchmark_id)
     kwargs: dict[str, object] = {"scale_factor": 0.01}
 
-    # Some benchmarks require SF >= 1.0.
     if benchmark_id in {"tpcds", "tpcds_obt", "joinorder", "clickbench"}:
         kwargs["scale_factor"] = 1.0
-    # Keep setup lightweight for real-data benchmarks.
+
     if benchmark_id == "nyctaxi":
         kwargs["months"] = [1]
 
@@ -46,7 +41,6 @@ def _instantiate_loader_benchmark(benchmark_id: str):
 
 
 def test_required_runtime_contract_coverage_for_loader_benchmarks() -> None:
-    """All loader-resolved benchmarks should satisfy the minimum runtime contract or be known outliers."""
 
     missing_by_benchmark: dict[str, list[str]] = {}
 
@@ -62,7 +56,6 @@ def test_required_runtime_contract_coverage_for_loader_benchmarks() -> None:
 
 
 def test_extended_runtime_contract_coverage_for_loader_benchmarks() -> None:
-    """Track full lifecycle/validation contract coverage for harmonization work."""
 
     extended_missing_by_benchmark: dict[str, list[str]] = {}
 
@@ -79,7 +72,6 @@ def test_extended_runtime_contract_coverage_for_loader_benchmarks() -> None:
 
 @pytest.mark.parametrize("benchmark_id", sorted(set(LOADER_RESOLVED_BENCHMARK_IDS) - EXPECTED_REQUIRED_CONTRACT_GAPS))
 def test_required_runtime_contract_helper_returns_true_for_conforming_loader_benchmarks(benchmark_id: str) -> None:
-    """Helper utility should return True for the currently conforming benchmark set."""
 
     benchmark = _instantiate_loader_benchmark(benchmark_id)
     assert has_runtime_contract(benchmark)

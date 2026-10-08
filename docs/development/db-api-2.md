@@ -65,7 +65,6 @@ BenchBox defines formal protocol interfaces matching PEP 249 in `benchbox/core/c
 
 ```python
 class DBCursor(Protocol):
-    """DB-API 2.0 compliant cursor protocol."""
     def execute(self, query: str, parameters: Optional[Any] = None) -> Any: ...
     def executemany(self, query: str, parameters: list[Any]) -> Any: ...
     def fetchone(self) -> Optional[tuple[Any, ...]]: ...
@@ -76,7 +75,6 @@ class DBCursor(Protocol):
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None: ...
 
 class DBConnection(Protocol):
-    """DB-API 2.0 compliant connection protocol."""
     def cursor(self) -> DBCursor: ...
     def commit(self) -> None: ...
     def rollback(self) -> None: ...
@@ -109,13 +107,11 @@ cursor = connection.execute(query)
 results = cursor.fetchall()
 ```
 
-The `DatabaseConnection` wrapper automatically detects and supports both patterns:
+The `DatabaseConnection` wrapper automatically detects and supports both patterns. It checks for a direct `execute()` method first (pattern 2, DuckDB and DataFusion), then falls back to the standard cursor pattern (pattern 1, PostgreSQL, MySQL, and SQLite):
 
 ```python
 def execute(self, query: str, parameters: Optional[...] = None) -> DBCursor:
-    """Execute query supporting both connection.execute() and cursor() patterns."""
     if hasattr(self.connection, "execute"):
-        # Pattern 2: Direct execute (DuckDB, DataFusion)
         if parameters is None:
             self.cursor = self.connection.execute(query)
         else:
@@ -123,7 +119,6 @@ def execute(self, query: str, parameters: Optional[...] = None) -> DBCursor:
         return self.cursor
 
     if hasattr(self.connection, "cursor"):
-        # Pattern 1: Standard cursor pattern (PostgreSQL, MySQL, SQLite)
         cur = self.connection.cursor()
         if parameters is None:
             cur.execute(query)
@@ -139,17 +134,14 @@ def execute(self, query: str, parameters: Optional[...] = None) -> DBCursor:
 
 #### Parameter Style Flexibility
 
-The wrapper supports multiple parameter types as allowed by DB API 2.0:
+The wrapper supports multiple parameter types as allowed by DB API 2.0. The first example below uses a list (positional parameters), the second a dict (named parameters), and the third a tuple (positional parameters):
 
 ```python
-# List parameters (positional)
 execute("SELECT * FROM users WHERE id = ? AND status = ?", [1, "active"])
 
-# Dict parameters (named)
 execute("SELECT * FROM users WHERE id = :id AND status = :status",
         {"id": 1, "status": "active"})
 
-# Tuple parameters (positional)
 execute("SELECT * FROM users WHERE id = ? AND status = ?", (1, "active"))
 ```
 
@@ -171,21 +163,20 @@ The wrapper implements all core DB API 2.0 methods:
 
 ### Platform-Specific Parameter Placeholders
 
-Different databases use different parameter placeholder styles. BenchBox automatically detects the appropriate style:
+Different databases use different parameter placeholder styles. BenchBox automatically detects the appropriate style. SQLite and DuckDB use the `?` qmark style, which is the PEP 249 standard. PostgreSQL and MySQL use the `%s` format style, also a PEP 249 standard. Any other connection type defaults to the DB-API 2.0 qmark style:
 
 ```python
 def _get_parameter_placeholder(self, connection: Any) -> str:
-    """Detect SQL parameter placeholder style for platform."""
     connection_type = type(connection).__name__.lower()
 
     if 'sqlite' in connection_type or 'duckdb' in connection_type:
-        return '?'  # qmark style - PEP 249 standard
+        return '?'
     elif 'psycopg' in connection_type or 'postgres' in connection_type:
-        return '%s'  # format style - PEP 249 standard
+        return '%s'
     elif 'mysql' in connection_type:
-        return '%s'  # format style
+        return '%s'
     else:
-        return '?'  # Default to DB-API 2.0 qmark style
+        return '?'
 ```
 
 **Location**:
@@ -193,6 +184,11 @@ def _get_parameter_placeholder(self, connection: Any) -> str:
 - `benchbox/core/tpch/maintenance_test.py:308-325`
 
 ## Platform Adapter Implementations
+
+The following excerpts focus on connection and cursor operations. `**options`
+stands for omitted platform-specific adapter options. See the
+[platform API reference](../reference/python-api/platforms.md) for complete
+method signatures.
 
 ### Fully Compliant Platforms
 
@@ -205,11 +201,11 @@ def _get_parameter_placeholder(self, connection: Any) -> str:
 def create_connection(self, **connection_config) -> Any:
     conn = duckdb.connect(db_path)
     conn.execute(f"SET memory_limit = '{self.memory_limit}'")
-    return conn  # Direct execute() available
+    return conn
 
-def execute_query(self, connection: Any, query: str, query_id: str, ...):
-    result = connection.execute(query)  # Direct execute
-    rows = result.fetchall()  # DB-API 2.0 method
+def execute_query(self, connection: Any, query: str, query_id: str, **options):
+    result = connection.execute(query)
+    rows = result.fetchall()
 ```
 
 **Location**: `benchbox/platforms/duckdb.py:189-242, 361-440`
@@ -226,10 +222,10 @@ def create_connection(self, **connection_config) -> Any:
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
-def execute_query(self, connection: Any, query: str, query_id: str, ...):
-    cursor = connection.cursor()  # Standard cursor pattern
+def execute_query(self, connection: Any, query: str, query_id: str, **options):
+    cursor = connection.cursor()
     cursor.execute(query)
-    results = cursor.fetchall()  # DB-API 2.0 method
+    results = cursor.fetchall()
 ```
 
 **Location**: `benchbox/platforms/sqlite.py:193-228, 326-393`
@@ -246,10 +242,10 @@ def create_connection(self, **connection_config) -> Any:
     cursor.execute("SELECT CURRENT_VERSION()")
     return connection
 
-def execute_query(self, connection: Any, query: str, query_id: str, ...):
+def execute_query(self, connection: Any, query: str, query_id: str, **options):
     cursor = connection.cursor()
     cursor.execute(query)
-    result = cursor.fetchall()  # DB-API 2.0 method
+    result = cursor.fetchall()
     cursor.close()
 ```
 
@@ -260,19 +256,19 @@ def execute_query(self, connection: Any, query: str, query_id: str, ...):
 - **Pattern**: Standard cursor pattern
 - **DB API 2.0 Compliance**: Full compliance (both drivers)
 
+Both `redshift_connector` and `psycopg2` are DB-API 2.0 compliant. The excerpt below shows the two `connect()` calls as alternatives; an adapter uses one of them, not both:
+
 ```python
 def create_connection(self, **connection_config) -> Any:
-    # Both redshift_connector and psycopg2 are DB-API 2.0 compliant
     connection = redshift_connector.connect(...)
-    # or
     connection = psycopg2.connect(...)
     connection.autocommit = True
     return connection
 
-def execute_query(self, connection: Any, query: str, query_id: str, ...):
+def execute_query(self, connection: Any, query: str, query_id: str, **options):
     cursor = connection.cursor()
     cursor.execute(query)
-    result = cursor.fetchall()  # DB-API 2.0 method
+    result = cursor.fetchall()
     cursor.close()
 ```
 
@@ -290,12 +286,12 @@ def execute_query(self, connection: Any, query: str, query_id: str, ...):
 - **Pattern**: Custom (sql() method, not standard cursor)
 - **DB API 2.0 Compliance**: Non-compliant - uses custom interface
 
+DataFusion uses a non-standard interface (`connection.sql()` is not DB-API 2.0), so it needs custom result handling:
+
 ```python
-def execute_query(self, connection: Any, query: str, query_id: str, ...):
-    # DataFusion uses non-standard interface
-    df = connection.sql(query)  # Not DB-API 2.0
+def execute_query(self, connection: Any, query: str, query_id: str, **options):
+    df = connection.sql(query)
     result_batches = df.collect()
-    # Custom result handling required
 ```
 
 **Note**: DataFusion is supported through custom adapter logic, demonstrating BenchBox's flexibility to work with non-compliant libraries when necessary.
@@ -323,17 +319,17 @@ BenchBox includes extensive tests for DB API 2.0 compliance in `tests/unit/core/
 **Pattern 1: SQLite-like (direct execute)**
 ```python
 def test_sqlite_like_connection(self):
-    mock_conn.execute = Mock()  # Direct execute method
+    mock_conn.execute = Mock()
     cursor = db_conn.execute("SELECT * FROM test")
-    results = db_conn.fetchall(cursor)  # DB-API 2.0 method
+    results = db_conn.fetchall(cursor)
 ```
 
 **Pattern 2: PostgreSQL-like (cursor pattern)**
 ```python
 def test_postgres_like_connection(self):
-    mock_conn.cursor = Mock(return_value=mock_cursor)  # Returns cursor
+    mock_conn.cursor = Mock(return_value=mock_cursor)
     cursor = db_conn.execute("SELECT * FROM test", [1, "param"])
-    results = db_conn.fetchall(cursor)  # DB-API 2.0 method
+    results = db_conn.fetchall(cursor)
 ```
 
 **Location**: `tests/unit/core/test_connection.py:320-397`
@@ -388,17 +384,16 @@ def test_postgres_like_connection(self):
 
 ### Connection Management
 
+The first example uses a context manager (good), and the connection is closed automatically when the block ends. The second is also good: manual management with `try`/`finally`.
+
 ```python
-# Good: Using context manager
 with adapter.managed_connection(**config) as connection:
     cursor = connection.cursor()
     cursor.execute(query)
     results = cursor.fetchall()
     cursor.close()
     connection.commit()
-# Connection automatically closed
 
-# Also Good: Manual management with try/finally
 connection = adapter.create_connection(**config)
 try:
     cursor = connection.cursor()
@@ -412,11 +407,11 @@ finally:
 
 ### Parameter Usage
 
+The first call is good: it uses parameterized queries, which prevent SQL injection. The second is bad: string formatting makes the query vulnerable to SQL injection.
+
 ```python
-# Good: Using parameterized queries (prevents SQL injection)
 cursor.execute("SELECT * FROM users WHERE id = ? AND status = ?", [user_id, status])
 
-# Bad: String formatting (vulnerable to SQL injection)
 cursor.execute(f"SELECT * FROM users WHERE id = {user_id} AND status = '{status}'")
 ```
 

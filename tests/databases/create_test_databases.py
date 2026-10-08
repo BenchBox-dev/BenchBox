@@ -1,29 +1,20 @@
 #!/usr/bin/env python3
-"""Script to create small embedded DuckDB databases for testing.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This script creates minimal databases for each benchmark type with small scale factors
-to support fast test execution while providing realistic database interactions.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import sys
 from pathlib import Path
 
 import duckdb
 
-# Include the project root to the Python path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 
 def create_basic_test_database(db_path: Path) -> None:
-    """Create a basic test database with simple tables for connection testing."""
     conn = duckdb.connect(str(db_path))
 
-    # basic test tables
     conn.execute("""
         CREATE TABLE test_table (
             id INTEGER PRIMARY KEY,
@@ -40,7 +31,6 @@ def create_basic_test_database(db_path: Path) -> None:
         (3, 'test_record_3', 300.25, '2023-01-03')
     """)
 
-    # a second table for join testing
     conn.execute("""
         CREATE TABLE test_metadata (
             test_id INTEGER,
@@ -60,10 +50,8 @@ def create_basic_test_database(db_path: Path) -> None:
 
 
 def create_tpch_test_database(db_path: Path) -> None:
-    """Create a minimal TPC-H test database."""
     conn = duckdb.connect(str(db_path))
 
-    # TPC-H tables with minimal schema
     conn.execute("""
         CREATE TABLE region (
             r_regionkey INTEGER PRIMARY KEY,
@@ -243,10 +231,8 @@ def create_tpch_test_database(db_path: Path) -> None:
 
 
 def create_tpcds_test_database(db_path: Path) -> None:
-    """Create a minimal TPC-DS test database."""
     conn = duckdb.connect(str(db_path))
 
-    # minimal TPC-DS tables
     conn.execute("""
         CREATE TABLE call_center (
             cc_call_center_sk INTEGER PRIMARY KEY,
@@ -323,10 +309,8 @@ def create_tpcds_test_database(db_path: Path) -> None:
 
 
 def create_ssb_test_database(db_path: Path) -> None:
-    """Create a minimal Star Schema Benchmark test database."""
     conn = duckdb.connect(str(db_path))
 
-    # SSB tables
     conn.execute("""
         CREATE TABLE date (
             d_datekey INTEGER PRIMARY KEY,
@@ -450,10 +434,8 @@ def create_ssb_test_database(db_path: Path) -> None:
 
 
 def create_primitives_test_database(db_path: Path) -> None:
-    """Create a database for testing basic OLAP operations."""
     conn = duckdb.connect(str(db_path))
 
-    # tables for testing window functions and aggregations
     conn.execute("""
         CREATE TABLE sales_data (
             id INTEGER PRIMARY KEY,
@@ -478,7 +460,6 @@ def create_primitives_test_database(db_path: Path) -> None:
         (8, 'Product D', 'Clothing', 'South', 1300.00, 13, '2023-01-08')
     """)
 
-    # a time dimension table for testing joins
     conn.execute("""
         CREATE TABLE time_periods (
             date_key DATE PRIMARY KEY,
@@ -506,7 +487,6 @@ def create_primitives_test_database(db_path: Path) -> None:
 
 
 def main():
-    """Create all test databases."""
     databases_dir = Path(__file__).parent
 
     databases = [

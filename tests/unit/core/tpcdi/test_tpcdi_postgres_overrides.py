@@ -1,5 +1,3 @@
-"""Unit tests for TPC-DI PostgreSQL dialect rendering."""
-
 from __future__ import annotations
 
 import pytest
@@ -17,7 +15,6 @@ def _bench():
 
 
 def test_postgres_replaces_julianday_date_arithmetic() -> None:
-    """PostgreSQL-family TPC-DI queries must not retain SQLite JULIANDAY calls."""
     queries = _bench().get_queries(dialect="postgres")
 
     for query_id in ("AQ7", "AQ8", "AQ10"):
@@ -27,7 +24,6 @@ def test_postgres_replaces_julianday_date_arithmetic() -> None:
 
 
 def test_postgres_renders_boolean_numeric_comparisons() -> None:
-    """PostgreSQL does not compare boolean columns to integer literals."""
     queries = _bench().get_queries(dialect="postgres")
     rendered = "\n".join(queries.values())
 
@@ -43,7 +39,6 @@ def test_postgres_renders_boolean_numeric_comparisons() -> None:
 
 
 def test_postgres_removes_same_select_alias_references() -> None:
-    """PostgreSQL does not allow all same-level SELECT aliases in HAVING/ORDER BY peers."""
     queries = _bench().get_queries(dialect="postgres")
 
     assert "HAVING customer_count > 10" not in queries["A5"]
@@ -55,7 +50,6 @@ def test_postgres_removes_same_select_alias_references() -> None:
 
 
 def test_datafusion_renders_boolean_dates_and_eq7_aliases() -> None:
-    """DataFusion TPC-DI SQL must use native booleans, date arithmetic, and derived metrics."""
     queries = _bench().get_queries(dialect="datafusion")
     rendered = "\n".join(queries.values())
 
@@ -73,7 +67,6 @@ def test_datafusion_renders_boolean_dates_and_eq7_aliases() -> None:
 
 @pytest.mark.parametrize("query_id", ["AQ9", "EQ7", "VQ6"])
 def test_get_query_datafusion_matches_bulk_variant(query_id: str) -> None:
-    """Single-query DataFusion retrieval must use the same variant as bulk retrieval."""
     bench = _bench()
 
     assert bench.get_query(query_id, dialect="datafusion") == bench.get_queries(dialect="datafusion")[query_id]

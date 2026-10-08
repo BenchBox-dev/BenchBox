@@ -1,26 +1,6 @@
-"""Extended coverage tests for Firebolt platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Targets branches not covered by test_firebolt_adapter.py and test_firebolt_cloud.py:
-- check_server_database_exists (core + cloud paths)
-- drop_database (core + cloud paths)
-- create_connection with result-cache disable
-- _disable_result_cache / validate_session_cache_control
-- _create_admin_connection
-- _get_platform_metadata
-- _load_data_via_insert manifest fallback, batch flush, column-count mismatch
-- _execute_batch_insert executemany fallback
-- _get_parameter_placeholder / _coerce_bool helpers
-- _parse_s3_url, S3 URL validation in __init__
-- apply_unified_tuning / generate_tuning_clause (distribution)
-- _get_existing_tables / analyze_table / apply_platform_optimizations
-- supports_tuning_type ImportError path
-- _build_firebolt_config function
-- get_platform_info library-version + error branches
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -36,11 +16,6 @@ from benchbox.platforms.base.data_loading import DataSource
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
-# ---------------------------------------------------------------------------
-# Shared module-level mock for the firebolt SDK so each test doesn't need to
-# re-patch sys.modules individually.  We use an autouse fixture that installs
-# the mocks for every test in this file.
-# ---------------------------------------------------------------------------
 
 _FIREBOLT_MOCKS = {
     "firebolt": MagicMock(),
@@ -53,25 +28,17 @@ _FIREBOLT_MOCKS = {
 
 @pytest.fixture(autouse=True)
 def _patch_firebolt_sdk():
-    """Ensure firebolt SDK is mocked for every test in this file."""
     with patch.dict("sys.modules", _FIREBOLT_MOCKS):
         yield
 
 
-# ---------------------------------------------------------------------------
-# Helper factories
-# ---------------------------------------------------------------------------
-
-
 def _make_core_adapter(**extra):
-    """Return a FireboltAdapter in Core mode (no imports needed)."""
     from benchbox.platforms.firebolt import FireboltAdapter
 
     return FireboltAdapter(url="http://localhost:3473", **extra)
 
 
 def _make_cloud_adapter(**extra):
-    """Return a FireboltAdapter in Cloud mode."""
     from benchbox.platforms.firebolt import FireboltAdapter
 
     return FireboltAdapter(
@@ -83,16 +50,8 @@ def _make_cloud_adapter(**extra):
     )
 
 
-# ---------------------------------------------------------------------------
-# check_server_database_exists - Cloud path
-# ---------------------------------------------------------------------------
-
-
 class TestCheckServerDatabaseExistsCloud:
-    """Tests for check_server_database_exists in Cloud mode."""
-
     def test_cloud_database_exists_returns_true(self):
-        """Cloud mode: database found in information_schema returns True."""
         adapter = _make_cloud_adapter()
 
         mock_conn = Mock()
@@ -106,7 +65,6 @@ class TestCheckServerDatabaseExistsCloud:
         assert result is True
 
     def test_cloud_database_missing_returns_false(self):
-        """Cloud mode: database not found returns False."""
         adapter = _make_cloud_adapter()
 
         mock_conn = Mock()
@@ -120,7 +78,6 @@ class TestCheckServerDatabaseExistsCloud:
         assert result is False
 
     def test_cloud_connection_error_returns_false(self):
-        """Cloud mode: connection error returns False gracefully."""
         adapter = _make_cloud_adapter()
 
         with patch("benchbox.platforms.firebolt.firebolt_connect", side_effect=Exception("auth failed")):
@@ -129,7 +86,6 @@ class TestCheckServerDatabaseExistsCloud:
         assert result is False
 
     def test_cloud_query_error_returns_false(self):
-        """Cloud mode: query error returns False."""
         adapter = _make_cloud_adapter()
 
         mock_conn = Mock()
@@ -144,10 +100,7 @@ class TestCheckServerDatabaseExistsCloud:
 
 
 class TestCheckServerDatabaseExistsCore:
-    """Tests for check_server_database_exists in Core mode."""
-
     def test_core_with_tables_returns_true(self):
-        """Core mode: existing tables means database 'exists' for benchmarks."""
         adapter = _make_core_adapter()
 
         mock_conn = Mock()
@@ -161,7 +114,6 @@ class TestCheckServerDatabaseExistsCore:
         assert result is True
 
     def test_core_empty_database_returns_false(self):
-        """Core mode: empty database returns False (safe to recreate)."""
         adapter = _make_core_adapter()
 
         mock_conn = Mock()
@@ -175,7 +127,6 @@ class TestCheckServerDatabaseExistsCore:
         assert result is False
 
     def test_core_connection_failure_returns_false(self):
-        """Core mode: connection failure returns False."""
         adapter = _make_core_adapter()
 
         with patch("benchbox.platforms.firebolt.firebolt_connect", side_effect=Exception("docker not running")):
@@ -184,16 +135,8 @@ class TestCheckServerDatabaseExistsCore:
         assert result is False
 
 
-# ---------------------------------------------------------------------------
-# drop_database
-# ---------------------------------------------------------------------------
-
-
 class TestDropDatabase:
-    """Tests for drop_database in both modes."""
-
     def test_core_mode_drop_is_noop(self):
-        """Core mode drop_database is a no-op (databases recreated implicitly)."""
         adapter = _make_core_adapter()
 
         with patch("benchbox.platforms.firebolt.firebolt_connect") as mock_connect:
@@ -202,7 +145,6 @@ class TestDropDatabase:
         mock_connect.assert_not_called()
 
     def test_cloud_drop_skips_when_db_missing(self):
-        """Cloud mode drop_database is skipped if database doesn't exist."""
         adapter = _make_cloud_adapter()
 
         with patch.object(adapter, "check_server_database_exists", return_value=False):
@@ -212,7 +154,6 @@ class TestDropDatabase:
         mock_connect.assert_not_called()
 
     def test_cloud_drop_executes_when_db_exists(self):
-        """Cloud mode drop_database executes DROP DATABASE."""
         adapter = _make_cloud_adapter()
 
         mock_conn = Mock()
@@ -230,7 +171,6 @@ class TestDropDatabase:
         assert "DROP DATABASE" in sql_call
 
     def test_cloud_drop_raises_on_execute_error(self):
-        """Cloud mode drop_database raises RuntimeError on failure."""
         adapter = _make_cloud_adapter()
 
         mock_conn = Mock()
@@ -246,16 +186,8 @@ class TestDropDatabase:
             adapter.drop_database(database="db")
 
 
-# ---------------------------------------------------------------------------
-# create_connection - result cache disable path
-# ---------------------------------------------------------------------------
-
-
 class TestCreateConnectionResultCache:
-    """Tests for create_connection result-cache-disable branch."""
-
     def test_cloud_disables_result_cache_when_configured(self):
-        """Cloud create_connection calls _disable_result_cache when enabled."""
         adapter = _make_cloud_adapter(disable_result_cache=True)
 
         mock_conn = Mock()
@@ -274,7 +206,6 @@ class TestCreateConnectionResultCache:
         assert connection is mock_conn
 
     def test_core_does_not_disable_result_cache(self):
-        """Core create_connection does NOT call _disable_result_cache."""
         adapter = _make_core_adapter(disable_result_cache=True)
 
         mock_conn = Mock()
@@ -292,7 +223,6 @@ class TestCreateConnectionResultCache:
         mock_disable.assert_not_called()
 
     def test_create_connection_raises_on_connect_error(self):
-        """create_connection propagates connection errors."""
         adapter = _make_core_adapter()
 
         with (
@@ -303,16 +233,8 @@ class TestCreateConnectionResultCache:
             adapter.create_connection()
 
 
-# ---------------------------------------------------------------------------
-# _disable_result_cache
-# ---------------------------------------------------------------------------
-
-
 class TestDisableResultCache:
-    """Tests for _disable_result_cache."""
-
     def test_cloud_disables_cache_success(self):
-        """Cloud mode: SET enable_result_cache = false is executed."""
         adapter = _make_cloud_adapter()
 
         mock_conn = Mock()
@@ -325,7 +247,6 @@ class TestDisableResultCache:
         mock_cursor.close.assert_called_once()
 
     def test_core_mode_skips_disable(self):
-        """Core mode: _disable_result_cache is a no-op."""
         adapter = _make_core_adapter()
 
         mock_conn = Mock()
@@ -337,7 +258,6 @@ class TestDisableResultCache:
         mock_cursor.execute.assert_not_called()
 
     def test_strict_validation_raises_on_failure(self):
-        """With strict_validation, execute failure raises ConfigurationError."""
         from benchbox.core.exceptions import ConfigurationError
 
         adapter = _make_cloud_adapter(strict_validation=True)
@@ -351,7 +271,6 @@ class TestDisableResultCache:
             adapter._disable_result_cache(mock_conn)
 
     def test_non_strict_logs_warning_on_failure(self):
-        """Without strict_validation, execute failure only logs warning."""
         adapter = _make_cloud_adapter(strict_validation=False)
 
         mock_conn = Mock()
@@ -359,11 +278,9 @@ class TestDisableResultCache:
         mock_conn.cursor.return_value = mock_cursor
         mock_cursor.execute.side_effect = Exception("not supported")
 
-        # Should not raise
         adapter._disable_result_cache(mock_conn)
 
     def test_strict_validation_validates_cache_after_disable(self):
-        """With strict_validation, validate_session_cache_control is called."""
         adapter = _make_cloud_adapter(strict_validation=True)
 
         mock_conn = Mock()
@@ -376,21 +293,12 @@ class TestDisableResultCache:
         mock_validate.assert_called_once_with(mock_conn)
 
 
-# ---------------------------------------------------------------------------
-# validate_session_cache_control
-# ---------------------------------------------------------------------------
-
-
 class TestValidateSessionCacheControl:
-    """Tests for validate_session_cache_control."""
-
     def test_core_mode_returns_true(self):
-        """Core mode always returns True (no cache to validate)."""
         adapter = _make_core_adapter()
         assert adapter.validate_session_cache_control(Mock()) is True
 
     def test_cloud_cache_disabled_returns_true(self):
-        """Cloud mode: cache disabled => returns True."""
         adapter = _make_cloud_adapter()
 
         mock_conn = Mock()
@@ -402,7 +310,6 @@ class TestValidateSessionCacheControl:
         assert result is True
 
     def test_cloud_cache_enabled_returns_false_non_strict(self):
-        """Cloud mode: cache still enabled => returns False (non-strict)."""
         adapter = _make_cloud_adapter(strict_validation=False)
 
         mock_conn = Mock()
@@ -414,7 +321,6 @@ class TestValidateSessionCacheControl:
         assert result is False
 
     def test_cloud_cache_enabled_raises_strict(self):
-        """Cloud mode: cache still enabled raises ConfigurationError (strict)."""
         from benchbox.core.exceptions import ConfigurationError
 
         adapter = _make_cloud_adapter(strict_validation=True)
@@ -428,7 +334,6 @@ class TestValidateSessionCacheControl:
             adapter.validate_session_cache_control(mock_conn)
 
     def test_show_not_supported_returns_true(self):
-        """SHOW command not supported logs debug and returns True."""
         adapter = _make_cloud_adapter()
 
         mock_conn = Mock()
@@ -440,7 +345,6 @@ class TestValidateSessionCacheControl:
         assert result is True
 
     def test_non_show_error_non_strict_returns_false(self):
-        """Non-SHOW error in non-strict mode returns False."""
         adapter = _make_cloud_adapter(strict_validation=False)
 
         mock_conn = Mock()
@@ -452,7 +356,6 @@ class TestValidateSessionCacheControl:
         assert result is False
 
     def test_non_show_error_strict_raises(self):
-        """Non-SHOW error in strict mode raises ConfigurationError."""
         from benchbox.core.exceptions import ConfigurationError
 
         adapter = _make_cloud_adapter(strict_validation=True)
@@ -466,7 +369,6 @@ class TestValidateSessionCacheControl:
             adapter.validate_session_cache_control(mock_conn)
 
     def test_no_result_from_show(self):
-        """SHOW returns None result; cache disabled assumed."""
         adapter = _make_cloud_adapter()
 
         mock_conn = Mock()
@@ -478,16 +380,8 @@ class TestValidateSessionCacheControl:
         assert result is True
 
 
-# ---------------------------------------------------------------------------
-# _create_admin_connection
-# ---------------------------------------------------------------------------
-
-
 class TestCreateAdminConnection:
-    """Tests for _create_admin_connection."""
-
     def test_cloud_connects_to_information_schema(self):
-        """Cloud mode admin connection targets information_schema."""
         adapter = _make_cloud_adapter()
 
         mock_conn = Mock()
@@ -499,7 +393,6 @@ class TestCreateAdminConnection:
         assert call_kwargs["database"] == "information_schema"
 
     def test_core_connects_without_information_schema(self):
-        """Core mode admin connection does NOT override database."""
         adapter = _make_core_adapter()
 
         mock_conn = Mock()
@@ -511,7 +404,6 @@ class TestCreateAdminConnection:
         assert call_kwargs.get("database") != "information_schema"
 
     def test_connection_error_propagates(self):
-        """Admin connection failure propagates."""
         adapter = _make_cloud_adapter()
 
         with (
@@ -521,24 +413,16 @@ class TestCreateAdminConnection:
             adapter._create_admin_connection()
 
 
-# ---------------------------------------------------------------------------
-# _get_platform_metadata
-# ---------------------------------------------------------------------------
-
-
 class TestGetPlatformMetadata:
-    """Tests for _get_platform_metadata."""
-
     def test_cloud_includes_engine_details(self):
-        """Cloud mode metadata includes account, engine, api endpoint."""
         adapter = _make_cloud_adapter()
 
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
         mock_cursor.fetchone.side_effect = [
-            ("Firebolt 1.2.3",),  # version()
-            ("my-engine", "M", "RUNNING"),  # engine details
+            ("Firebolt 1.2.3",),
+            ("my-engine", "M", "RUNNING"),
         ]
 
         metadata = adapter._get_platform_metadata(mock_conn)
@@ -549,7 +433,6 @@ class TestGetPlatformMetadata:
         assert metadata["version"] == "Firebolt 1.2.3"
 
     def test_core_includes_url(self):
-        """Core mode metadata includes url."""
         adapter = _make_core_adapter()
 
         mock_conn = Mock()
@@ -563,7 +446,6 @@ class TestGetPlatformMetadata:
         assert metadata["url"] == "http://localhost:3473"
 
     def test_version_query_error_skipped(self):
-        """Version query failure is swallowed; metadata still returns."""
         adapter = _make_core_adapter()
 
         mock_conn = Mock()
@@ -577,31 +459,20 @@ class TestGetPlatformMetadata:
         assert "database" in metadata
 
     def test_engine_details_query_error_ignored(self):
-        """Cloud engine details query failure is ignored."""
         adapter = _make_cloud_adapter()
 
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
-        # First call (version()) succeeds, second (engine details) fails
         mock_cursor.fetchone.side_effect = [("v1",), Exception("engine query failed")]
         mock_cursor.execute.side_effect = [None, Exception("engine query failed")]
 
-        # Should not raise
         metadata = adapter._get_platform_metadata(mock_conn)
         assert metadata["mode"] == "cloud"
 
 
-# ---------------------------------------------------------------------------
-# get_platform_info - SDK version + error branches
-# ---------------------------------------------------------------------------
-
-
 class TestGetPlatformInfoBranches:
-    """Tests for get_platform_info SDK and version branches."""
-
     def test_firebolt_version_from_sdk(self):
-        """get_platform_info retrieves firebolt SDK version when available."""
         adapter = _make_core_adapter()
 
         mock_firebolt = MagicMock()
@@ -612,17 +483,15 @@ class TestGetPlatformInfoBranches:
         assert info["client_library_version"] == "2.0.0"
 
     def test_firebolt_version_none_on_attribute_error(self):
-        """get_platform_info handles missing __version__ gracefully."""
         adapter = _make_core_adapter()
 
-        mock_firebolt = MagicMock(spec=[])  # No __version__
+        mock_firebolt = MagicMock(spec=[])
         with patch.dict("sys.modules", {"firebolt": mock_firebolt}):
             info = adapter.get_platform_info(None)
 
         assert info["client_library_version"] is None
 
     def test_version_query_error_is_swallowed(self):
-        """get_platform_info swallows cursor errors from version query."""
         adapter = _make_core_adapter()
 
         mock_conn = Mock()
@@ -634,16 +503,8 @@ class TestGetPlatformInfoBranches:
         assert info["platform_version"] is None
 
 
-# ---------------------------------------------------------------------------
-# _load_data_via_insert - manifest fallback + batch flushing
-# ---------------------------------------------------------------------------
-
-
 class TestLoadDataInsertBranches:
-    """Tests for _load_data_via_insert edge-case branches."""
-
     def test_manifest_fallback_loads_data(self):
-        """_load_data_via_insert reads tables from _datagen_manifest.json."""
         adapter = _make_core_adapter()
 
         mock_conn = Mock()
@@ -651,11 +512,9 @@ class TestLoadDataInsertBranches:
         mock_conn.cursor.return_value = mock_cursor
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            # Create a CSV data file
             data_file = Path(tmp_dir) / "orders.csv"
             data_file.write_text("1,foo\n2,bar\n")
 
-            # Create manifest
             manifest = {
                 "tables": {
                     "orders": [{"path": "orders.csv"}],
@@ -663,7 +522,7 @@ class TestLoadDataInsertBranches:
             }
             (Path(tmp_dir) / "_datagen_manifest.json").write_text(json.dumps(manifest))
 
-            mock_benchmark = Mock(spec=[])  # No .tables attribute
+            mock_benchmark = Mock(spec=[])
 
             table_stats, load_time, _ = adapter._load_data_via_insert(mock_benchmark, mock_conn, Path(tmp_dir))
 
@@ -671,7 +530,6 @@ class TestLoadDataInsertBranches:
         assert table_stats["orders"] == 2
 
     def test_missing_data_files_raises_value_error(self):
-        """_load_data_via_insert raises ValueError when no data found."""
         adapter = _make_core_adapter()
 
         mock_conn = Mock()
@@ -685,14 +543,12 @@ class TestLoadDataInsertBranches:
                 adapter._load_data_via_insert(mock_benchmark, mock_conn, Path(tmp_dir))
 
     def test_large_batch_is_flushed_mid_file(self):
-        """_load_data_via_insert flushes batches when batch_size exceeded."""
         adapter = _make_core_adapter()
 
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
 
-        # Create a file with 600 rows (> default batch_size=500)
         rows = "\n".join(f"{i},value{i}" for i in range(600))
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
@@ -708,11 +564,9 @@ class TestLoadDataInsertBranches:
             tmp_path.unlink()
 
         assert table_stats["big_table"] == 600
-        # executemany should have been called multiple times (mid-batch + remainder)
         assert mock_cursor.executemany.call_count >= 2
 
     def test_empty_file_is_skipped(self):
-        """_load_data_via_insert skips empty files gracefully."""
         adapter = _make_core_adapter()
 
         mock_conn = Mock()
@@ -720,7 +574,7 @@ class TestLoadDataInsertBranches:
         mock_conn.cursor.return_value = mock_cursor
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
-            f.write("")  # Empty file
+            f.write("")
             tmp_path = Path(f.name)
 
         try:
@@ -735,7 +589,6 @@ class TestLoadDataInsertBranches:
         mock_cursor.executemany.assert_not_called()
 
     def test_column_count_mismatch_raises(self):
-        """_load_data_via_insert raises on inconsistent column counts."""
         adapter = _make_core_adapter()
 
         mock_conn = Mock()
@@ -743,14 +596,13 @@ class TestLoadDataInsertBranches:
         mock_conn.cursor.return_value = mock_cursor
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
-            f.write("1,a\n2,b,extra\n")  # Row 2 has 3 columns, row 1 has 2
+            f.write("1,a\n2,b,extra\n")
             tmp_path = Path(f.name)
 
         try:
             mock_benchmark = Mock()
             mock_benchmark.tables = {"bad_table": str(tmp_path)}
 
-            # The error is caught internally and logged; table_stats gets 0
             table_stats, _, _ = adapter._load_data_via_insert(mock_benchmark, mock_conn, Path("/tmp"))
         finally:
             tmp_path.unlink()
@@ -758,17 +610,13 @@ class TestLoadDataInsertBranches:
         assert table_stats["bad_table"] == 0
 
     def test_null_values_converted(self):
-        """_load_data_via_insert converts empty/null strings to Python None."""
         adapter = _make_core_adapter()
 
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
 
-        # Use pipe-delimited .tbl so trailing-delimiter logic doesn't strip columns
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
-            # Two columns: id (non-null) and name (null/empty)
-            # No trailing delimiter, so columns are preserved
             f.write("1,empty_col\n2,NULL\n")
             tmp_path = Path(f.name)
 
@@ -786,24 +634,14 @@ class TestLoadDataInsertBranches:
                 adapter._load_data_via_insert(mock_benchmark, mock_conn, Path("/tmp"))
 
             _, rows = mock_cursor.executemany.call_args[0]
-            # Second column "empty_col" stays as-is (not empty string)
             assert rows[0] == ("1", "empty_col")
-            # NULL → None
             assert rows[1] == ("2", None)
         finally:
             tmp_path.unlink()
 
 
-# ---------------------------------------------------------------------------
-# _execute_batch_insert - executemany fallback
-# ---------------------------------------------------------------------------
-
-
 class TestExecuteBatchInsert:
-    """Tests for _execute_batch_insert fallback logic."""
-
     def test_uses_executemany_when_available(self):
-        """_execute_batch_insert prefers executemany."""
         adapter = _make_core_adapter()
 
         cursor = Mock()
@@ -814,17 +652,15 @@ class TestExecuteBatchInsert:
         cursor.executemany.assert_called_once_with("INSERT INTO t VALUES (?)", rows)
 
     def test_fallback_to_execute_when_no_executemany(self):
-        """_execute_batch_insert falls back to individual execute calls."""
         adapter = _make_core_adapter()
 
-        cursor = Mock(spec=["execute"])  # No executemany
+        cursor = Mock(spec=["execute"])
         rows = [("a",), ("b",)]
         adapter._execute_batch_insert(cursor, "INSERT INTO t VALUES (?)", rows)
 
         assert cursor.execute.call_count == 2
 
     def test_empty_rows_does_nothing(self):
-        """_execute_batch_insert returns immediately for empty rows."""
         adapter = _make_core_adapter()
 
         cursor = Mock()
@@ -834,16 +670,8 @@ class TestExecuteBatchInsert:
         cursor.execute.assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# _get_parameter_placeholder
-# ---------------------------------------------------------------------------
-
-
 class TestGetParameterPlaceholder:
-    """Tests for _get_parameter_placeholder."""
-
     def test_format_style_returns_percent_s(self):
-        """format paramstyle returns %s."""
         adapter = _make_core_adapter()
 
         cursor = Mock()
@@ -851,7 +679,6 @@ class TestGetParameterPlaceholder:
         assert adapter._get_parameter_placeholder(cursor) == "%s"
 
     def test_pyformat_style_returns_percent_s(self):
-        """pyformat paramstyle returns %s."""
         adapter = _make_core_adapter()
 
         cursor = Mock()
@@ -859,7 +686,6 @@ class TestGetParameterPlaceholder:
         assert adapter._get_parameter_placeholder(cursor) == "%s"
 
     def test_unknown_style_returns_question_mark(self):
-        """Unknown paramstyle returns ?."""
         adapter = _make_core_adapter()
 
         cursor = Mock()
@@ -867,21 +693,13 @@ class TestGetParameterPlaceholder:
         assert adapter._get_parameter_placeholder(cursor) == "?"
 
     def test_no_paramstyle_returns_question_mark(self):
-        """Missing paramstyle returns ?."""
         adapter = _make_core_adapter()
 
-        cursor = Mock(spec=["execute"])  # No paramstyle
+        cursor = Mock(spec=["execute"])
         assert adapter._get_parameter_placeholder(cursor) == "?"
 
 
-# ---------------------------------------------------------------------------
-# _coerce_bool
-# ---------------------------------------------------------------------------
-
-
 class TestCoerceBool:
-    """Tests for _coerce_bool helper."""
-
     def test_none_returns_default(self):
         adapter = _make_core_adapter()
         assert adapter._coerce_bool(None, True) is True
@@ -906,48 +724,29 @@ class TestCoerceBool:
             assert adapter._coerce_bool(truthy, False) is True, f"Expected True for {truthy!r}"
 
 
-# ---------------------------------------------------------------------------
-# S3 URL validation in __init__
-# ---------------------------------------------------------------------------
-
-
 class TestS3UrlValidation:
-    """Tests for S3 staging URL validation."""
-
     def test_valid_s3_url_accepted(self):
-        """Valid s3:// URL is accepted."""
         adapter = _make_cloud_adapter(s3_staging_url="s3://my-bucket/prefix/")
         assert adapter.s3_staging_url == "s3://my-bucket/prefix/"
 
     def test_s3_url_without_trailing_slash_gets_one(self):
-        """S3 URL without trailing slash gets one appended."""
         adapter = _make_cloud_adapter(s3_staging_url="s3://my-bucket/prefix")
         assert adapter.s3_staging_url == "s3://my-bucket/prefix/"
 
     def test_invalid_s3_url_raises(self):
-        """Non-s3:// URL raises ConfigurationError."""
         from benchbox.core.exceptions import ConfigurationError
 
         with pytest.raises(ConfigurationError, match="Invalid S3 staging URL"):
             _make_cloud_adapter(s3_staging_url="https://my-bucket/prefix")
 
     def test_env_var_s3_url(self):
-        """S3 URL from env var is read and validated."""
         with patch.dict(os.environ, {"FIREBOLT_S3_STAGING_URL": "s3://env-bucket/path/"}):
             adapter = _make_cloud_adapter()
         assert adapter.s3_staging_url == "s3://env-bucket/path/"
 
 
-# ---------------------------------------------------------------------------
-# _parse_s3_url
-# ---------------------------------------------------------------------------
-
-
 class TestParseS3Url:
-    """Tests for _parse_s3_url static helper."""
-
     def test_parses_bucket_and_prefix(self):
-        """_parse_s3_url splits bucket and prefix correctly."""
         from benchbox.platforms.firebolt import FireboltAdapter
 
         bucket, prefix = FireboltAdapter._parse_s3_url("s3://my-bucket/some/prefix/")
@@ -955,7 +754,6 @@ class TestParseS3Url:
         assert prefix == "some/prefix/"
 
     def test_parses_bucket_only(self):
-        """_parse_s3_url handles bucket-only URL."""
         from benchbox.platforms.firebolt import FireboltAdapter
 
         bucket, prefix = FireboltAdapter._parse_s3_url("s3://my-bucket/")
@@ -963,16 +761,8 @@ class TestParseS3Url:
         assert prefix == ""
 
 
-# ---------------------------------------------------------------------------
-# generate_tuning_clause - distribution path
-# ---------------------------------------------------------------------------
-
-
 class TestGenerateTuningClauseDistribution:
-    """Tests for generate_tuning_clause distribution columns path."""
-
     def test_distribution_generates_primary_index(self):
-        """Distribution tuning generates PRIMARY INDEX clause."""
         adapter = _make_core_adapter()
 
         mock_tuning = Mock()
@@ -1002,7 +792,6 @@ class TestGenerateTuningClauseDistribution:
         assert "order_date" in clause
 
     def test_both_distribution_and_partition(self):
-        """Distribution + partition generates both clauses."""
         adapter = _make_core_adapter()
 
         mock_tuning = Mock()
@@ -1034,36 +823,19 @@ class TestGenerateTuningClauseDistribution:
         assert "PARTITION BY" in clause
 
 
-# ---------------------------------------------------------------------------
-# supports_tuning_type - ImportError path
-# ---------------------------------------------------------------------------
-
-
 class TestSupportsTuningTypeImportError:
-    """Tests for supports_tuning_type when TuningType is unavailable."""
-
     def test_import_error_returns_false(self):
-        """supports_tuning_type returns False when TuningType can't be imported."""
         adapter = _make_core_adapter()
 
         with patch("benchbox.core.tuning.interface.TuningType", side_effect=ImportError("no tuning")):
-            # patch the actual import location
             with patch.dict("sys.modules", {"benchbox.core.tuning.interface": None}):
                 result = adapter.supports_tuning_type("anything")
 
         assert result is False
 
 
-# ---------------------------------------------------------------------------
-# _get_existing_tables
-# ---------------------------------------------------------------------------
-
-
 class TestGetExistingTables:
-    """Tests for _get_existing_tables."""
-
     def test_returns_lowercase_table_names(self):
-        """_get_existing_tables returns lowercase table names."""
         adapter = _make_core_adapter()
 
         mock_conn = Mock()
@@ -1076,7 +848,6 @@ class TestGetExistingTables:
         assert result == ["lineitem", "orders", "customer"]
 
     def test_returns_empty_on_error(self):
-        """_get_existing_tables returns empty list on error."""
         adapter = _make_core_adapter()
 
         mock_conn = Mock()
@@ -1089,41 +860,23 @@ class TestGetExistingTables:
         assert result == []
 
 
-# ---------------------------------------------------------------------------
-# analyze_table
-# ---------------------------------------------------------------------------
-
-
 class TestAnalyzeTable:
-    """Tests for analyze_table (Firebolt auto-collects stats)."""
-
     def test_analyze_is_noop(self):
-        """analyze_table does not execute any SQL (Firebolt auto-collects)."""
         adapter = _make_core_adapter()
 
         mock_conn = Mock()
 
-        # Should not raise and should not interact with the connection
         adapter.analyze_table(mock_conn, "lineitem")
 
         mock_conn.cursor.assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# apply_platform_optimizations
-# ---------------------------------------------------------------------------
-
-
 class TestApplyPlatformOptimizations:
-    """Tests for apply_platform_optimizations."""
-
     def test_none_config_is_noop(self):
-        """apply_platform_optimizations returns early for None config."""
         adapter = _make_core_adapter()
-        adapter.apply_platform_optimizations(None, Mock())  # Should not raise
+        adapter.apply_platform_optimizations(None, Mock())
 
     def test_valid_config_logs_info(self):
-        """apply_platform_optimizations logs informational message."""
         adapter = _make_core_adapter()
 
         mock_config = Mock()
@@ -1134,21 +887,12 @@ class TestApplyPlatformOptimizations:
         assert "optimized" in mock_log.call_args[0][0].lower()
 
 
-# ---------------------------------------------------------------------------
-# apply_unified_tuning
-# ---------------------------------------------------------------------------
-
-
 class TestApplyUnifiedTuning:
-    """Tests for apply_unified_tuning."""
-
     def test_none_config_returns_early(self):
-        """apply_unified_tuning returns early for None input."""
         adapter = _make_core_adapter()
-        adapter.apply_unified_tuning(None, Mock())  # Should not raise
+        adapter.apply_unified_tuning(None, Mock())
 
     def test_delegates_to_sub_methods(self):
-        """apply_unified_tuning calls each sub-method."""
         adapter = _make_core_adapter()
 
         mock_config = Mock()
@@ -1169,16 +913,8 @@ class TestApplyUnifiedTuning:
         mock_table.assert_called_once()
 
 
-# ---------------------------------------------------------------------------
-# from_config - mode override path
-# ---------------------------------------------------------------------------
-
-
 class TestFromConfigCoreOverride:
-    """Tests for from_config core mode override."""
-
     def test_core_mode_override_sets_default_url(self):
-        """from_config with deployment_mode=core sets default URL."""
         from benchbox.platforms.firebolt import FireboltAdapter
 
         config = {
@@ -1192,7 +928,6 @@ class TestFromConfigCoreOverride:
         assert adapter.url == "http://localhost:3473"
 
     def test_cloud_from_config_with_s3(self):
-        """from_config passes s3_staging_url through."""
         from benchbox.platforms.firebolt import FireboltAdapter
 
         config = {
@@ -1211,16 +946,8 @@ class TestFromConfigCoreOverride:
         assert adapter.s3_region == "us-east-1"
 
 
-# ---------------------------------------------------------------------------
-# _build_firebolt_config
-# ---------------------------------------------------------------------------
-
-
 class TestBuildFireboltConfig:
-    """Tests for the _build_firebolt_config module-level function."""
-
     def test_builds_config_with_merged_options(self):
-        """_build_firebolt_config merges saved_creds < options < overrides."""
         from benchbox.platforms.firebolt import _build_firebolt_config
 
         mock_info = Mock()
@@ -1248,7 +975,6 @@ class TestBuildFireboltConfig:
         assert config.engine_name == "override-engine"
 
     def test_builds_config_without_platform_info(self):
-        """_build_firebolt_config handles None info gracefully."""
         from benchbox.platforms.firebolt import _build_firebolt_config
 
         mock_cred_mgr = Mock()
@@ -1262,7 +988,6 @@ class TestBuildFireboltConfig:
         assert config is not None
 
     def test_explicit_database_override_is_used(self):
-        """_build_firebolt_config uses explicit database override when provided."""
         from benchbox.platforms.firebolt import _build_firebolt_config
 
         mock_info = Mock()
@@ -1284,7 +1009,6 @@ class TestBuildFireboltConfig:
         assert config.database == "explicit_db"
 
     def test_builds_config_with_runtime_metadata_fields(self):
-        """_build_firebolt_config preserves metadata-only cloud fields."""
         from benchbox.platforms.firebolt import _build_firebolt_config
 
         mock_info = Mock()
@@ -1313,7 +1037,6 @@ class TestBuildFireboltConfig:
         assert config.options["s3_staging_url"] == "s3://bench-bucket/stage/"
 
     def test_firebolt_platform_options_parse_metadata_aliases(self):
-        """Platform options expose deployment and region aliases used by CLI callers."""
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
         parsed = PlatformHookRegistry.parse_options(
@@ -1331,10 +1054,7 @@ class TestBuildFireboltConfig:
 
 
 class TestNormalizedResultMetadata:
-    """Tests for Firebolt normalized runtime and cloud metadata."""
-
     def test_cloud_metadata_maps_observed_engine_and_s3_staging(self):
-        """Cloud mode maps account, engine, region, compute, cache, and staging metadata."""
         adapter = _make_cloud_adapter(
             database="bench",
             region="us-east-1",
@@ -1374,7 +1094,6 @@ class TestNormalizedResultMetadata:
         assert metadata["platform_storage"]["region"] == "us-east-1"
 
     def test_cloud_malformed_engine_metadata_remains_requested(self):
-        """Malformed engine rows do not masquerade as observed compute metadata."""
         adapter = _make_cloud_adapter(engine_type="GENERAL_PURPOSE")
         mock_conn = Mock()
         mock_cursor = Mock()
@@ -1394,7 +1113,6 @@ class TestNormalizedResultMetadata:
         assert metadata["platform_compute"]["collection_status"] == "partial"
 
     def test_cloud_sparse_metadata_marks_region_and_engine_metadata_unavailable(self):
-        """Sparse Cloud config keeps missing region explicit and compute partial."""
         adapter = _make_cloud_adapter()
 
         info = adapter.get_platform_info(connection=None)
@@ -1409,7 +1127,6 @@ class TestNormalizedResultMetadata:
         assert metadata["platform_storage"]["staging_url_type_status"] == "unavailable"
 
     def test_core_metadata_maps_localhost_self_hosted_runtime(self):
-        """Core mode maps to self-hosted localhost with no cloud facets."""
         adapter = _make_core_adapter(database="core_db")
 
         metadata = adapter.get_normalized_result_metadata(platform_info=adapter.get_platform_info(connection=None))
@@ -1422,14 +1139,7 @@ class TestNormalizedResultMetadata:
         assert metadata["platform_compute"]["service_model"] == "core"
 
 
-# ---------------------------------------------------------------------------
-# _quote_identifier edge cases
-# ---------------------------------------------------------------------------
-
-
 class TestQuoteIdentifier:
-    """Tests for _quote_identifier."""
-
     def test_quotes_simple_name(self):
         adapter = _make_core_adapter()
         assert adapter._quote_identifier("lineitem") == '"lineitem"'
@@ -1449,25 +1159,15 @@ class TestQuoteIdentifier:
             adapter._quote_identifier(None)
 
 
-# ---------------------------------------------------------------------------
-# configure_for_benchmark
-# ---------------------------------------------------------------------------
-
-
 class TestConfigureForBenchmark:
-    """Tests for configure_for_benchmark."""
-
     def test_tpch_is_accepted(self):
-        """configure_for_benchmark works for tpch."""
         adapter = _make_core_adapter()
-        adapter.configure_for_benchmark(Mock(), "tpch")  # Should not raise
+        adapter.configure_for_benchmark(Mock(), "tpch")
 
     def test_tpcds_is_accepted(self):
-        """configure_for_benchmark works for tpcds."""
         adapter = _make_core_adapter()
         adapter.configure_for_benchmark(Mock(), "tpcds")
 
     def test_generic_type_accepted(self):
-        """configure_for_benchmark works for generic benchmark types."""
         adapter = _make_core_adapter()
         adapter.configure_for_benchmark(Mock(), "custom_benchmark")

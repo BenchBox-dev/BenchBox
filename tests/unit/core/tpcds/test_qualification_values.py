@@ -1,10 +1,3 @@
-"""The committed TPC-DS qualification values agree with the specification and render real SQL.
-
-The values are the "Qualification Substitution Parameters" of Appendix B of the TPC-DS 4.0.0
-specification, keyed by the names ``dsqgen -LOG`` writes. The expected literals below were copied from
-the specification text, so a change to the data file that disagrees with the specification fails here.
-"""
-
 from __future__ import annotations
 
 import json
@@ -23,7 +16,6 @@ DATA_FILE = (
     / "qualification_values.json"
 )
 
-# (query, name, value) as printed in Appendix B.
 SPEC_SAMPLE = [
     (1, "YEAR.01", "2000"),
     (1, "STATE.01", "TN"),
@@ -70,7 +62,6 @@ def test_sampled_values_match_the_specification_text(document, query_id, name, e
 
 
 def test_no_value_swallowed_a_comment_that_follows_it_in_the_specification(document):
-    """Appendix B puts prose comments after some parameter lists (Q72's note on the 5-day offset)."""
     offenders = {
         (query_id, name): value
         for query_id, values in document["values"].items()
@@ -86,7 +77,6 @@ def test_q8_carries_all_four_hundred_zip_codes(document):
 
 
 def test_a_name_the_template_does_not_define_is_recorded_not_kept(document):
-    """Appendix B lists MANAGER.01 for Q71, but the template hard-codes the manager."""
     assert document["not_in_template"] == {"71": ["MANAGER.01"]}
     assert "MANAGER.01" not in document["values"]["71"]
 
@@ -97,7 +87,7 @@ def dsqgen():
 
     try:
         return DSQGenBinary()
-    except Exception as exc:  # no bundled binary for this platform
+    except Exception as exc:
         pytest.skip(f"dsqgen is not available: {exc}")
 
 
@@ -110,7 +100,6 @@ def test_every_query_renders_from_the_specification_values_independent_of_the_se
 
 
 def test_the_queries_empty_at_scale_factor_one_have_non_empty_official_answer_sets():
-    """Those eight are parameter problems, not legitimately empty queries."""
     from benchbox.core.expected_results.loader import load_tpcds_expected_results
 
     try:

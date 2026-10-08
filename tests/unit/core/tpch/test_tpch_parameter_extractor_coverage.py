@@ -1,5 +1,3 @@
-"""Coverage-focused tests for TPC-H parameter extraction helpers."""
-
 from __future__ import annotations
 
 from datetime import date

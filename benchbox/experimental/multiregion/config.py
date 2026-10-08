@@ -1,9 +1,6 @@
-"""Region configuration for multi-region testing.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -13,8 +10,6 @@ from typing import Any
 
 
 class CloudProvider(str, Enum):
-    """Supported cloud providers."""
-
     AWS = "aws"
     GCP = "gcp"
     AZURE = "azure"
@@ -25,16 +20,6 @@ class CloudProvider(str, Enum):
 
 @dataclass
 class Region:
-    """A geographic region for database deployment.
-
-    Attributes:
-        name: Human-readable region name (e.g., "US East")
-        code: Region code (e.g., "us-east-1", "eastus", "us-east1")
-        provider: Cloud provider for this region
-        latitude: Approximate latitude for distance calculation
-        longitude: Approximate longitude for distance calculation
-    """
-
     name: str
     code: str
     provider: CloudProvider
@@ -53,15 +38,6 @@ class Region:
 
 @dataclass
 class RegionConfig:
-    """Configuration for a single region's database endpoint.
-
-    Attributes:
-        region: The geographic region
-        endpoint: Database connection endpoint/URL
-        port: Database port
-        connection_params: Additional connection parameters
-    """
-
     region: Region
     endpoint: str
     port: int = 5432
@@ -69,22 +45,11 @@ class RegionConfig:
 
     @property
     def connection_string(self) -> str:
-        """Build connection string for this region."""
         return f"{self.endpoint}:{self.port}"
 
 
 @dataclass
 class MultiRegionConfig:
-    """Configuration for multi-region benchmark testing.
-
-    Attributes:
-        primary_region: The primary/source region
-        secondary_regions: List of secondary/target regions
-        client_region: Region where benchmark client runs (for latency)
-        enable_latency_measurement: Whether to measure cross-region latency
-        enable_transfer_tracking: Whether to track data transfer
-    """
-
     primary_region: RegionConfig
     secondary_regions: list[RegionConfig] = field(default_factory=list)
     client_region: Region | None = None
@@ -93,18 +58,15 @@ class MultiRegionConfig:
 
     @property
     def all_regions(self) -> list[RegionConfig]:
-        """Get all configured regions."""
         return [self.primary_region] + self.secondary_regions
 
     def get_region_by_code(self, code: str) -> RegionConfig | None:
-        """Find region configuration by code."""
         for region_config in self.all_regions:
             if region_config.region.code == code:
                 return region_config
         return None
 
 
-# Pre-defined regions for major cloud providers
 AWS_REGIONS: dict[str, Region] = {
     "us-east-1": Region("US East (N. Virginia)", "us-east-1", CloudProvider.AWS, 38.9, -77.0),
     "us-east-2": Region("US East (Ohio)", "us-east-2", CloudProvider.AWS, 40.4, -82.9),
@@ -146,15 +108,6 @@ AZURE_REGIONS: dict[str, Region] = {
 
 
 def get_region(provider: CloudProvider, code: str) -> Region | None:
-    """Get a pre-defined region by provider and code.
-
-    Args:
-        provider: Cloud provider
-        code: Region code
-
-    Returns:
-        Region if found, None otherwise
-    """
     region_maps = {
         CloudProvider.AWS: AWS_REGIONS,
         CloudProvider.GCP: GCP_REGIONS,
@@ -166,23 +119,12 @@ def get_region(provider: CloudProvider, code: str) -> Region | None:
 
 
 def calculate_distance_km(region1: Region, region2: Region) -> float | None:
-    """Calculate approximate distance between two regions.
-
-    Uses Haversine formula for great-circle distance.
-
-    Args:
-        region1: First region
-        region2: Second region
-
-    Returns:
-        Distance in kilometers, or None if coordinates unavailable
-    """
     import math
 
     if region1.latitude is None or region1.longitude is None or region2.latitude is None or region2.longitude is None:
         return None
 
-    R = 6371  # Earth's radius in km
+    R = 6371
 
     lat1 = math.radians(region1.latitude)
     lat2 = math.radians(region2.latitude)

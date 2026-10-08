@@ -24,44 +24,40 @@ Apache Doris is used in production by Baidu, Xiaomi, ByteDance, JD.com, Meituan,
 ## Quick Start
 
 ```bash
-# Install PyMySQL dependency
 uv add pymysql
 
-# Or install via the Doris extra
 uv add benchbox --extra doris
 
-# Configure connection (Doris must be running)
 export DORIS_HOST=localhost
 export DORIS_PORT=9030
 
-# Run TPC-H benchmark
 benchbox run --platform doris --benchmark tpch --scale 0.01
 ```
+
+The first two commands are alternatives: install the PyMySQL dependency directly, or install it through the Doris extra. Doris must be running before you set the connection variables and run the benchmark.
 
 ### Docker Quick Start
 
 ```bash
-# Start the repo-managed Apache Doris 4.0.3 stack and wait for FE+BE readiness
 docker compose -f docker/doris/docker-compose.yml up --wait
 
-# Point BenchBox at the mapped Doris ports
 export DORIS_HOST=localhost
 export DORIS_PORT=19031
 export DORIS_HTTP_PORT=18030
 
-# Verify connectivity
 mysql -h 127.0.0.1 -P 19031 -u root -e "SELECT 1"
 
-# Run benchmark
 benchbox run --platform doris --benchmark tpch --scale 1.0
 ```
+
+The `docker compose` command starts the repo-managed Apache Doris 4.0.3 stack and waits for FE and BE readiness. The environment variables point BenchBox at the mapped Doris ports, and the `mysql` command verifies connectivity before the benchmark runs.
 
 The checked-in compose file uses the official `apache/doris:4.0.3-all-slim`
 image and applies a small amount of startup configuration for local Docker
 Desktop environments, including Doris' `vm.max_map_count`, `ulimit -n`, and
 Java requirements.
 
-By default the stack now runs without `privileged` mode. Set
+By default the stack runs without `privileged` mode. Set
 `DORIS_PRIVILEGED=true` only if your Docker VM still reports
 `vm.max_map_count < 2000000` and you want the container to raise it at startup;
 preconfiguring the Docker VM once is the narrower alternative.
@@ -88,14 +84,10 @@ These are environment limits, not adapter correctness issues. Increase Docker
 memory and the Doris `mem_limit` if you need those datasets to load reliably at
 SF=1.
 
-### Validation Caveat For Major Upgrades
+### Validation Caveat
 
-BenchBox's Doris benchmark runs are still commonly exercised under loose
-row-count validation for TPC-H and TPC-DS. That catches gross regressions, but
-it is weaker than exact cross-platform validation for detecting silent semantic
-drift across Doris majors. Treat future compose image bumps as engine upgrades:
-re-run exact or targeted cross-platform spot checks before changing the pinned
-Docker tag.
+TPC-H and TPC-DS validation on Doris checks row counts only, so it can miss
+wrong result values.
 
 ## Configuration Options
 
@@ -170,13 +162,10 @@ The Duplicate Key model is optimal for TPC-H and TPC-DS workloads because:
 ### Basic Benchmarks
 
 ```bash
-# TPC-H at scale factor 1
 benchbox run --platform doris --benchmark tpch --scale 1.0
 
-# TPC-DS at scale factor 10
 benchbox run --platform doris --benchmark tpcds --scale 10.0
 
-# Run specific queries only
 benchbox run --platform doris --benchmark tpch --queries Q1,Q6,Q17
 ```
 
@@ -207,7 +196,6 @@ benchbox run --platform doris --benchmark tpch --scale 1.0 \
 ### Dry Run (Preview)
 
 ```bash
-# Preview execution plan without running
 benchbox run --platform doris --benchmark tpch --scale 1.0 --dry-run ./preview
 ```
 
@@ -299,7 +287,6 @@ The adapter automatically applies session-level optimizations when running bench
 Choosing effective distribution keys is critical for Doris query performance:
 
 ```sql
--- Hash distribution on frequently joined columns
 CREATE TABLE lineitem (
     l_orderkey BIGINT,
     l_partkey BIGINT,
@@ -318,19 +305,18 @@ DISTRIBUTED BY HASH(l_orderkey) BUCKETS 16;
 Doris supports secondary indexes for accelerating point queries and filter predicates:
 
 ```sql
--- Bloom filter index for high-cardinality columns
 ALTER TABLE lineitem SET ("bloom_filter_columns" = "l_orderkey, l_partkey");
 
--- Bitmap index for low-cardinality columns
 CREATE INDEX idx_shipmode ON lineitem (l_shipmode) USING BITMAP;
 ```
+
+Use a Bloom filter index for high-cardinality columns and a bitmap index for low-cardinality columns.
 
 ### Colocate Join Groups
 
 For frequently joined tables, colocate groups ensure data locality:
 
 ```sql
--- Create colocate group for TPC-H tables
 CREATE TABLE orders (
     o_orderkey BIGINT,
     ...

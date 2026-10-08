@@ -1,20 +1,6 @@
-"""Onehouse API client for Quanton managed Spark.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides HTTP client for interacting with Onehouse Quanton API for:
-- Job submission and management
-- Cluster lifecycle
-- Status polling and result retrieval
-
-Onehouse Quanton is a serverless managed Spark compute runtime with:
-- 2-3x better price-performance vs AWS EMR and Databricks
-- Multi-table-format support: Apache Hudi, Apache Iceberg, Delta Lake
-- Apache XTable integration for cross-format metadata translation
-- Serverless architecture with intelligent cluster management
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -48,8 +34,6 @@ logger = logging.getLogger(__name__)
 
 
 class JobState(str, Enum):
-    """Quanton job state constants."""
-
     PENDING = "PENDING"
     QUEUED = "QUEUED"
     RUNNING = "RUNNING"
@@ -60,18 +44,14 @@ class JobState(str, Enum):
 
     @property
     def is_terminal(self) -> bool:
-        """Check if job state is terminal (no further transitions)."""
         return self in {JobState.SUCCEEDED, JobState.FAILED, JobState.CANCELLED}
 
     @property
     def is_success(self) -> bool:
-        """Check if job completed successfully."""
         return self == JobState.SUCCEEDED
 
 
 class TableFormat(str, Enum):
-    """Supported table formats for Quanton."""
-
     HUDI = "hudi"
     ICEBERG = "iceberg"
     DELTA = "delta"
@@ -79,8 +59,6 @@ class TableFormat(str, Enum):
 
 @dataclass
 class JobResult:
-    """Result of a Quanton job execution."""
-
     job_id: str
     state: JobState
     duration_seconds: float | None = None
@@ -91,9 +69,7 @@ class JobResult:
 
 @dataclass
 class ClusterConfig:
-    """Quanton cluster configuration."""
-
-    cluster_size: str = "small"  # small, medium, large, xlarge
+    cluster_size: str = "small"
     spark_version: str = "3.5"
     auto_scaling: bool = True
     min_workers: int = 1
@@ -102,30 +78,6 @@ class ClusterConfig:
 
 
 class OnehouseClient:
-    """HTTP client for Onehouse Quanton API.
-
-    Provides methods for:
-    - Authentication and session management
-    - Job submission and status polling
-    - Cluster management
-    - Result retrieval
-
-    Usage:
-        client = OnehouseClient(
-            api_key="your-api-key",
-            region="us-east-1",
-        )
-
-        # Submit a Spark SQL job
-        job_id = client.submit_sql_job(
-            sql="SELECT * FROM my_table LIMIT 10",
-            database="my_database",
-        )
-
-        # Wait for completion
-        result = client.wait_for_job(job_id)
-    """
-
     DEFAULT_API_ENDPOINT = "api.onehouse.ai"
     DEFAULT_TIMEOUT_SECONDS = 30
     MAX_RETRIES = 3
@@ -139,15 +91,6 @@ class OnehouseClient:
         timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
         cluster_config: ClusterConfig | None = None,
     ) -> None:
-        """Initialize the Onehouse client.
-
-        Args:
-            api_key: Onehouse API key for authentication.
-            region: AWS region for cluster deployment.
-            api_endpoint: Custom API endpoint (for testing or private deployments).
-            timeout_seconds: Request timeout in seconds.
-            cluster_config: Cluster configuration for job execution.
-        """
         if not REQUESTS_AVAILABLE:
             deps_satisfied, missing = check_platform_dependencies("quanton")
             if not deps_satisfied:
@@ -163,11 +106,9 @@ class OnehouseClient:
         self._cluster_id: str | None = None
 
     def _get_session(self) -> Any:
-        """Get or create HTTP session with retry configuration."""
         if self._session is None:
             self._session = requests.Session()
 
-            # Configure retry strategy
             retry_strategy = Retry(
                 total=self.MAX_RETRIES,
                 backoff_factor=self.RETRY_BACKOFF_FACTOR,
@@ -178,7 +119,6 @@ class OnehouseClient:
             self._session.mount("https://", adapter)
             self._session.mount("http://", adapter)
 
-            # Set default headers
             self._session.headers.update(
                 {
                     "Content-Type": "application/json",
@@ -193,7 +133,6 @@ class OnehouseClient:
         return self._session
 
     def _build_url(self, path: str) -> str:
-        """Build full API URL from path."""
         base = f"https://{self.api_endpoint}"
         return f"{base}/v1/{path.lstrip('/')}"
 
@@ -204,21 +143,6 @@ class OnehouseClient:
         data: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Make authenticated API request.
-
-        Args:
-            method: HTTP method (GET, POST, etc.)
-            path: API path
-            data: Request body data
-            params: Query parameters
-
-        Returns:
-            Response JSON as dict
-
-        Raises:
-            ConfigurationError: On authentication or configuration errors
-            RuntimeError: On API errors
-        """
         session = self._get_session()
         url = self._build_url(path)
 
@@ -252,11 +176,6 @@ class OnehouseClient:
             raise RuntimeError(f"API error: {error_detail}") from e
 
     def test_connection(self) -> bool:
-        """Test API connectivity and authentication.
-
-        Returns:
-            True if connection and authentication successful
-        """
         try:
             self._request("GET", "/health")
             return True
@@ -265,22 +184,12 @@ class OnehouseClient:
             return False
 
     def get_cluster_status(self) -> dict[str, Any]:
-        """Get current cluster status.
-
-        Returns:
-            Dict with cluster state information
-        """
         if not self._cluster_id:
             return {"status": "no_cluster", "message": "No cluster provisioned"}
 
         return self._request("GET", f"/clusters/{self._cluster_id}")
 
     def provision_cluster(self) -> str:
-        """Provision a new Quanton cluster.
-
-        Returns:
-            Cluster ID
-        """
         data = {
             "region": self.region,
             "size": self.cluster_config.cluster_size,
@@ -302,7 +211,6 @@ class OnehouseClient:
         return cluster_id
 
     def terminate_cluster(self) -> None:
-        """Terminate the current cluster."""
         if self._cluster_id:
             try:
                 self._request("DELETE", f"/clusters/{self._cluster_id}")
@@ -321,19 +229,6 @@ class OnehouseClient:
         spark_config: dict[str, str] | None = None,
         job_name: str | None = None,
     ) -> str:
-        """Submit a Spark SQL job for execution.
-
-        Args:
-            sql: SQL query to execute
-            database: Database name
-            table_format: Table format (hudi, iceberg, delta)
-            output_location: S3 location for results (optional)
-            spark_config: Additional Spark configuration
-            job_name: Optional job name for tracking
-
-        Returns:
-            Job ID for tracking
-        """
         job_id = job_name or f"benchbox-{uuid.uuid4().hex[:12]}"
 
         data = {
@@ -366,20 +261,6 @@ class OnehouseClient:
         spark_config: dict[str, str] | None = None,
         job_name: str | None = None,
     ) -> str:
-        """Submit a PySpark script job for execution.
-
-        Args:
-            script: PySpark script content
-            script_args: Command-line arguments for script
-            database: Database name
-            table_format: Table format (hudi, iceberg, delta)
-            output_location: S3 location for results
-            spark_config: Additional Spark configuration
-            job_name: Optional job name
-
-        Returns:
-            Job ID for tracking
-        """
         job_id = job_name or f"benchbox-{uuid.uuid4().hex[:12]}"
 
         data = {
@@ -404,14 +285,6 @@ class OnehouseClient:
         return submitted_job_id
 
     def get_job_status(self, job_id: str) -> JobResult:
-        """Get status of a job.
-
-        Args:
-            job_id: Job ID to check
-
-        Returns:
-            JobResult with current state
-        """
         response = self._request("GET", f"/jobs/{job_id}")
 
         state_str = response.get("state", "PENDING")
@@ -435,19 +308,6 @@ class OnehouseClient:
         timeout_minutes: int = 60,
         poll_interval_seconds: int = 5,
     ) -> JobResult:
-        """Wait for a job to complete.
-
-        Args:
-            job_id: Job ID to wait for
-            timeout_minutes: Maximum wait time
-            poll_interval_seconds: Interval between status checks
-
-        Returns:
-            Final JobResult
-
-        Raises:
-            RuntimeError: If job fails or times out
-        """
         timeout_seconds = timeout_minutes * 60
         start_time = mono_time()
 
@@ -468,33 +328,14 @@ class OnehouseClient:
         raise RuntimeError(f"Job {job_id} timed out after {timeout_minutes} minutes")
 
     def cancel_job(self, job_id: str) -> None:
-        """Cancel a running job.
-
-        Args:
-            job_id: Job ID to cancel
-        """
         self._request("POST", f"/jobs/{job_id}/cancel")
         logger.info(f"Cancelled job: {job_id}")
 
     def get_job_results(self, job_id: str) -> list[dict[str, Any]]:
-        """Retrieve job results.
-
-        Args:
-            job_id: Job ID
-
-        Returns:
-            List of result rows as dicts
-        """
         response = self._request("GET", f"/jobs/{job_id}/results")
         return response.get("rows", [])
 
     def create_database(self, database: str, location: str | None = None) -> None:
-        """Create a database in the Quanton metastore.
-
-        Args:
-            database: Database name
-            location: S3 location for database storage
-        """
         data = {"database": database}
         if location:
             data["location"] = location
@@ -503,7 +344,6 @@ class OnehouseClient:
         logger.info(f"Created database: {database}")
 
     def close(self) -> None:
-        """Close the client and clean up resources."""
         self.terminate_cluster()
         if self._session:
             self._session.close()

@@ -1,30 +1,6 @@
-"""ClickHouse Cloud platform adapter for managed ClickHouse service.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-ClickHouse Cloud is the managed cloud version of ClickHouse, providing
-serverless and dedicated compute options with automatic scaling.
-This adapter inherits from ClickHouseAdapter to reuse all shared logic
-(mixins, client code) while implementing cloud-specific defaults.
-
-Authentication:
-- Uses environment variables or config file:
-  - CLICKHOUSE_CLOUD_HOST: Hostname (e.g., abc123.us-east-2.aws.clickhouse.cloud)
-  - CLICKHOUSE_CLOUD_PASSWORD: Password for authentication
-  - CLICKHOUSE_CLOUD_USER: Username (default: "default")
-  - CLICKHOUSE_CLOUD_OAUTH_TOKEN: OAuth/bearer token (alternative to password)
-
-Connection:
-- Uses clickhouse-connect for HTTPS-based communication (port 8443)
-- Supports compression and secure connections by default
-
-Data Loading:
-- Default: Local INSERT via clickhouse-connect
-- S3 staging: Upload to S3 then INSERT FROM s3() table function
-- GCS staging: Upload to GCS then INSERT FROM gcs() table function
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -53,144 +29,54 @@ def _compact_metadata(payload: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _names_contain_glob_syntax(names: list[str]) -> bool:
-    """Return True when any staged name could change a glob's meaning.
-
-    A ``*`` in a table or file name would widen the table-prefix glob beyond
-    its own files (or match nothing the uploader wrote); ``?[{`` have the
-    same effect on ClickHouse's glob matcher. Callers fall back to the
-    per-file loop for such tables so the glob path never silently loads the
-    wrong files.
-    """
     return any(char in name for name in names for char in ("*", "?", "{", "["))
 
 
 class ClickHouseCloudAdapter(ClickHouseAdapter):
-    """ClickHouse Cloud platform adapter - managed ClickHouse service.
-
-    This adapter enables running benchmarks against ClickHouse Cloud,
-    allowing direct comparison with self-hosted ClickHouse performance.
-
-    Authentication:
-        Set environment variables, or provide via platform options:
-        - CLICKHOUSE_CLOUD_HOST: Cloud hostname
-        - CLICKHOUSE_CLOUD_PASSWORD: Authentication password
-        - CLICKHOUSE_CLOUD_USER: Username (default: "default")
-        - CLICKHOUSE_CLOUD_OAUTH_TOKEN: OAuth/bearer token (alternative to password)
-
-    Data Loading:
-        By default, data is loaded via local INSERT statements. For large datasets,
-        configure cloud storage staging:
-        - S3: Set CLICKHOUSE_CLOUD_S3_STAGING_URL (e.g., s3://bucket/prefix/)
-        - GCS: Set CLICKHOUSE_CLOUD_GCS_STAGING_URL (e.g., gs://bucket/prefix/)
-
-    Example usage:
-        benchbox run --platform clickhouse-cloud --benchmark tpch --scale 0.01
-
-        # With explicit options
-        benchbox run --platform clickhouse-cloud --benchmark tpch \\
-            --platform-option host=abc123.us-east-2.aws.clickhouse.cloud \\
-            --platform-option password=my-password
-
-        # With OAuth token (alternative to --platform-option password=...)
-        benchbox run --platform clickhouse-cloud --benchmark tpch \\
-            --platform-option oauth_token=my-token
-
-        # With S3 staging for data loading
-        benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1 \\
-            --platform-option s3_staging_url=s3://my-bucket/benchbox-staging/
-    """
-
     plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
 
     def __init__(self, **config):
-        """Initialize ClickHouse Cloud adapter.
-
-        Forces deployment_mode to "cloud" and validates credentials upfront.
-
-        Args:
-            **config: Configuration options:
-                - host: ClickHouse Cloud hostname (or use CLICKHOUSE_CLOUD_HOST env)
-                - password: Authentication password (or use CLICKHOUSE_CLOUD_PASSWORD env)
-                - oauth_token: OAuth/bearer token (or use CLICKHOUSE_CLOUD_OAUTH_TOKEN env)
-                - username: Username (default: "default", or use CLICKHOUSE_CLOUD_USER env)
-                - database: Database name (default: "default")
-                - s3_staging_url: S3 URL for staging data (or use CLICKHOUSE_CLOUD_S3_STAGING_URL env)
-                - s3_region: AWS region for S3 bucket (or use CLICKHOUSE_CLOUD_S3_REGION env)
-                - gcs_staging_url: GCS URL for staging data (or use CLICKHOUSE_CLOUD_GCS_STAGING_URL env)
-        """
-        # Force cloud deployment mode - this is the key distinction
         config["deployment_mode"] = "cloud"
-        # Internal flag to bypass the base adapter's cloud mode rejection
-        # (cloud is only valid when called from this subclass)
         config["_is_cloud_subclass"] = True
 
-        # Apply cloud-specific defaults from environment before parent init
         self._apply_cloud_defaults(config)
 
-        # Call parent initialization (handles mixin composition)
         super().__init__(**config)
 
-        # Remove internal flag from config to prevent leakage to other components
         config.pop("_is_cloud_subclass", None)
 
         logger.info(f"ClickHouse Cloud adapter initialized for host: {self.host}")
 
     def _apply_cloud_defaults(self, config: dict[str, Any]) -> None:
-        """Apply cloud-specific defaults from environment variables.
-
-        Environment variables follow the existing ClickHouse Cloud pattern:
-        - CLICKHOUSE_CLOUD_HOST
-        - CLICKHOUSE_CLOUD_PASSWORD
-        - CLICKHOUSE_CLOUD_USER
-        - CLICKHOUSE_CLOUD_OAUTH_TOKEN
-        - CLICKHOUSE_CLOUD_S3_STAGING_URL
-        - CLICKHOUSE_CLOUD_S3_REGION
-        - CLICKHOUSE_CLOUD_GCS_STAGING_URL
-
-        Args:
-            config: Configuration dictionary to update with defaults
-        """
-        # Host from env if not provided
         if "host" not in config or not config["host"]:
             config["host"] = os.environ.get("CLICKHOUSE_CLOUD_HOST")
 
-        # Password from env if not provided
         if "password" not in config or not config["password"]:
             config["password"] = os.environ.get("CLICKHOUSE_CLOUD_PASSWORD")
 
-        # OAuth token from env if not provided
         if "oauth_token" not in config or not config["oauth_token"]:
             config["oauth_token"] = os.environ.get("CLICKHOUSE_CLOUD_OAUTH_TOKEN")
 
-        # Username with default fallback
         if "username" not in config or not config["username"]:
             config["username"] = os.environ.get("CLICKHOUSE_CLOUD_USER", "default")
 
-        # S3 staging from env if not provided
         if "s3_staging_url" not in config or not config["s3_staging_url"]:
             config["s3_staging_url"] = os.environ.get("CLICKHOUSE_CLOUD_S3_STAGING_URL")
 
         if "s3_region" not in config or not config["s3_region"]:
             config["s3_region"] = os.environ.get("CLICKHOUSE_CLOUD_S3_REGION")
 
-        # GCS staging from env if not provided
         if "gcs_staging_url" not in config or not config["gcs_staging_url"]:
             config["gcs_staging_url"] = os.environ.get("CLICKHOUSE_CLOUD_GCS_STAGING_URL")
 
     @property
     def platform_name(self) -> str:
-        """Return platform display name."""
         return "ClickHouse Cloud"
 
     def _build_ctas_sort_sql(self, table_name: str, sort_columns: list[TuningColumn]) -> str | None:
-        """Resolve sorted-ingestion support for ClickHouse Cloud.
-
-        ClickHouse Cloud uses MergeTree ORDER BY at table creation, so post-load
-        sorted-ingestion rewrites are intentionally unsupported.
-        """
         try:
             mode, _method = self.resolve_sorted_ingestion_strategy()
         except ValueError as exc:
@@ -208,7 +94,6 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
 
     @staticmethod
     def add_cli_arguments(parser) -> None:
-        """Add ClickHouse Cloud-specific CLI arguments."""
         cloud_group = parser.add_argument_group("ClickHouse Cloud Arguments")
         cloud_group.add_argument(
             "--host",
@@ -239,7 +124,6 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
             help="Database name (default: 'default')",
         )
 
-        # Cloud storage staging arguments for data loading
         staging_group = parser.add_argument_group("ClickHouse Cloud Storage Staging")
         staging_group.add_argument(
             "--clickhouse-cloud-s3-staging-url",
@@ -261,19 +145,8 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
 
     @classmethod
     def from_config(cls, config: dict[str, Any]):
-        """Create ClickHouse Cloud adapter from unified configuration.
-
-        Maps CLI arguments and platform options to adapter configuration.
-
-        Args:
-            config: Unified configuration dictionary from CLI/orchestrator
-
-        Returns:
-            Configured ClickHouseCloudAdapter instance
-        """
         adapter_config: dict[str, Any] = {}
 
-        # Map cloud-specific parameters
         for key in [
             "host",
             "password",
@@ -291,7 +164,6 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
             if key in config and config[key] is not None:
                 adapter_config[key] = config[key]
 
-        # Map optional performance settings
         for key in [
             "max_memory_usage",
             "max_execution_time",
@@ -303,16 +175,13 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
             if key in config and config[key] is not None:
                 adapter_config[key] = config[key]
 
-        # Map cloud storage staging settings
         for key in ["s3_staging_url", "s3_region", "gcs_staging_url"]:
             if key in config and config[key] is not None:
                 adapter_config[key] = config[key]
 
-        # Pass through benchmark context for potential use
         if "benchmark" in config:
             adapter_config["benchmark"] = config["benchmark"]
 
-        # Pass through tuning provenance/config
         for key in [
             "tuning_config",
             "tuning_enabled",
@@ -326,16 +195,6 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
         return cls(**adapter_config)
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get ClickHouse Cloud platform information.
-
-        Extends base ClickHouse platform info with cloud-specific details.
-
-        Args:
-            connection: Optional active connection
-
-        Returns:
-            Dictionary with platform metadata
-        """
         info = super().get_platform_info(connection)
         info.setdefault("configuration", {})
         info["platform_type"] = "clickhouse-cloud"
@@ -353,13 +212,11 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
         info["configuration"]["service_tier"] = self.platform_config.get("service_tier")
         info["configuration"]["compute_size"] = self.platform_config.get("compute_size")
 
-        # Include authentication mode indicator
         if getattr(self, "oauth_token", None):
             info["configuration"]["auth_method"] = "oauth"
         else:
             info["configuration"]["auth_method"] = "password"
 
-        # Include cloud storage staging configuration if set
         if getattr(self, "s3_staging_url", None):
             info["configuration"]["s3_staging_url"] = self.s3_staging_url
         if getattr(self, "s3_region", None):
@@ -375,7 +232,6 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
         connection: Any | None = None,
         platform_info: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Return ClickHouse Cloud-specific normalized deployment and storage metadata."""
         info = dict(platform_info) if isinstance(platform_info, Mapping) else self.get_platform_info(connection)
         metadata = build_default_normalized_result_metadata(self, connection=connection, platform_info=info)
         config = info.get("configuration") if isinstance(info.get("configuration"), Mapping) else {}
@@ -509,40 +365,17 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
             return {"type": "gcs", "bucket": bucket, "prefix": prefix}
         return {}
 
-    # -------------------------------------------------------------------------
-    # Cloud Storage Staging for Data Loading
-    # -------------------------------------------------------------------------
-
     def load_data(
         self, benchmark, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load data with cloud storage staging dispatch.
-
-        Loading strategies (in priority order):
-        1. **S3 staging** (if s3_staging_url is configured): Upload CSV to S3,
-           then INSERT FROM s3() table function.
-        2. **GCS staging** (if gcs_staging_url is configured): Upload CSV to GCS,
-           then INSERT FROM gcs() table function.
-        3. **Default INSERT** (fallback): Use inherited ClickHouse local INSERT path.
-
-        Args:
-            benchmark: Benchmark instance with table/data info
-            connection: Active ClickHouse Cloud connection
-            data_dir: Path to local data directory
-
-        Returns:
-            Tuple of (table_stats, total_time, loading_metadata)
-        """
         if getattr(self, "s3_staging_url", None):
             return self._load_data_via_s3(benchmark, connection, data_dir)
         elif getattr(self, "gcs_staging_url", None):
             return self._load_data_via_gcs(benchmark, connection, data_dir)
         else:
-            # Fall back to the inherited ClickHouse data loading (INSERT batching)
             return super().load_data(benchmark, connection, data_dir)
 
     def validate_external_table_requirements(self) -> None:
-        """Validate cloud staging prerequisites for external table mode."""
         if not getattr(self, "s3_staging_url", None) and not getattr(self, "gcs_staging_url", None):
             raise ValueError(
                 "ClickHouse Cloud external mode requires cloud staging URL. "
@@ -553,7 +386,6 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
     def create_external_tables(
         self, benchmark: Any, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Register external Parquet-backed views in ClickHouse Cloud."""
         self.validate_external_table_requirements()
         if getattr(self, "s3_staging_url", None):
             return self._create_external_tables_via_s3(benchmark, connection, data_dir)
@@ -561,7 +393,6 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
 
     @staticmethod
     def _normalize_external_file_inputs(file_paths: Any) -> tuple[list[Path], list[str]]:
-        """Split file paths into local files and cloud URIs."""
         normalized_paths = file_paths if isinstance(file_paths, list) else [file_paths]
         local_paths: list[Path] = []
         cloud_uris: list[str] = []
@@ -581,7 +412,6 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
     def _create_external_tables_via_s3(
         self, benchmark: Any, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Create external views over S3-hosted Parquet data."""
         try:
             import boto3
         except ImportError:
@@ -637,12 +467,10 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
                 escaped_glob = parquet_glob.replace("'", "''")
                 source_expr = f"s3('{escaped_glob}', '{aws_key_id}', '{aws_secret_key}', 'Parquet')"
             elif parquet_cloud_uris:
-                # Derive a common prefix covering all cloud URIs for this table.
                 dirs = {uri.rsplit("/", 1)[0] for uri in parquet_cloud_uris}
                 if len(dirs) == 1:
                     parquet_glob = dirs.pop() + "/*.parquet"
                 else:
-                    # Multiple directories: find the longest common prefix
                     common = os.path.commonprefix(list(dirs)).rsplit("/", 1)[0]
                     parquet_glob = common + "/**/*.parquet"
                 escaped_glob = parquet_glob.replace("'", "''")
@@ -668,7 +496,6 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
     def _create_external_tables_via_gcs(
         self, benchmark: Any, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Create external views over GCS-hosted Parquet data."""
         try:
             from google.cloud import storage as gcs_storage
         except ImportError:
@@ -728,7 +555,6 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
                 escaped_glob = parquet_glob.replace("'", "''")
                 source_expr = f"gcs('{escaped_glob}', '{gcs_hmac_key}', '{gcs_hmac_secret}', 'Parquet')"
             elif parquet_cloud_uris:
-                # Derive a common prefix covering all cloud URIs for this table.
                 dirs = {uri.rsplit("/", 1)[0] for uri in parquet_cloud_uris}
                 if len(dirs) == 1:
                     cloud_prefix = dirs.pop()
@@ -756,14 +582,6 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
         return table_stats, total_time, metadata
 
     def _resolve_cloud_data_files(self, benchmark, data_dir: Path) -> dict[str, list[Path]]:
-        """Resolve data files for cloud staging upload.
-
-        Returns:
-            Mapping of table_name -> list of valid file paths.
-
-        Raises:
-            ValueError: If no data files are found.
-        """
         from benchbox.platforms.base.data_loading import resolve_adapter_data_source
 
         data_source = resolve_adapter_data_source(self, benchmark, data_dir)
@@ -781,13 +599,6 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
         upload_fn: Any,
         glob_url_fn: Any,
     ) -> int:
-        """Upload every file, then ingest the table with one glob INSERT.
-
-        Each staged file parses independently under ``CSVWithNames``, so one
-        header row per file is expected and correct: unlike byte-stream
-        concatenation, no header skipping is needed. Returns the post-ingest
-        row count for the table.
-        """
         for file_path in valid_files:
             upload_start = mono_time()
             self.log_verbose(f"Uploading {file_path.name} to {kind.upper()} staging")
@@ -831,22 +642,6 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
         glob_url_fn: Any | None = None,
         extra_metadata: dict[str, Any] | None = None,
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Shared core for S3 and GCS staging loads.
-
-        Args:
-            kind: Provider label for log messages (``"s3"`` or ``"gcs"``).
-            staging_url: Full staging URL (e.g. ``s3://bucket/prefix/``).
-            sql_fn: ClickHouse table function name (``"s3"`` or ``"gcs"``).
-            creds: (key, secret) pair, already SQL-quote-escaped.
-            upload_fn: Callable ``(file_path, table_name_lower, file_name) -> sql_url``.
-                       Uploads the file and returns the URL to embed in the SQL statement.
-            glob_url_fn: Optional callable ``(table_name_lower) -> glob_url`` covering
-                         every file staged under that table's prefix. When present
-                         (and no staged name carries glob metacharacters), all of
-                         the table's files upload first and a single INSERT reads
-                         them through one glob instead of one INSERT per file.
-            extra_metadata: Additional keys to merge into the returned loading_metadata dict.
-        """
         start_time = mono_time()
         table_stats: dict[str, int] = {}
         safe_key, safe_secret = creds
@@ -950,11 +745,6 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
     def _load_data_via_s3(
         self, benchmark, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load data via S3 staging using ClickHouse's s3() table function.
-
-        AWS credentials are resolved from AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.
-        Requires boto3 (lazy import).
-        """
         try:
             import boto3
         except ImportError:
@@ -972,10 +762,6 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
             s3_client_kwargs["region_name"] = self.s3_region
         s3_client = boto3.client("s3", **s3_client_kwargs)
         s3_bucket, s3_prefix = self._parse_s3_url(self.s3_staging_url)
-        # Isolate this load under a unique prefix so the bulk glob INSERT
-        # reads exactly the files uploaded by this invocation. Reusing the
-        # bare table prefix would also match stale objects from earlier runs
-        # (e.g. obsolete shards after rerunning with fewer files).
         s3_load_token = uuid.uuid4().hex[:12]
 
         def upload_to_s3(file_path: Path, table_name_lower: str, file_name: str) -> str:
@@ -1003,11 +789,6 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
     def _load_data_via_gcs(
         self, benchmark, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load data via GCS staging using ClickHouse's gcs() table function.
-
-        GCS HMAC credentials are resolved from GCS_HMAC_ACCESS_KEY / GCS_HMAC_SECRET.
-        Requires google-cloud-storage (lazy import).
-        """
         try:
             from google.cloud import storage as gcs_storage
         except ImportError:
@@ -1023,15 +804,12 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
         gcs_client = gcs_storage.Client()
         gcs_bucket_name, gcs_prefix = self._parse_gcs_url(self.gcs_staging_url)
         gcs_bucket_obj = gcs_client.bucket(gcs_bucket_name)
-        # Same run isolation as the S3 path: the bulk glob INSERT must read
-        # only this invocation's files, never stale objects under the table prefix.
         gcs_load_token = uuid.uuid4().hex[:12]
 
         def upload_to_gcs(file_path: Path, table_name_lower: str, file_name: str) -> str:
             blob_name = f"{gcs_prefix}{table_name_lower}/{gcs_load_token}/{file_name}"
             blob = gcs_bucket_obj.blob(blob_name)
             blob.upload_from_filename(str(file_path))
-            # ClickHouse gcs() requires https:// URL, not gs://
             return f"https://storage.googleapis.com/{gcs_bucket_name}/{blob_name}"
 
         def gcs_glob_url(table_name_lower: str) -> str:
@@ -1051,14 +829,12 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
 
     @staticmethod
     def _parse_s3_url(s3_url: str) -> tuple[str, str]:
-        """Parse an S3 URL into (bucket, prefix) components."""
         from benchbox.utils.cloud_urls import parse_s3_url
 
         return parse_s3_url(s3_url)
 
     @staticmethod
     def _parse_gcs_url(gcs_url: str) -> tuple[str, str]:
-        """Parse a GCS URL into (bucket, prefix) components."""
         from benchbox.utils.cloud_urls import parse_gcs_url
 
         return parse_gcs_url(gcs_url)

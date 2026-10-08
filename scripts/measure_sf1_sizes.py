@@ -1,24 +1,4 @@
 #!/usr/bin/env python3
-"""Measure actual uncompressed SF=1 source-data sizes for all benchmarks.
-
-Runs each benchmark's generator at scale_factor=1.0 with compression disabled
-and sums the emitted file bytes. Real-data benchmarks (nyctaxi, flightdata,
-clickbench) download or sample from finite corpora, so the script measures
-what the generator actually emits rather than projecting from row counts.
-
-Results are written as JSON to stdout (or --output): one record per
-benchmark with total bytes, file count, row counts where the manifest
-reports them, elapsed seconds, method (generated | manifest | spec), and
-any error.
-
-Usage:
-    uv run -- python scripts/measure_sf1_sizes.py --output /tmp/sf1.json
-    uv run -- python scripts/measure_sf1_sizes.py --benchmark tpch,ssb
-
-Parallel runs (--jobs N) execute benchmarks concurrently, one process per
-benchmark. Keep the default sequential mode unless the scratch filesystem
-has ample space: several SF=1 datasets exceed 1 GB.
-"""
 
 from __future__ import annotations
 
@@ -35,37 +15,38 @@ from pathlib import Path
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.datagen_manifest import MANIFEST_FILENAME
 
-# Manifest row counts are advisory metadata: a generator may emit placeholder
-# or modelled counts rather than exact per-file rows. The measurement records
-# the summed manifest total whenever one is present.
+CLI_DESCRIPTION = (
+    "Measure actual uncompressed SF=1 source-data sizes for all benchmarks.\n"
+    "\n"
+    "Runs each benchmark's generator at scale_factor=1.0 with compression disabled\n"
+    "and sums the emitted file bytes. Real-data benchmarks (nyctaxi, flightdata,\n"
+    "clickbench) download or sample from finite corpora, so the script measures\n"
+    "what the generator actually emits rather than projecting from row counts.\n"
+    "\n"
+    "Results are written as JSON to stdout (or --output): one record per\n"
+    "benchmark with total bytes, file count, row counts where the manifest\n"
+    "reports them, elapsed seconds, method (generated | manifest | spec), and\n"
+    "any error.\n"
+    "\n"
+    "Usage:\n"
+    "    uv run -- python scripts/measure_sf1_sizes.py --output /tmp/sf1.json\n"
+    "    uv run -- python scripts/measure_sf1_sizes.py --benchmark tpch,ssb\n"
+    "\n"
+    "Parallel runs (--jobs N) execute benchmarks concurrently, one process per\n"
+    "benchmark. Keep the default sequential mode unless the scratch filesystem\n"
+    "has ample space: several SF=1 datasets exceed 1 GB.\n"
+)
+
 _MANIFEST_TABLES_KEY = "tables"
 
-# Per-process memo of successful measurements: alias entries and repeated
-# runs reuse the source record without regenerating multi-GB datasets.
-# (Declared after SizeRecord below; populated by measure_one.)
 
-# Transport archives and compressed variants retained alongside extracted
-# source data (for example the canonical JoinOrder tarball, or the
-# primitives auxiliary corpus shipped in .csv/.csv.gz/.csv.zst/.csv.bz2 and
-# multi-codec Parquet) are compressed forms of bytes counted uncompressed
-# after extraction. They are excluded so the same logical data is not
-# counted twice against the uncompressed contract. Columnar Parquet files
-# are dictionary-encoded and compressed on disk: they cannot stand in for
-# uncompressed bytes and are excluded unless the benchmark ships only Parquet
-# (joinorder, via ``count_parquet``), in which case the documented size is the
-# on-disk Parquet footprint, not an uncompressed source size. tpcds_obt is
-# forced to ``.dat`` and measured uncompressed.
 _ARCHIVE_SUFFIXES = (".tar.zst", ".tar.gz", ".tgz", ".tar", ".zip")
 _COMPRESSED_SUFFIXES = (".gz", ".zst", ".bz2", ".snappy", ".lz4", ".parquet", ".lock")
-# Generator-emitted run metadata (timestamps, environment fingerprints)
-# varies run to run and is not dataset content.
 _METADATA_FILENAMES = {".bulk_load_metadata.json"}
 
 
 @dataclass
 class SizeRecord:
-    """One benchmark's measured SF=1 result."""
-
     benchmark: str
     scale_factor: float = 1.0
     method: str = "generated"
@@ -78,19 +59,13 @@ class SizeRecord:
 
 
 _RECORD_CACHE: dict[str, SizeRecord] = {}
-"""Per-process memo of successful measurements, keyed by benchmark id."""
 
 
-# (benchmark_id, module, class, kwargs) for direct generator invocation.
-# Benchmark-level classes are used where the generator needs benchmark
-# wiring (tpcds manager, tpcdi source stages, real-data downloaders).
 GENERATORS: list[tuple[str, str, str, dict]] = [
     ("tpch", "benchbox.core.tpch.generator", "TPCHDataGenerator", {}),
     ("tpcds", "benchbox.core.tpcds.generator.manager", "TPCDSDataGenerator", {}),
     ("ssb", "benchbox.core.ssb.generator", "SSBDataGenerator", {}),
     ("tpch_skew", "benchbox.core.tpch_skew.generator", "TPCHSkewDataGenerator", {}),
-    # tpchavoc reuses the TPC-H generator byte-for-byte; alias it so the
-    # multi-minute SF=1 generation runs once and both rows share the total.
     ("tpchavoc", "__alias__:tpch", "", {}),
     ("amplab", "benchbox.core.amplab.generator", "AMPLabDataGenerator", {}),
     ("h2odb", "benchbox.core.h2odb.generator", "H2ODataGenerator", {}),
@@ -109,10 +84,6 @@ GENERATORS: list[tuple[str, str, str, dict]] = [
     ("clickbench", "benchbox.core.clickbench.generator", "ClickBenchDataGenerator", {}),
 ]
 
-# Benchmarks whose SF=1 data comes from a fixed corpus or a checked-in
-# derived archive rather than a parameterized generator. Measuring means
-# running the benchmark-level generate_data path (download + extract) or,
-# for joinorder, sizing the canonical manifest-owned files.
 BENCHMARK_LEVEL: list[tuple[str, str, str, dict]] = [
     ("tpcdi", "benchbox.core.tpcdi.benchmark", "TPCDIBenchmark", {}),
     ("nyctaxi", "benchbox.core.nyctaxi.benchmark", "NYCTaxiBenchmark", {}),
@@ -124,11 +95,6 @@ BENCHMARK_LEVEL: list[tuple[str, str, str, dict]] = [
 
 
 def _is_counted_file(path: Path, *, count_parquet: bool = False) -> bool:
-    """Return whether a file counts toward the uncompressed source total.
-
-    ``count_parquet`` admits ``.parquet`` files for benchmarks whose canonical
-    data has no uncompressed form (the documented on-disk Parquet footprint).
-    """
     name = path.name
     if name == MANIFEST_FILENAME or name in _METADATA_FILENAMES:
         return False
@@ -141,7 +107,6 @@ def _is_counted_file(path: Path, *, count_parquet: bool = False) -> bool:
 
 
 def _sum_tree(root: Path, seen: set[str], *, count_parquet: bool = False) -> tuple[int, int]:
-    """Sum every data file under a generator-owned output root."""
     total = 0
     count = 0
     for child in sorted(root.rglob("*")):
@@ -154,13 +119,6 @@ def _sum_tree(root: Path, seen: set[str], *, count_parquet: bool = False) -> tup
 
 
 def _sum_paths(paths: object, *, count_parquet: bool = False) -> tuple[int, int]:
-    """Sum file bytes under generator return values (dict | list | nested).
-
-    Some generators return only table paths while emitting additional corpora
-    elsewhere in their output tree (for example the primitives bulk-load
-    files). Directories are therefore walked in full, so every generator-owned
-    file beneath a returned directory counts toward the total.
-    """
     total = 0
     count = 0
     stack: list[object] = [paths]
@@ -188,7 +146,6 @@ def _sum_paths(paths: object, *, count_parquet: bool = False) -> tuple[int, int]
 
 
 def _flatten_paths(paths: object) -> list[str | Path]:
-    """Flatten generator return values (dict | list | nested) to path leaves."""
     leaves: list[str | Path] = []
     stack: list[object] = [paths]
     while stack:
@@ -203,7 +160,6 @@ def _flatten_paths(paths: object) -> list[str | Path]:
 
 
 def _sum_tree_excluding(root: Path, skip: set[Path], seen: set[str], *, count_parquet: bool = False) -> tuple[int, int]:
-    """Walk an output root, skipping staging subtrees already excluded."""
     total = 0
     count = 0
     skip_resolved = {path.resolve() for path in skip}
@@ -220,15 +176,6 @@ def _sum_tree_excluding(root: Path, skip: set[Path], seen: set[str], *, count_pa
 
 
 def _sum_manifest_rows(root: Path) -> int | None:
-    """Sum row_count entries from the top-level manifest beneath an output root.
-
-    Only the manifest at the benchmark output root is read: nested
-    manifests (for example an upstream source cache staged inside the
-    temp tree) belong to a different dataset. Within one table only the
-    first format's entries count, since every format lists the same rows.
-
-    Returns None when no manifest with row metadata is present.
-    """
     manifest_path = root / MANIFEST_FILENAME
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -259,20 +206,12 @@ def _sum_manifest_rows(root: Path) -> int | None:
 
 
 def _run_generator(module: str, cls_name: str, extra: dict) -> tuple[int, int, int | None, float]:
-    """Instantiate a generator at SF=1 uncompressed and sum its output."""
     module_obj = __import__(module, fromlist=[cls_name])
     cls = getattr(module_obj, cls_name)
     extra = dict(extra)
     count_parquet = bool(extra.pop("count_parquet", False))
     with tempfile.TemporaryDirectory(prefix="sf1measure-") as tmp:
         start = mono_time()
-        # Benchmarks with auxiliary source datasets (TPC-DS-OBT's TPC-DS
-        # cache, DataVault's TPC-H cache) derive those paths from the output
-        # root. Point them beneath the temp root too so multi-GB caches are
-        # cleaned up with the measurement and never touch shared caches.
-        # TPCDSOBTBenchmark takes tpcds_source_dir as a constructor
-        # argument; DataVault only exposes _tpch_source_dir post-hoc, so
-        # pass a kwargs override where supported and patch otherwise.
         tmp_path = Path(tmp)
         source_dir = tmp_path / "source_cache"
         if "tpcds_source_dir" not in extra:
@@ -285,7 +224,6 @@ def _run_generator(module: str, cls_name: str, extra: dict) -> tuple[int, int, i
         try:
             instance = cls(scale_factor=1.0, output_dir=tmp, compress_data=False, **extra)
         except TypeError:
-            # Generators with narrower constructors (no compression flags).
             try:
                 instance = cls(scale_factor=1.0, output_dir=tmp, **extra)
             except TypeError:
@@ -303,19 +241,9 @@ def _run_generator(module: str, cls_name: str, extra: dict) -> tuple[int, int, i
         paths = meth()
         _reject_synthetic_fallback(instance, cls_name)
         if isinstance(paths, dict) and not paths:
-            # Some generators return paths implicitly via output_dir.
             paths = tmp_path
         elapsed = elapsed_seconds(start)
-        # Measure the generator's own outputs. The upstream source cache
-        # (TPC-DS/TPC-H staging pointed inside the temp tree for cleanup)
-        # is build-time staging, not dataset content, and is never summed.
-        # Returned paths are table files, so also walk the output root for
-        # auxiliary corpora the return value omits (primitives bulk-load
-        # files); the walk skips the source cache subtree explicitly.
         total, count = _sum_paths(paths, count_parquet=count_parquet)
-        # Collect the returned table files so the auxiliary walk below does
-        # not double count them. `_sum_paths` keys files by str(path),
-        # so expand directory leaves to their contained files here.
         seen: set[str] = set()
         for leaf in _flatten_paths(paths):
             candidate = Path(leaf)
@@ -331,13 +259,6 @@ def _run_generator(module: str, cls_name: str, extra: dict) -> tuple[int, int, i
 
 
 def _reject_synthetic_fallback(instance: object, cls_name: str) -> None:
-    """Fail loudly when a downloader silently substituted synthetic data.
-
-    Real-data benchmarks fall back to tiny synthetic months when the
-    network is unavailable; recording those bytes as calibrated SF=1
-    sizes would corrupt the table. Any downloader on the instance tree
-    reporting synthetic fallback months aborts the measurement.
-    """
     seen: set[int] = set()
     stack: list[object] = [instance]
     while stack:
@@ -357,11 +278,6 @@ def _reject_synthetic_fallback(instance: object, cls_name: str) -> None:
 
 
 def measure_one(benchmark: str) -> SizeRecord:
-    """Measure a single benchmark, never raising.
-
-    Successful records are memoized per process: alias entries (tpchavoc)
-    and repeated runs reuse the source measurement without regenerating.
-    """
     cached = _RECORD_CACHE.get(benchmark)
     if cached is not None:
         return cached
@@ -396,7 +312,7 @@ def measure_one(benchmark: str) -> SizeRecord:
             record.error = "generator emitted no measurable files"
         else:
             _RECORD_CACHE[benchmark] = record
-    except Exception as exc:  # noqa: BLE001 - record per-benchmark failures as data
+    except Exception as exc:
         record.error = f"{type(exc).__name__}: {exc}"
         record.elapsed_seconds = round(elapsed_seconds(start), 1)
         traceback.print_exc()
@@ -404,19 +320,14 @@ def measure_one(benchmark: str) -> SizeRecord:
 
 
 def all_benchmark_ids() -> list[str]:
-    """Every benchmark with a measurement entry, in registry order."""
     return [g[0] for g in GENERATORS] + [g[0] for g in BENCHMARK_LEVEL]
 
 
 def measure_many(benchmarks: list[str], jobs: int = 1) -> list[SizeRecord]:
-    """Measure benchmarks sequentially or with bounded process parallelism."""
     if jobs < 1:
         raise ValueError(f"--jobs must be >= 1, got {jobs}")
     if jobs == 1 or len(benchmarks) <= 1:
         return [measure_one(benchmark) for benchmark in benchmarks]
-    # Aliases (tpchavoc -> tpch) resolve from the in-process record cache. Worker
-    # processes do not share it, so measure real generators in the pool, seed the
-    # parent cache with their results, and resolve aliases here without regenerating.
     aliased = {b for b in benchmarks if _is_alias(b)}
     real = [b for b in benchmarks if b not in aliased]
     results: dict[str, SizeRecord] = {}
@@ -437,7 +348,7 @@ def _is_alias(benchmark: str) -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument(
         "--benchmark",
         default="",
@@ -501,7 +412,6 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _report_record(record: SizeRecord) -> None:
-    """Log one completed measurement to stderr."""
     if record.error:
         print(f"  {record.benchmark} FAILED: {record.error}", file=sys.stderr)
     else:

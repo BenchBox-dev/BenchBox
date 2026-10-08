@@ -1,11 +1,5 @@
-"""Read Primitives fresh mappings must match manifest reuse at the platform seam.
-
-These tests cover generation and path normalization, not the legacy direct
-loaders, whose shard and compression support is outside this mapping contract.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -26,7 +20,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 @pytest.mark.parametrize("compressed", [False, True], ids=["uncompressed", "gzip"])
 @pytest.mark.parametrize("facade", [False, True], ids=["implementation", "public-facade"])
 def test_fresh_mapping_matches_manifest_reuse(tmp_path: Path, monkeypatch, compressed: bool, facade: bool) -> None:
-    """Propagate real shard paths through the mixin and normal platform helper."""
     benchmark = (
         ReadPrimitives(scale_factor=0.01, output_dir=tmp_path)
         if facade
@@ -62,8 +55,6 @@ def test_fresh_mapping_matches_manifest_reuse(tmp_path: Path, monkeypatch, compr
         producer_manifest_bytes = manifest.manifest_path.read_bytes()
         return layout
 
-    # Replace only expensive dbgen execution. Keep wrapper, mixin, manifest I/O,
-    # runner reuse and platform normalization real.
     monkeypatch.setattr(impl.data_generator.tpch_generator, "generate", generate)
     fresh = benchmark.generate_data(tables=["customer", "nation"])
     assert fresh is impl.tables

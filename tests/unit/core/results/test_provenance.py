@@ -1,5 +1,3 @@
-"""Tests for the canonical result-provenance vocabulary."""
-
 from __future__ import annotations
 
 import ast
@@ -55,7 +53,7 @@ class TestVisibilityAndRanking:
         assert p.visibility_for_label(label) == visibility
 
     def test_vendor_is_ranking_eligible(self) -> None:
-        # Decision D2: vendor-supplied is ranked (with a distinct badge).
+
         assert p.is_ranking_eligible_visibility("public-vendor-reported") is True
 
     def test_curated_and_verified_are_ranking_eligible(self) -> None:
@@ -76,9 +74,8 @@ class TestVisibilityAndRanking:
         assert p.display_for_label("maintainer-run") == "Maintainer Run"
 
     def test_unknown_label_fails_safe_to_non_ranked_visibility(self) -> None:
-        # A corrupt/typo/future label must NOT be promoted to the ranked
-        # public-curated tier; it falls back to a visible-but-unranked state.
-        vis = p.visibility_for_label("vendor-suppplied")  # deliberate typo
+
+        vis = p.visibility_for_label("vendor-suppplied")
         assert vis == "public-self-reported"
         assert p.is_ranking_eligible_visibility(vis) is False
 
@@ -110,12 +107,6 @@ class TestFunding:
 
 
 def _except_import_literals(source_path: Path) -> dict[str, object]:
-    """Extract module-level assignments made inside an `except ImportError` block.
-
-    These are the offline fallback copies of the provenance vocabulary shipped to
-    the slim published-results branch (where benchbox/ is absent). They are
-    hand-maintained, so this lets us assert they never drift from provenance.py.
-    """
     tree = ast.parse(source_path.read_text(encoding="utf-8"))
     found: dict[str, object] = {}
     for node in ast.walk(tree):
@@ -134,8 +125,6 @@ def _except_import_literals(source_path: Path) -> dict[str, object]:
 
 
 class TestFallbackLockstep:
-    """The offline mirror copies of the vocabulary must equal provenance.py."""
-
     @pytest.mark.parametrize(
         "rel_path",
         [
@@ -147,8 +136,7 @@ class TestFallbackLockstep:
         repo_root = Path(__file__).resolve().parents[4]
         literals = _except_import_literals(repo_root / rel_path)
         assert literals.get("FUNDING_SOURCES") == p.FUNDING_SOURCES
-        # generate_corpus_inventory mirrors SOURCE_TO_TRUST_LABEL; bundle.py
-        # mirrors RESULT_SOURCES. Assert whichever it carries.
+
         if "RESULT_SOURCES" in literals:
             assert literals["RESULT_SOURCES"] == p.RESULT_SOURCES
         if "SOURCE_TO_TRUST_LABEL" in literals:
@@ -160,10 +148,7 @@ class TestPublishLabelIntegration:
         assert "vendor-supplied" in VALID_LABELS
 
     def test_provenance_labels_lead_the_publish_vocabulary(self) -> None:
-        # The three source-derived labels must come FIRST, in source order, so
-        # the publish vocabulary stays derived from provenance.py rather than
-        # re-listing literals. Assert position, not mere membership (membership
-        # is guaranteed by construction and would be a tautology).
+
         source_labels = tuple(p.SOURCE_TO_TRUST_LABEL.values())
         assert VALID_LABELS[: len(source_labels)] == source_labels
 

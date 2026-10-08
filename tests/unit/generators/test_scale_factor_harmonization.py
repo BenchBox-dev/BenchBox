@@ -1,5 +1,3 @@
-"""Scale-factor baseline harmonization tests."""
-
 from __future__ import annotations
 
 import json
@@ -33,15 +31,8 @@ def test_spec_locked_or_already_on_target_generators_stay_put(tmp_path):
 
 
 def test_adjustable_baselines_project_near_one_gb(tmp_path):
-    """Verify that new SF=1 baselines project to ~1 GB uncompressed.
-
-    Each ratio below scales from a measured pre-harmonization dataset size
-    (the "old" baseline) to the new row counts, so we can assert that the
-    new configuration lands within BenchBox's 0.8-1.3 GB target band.
-    """
     joinorder = JoinOrderGenerator(scale_factor=1.0, output_dir=tmp_path, compress_data=False)
     amplab_projection_gb = 0.45 * 2.5
-    # Pre-harmonization JOB row counts (measured ~5 GB uncompressed).
     joinorder_old_total = sum(
         [
             7,
@@ -106,30 +97,21 @@ def test_tsbs_devops_supports_compressed_generation(tmp_path):
     assert manifest["compression"]["type"] == "zstd"
 
 
-# --- Scaling linearity tests (large-SF behavior) ---
-
-
 def test_tsbs_devops_scales_linearly_not_quadratically():
-    """Verify TSBS row counts grow linearly with SF, not quadratically.
-
-    Uses SF=1 and SF=2 to stay above the max(10, ...) host floor.
-    """
     g1 = TSBSDevOpsDataGenerator(scale_factor=1)
     g2 = TSBSDevOpsDataGenerator(scale_factor=2)
     stats1 = g1.get_generation_stats()
     stats2 = g2.get_generation_stats()
 
-    # Duration should be fixed (both use DEFAULT_DURATION_DAYS)
     assert stats1["duration_days"] == DEFAULT_DURATION_DAYS
     assert stats2["duration_days"] == DEFAULT_DURATION_DAYS
 
-    # Row ratio should be ~2× (linear), not ~4× (quadratic)
     ratio = stats2["total_rows"] / stats1["total_rows"]
     assert 1.5 <= ratio <= 2.5, f"Expected ~2× ratio, got {ratio:.2f}× (quadratic would be ~4×)"
 
 
 def test_tsbs_devops_duration_fixed_at_large_sf():
-    """Verify duration_days does not scale with SF."""
+
     for sf in [1, 10, 100]:
         g = TSBSDevOpsDataGenerator(scale_factor=sf)
         assert g.duration_days == DEFAULT_DURATION_DAYS, (
@@ -138,7 +120,7 @@ def test_tsbs_devops_duration_fixed_at_large_sf():
 
 
 def test_flightdata_warns_at_corpus_ceiling(caplog):
-    """Verify FlightData logs a warning when BTS corpus is exhausted."""
+
     import logging
 
     from benchbox.core.flightdata.downloader import FlightDataDownloader
@@ -152,7 +134,7 @@ def test_flightdata_warns_at_corpus_ceiling(caplog):
 
 
 def test_flightdata_no_warning_below_ceiling(caplog):
-    """Verify FlightData does NOT warn at normal scale factors."""
+
     import logging
 
     from benchbox.core.flightdata.downloader import FlightDataDownloader
@@ -164,15 +146,10 @@ def test_flightdata_no_warning_below_ceiling(caplog):
 
 
 def test_nyctaxi_warns_at_sample_rate_saturation(caplog):
-    """Verify NYC Taxi logs a warning when sample_rate saturates at 1.0.
-
-    Warning should fire at exactly SF=10 (the saturation boundary), not just above it.
-    """
     import logging
 
     from benchbox.core.nyctaxi.downloader import NYCTaxiDataDownloader
 
-    # SF=10 is the exact boundary - warning should fire here
     with caplog.at_level(logging.WARNING, logger="benchbox.core.nyctaxi.downloader"):
         NYCTaxiDataDownloader(scale_factor=10, output_dir="/tmp/test_nyc_warn_boundary")
 
@@ -180,7 +157,6 @@ def test_nyctaxi_warns_at_sample_rate_saturation(caplog):
         f"Expected saturation warning at SF=10, got: {[r.message for r in caplog.records]}"
     )
 
-    # SF=100 should also warn
     caplog.clear()
     with caplog.at_level(logging.WARNING, logger="benchbox.core.nyctaxi.downloader"):
         NYCTaxiDataDownloader(scale_factor=100, output_dir="/tmp/test_nyc_warn")
@@ -191,7 +167,7 @@ def test_nyctaxi_warns_at_sample_rate_saturation(caplog):
 
 
 def test_nyctaxi_no_warning_below_saturation(caplog):
-    """Verify NYC Taxi does NOT warn at normal scale factors."""
+
     import logging
 
     from benchbox.core.nyctaxi.downloader import NYCTaxiDataDownloader

@@ -12,36 +12,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-/**
- * Hadoop CompressionCodec for Zstandard (.zst) backed by zstd-jni.
- *
- * The official apache/spark Docker image ships Hadoop 3.4.1 whose
- * ZStandardCodec requires native libhadoop compiled with zstd support, which
- * that image does NOT include.  This codec instead wraps ZstdInputStream /
- * ZstdOutputStream from the zstd-jni-*.jar already on the Spark classpath,
- * providing a pure-JVM decompression path for .zst files.
- *
- * Registration (in spark-defaults.conf or --conf):
- *   spark.hadoop.io.compression.codecs = io.benchbox.codec.ZstdJniCodec
- *
- * NOTE - read-only in BenchBox.  BenchBox only consumes .zst input data; it
- * never writes .zst output via Spark.  The compression (createOutputStream /
- * ZstdCompressionOutputStream) path is implemented for completeness but is
- * NOT exercised by any BenchBox workflow.  In particular,
- * ZstdCompressionOutputStream.finish() flushes but does not finalize the zstd
- * frame, so consumers of a written-and-not-closed stream would see truncated
- * data.  If a future workflow needs .zst writes, replace finish() with a
- * proper frame-finalization call (e.g. zout.close() with the underlying-
- * stream-ownership contract reviewed) and add a unit test.
- */
 public class ZstdJniCodec implements CompressionCodec {
 
     @Override
     public String getDefaultExtension() {
         return ".zst";
     }
-
-    // ── decompression ──────────────────────────────────────────────────────
 
     @Override
     public CompressionInputStream createInputStream(InputStream in) throws IOException {
@@ -64,8 +40,6 @@ public class ZstdJniCodec implements CompressionCodec {
         return null;
     }
 
-    // ── compression ────────────────────────────────────────────────────────
-
     @Override
     public CompressionOutputStream createOutputStream(OutputStream out) throws IOException {
         return new ZstdCompressionOutputStream(new ZstdOutputStream(out));
@@ -87,8 +61,6 @@ public class ZstdJniCodec implements CompressionCodec {
         return null;
     }
 
-    // ── inner stream wrappers ──────────────────────────────────────────────
-
     private static final class ZstdCompressionInputStream extends CompressionInputStream {
         ZstdCompressionInputStream(ZstdInputStream zin) throws IOException {
             super(zin);
@@ -106,7 +78,6 @@ public class ZstdJniCodec implements CompressionCodec {
 
         @Override
         public void resetState() throws IOException {
-            // zstd frames are self-contained; nothing to reset for sequential reads.
         }
     }
 
@@ -135,7 +106,6 @@ public class ZstdJniCodec implements CompressionCodec {
 
         @Override
         public void resetState() throws IOException {
-            // Not required for single-frame zstd files.
         }
     }
 }

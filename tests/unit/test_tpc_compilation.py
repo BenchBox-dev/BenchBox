@@ -1,10 +1,6 @@
-"""
-Copyright 2026 Joe Harris / BenchBox Project
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Unit tests for TPC binary auto-compilation functionality.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -27,7 +23,6 @@ pytestmark = [
 
 
 def _mock_discover_paths(tpc_h=None, tpc_ds=None, precompiled=None):
-    """Helper to create a mock for _discover_tpc_paths."""
     return {
         "tpc_h_source": tpc_h,
         "tpc_ds_source": tpc_ds,
@@ -36,13 +31,9 @@ def _mock_discover_paths(tpc_h=None, tpc_ds=None, precompiled=None):
 
 
 class TestTPCCompiler:
-    """Test TPCCompiler class functionality."""
-
     def test_init_no_sources(self):
-        """Test initialization when no TPC sources are found."""
         import benchbox.utils.tpc_compilation as tpc_mod
 
-        # Clear the discovery cache
         original_cache = tpc_mod._discovered_paths.copy()
         tpc_mod._discovered_paths.clear()
 
@@ -61,7 +52,6 @@ class TestTPCCompiler:
             tpc_mod._discovered_paths.update(original_cache)
 
     def test_init_with_sources(self):
-        """Test initialization when TPC sources are found."""
         import benchbox.utils.tpc_compilation as tpc_mod
 
         tpc_h_path = Path("/fake/tpc-h")
@@ -79,13 +69,12 @@ class TestTPCCompiler:
 
                 assert compiler.tpc_h_source == tpc_h_path
                 assert compiler.tpc_ds_source == tpc_ds_path
-                assert len(compiler.binaries) == 4  # dbgen, qgen, dsdgen, dsqgen
+                assert len(compiler.binaries) == 4
         finally:
             tpc_mod._discovered_paths.clear()
             tpc_mod._discovered_paths.update(original_cache)
 
     def test_is_binary_available_exists(self):
-        """Test binary availability check when binary exists."""
         import benchbox.utils.tpc_compilation as tpc_mod
 
         tpc_ds_path = Path("/fake/tpc-ds")
@@ -100,7 +89,6 @@ class TestTPCCompiler:
             ):
                 compiler = TPCCompiler()
 
-                # Mock binary exists and is executable
                 with (
                     patch("pathlib.Path.exists", return_value=True),
                     patch("os.access", return_value=True),
@@ -111,7 +99,6 @@ class TestTPCCompiler:
             tpc_mod._discovered_paths.update(original_cache)
 
     def test_is_binary_available_not_exists(self):
-        """Test binary availability check when binary doesn't exist."""
         import benchbox.utils.tpc_compilation as tpc_mod
 
         tpc_ds_path = Path("/fake/tpc-ds")
@@ -126,7 +113,6 @@ class TestTPCCompiler:
             ):
                 compiler = TPCCompiler()
 
-                # Mock binary doesn't exist
                 with patch("pathlib.Path.exists", return_value=False):
                     assert compiler.is_binary_available("dsdgen") is False
         finally:
@@ -134,7 +120,6 @@ class TestTPCCompiler:
             tpc_mod._discovered_paths.update(original_cache)
 
     def test_needs_compilation_source_missing(self):
-        """Test compilation need check when source is missing."""
         import benchbox.utils.tpc_compilation as tpc_mod
 
         original_cache = tpc_mod._discovered_paths.copy()
@@ -152,7 +137,6 @@ class TestTPCCompiler:
             tpc_mod._discovered_paths.update(original_cache)
 
     def test_needs_compilation_binary_exists(self):
-        """Test compilation need check when binary already exists."""
         import benchbox.utils.tpc_compilation as tpc_mod
 
         tpc_ds_path = Path("/fake/tpc-ds")
@@ -167,7 +151,6 @@ class TestTPCCompiler:
             ):
                 compiler = TPCCompiler()
 
-                # Mock source exists, binary exists
                 with (
                     patch("pathlib.Path.exists", return_value=True),
                     patch("os.access", return_value=True),
@@ -178,7 +161,6 @@ class TestTPCCompiler:
             tpc_mod._discovered_paths.update(original_cache)
 
     def test_needs_compilation_binary_missing(self):
-        """Test compilation need check when binary is missing."""
         import benchbox.utils.tpc_compilation as tpc_mod
 
         tpc_ds_path = Path("/fake/tpc-ds")
@@ -193,7 +175,6 @@ class TestTPCCompiler:
             ):
                 compiler = TPCCompiler()
 
-                # Mock source exists, binary doesn't exist
                 with patch.object(compiler.binaries["dsdgen"], "source_dir") as mock_source_dir:
                     mock_source_dir.exists.return_value = True
                     with patch("pathlib.Path.exists", return_value=False):
@@ -203,7 +184,6 @@ class TestTPCCompiler:
             tpc_mod._discovered_paths.update(original_cache)
 
     def test_check_dependencies_all_available(self):
-        """Test dependency checking when all dependencies are available."""
         import benchbox.utils.tpc_compilation as tpc_mod
 
         tpc_ds_path = Path("/fake/tpc-ds")
@@ -227,7 +207,6 @@ class TestTPCCompiler:
             tpc_mod._discovered_paths.update(original_cache)
 
     def test_check_dependencies_missing(self):
-        """Test dependency checking when dependencies are missing."""
         import benchbox.utils.tpc_compilation as tpc_mod
 
         tpc_ds_path = Path("/fake/tpc-ds")
@@ -253,7 +232,6 @@ class TestTPCCompiler:
             tpc_mod._discovered_paths.update(original_cache)
 
     def test_compile_binary_disabled(self):
-        """Test compilation when auto-compile is disabled."""
         compiler = TPCCompiler(auto_compile=False)
         result = compiler.compile_binary("dbgen")
 
@@ -261,7 +239,6 @@ class TestTPCCompiler:
         assert "disabled" in result.error_message.lower()
 
     def test_compile_binary_unknown(self):
-        """Test compilation with unknown binary name."""
         compiler = TPCCompiler()
         result = compiler.compile_binary("unknown_binary")
 
@@ -269,7 +246,6 @@ class TestTPCCompiler:
         assert "unknown binary" in result.error_message.lower()
 
     def test_compile_binary_not_needed(self):
-        """Test compilation when binary already exists."""
         import benchbox.utils.tpc_compilation as tpc_mod
 
         tpc_ds_path = Path("/fake/tpc-ds")
@@ -285,7 +261,6 @@ class TestTPCCompiler:
             ):
                 compiler = TPCCompiler()
 
-                # Mock binary exists and get_binary_path returns valid path
                 with (
                     patch.object(compiler, "needs_compilation", return_value=False),
                     patch.object(compiler, "is_binary_available", return_value=True),
@@ -303,7 +278,6 @@ class TestTPCCompiler:
             tpc_mod._discovered_paths.update(original_cache)
 
     def test_compile_binary_missing_dependencies(self):
-        """Test compilation when dependencies are missing."""
         import benchbox.utils.tpc_compilation as tpc_mod
 
         tpc_ds_path = Path("/fake/tpc-ds")
@@ -318,7 +292,6 @@ class TestTPCCompiler:
             ):
                 compiler = TPCCompiler()
 
-                # Mock binary needs compilation but dependencies missing
                 with (
                     patch.object(compiler, "needs_compilation", return_value=True),
                     patch.object(
@@ -336,7 +309,6 @@ class TestTPCCompiler:
             tpc_mod._discovered_paths.update(original_cache)
 
     def test_get_status_report(self):
-        """Test status report generation."""
         import benchbox.utils.tpc_compilation as tpc_mod
 
         tpc_ds_path = Path("/fake/tpc-ds")
@@ -366,10 +338,7 @@ class TestTPCCompiler:
 
 
 class TestCompilationResult:
-    """Test CompilationResult dataclass."""
-
     def test_compilation_result_creation(self):
-        """Test CompilationResult creation."""
         result = CompilationResult(
             binary_name="dbgen",
             status=CompilationStatus.SUCCESS,
@@ -385,10 +354,7 @@ class TestCompilationResult:
 
 
 class TestBinaryInfo:
-    """Test BinaryInfo dataclass."""
-
     def test_binary_info_creation(self):
-        """Test BinaryInfo creation."""
         info = BinaryInfo(
             name="dbgen",
             source_dir=Path("/fake/source"),
@@ -402,7 +368,6 @@ class TestBinaryInfo:
         assert info.dependencies == ["gcc", "make"]
 
     def test_binary_info_post_init(self):
-        """Test BinaryInfo post_init with no dependencies."""
         info = BinaryInfo(
             name="dbgen",
             source_dir=Path("/fake/source"),
@@ -413,21 +378,16 @@ class TestBinaryInfo:
 
 
 class TestUtilityFunctions:
-    """Test utility functions."""
-
     def test_get_tpc_compiler(self):
-        """Test get_tpc_compiler function."""
         with patch("benchbox.utils.tpc_compilation.TPCCompiler") as mock_compiler:
             get_tpc_compiler(auto_compile=False, verbose=True)
             mock_compiler.assert_called_once_with(auto_compile=False, verbose=True)
 
     def test_ensure_tpc_binaries(self):
-        """Test ensure_tpc_binaries function."""
         with patch("benchbox.utils.tpc_compilation.get_tpc_compiler") as mock_get_compiler:
             mock_compiler = Mock()
             mock_get_compiler.return_value = mock_compiler
 
-            # Mock compiler behavior
             mock_compiler.binaries = {"dbgen": Mock()}
             mock_compiler.needs_compilation.return_value = False
             mock_compiler.is_binary_available.return_value = True
@@ -442,7 +402,6 @@ class TestUtilityFunctions:
             ]
 
     def test_ensure_tpc_binaries_unknown(self):
-        """Test ensure_tpc_binaries with unknown binary."""
         with patch("benchbox.utils.tpc_compilation.get_tpc_compiler") as mock_get_compiler:
             mock_compiler = Mock()
             mock_get_compiler.return_value = mock_compiler
@@ -456,10 +415,7 @@ class TestUtilityFunctions:
 
 
 class TestCompilationStatus:
-    """Test CompilationStatus enum."""
-
     def test_enum_values(self):
-        """Test enum values are correct."""
         assert CompilationStatus.SUCCESS.value == "success"
         assert CompilationStatus.FAILED.value == "failed"
         assert CompilationStatus.SKIPPED.value == "skipped"
@@ -468,50 +424,39 @@ class TestCompilationStatus:
 
 
 class TestPathDiscoveryCaching:
-    """Test that TPC path discovery is cached globally."""
-
     def test_discover_tpc_paths_caches_results(self):
-        """Test that _discover_tpc_paths returns cached results on subsequent calls."""
         import benchbox.utils.tpc_compilation as tpc_mod
 
-        # Clear the cache to ensure clean test
         original_cache = tpc_mod._discovered_paths.copy()
         tpc_mod._discovered_paths.clear()
 
         try:
-            # First call should populate the cache
             result1 = tpc_mod._discover_tpc_paths()
             assert result1 is not None
             assert "tpc_h_source" in result1
             assert "tpc_ds_source" in result1
             assert "precompiled_base" in result1
 
-            # Second call should return the same cached dict
             result2 = tpc_mod._discover_tpc_paths()
-            assert result1 is result2  # Same object, not just equal
+            assert result1 is result2
 
         finally:
-            # Restore original cache
             tpc_mod._discovered_paths.clear()
             tpc_mod._discovered_paths.update(original_cache)
 
     def test_multiple_compiler_instances_share_discovery(self):
-        """Test that multiple TPCCompiler instances share the same discovered paths."""
         import benchbox.utils.tpc_compilation as tpc_mod
 
-        # Clear caches
         original_paths = tpc_mod._discovered_paths.copy()
         original_checksums = tpc_mod._checksum_cache.copy()
         tpc_mod._discovered_paths.clear()
         tpc_mod._checksum_cache.clear()
 
         try:
-            # Create multiple compiler instances
             compiler1 = TPCCompiler(auto_compile=False)
             compiler2 = TPCCompiler(auto_compile=True)
             compiler3 = TPCCompiler(auto_compile=False, verbose=True)
 
-            # All should have the same source paths
             assert compiler1.tpc_h_source == compiler2.tpc_h_source == compiler3.tpc_h_source
             assert compiler1.tpc_ds_source == compiler2.tpc_ds_source == compiler3.tpc_ds_source
             assert compiler1.precompiled_base == compiler2.precompiled_base == compiler3.precompiled_base
@@ -524,13 +469,9 @@ class TestPathDiscoveryCaching:
 
 
 class TestChecksumCaching:
-    """Test that checksum verification is cached globally."""
-
     def test_checksum_cache_shared_across_instances(self):
-        """Test that checksum verification results are cached globally."""
         import benchbox.utils.tpc_compilation as tpc_mod
 
-        # Clear checksum cache
         original_cache = tpc_mod._checksum_cache.copy()
         tpc_mod._checksum_cache.clear()
 
@@ -538,21 +479,15 @@ class TestChecksumCaching:
             compiler1 = TPCCompiler(auto_compile=False)
             compiler2 = TPCCompiler(auto_compile=True)
 
-            # If precompiled binaries exist, verify checksum caching
             if compiler1.precompiled_base:
-                # First verification should populate cache
                 result1 = compiler1.is_precompiled_available("dsqgen")
 
-                # Get cache state after first check
                 cache_after_first = tpc_mod._checksum_cache.copy()
 
-                # Second verification (even from different instance) should use cache
                 result2 = compiler2.is_precompiled_available("dsqgen")
 
-                # Cache should not have grown (result was cached)
                 assert len(tpc_mod._checksum_cache) == len(cache_after_first)
 
-                # Results should match
                 assert result1 == result2
 
         finally:

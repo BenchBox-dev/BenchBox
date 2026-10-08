@@ -1,30 +1,3 @@
-"""QuestDB query plan parser.
-
-Parses QuestDB ``EXPLAIN <query>`` output into the harmonized ``QueryPlanDAG``.
-QuestDB returns the plan as a single ``QUERY PLAN`` text column (one row per
-line); ``QuestDBAdapter.get_query_plan()`` joins those rows with newlines. The
-result is an indentation-based tree, e.g.::
-
-    Sort light lo: 10
-      keys: [symbol]
-        GroupBy vectorized: true workers: 1
-          keys: [symbol]
-          values: [sum(price)]
-            Async JIT Filter workers: 1
-              filter: 100<price
-                PageFrame
-                    Row forward scan
-                    Frame forward scan on: trades
-
-Two kinds of line appear: operator nodes (start with an upper-case letter, e.g.
-``Sort``, ``GroupBy``, ``Async JIT Filter``, ``PageFrame``, ``Frame forward scan
-on: ...``) and property lines (start lower-case, e.g. ``keys:``, ``values:``,
-``filter:``). Property lines attach to the nearest enclosing operator; only
-operator lines nest the tree. Because QuestDB's indentation step is not uniform
-(properties and child operators can share an indent), nesting is derived from
-relative indentation rather than a fixed unit.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -42,12 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 class QuestDBQueryPlanParser(QueryPlanParser):
-    """Parser for QuestDB ``EXPLAIN`` indented text output."""
-
-    # Ordered (substring, type) pairs; the first substring found in the
-    # lower-cased, space-stripped operator line wins (QuestDB appends inline
-    # parameters to the operator name, e.g. "Sort light lo: 10"). More specific
-    # names precede the generic ones they contain.
     _OPERATOR_KEYWORDS: tuple[tuple[str, LogicalOperatorType], ...] = (
         ("frameforwardscan", LogicalOperatorType.SCAN),
         ("framebackwardscan", LogicalOperatorType.SCAN),
@@ -86,9 +53,6 @@ class QuestDBQueryPlanParser(QueryPlanParser):
     def __init__(self):
         super().__init__("questdb")
 
-    # Error-channel cleanup: EXPLAIN-failure producers now return None (capture
-    # records explain_failed), so these prefixes should no longer arrive here.
-    # Both stay rejected as defense so stray error text can never parse as a plan.
     def _parse_impl(self, query_id: str, explain_output: str) -> QueryPlanDAG:
         if not explain_output or not explain_output.strip():
             raise ValueError("Empty EXPLAIN output")
@@ -117,19 +81,15 @@ class QuestDBQueryPlanParser(QueryPlanParser):
             stripped = raw_line.strip()
             if not stripped:
                 continue
-            # Skip a leading "QUERY PLAN" column header if present.
             if stripped == "QUERY PLAN":
                 continue
             indent = len(raw_line) - len(raw_line.lstrip())
-            # Operator lines start with an upper-case letter; property lines
-            # (keys:/values:/filter:/condition:) start lower-case.
             is_operator = stripped[0].isupper()
             parsed.append({"indent": indent, "content": stripped, "is_operator": is_operator})
         return parsed
 
     def _build_raw_tree(self, parsed_lines: list[dict[str, Any]]) -> dict[str, Any] | None:
         root: dict[str, Any] | None = None
-        # Stack of operator nodes on the current root-to-leaf path, keyed by indent.
         stack: list[dict[str, Any]] = []
 
         for line in parsed_lines:
@@ -187,7 +147,6 @@ class QuestDBQueryPlanParser(QueryPlanParser):
 
     @staticmethod
     def _extract_table(content: str) -> str | None:
-        """Extract the table from a frame-scan line, e.g. 'Frame forward scan on: trades'."""
         match = re.search(r"\bon:\s*([A-Za-z_][\w.]*)", content)
         return match.group(1) if match else None
 

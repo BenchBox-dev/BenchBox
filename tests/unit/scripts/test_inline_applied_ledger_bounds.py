@@ -1,14 +1,6 @@
-"""The inlined applied ledger carries the same entry cap as the companion.
-
-``_validate_applied_companion_limits`` bounds ``*.applied.json`` by filename, so
-folding the ledger into ``platform.tuning.applied`` opened a path around it: the
-validator runs on attacker-controlled PR JSON, and a hand-authored bundle can
-inline an unbounded receipt while shipping no companion at all.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for
-details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for
+# details.
 
 from __future__ import annotations
 
@@ -63,8 +55,6 @@ class TestInlineAppliedLedgerBounds:
 
     @pytest.mark.parametrize("tuning", [None, {}, {"applied": None}, {"applied": "not-a-dict"}])
     def test_absent_or_malformed_blocks_are_not_errors_here(self, tuning: object) -> None:
-        """Shape validation for the ledger stays with its producer; this gate
-        only bounds resources and must not broaden rejection semantics."""
         platform: dict = {"name": "duckdb"}
         if tuning is not None:
             platform["tuning"] = tuning
@@ -73,8 +63,6 @@ class TestInlineAppliedLedgerBounds:
 
 
 class TestBoundsCoverEveryLedgerArray:
-    """An entry cap on two arrays is evadable through the other eight."""
-
     @pytest.mark.parametrize(
         "applied",
         [
@@ -104,7 +92,6 @@ class TestBoundsCoverEveryLedgerArray:
         assert any("exceeds the" in error for error in vr.errors)
 
     def test_few_entries_holding_huge_strings_are_rejected(self) -> None:
-        """A per-array entry cap alone passes a handful of multi-megabyte strings."""
         vr = _validate(_platform({"statements": [{"phase": "ddl", "note": "x" * (3 * 1024 * 1024)}] * 4}))
 
         assert not vr.ok

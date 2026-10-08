@@ -1,15 +1,3 @@
-"""Integration tests validating throughput test corrections.
-
-This module contains tests that validate the critical fixes made to the
-TPC-H and TPC-DS Throughput Test implementations, including:
-- Timing measurement accuracy (TTT calculation)
-- Timeout behavior and error reporting
-- Connection cleanup on failures
-
-These tests use real ThreadPoolExecutor and actual timing to validate
-behavior that cannot be tested with mocks alone.
-"""
-
 from __future__ import annotations
 
 import time
@@ -27,7 +15,6 @@ from benchbox.core.tpch.throughput_test import (
     TPCHThroughputTestConfig,
 )
 
-# Mark all tests in this file as integration tests
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.slow,
@@ -35,11 +22,8 @@ pytestmark = [
 
 
 class TestTimingMeasurementAccuracy:
-    """Validate that Total Test Time (TTT) is measured correctly."""
-
     def test_tpch_ttt_excludes_setup_overhead(self):
-        """Test that TPC-H TTT measures only concurrent execution time."""
-        # Create a benchmark that tracks when queries actually execute
+
         execution_times = []
         execution_lock = Lock()
 
@@ -51,7 +35,6 @@ class TestTimingMeasurementAccuracy:
         benchmark = Mock()
         benchmark.get_query = mock_get_query
 
-        # Create connections that track execution timing
         connection_creation_times = []
         connection_lock = Lock()
 
@@ -66,7 +49,6 @@ class TestTimingMeasurementAccuracy:
             conn.close.return_value = None
             return conn
 
-        # Run throughput test with 2 streams
         config = TPCHThroughputTestConfig(
             scale_factor=1.0,
             num_streams=2,
@@ -86,31 +68,22 @@ class TestTimingMeasurementAccuracy:
         result = test.run(config)
         test_end = time.time()
 
-        # Verify test succeeded
         assert result.success
         assert result.streams_executed == 2
         assert len(result.stream_results) == 2
 
-        # Critical validation: TTT should be less than wall-clock time
-        # because it excludes setup/teardown overhead
         wall_clock_time = test_end - test_start
         measured_ttt = result.total_time
 
-        # TTT should be based on actual stream execution time
         assert measured_ttt > 0
         assert measured_ttt <= wall_clock_time
 
-        # TTT should be close to the duration of the longest stream
-        # (since streams run concurrently)
         max_stream_duration = max(sr.duration for sr in result.stream_results)
 
-        # TTT should match max stream duration within reasonable tolerance
-        # (allowing for thread scheduling overhead)
-        assert abs(measured_ttt - max_stream_duration) < 0.5  # 500ms tolerance
+        assert abs(measured_ttt - max_stream_duration) < 0.5
 
     def test_tpcds_ttt_excludes_setup_overhead(self):
-        """Test that TPC-DS TTT measures only concurrent execution time."""
-        # Similar structure to TPC-H test
+
         execution_times = []
         execution_lock = Lock()
 
@@ -128,7 +101,6 @@ class TestTimingMeasurementAccuracy:
             conn.commit.return_value = None
             return conn
 
-        # Create mock benchmark
         benchmark = Mock()
         benchmark.get_query = mock_get_query
         benchmark.get_queries.return_value = {"1": "SELECT 1", "2": "SELECT 2"}
@@ -139,8 +111,8 @@ class TestTimingMeasurementAccuracy:
             num_streams=2,
             stream_timeout=10,
             verbose=False,
-            queries_per_stream=2,  # Limit to 2 queries for faster test
-            enable_preflight=False,  # Skip preflight for this test
+            queries_per_stream=2,
+            enable_preflight=False,
         )
 
         test = TPCDSThroughputTest(
@@ -151,13 +123,12 @@ class TestTimingMeasurementAccuracy:
             verbose=config.verbose,
         )
 
-        # Patch stream generation to avoid complexity
         from unittest.mock import patch
 
         with patch("benchbox.core.tpcds.streams.create_standard_streams") as mock_create:
             mock_manager = Mock()
             mock_streams = {}
-            for stream_id in range(2):
+            for stream_id in range(3):
                 mock_streams[stream_id] = [
                     Mock(stream_id=stream_id, query_id=1, position=1, variant=None, sql="SELECT 1"),
                     Mock(stream_id=stream_id, query_id=2, position=2, variant=None, sql="SELECT 2"),
@@ -169,7 +140,6 @@ class TestTimingMeasurementAccuracy:
             result = test.run(config)
             test_end = time.time()
 
-        # Validations
         assert result.success
         assert result.streams_executed == 2
 
@@ -179,29 +149,15 @@ class TestTimingMeasurementAccuracy:
         assert measured_ttt > 0
         assert measured_ttt <= wall_clock_time
 
-        # TTT should match concurrent execution time
         if result.stream_results:
             max_stream_duration = max(sr.duration for sr in result.stream_results)
             assert abs(measured_ttt - max_stream_duration) < 0.5
 
 
 class TestGenerationExcludedFromTiming:
-    """Validate that query GENERATION cost is excluded from the timed window.
-
-    Query generation (qgen/dsqgen subprocess calls) used to run INSIDE the
-    per-query timed region, contaminating both ``execution_time_seconds`` and
-    TTT with generation cost. These tests instrument ``get_query`` to sleep
-    for a known duration and assert neither the per-query timing nor TTT
-    include it, proving generation now happens entirely before the timed
-    concurrent window (see ``_pregenerate_stream_queries`` in both
-    ``tpch/throughput_test.py`` and ``tpcds/throughput_test.py``).
-    """
-
     GENERATION_SLEEP = 0.3
 
     def test_tpch_generation_time_excluded_from_timing(self):
-        """22 queries x 0.3s sleep = 6.6s of generation cost must not land
-        inside TTT or any single query's execution_time_seconds."""
 
         def slow_get_query(*args, **kwargs):
             time.sleep(self.GENERATION_SLEEP)
@@ -239,16 +195,11 @@ class TestGenerationExcludedFromTiming:
         assert result.stream_results[0].queries_executed == 22
 
         total_generation_time = 22 * self.GENERATION_SLEEP
-        # TTT excludes generation entirely -- it happens before the timed
-        # window starts, so it should be nowhere near the 6.6s of sleeping
-        # that 22 in-loop get_query() calls would have added.
         assert result.total_time < total_generation_time
         for query_result in result.stream_results[0].query_results:
             assert query_result["execution_time_seconds"] < self.GENERATION_SLEEP
 
     def test_tpcds_generation_time_excluded_from_timing(self):
-        """3 queries x 0.3s sleep = 0.9s of generation cost must not land
-        inside TTT or any single query's execution_time_seconds."""
 
         def slow_get_query(*args, **kwargs):
             time.sleep(self.GENERATION_SLEEP)
@@ -274,7 +225,7 @@ class TestGenerationExcludedFromTiming:
             stream_timeout=30,
             verbose=False,
             queries_per_stream=3,
-            enable_preflight=True,  # pre-generation only runs when preflight is enabled
+            enable_preflight=True,
         )
 
         test = TPCDSThroughputTest(
@@ -310,10 +261,8 @@ class TestGenerationExcludedFromTiming:
 
 
 class TestConnectionCleanup:
-    """Validate connection cleanup on failures."""
-
     def test_tpch_connection_closed_on_query_failure(self):
-        """Test that TPC-H closes connections even when queries fail."""
+
         connections_created = []
         connections_closed = []
         creation_lock = Lock()
@@ -322,11 +271,9 @@ class TestConnectionCleanup:
         def connection_factory():
             conn = Mock()
 
-            # Track creation
             with creation_lock:
                 connections_created.append(conn)
 
-            # Track closure
             original_close = conn.close
 
             def tracked_close():
@@ -336,7 +283,6 @@ class TestConnectionCleanup:
 
             conn.close = tracked_close
 
-            # Make execute fail
             def failing_execute(*args, **kwargs):
                 raise RuntimeError("Simulated query failure")
 
@@ -364,25 +310,20 @@ class TestConnectionCleanup:
 
         result = test.run(config)
 
-        # Verify test failed (queries failed)
         assert not result.success
 
-        # Critical validation: All connections were closed
-        # Even though queries failed, connections must be cleaned up
-        assert len(connections_created) == 2  # 2 streams = 2 connections
+        assert len(connections_created) == 2
 
-        # Wait briefly for background cleanup paths to close all connections.
         deadline = time.time() + 0.5
         while len(connections_closed) < 2 and time.time() < deadline:
             time.sleep(0.01)
 
-        assert len(connections_closed) == 2  # All connections closed
+        assert len(connections_closed) == 2
 
-        # Same connection objects should be in both lists
         assert set(connections_created) == set(connections_closed)
 
     def test_tpcds_connection_closed_on_stream_failure(self):
-        """Test that TPC-DS closes connections even when streams fail."""
+
         connections_created = []
         connections_closed = []
         creation_lock = Lock()
@@ -403,7 +344,6 @@ class TestConnectionCleanup:
 
             conn.close = tracked_close
 
-            # Make execute fail
             def failing_execute(*args, **kwargs):
                 raise RuntimeError("Simulated failure")
 
@@ -447,10 +387,8 @@ class TestConnectionCleanup:
 
             result = test.run(config)
 
-        # Verify failures occurred
         assert result.streams_executed == 2
 
-        # Validate cleanup
         assert len(connections_created) == 2
 
         deadline = time.time() + 0.5
@@ -462,22 +400,7 @@ class TestConnectionCleanup:
 
 
 class TestTimeoutDetectionAndCooperativeCancellation:
-    """Validate the throughput-timeout-leak-and-success-gates fixes end-to-end
-    through real ThreadPoolExecutor/timing (not mocked internals):
-
-    1. Per-stream timeout detection was dead code (future.result(timeout=...)
-       inside an as_completed() loop can never raise TimeoutError once
-       as_completed() has already yielded that future as done()). It now
-       surfaces as a timed-out/leaked stream in result.errors.
-    2. Opt-in cooperative cancellation (config.cancel_on_timeout, default
-       OFF) lets a stream stuck past its timeout actually stop soon instead
-       of continuing to run every remaining query in the background.
-    """
-
     def test_tpch_timed_out_stream_is_surfaced_as_leaked(self):
-        """A stream whose very first query never returns within
-        stream_timeout must be reported as timed-out/leaked -- not silently
-        recorded as a generic failure and not silently ignored."""
 
         def connection_factory():
             conn = Mock()
@@ -488,10 +411,6 @@ class TestTimeoutDetectionAndCooperativeCancellation:
             def slow_execute(_query_text):
                 call_count["n"] += 1
                 if call_count["n"] == 1:
-                    # Only the first of 22 queries is slow (comfortably past
-                    # stream_timeout=1 below); the rest return immediately so
-                    # the leaked-but-uncancelled stream still finishes this
-                    # test quickly instead of running 22 slow queries serially.
                     time.sleep(1.5)
                 return cursor
 
@@ -519,9 +438,6 @@ class TestTimeoutDetectionAndCooperativeCancellation:
         assert any("timed out" in e.lower() and "leaked" in e.lower() for e in result.errors)
 
     def test_tpch_cooperative_cancel_stops_a_hung_stream_promptly(self):
-        """With cancel_on_timeout=True, a stream stuck on slow queries notices
-        the cancellation signal set once its timeout elapses and returns
-        promptly, instead of continuing to run every one of its 22 queries."""
         executed_queries: list[str] = []
         lock = Lock()
 
@@ -562,8 +478,6 @@ class TestTimeoutDetectionAndCooperativeCancellation:
         result = test.run(config)
         elapsed = time.time() - start
 
-        # 22 queries * 0.3s = 6.6s if it ran to completion; cooperative
-        # cancellation must stop it soon after the 1s timeout instead.
         assert elapsed < 3.0
         assert len(executed_queries) < 22
         assert result.success is False
@@ -608,7 +522,8 @@ class TestTimeoutDetectionAndCooperativeCancellation:
         with patch("benchbox.core.tpcds.streams.create_standard_streams") as mock_create:
             mock_manager = Mock()
             mock_manager.generate_streams.return_value = {
-                0: [Mock(stream_id=0, query_id=1, position=1, variant=None, sql="SELECT 1")],
+                stream_id: [Mock(stream_id=stream_id, query_id=1, position=1, variant=None, sql="SELECT 1")]
+                for stream_id in range(2)
             }
             mock_create.return_value = mock_manager
 

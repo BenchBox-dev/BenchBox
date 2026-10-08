@@ -1,15 +1,6 @@
-"""Unit tests for Trino/Presto/Athena DDL Generators.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the TrinoDDLGenerator and AthenaDDLGenerator for:
-- Hive connector partitioning and bucketing
-- Iceberg connector partition transforms
-- Athena EXTERNAL TABLE syntax
-- WITH clause property generation
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -34,15 +25,13 @@ pytestmark = [
 
 
 class TestTrinoDDLGeneratorBasics:
-    """Tests for TrinoDDLGenerator basic properties."""
-
     def test_platform_name(self) -> None:
-        """Test platform name property."""
+
         generator = TrinoDDLGenerator()
         assert generator.platform_name == "trino"
 
     def test_supported_tuning_types(self) -> None:
-        """Test supported tuning types."""
+
         generator = TrinoDDLGenerator()
         assert generator.supports_tuning_type("partitioning")
         assert generator.supports_tuning_type("distribution")
@@ -50,7 +39,7 @@ class TestTrinoDDLGeneratorBasics:
         assert generator.supports_tuning_type("clustering")
 
     def test_connector_property(self) -> None:
-        """Test connector type property."""
+
         generator = TrinoDDLGenerator(connector="iceberg")
         assert generator.connector == ConnectorType.ICEBERG
 
@@ -59,10 +48,8 @@ class TestTrinoDDLGeneratorBasics:
 
 
 class TestHiveConnectorPartitioning:
-    """Tests for Hive connector partitioning and bucketing."""
-
     def test_basic_partitioning(self) -> None:
-        """Test basic Hive partitioning."""
+
         generator = TrinoDDLGenerator(connector=ConnectorType.HIVE)
         table_tuning = TableTuning(
             table_name="lineitem",
@@ -72,7 +59,7 @@ class TestHiveConnectorPartitioning:
         assert clauses.table_properties["partitioned_by"] == "ARRAY['l_shipdate']"
 
     def test_multiple_partition_columns(self) -> None:
-        """Test multiple partition columns."""
+
         generator = TrinoDDLGenerator(connector=ConnectorType.HIVE)
         table_tuning = TableTuning(
             table_name="orders",
@@ -85,7 +72,7 @@ class TestHiveConnectorPartitioning:
         assert clauses.table_properties["partitioned_by"] == "ARRAY['order_year', 'order_month']"
 
     def test_bucketing(self) -> None:
-        """Test Hive bucketing with bucket count."""
+
         generator = TrinoDDLGenerator(connector=ConnectorType.HIVE, default_bucket_count=16)
         table_tuning = TableTuning(
             table_name="lineitem",
@@ -96,7 +83,7 @@ class TestHiveConnectorPartitioning:
         assert clauses.table_properties["bucket_count"] == "16"
 
     def test_sorting_within_buckets(self) -> None:
-        """Test sorted_by for Hive connector."""
+
         generator = TrinoDDLGenerator(connector=ConnectorType.HIVE)
         table_tuning = TableTuning(
             table_name="lineitem",
@@ -109,7 +96,7 @@ class TestHiveConnectorPartitioning:
         assert clauses.table_properties["sorted_by"] == "ARRAY['l_orderkey', 'l_linenumber']"
 
     def test_complete_tuning(self) -> None:
-        """Test complete Hive tuning with partitioning, bucketing, and sorting."""
+
         generator = TrinoDDLGenerator(connector=ConnectorType.HIVE, default_bucket_count=32)
         table_tuning = TableTuning(
             table_name="lineitem",
@@ -125,33 +112,28 @@ class TestHiveConnectorPartitioning:
 
 
 class TestIcebergConnectorPartitioning:
-    """Tests for Iceberg connector partition transforms."""
-
     def test_date_partition_transform(self) -> None:
-        """Test Iceberg partition transform for date columns."""
+
         generator = TrinoDDLGenerator(connector=ConnectorType.ICEBERG)
         table_tuning = TableTuning(
             table_name="events",
             partitioning=[TuningColumn(name="event_date", type="DATE", order=1)],
         )
         clauses = generator.generate_tuning_clauses(table_tuning)
-        # Should use month transform for date columns by default
         assert "partitioning" in clauses.table_properties
         assert "month(event_date)" in clauses.table_properties["partitioning"]
 
     def test_non_date_partition(self) -> None:
-        """Test Iceberg partition for non-date columns (identity transform)."""
         generator = TrinoDDLGenerator(connector=ConnectorType.ICEBERG)
         table_tuning = TableTuning(
             table_name="orders",
             partitioning=[TuningColumn(name="region", type="VARCHAR", order=1)],
         )
         clauses = generator.generate_tuning_clauses(table_tuning)
-        # Should use identity transform (just column name)
         assert clauses.table_properties["partitioning"] == "ARRAY['region']"
 
     def test_iceberg_sorted_by(self) -> None:
-        """Test Iceberg sorted table writes."""
+
         generator = TrinoDDLGenerator(connector=ConnectorType.ICEBERG)
         table_tuning = TableTuning(
             table_name="events",
@@ -161,7 +143,7 @@ class TestIcebergConnectorPartitioning:
         assert clauses.table_properties["sorted_by"] == "ARRAY['event_id']"
 
     def test_iceberg_distribution_logs_info(self) -> None:
-        """Test that distribution columns log info for Iceberg."""
+
         generator = TrinoDDLGenerator(connector=ConnectorType.ICEBERG)
         table_tuning = TableTuning(
             table_name="orders",
@@ -175,10 +157,8 @@ class TestIcebergConnectorPartitioning:
 
 
 class TestDeltaConnector:
-    """Tests for Delta Lake connector."""
-
     def test_delta_partitioning(self) -> None:
-        """Test Delta Lake partitioning."""
+
         generator = TrinoDDLGenerator(connector=ConnectorType.DELTA)
         table_tuning = TableTuning(
             table_name="events",
@@ -188,7 +168,7 @@ class TestDeltaConnector:
         assert clauses.table_properties["partitioned_by"] == "ARRAY['event_date']"
 
     def test_delta_location(self) -> None:
-        """Test Delta Lake with location."""
+
         generator = TrinoDDLGenerator(
             connector=ConnectorType.DELTA,
             location="s3://bucket/delta/events",
@@ -198,26 +178,22 @@ class TestDeltaConnector:
 
 
 class TestFileFormat:
-    """Tests for file format handling."""
-
     def test_default_parquet_format(self) -> None:
-        """Test default PARQUET format."""
+
         generator = TrinoDDLGenerator()
         clauses = generator.generate_tuning_clauses(TableTuning(table_name="test"))
         assert clauses.table_properties["format"] == "'PARQUET'"
 
     def test_orc_format(self) -> None:
-        """Test ORC format."""
+
         generator = TrinoDDLGenerator(default_format=FileFormat.ORC)
         clauses = generator.generate_tuning_clauses(TableTuning(table_name="test"))
         assert clauses.table_properties["format"] == "'ORC'"
 
 
 class TestCreateTableDDL:
-    """Tests for CREATE TABLE DDL generation."""
-
     def test_basic_create_table(self) -> None:
-        """Test basic CREATE TABLE."""
+
         generator = TrinoDDLGenerator()
         columns = [
             ColumnDefinition("id", "BIGINT", ColumnNullability.NOT_NULL),
@@ -230,7 +206,7 @@ class TestCreateTableDDL:
         assert ddl.endswith(";")
 
     def test_create_table_with_tuning(self) -> None:
-        """Test CREATE TABLE with WITH clause."""
+
         generator = TrinoDDLGenerator(connector=ConnectorType.HIVE)
         columns = [
             ColumnDefinition("l_orderkey", "BIGINT"),
@@ -249,21 +225,21 @@ class TestCreateTableDDL:
         assert "partitioned_by = ARRAY['l_shipdate']" in ddl
 
     def test_create_table_if_not_exists(self) -> None:
-        """Test CREATE TABLE IF NOT EXISTS."""
+
         generator = TrinoDDLGenerator()
         columns = [ColumnDefinition("id", "BIGINT")]
         ddl = generator.generate_create_table_ddl("test", columns, if_not_exists=True)
         assert "CREATE TABLE IF NOT EXISTS test" in ddl
 
     def test_create_table_with_schema(self) -> None:
-        """Test CREATE TABLE with schema prefix."""
+
         generator = TrinoDDLGenerator()
         columns = [ColumnDefinition("id", "BIGINT")]
         ddl = generator.generate_create_table_ddl("orders", columns, schema="hive.tpch")
         assert "CREATE TABLE hive.tpch.orders" in ddl
 
     def test_external_table(self) -> None:
-        """Test CREATE EXTERNAL TABLE."""
+
         generator = TrinoDDLGenerator(external=True)
         columns = [ColumnDefinition("id", "BIGINT")]
         ddl = generator.generate_create_table_ddl("events", columns)
@@ -271,15 +247,13 @@ class TestCreateTableDDL:
 
 
 class TestAthenaDDLGenerator:
-    """Tests for AthenaDDLGenerator."""
-
     def test_platform_name(self) -> None:
-        """Test platform name."""
+
         generator = AthenaDDLGenerator()
         assert generator.platform_name == "athena"
 
     def test_creates_external_table(self) -> None:
-        """Test that Athena creates EXTERNAL TABLE."""
+
         generator = AthenaDDLGenerator(location="s3://bucket/data/")
         columns = [
             ColumnDefinition("id", "BIGINT"),
@@ -291,7 +265,7 @@ class TestAthenaDDLGenerator:
         assert "LOCATION 's3://bucket/data/'" in ddl
 
     def test_athena_with_different_format(self) -> None:
-        """Test Athena with ORC format."""
+
         generator = AthenaDDLGenerator(
             location="s3://bucket/orc/",
             default_format=FileFormat.ORC,
@@ -302,17 +276,15 @@ class TestAthenaDDLGenerator:
 
 
 class TestEnums:
-    """Tests for enum definitions."""
-
     def test_connector_type_values(self) -> None:
-        """Test ConnectorType enum values."""
+
         assert ConnectorType.HIVE.value == "hive"
         assert ConnectorType.ICEBERG.value == "iceberg"
         assert ConnectorType.DELTA.value == "delta"
         assert ConnectorType.MEMORY.value == "memory"
 
     def test_file_format_values(self) -> None:
-        """Test FileFormat enum values."""
+
         assert FileFormat.PARQUET.value == "PARQUET"
         assert FileFormat.ORC.value == "ORC"
         assert FileFormat.AVRO.value == "AVRO"

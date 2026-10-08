@@ -1,28 +1,10 @@
 #!/usr/bin/env python3
-"""Demonstrate running specific queries instead of full benchmark suite.
-
-This example shows how to run targeted subsets of queries for:
-- Fast smoke testing during development
-- Debugging specific slow queries
-- CI/CD pipelines with time constraints
-- Focused performance analysis
-
-Usage:
-    python features/query_subset.py
-
-Key Concepts:
-    - query_subset parameter for targeted testing
-    - Fast iteration with 2-3 queries instead of 22
-    - Query selection strategies for different purposes
-    - Integration with CI/CD pipelines
-"""
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
-# Add parent directory to path for imports
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _EXAMPLES_DIR = _SCRIPT_DIR.parent
 sys.path.insert(0, str(_EXAMPLES_DIR))
@@ -32,7 +14,6 @@ from benchbox.tpch import TPCH
 
 
 def run_full_suite():
-    """Run all 22 TPC-H queries (full suite)."""
     print("=" * 70)
     print("FULL SUITE: All 22 TPC-H Queries")
     print("=" * 70)
@@ -60,11 +41,6 @@ def run_full_suite():
 
 
 def run_smoke_test_subset():
-    """Run quick smoke test with 2 fast queries.
-
-    Smoke test strategy: Run the fastest, most reliable queries
-    to quickly validate that the system is working.
-    """
     print("=" * 70)
     print("QUERY SUBSET 1: Smoke Test (2 queries)")
     print("=" * 70)
@@ -79,9 +55,6 @@ def run_smoke_test_subset():
     benchmark.generate_data()
     adapter = DuckDBAdapter(database_path=":memory:")
 
-    # Query 1: Simple aggregation (very fast)
-    # Query 6: Simple filter + aggregation (very fast)
-    # These are the two fastest TPC-H queries
     smoke_test_queries = ["1", "6"]
 
     print(f"Running smoke test queries: {', '.join(f'Q{q}' for q in smoke_test_queries)}")
@@ -91,7 +64,7 @@ def run_smoke_test_subset():
     results = adapter.run_benchmark(
         benchmark,
         test_execution_type="power",
-        query_subset=smoke_test_queries,  # KEY FEATURE: query_subset parameter
+        query_subset=smoke_test_queries,
     )
 
     print("\n✓ Smoke Test Complete")
@@ -104,14 +77,6 @@ def run_smoke_test_subset():
 
 
 def run_representative_subset():
-    """Run representative sample of queries.
-
-    Representative strategy: Select queries that cover different patterns:
-    - Simple aggregation
-    - Joins
-    - GroupBy
-    - Complex conditions
-    """
     print("=" * 70)
     print("QUERY SUBSET 2: Representative Sample (5 queries)")
     print("=" * 70)
@@ -126,12 +91,6 @@ def run_representative_subset():
     benchmark.generate_data()
     adapter = DuckDBAdapter(database_path=":memory:")
 
-    # Representative queries covering different patterns:
-    # Q1: Simple aggregation
-    # Q3: 3-table join with GroupBy
-    # Q6: Simple filter + aggregation
-    # Q12: Join with complex conditions
-    # Q14: Join with percentage calculation
     representative_queries = ["1", "3", "6", "12", "14"]
 
     print(f"Running queries: {', '.join(f'Q{q}' for q in representative_queries)}")
@@ -155,11 +114,6 @@ def run_representative_subset():
 
 
 def run_specific_query_debug():
-    """Debug a specific slow query.
-
-    Debugging strategy: Run just the query you're investigating
-    for rapid iteration.
-    """
     print("=" * 70)
     print("QUERY SUBSET 3: Single Query Debug")
     print("=" * 70)
@@ -174,7 +128,6 @@ def run_specific_query_debug():
     benchmark.generate_data()
     adapter = DuckDBAdapter(database_path=":memory:")
 
-    # Debug a specific query (Q17 is typically complex)
     debug_query = ["17"]
 
     print(f"Debugging Query {debug_query[0]}")
@@ -196,7 +149,6 @@ def run_specific_query_debug():
 
 
 def show_query_selection_strategies():
-    """Show different strategies for selecting query subsets."""
     print("=" * 70)
     print("QUERY SELECTION STRATEGIES")
     print("=" * 70)
@@ -240,7 +192,6 @@ def show_query_selection_strategies():
 
 
 def show_ci_cd_usage():
-    """Show how to use query subsets in CI/CD."""
     print("=" * 70)
     print("CI/CD INTEGRATION EXAMPLE")
     print("=" * 70)
@@ -284,7 +235,6 @@ jobs:
 
 
 def main() -> int:
-    """Demonstrate query subset feature."""
     print()
     print("=" * 70)
     print("BENCHBOX FEATURE: QUERY SUBSET SELECTION")
@@ -294,13 +244,11 @@ def main() -> int:
     print("full benchmark suite for faster iteration and targeted testing.")
     print()
 
-    # Run different subset strategies
     full_time = run_full_suite()
     smoke_time = run_smoke_test_subset()
     representative_time = run_representative_subset()
     debug_time = run_specific_query_debug()
 
-    # Show time savings
     print("=" * 70)
     print("TIME COMPARISON")
     print("=" * 70)
@@ -313,13 +261,10 @@ def main() -> int:
     print(f"Time saved with smoke test: {(full_time - smoke_time) / full_time * 100:.0f}% faster!")
     print()
 
-    # Show selection strategies
     show_query_selection_strategies()
 
-    # Show CI/CD usage
     show_ci_cd_usage()
 
-    # Summary
     print("=" * 70)
     print("SUMMARY")
     print("=" * 70)

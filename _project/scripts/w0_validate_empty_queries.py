@@ -1,21 +1,3 @@
-"""Re-validate the issue #289 empty-query claim against the current generator.
-
-Pins the upstream evidence cited in joinorder-canonical-foundation's
-description: 10/13 embedded JOB queries return zero rows on synthetic
-data. Procedure (per TODO w0):
-  1. Generate joinorder synthetic data at sf=0.01
-  2. Load tables into DuckDB
-  3. For each of the 13 currently embedded JOB queries, count rows
-  4. Assert at least 8/13 return 0 rows
-
-Output: stdout suitable for capture to
-`_project/verification-logs/joinorder-canonical-foundation/w0.log`.
-
-Exits non-zero if the empty-query rate has dropped below 8/13 — that
-signals the upstream defect was partially patched and the TODO's
-framing must be re-surveyed before proceeding.
-"""
-
 from __future__ import annotations
 
 import sys
@@ -80,8 +62,6 @@ def main() -> int:
                 per_query.append((qid, "0-rows"))
                 empty += 1
                 continue
-            # Aggregation queries always return at least one row; "empty"
-            # means every projected MIN() is NULL.
             row = rows[0]
             if all(v is None for v in row):
                 per_query.append((qid, "all-NULL"))

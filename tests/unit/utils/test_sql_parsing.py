@@ -1,5 +1,3 @@
-"""Unit tests for benchbox.utils.sql_parsing."""
-
 from __future__ import annotations
 
 import pytest
@@ -13,8 +11,6 @@ pytestmark = [
 
 
 class TestFindMatchingParenthesis:
-    """Tests for find_matching_parenthesis()."""
-
     def test_simple_pair(self):
         assert find_matching_parenthesis("(abc)", 0) == 4
 
@@ -33,7 +29,7 @@ class TestFindMatchingParenthesis:
         assert find_matching_parenthesis(text, 0) == len(text) - 1
 
     def test_escaped_single_quote_inside_string(self):
-        """Doubled single quotes (SQL escape) must not break string tracking."""
+
         text = "('it''s (a) test')"
         assert find_matching_parenthesis(text, 0) == len(text) - 1
 

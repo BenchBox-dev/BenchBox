@@ -1,11 +1,5 @@
-"""Test utilities with lazy public helpers.
-
-Path and state utilities must be usable before optional native probes. Preserve
-existing package-level helper imports without loading DuckDB on package import.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 

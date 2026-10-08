@@ -1,5 +1,3 @@
-"""Flight data benchmark schema definitions."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -23,15 +21,6 @@ def get_create_tables_sql(
     dialect: str = "standard",
     include_constraints: bool = True,
 ) -> str:
-    """Generate CREATE TABLE SQL statements for the flight data benchmark.
-
-    Args:
-        dialect: SQL dialect (standard, duckdb, postgres, clickhouse, snowflake)
-        include_constraints: Include PRIMARY KEY constraints
-
-    Returns:
-        SQL script for creating all tables
-    """
     type_map = _TYPE_MAPPINGS.get(dialect, _TYPE_MAPPINGS["standard"])
     statements = []
 

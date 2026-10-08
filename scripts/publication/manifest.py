@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-"""Publication manifest schema, validation, and serialization (A3 w1).
-
-Defines the desired-state manifest contract for independent publication,
-including monotonic generation, parent commit linkage for CAS, complete
-build closure pins, and immutable artifact digests.
-"""
 
 from __future__ import annotations
 
@@ -120,7 +114,6 @@ class PublicationManifest:
         }
 
     def compute_digest(self) -> str:
-        """Compute canonical SHA-256 digest of the manifest content excluding signature."""
         data = self.to_dict()
         data["signature"] = None
         canonical = json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -152,11 +145,6 @@ def _validate_generation_and_parent(data: dict[str, Any], errors: list[str]) -> 
     else:
         if not _is_valid_sha40(parent_sha):
             errors.append(f"parent_sha must be a 40-char hex string for generation {gen}, got {parent_sha}")
-        # Generations are monotonic but not dense: a voided pre-send
-        # reservation retires its number, so the parent is the attested live
-        # head strictly before this generation, not necessarily gen - 1. The
-        # journal (not the manifest) is the authority that the named parent
-        # is the actual durable head; prepare validates that equality.
         if not isinstance(parent_gen, int) or not 1 <= parent_gen < gen:
             errors.append(f"parent_generation must precede generation {gen}, got {parent_gen}")
 
@@ -243,7 +231,6 @@ def _validate_corpus(data: dict[str, Any], errors: list[str]) -> None:
 
 
 def validate_manifest_dict(data: dict[str, Any]) -> list[str]:
-    """Validate a raw manifest dictionary and return a list of error strings."""
     errors: list[str] = []
 
     if data.get("schema_version") != SCHEMA_VERSION:
@@ -259,7 +246,6 @@ def validate_manifest_dict(data: dict[str, Any]) -> list[str]:
 
 
 def serialize_manifest(manifest: PublicationManifest, indent: int = 2) -> str:
-    """Serialize a publication manifest to JSON string."""
     errors = validate_manifest_dict(manifest.to_dict())
     if errors:
         raise ValueError(f"Cannot serialize invalid manifest: {'; '.join(errors)}")
@@ -267,7 +253,6 @@ def serialize_manifest(manifest: PublicationManifest, indent: int = 2) -> str:
 
 
 def deserialize_manifest(raw: str | dict[str, Any]) -> PublicationManifest:
-    """Deserialize JSON string or dictionary into a PublicationManifest."""
     data = json.loads(raw) if isinstance(raw, str) else raw
     errors = validate_manifest_dict(data)
     if errors:

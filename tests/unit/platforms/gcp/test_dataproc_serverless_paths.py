@@ -1,14 +1,6 @@
-"""Managed-path tests for DataprocServerlessAdapter miss clusters.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Covers the batch-submission execution paths with mocked GCP clients:
-client getters, connection verification, schema creation, batch build
-(service account, network), GCS upload/retrieve, the load path, the
-success/FAILED execute envelopes, and init guards.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -92,16 +84,41 @@ class TestBatchSubmission:
         adapter._batch_client = client
         return client
 
-    def test_quote_bearing_query_embeds_safely(self, adapter):
-        import json
+    def test_quote_bearing_query_passed_as_data(self, adapter, tmp_path):
+        import py_compile
+        from pathlib import Path
 
-        self._client(adapter)
+        from benchbox.platforms.gcp import dataproc_serverless_adapter
+
+        client = self._client(adapter)
         query = "SELECT 'it''s', \"q\" FROM t WHERE x = 'a\nb\\'"
         with patch.object(adapter, "_upload_to_gcs") as upload:
             adapter._submit_spark_sql_batch(query)
-        script = upload.call_args[0][1]
-        compile(script, "<generated>", "exec")
-        assert json.dumps(query) in script
+        source = Path(dataproc_serverless_adapter.__file__).with_name("_dataproc_query.py")
+        assert upload.call_args[0][1] == source.read_text(encoding="utf-8")
+        py_compile.compile(str(source), cfile=str(tmp_path / "dataproc_query.pyc"), doraise=True)
+        args = client.create_batch.call_args.kwargs["request"]["batch"]["pyspark_batch"]["args"]
+        assert args == ["USE benchbox", query, args[2]]
+        assert args[2].startswith("gs://bucket/prefix/results/benchbox-")
+        batch_id = client.create_batch.call_args.kwargs["request"]["batch_id"]
+        assert args[2] == f"gs://bucket/prefix/results/{batch_id}"
+
+    @pytest.mark.parametrize(
+        "database, expected",
+        [
+            ('quoted"database', 'USE quoted"database'),
+            ("line\nbreak", "USE line\nbreak"),
+            ("slash\\tname", "USE slash\tname"),
+        ],
+    )
+    def test_database_metadata_is_not_python_source(self, adapter, database, expected):
+        adapter.database = database
+        client = self._client(adapter)
+        with patch.object(adapter, "_upload_to_gcs"):
+            adapter._submit_spark_sql_batch("SELECT 1")
+        args = client.create_batch.call_args.kwargs["request"]["batch"]["pyspark_batch"]["args"]
+        assert args[0] == expected
+        assert args[1] == "SELECT 1"
 
     def test_submit_builds_service_account_and_network(self, adapter):
         adapter.service_account = "sa@proj.iam.gserviceaccount.com"
@@ -257,7 +274,7 @@ class TestFromConfigTuning:
 
 class TestImportFallback:
     def test_reload_with_google_cloud_present(self):
-        """A working google.cloud tree takes the try branch at import."""
+
         import importlib
         import sys
         import types
@@ -285,5 +302,44 @@ class TestImportFallback:
                 sys.modules.pop(k, None)
             sys.modules.update(saved)
             importlib.reload(mod)
-        # No assertion on the restored module: whether the real google-cloud
-        # SDKs are importable depends on the ambient environment, not this code.
+
+
+@pytest.mark.parametrize("failure", [None, "query", "write"])
+def test_uploaded_driver_runs_arguments_and_preserves_failure_order(monkeypatch, failure):
+    import sys
+
+    from benchbox.platforms.gcp import _dataproc_query
+
+    database_query = 'USE quoted"database'
+    query = "SELECT 'literal\\value'"
+    results_path = 'gs://bucket/quoted"prefix/results/batch'
+    result = MagicMock()
+    spark = MagicMock()
+    spark.sql.side_effect = [MagicMock(), RuntimeError("query failed") if failure == "query" else result]
+    result.write.mode.return_value = result.write
+    if failure == "write":
+        result.write.json.side_effect = RuntimeError("write failed")
+    builder = MagicMock()
+    builder.appName.return_value = builder
+    builder.enableHiveSupport.return_value = builder
+    builder.getOrCreate.return_value = spark
+    monkeypatch.setitem(sys.modules, "pyspark", SimpleNamespace())
+    monkeypatch.setitem(sys.modules, "pyspark.sql", SimpleNamespace(SparkSession=SimpleNamespace(builder=builder)))
+    monkeypatch.setattr(sys, "argv", ["driver.py", database_query, query, results_path])
+
+    if failure is None:
+        _dataproc_query.main()
+        spark.stop.assert_called_once_with()
+        result.write.mode.assert_called_once_with("overwrite")
+        result.write.json.assert_called_once_with(results_path)
+    else:
+        with pytest.raises(RuntimeError, match=f"{failure} failed"):
+            _dataproc_query.main()
+        spark.stop.assert_not_called()
+        if failure == "query":
+            result.write.mode.assert_not_called()
+        else:
+            result.write.json.assert_called_once_with(results_path)
+    assert [args[0][0] for args in spark.sql.call_args_list] == [database_query, query]
+    builder.appName.assert_called_once_with("BenchBox Query")
+    builder.enableHiveSupport.assert_called_once_with()

@@ -1,15 +1,6 @@
-"""Output-contract regression tests for the FlightData SQL/DataFrame surfaces.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Pins the alignment the cross-surface gate enforces at scale: identical output
-column order, integral hour bucketing, deterministic ORDER BY/top-N cuts,
-half-away rounding of whole-minute totals, and empty-field-means-NULL CSV
-loading. Each test runs the real SQL text on DuckDB against the real
-expression and pandas implementations on shared fixture data.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -26,9 +17,6 @@ pytestmark = [
 START_DATE = "2024-12-01"
 END_DATE = "2025-01-01"
 
-# Cell comparisons below use exact equality except for a 1e-9 float slack, far
-# below the coarsest output granularity (0.01 for two-decimal averages), so a
-# real formula drift of even one output unit still fails loudly.
 FLOAT_SLACK = 1e-9
 
 
@@ -76,9 +64,6 @@ def _build_flights() -> list[dict[str, Any]]:
         rows.append(_flight_row(flight_id, **overrides))
         flight_id += 1
 
-    # Two large carriers with identical on-time/cancellation profiles (tied
-    # top metrics) but different average delays, so ORDER BY cuts must fall
-    # back to the carrier tiebreaker deterministically.
     for i in range(1050):
         add(reporting_airline="AA", origin="JFK", dest="LAX", distance=2500.0)
     for i in range(1050):
@@ -95,7 +80,6 @@ def _build_flights() -> list[dict[str, Any]]:
             late_aircraft_delay=6.0,
         )
 
-    # Cancelled rows carrying NULL delays and each cancellation code.
     for code in ("A", "B", "C", "D"):
         add(
             reporting_airline="UA",
@@ -116,17 +100,12 @@ def _build_flights() -> list[dict[str, Any]]:
             late_aircraft_delay=None,
         )
 
-    # Fractional-boundary scheduled times: 559 and 560 share hour 5, 5 maps to
-    # hour 0, 2359 maps to hour 23. Fractional grouping would split 559/560.
     for crs in (559, 560, 5, 2359):
         add(reporting_airline="B6", origin="BOS", dest="MIA", crs_dep_time=crs, distance=100.0)
 
-    # Exact-half cascade total: 10.2 + 10.3 = 20.5 must round to 21 (half away
-    # from zero, matching SQL), not 20 (half even).
     add(reporting_airline="WN", origin="DAL", dest="HOU", late_aircraft_delay=10.2, arr_delay=20.5)
     add(reporting_airline="WN", origin="DAL", dest="HOU", late_aircraft_delay=10.3, arr_delay=20.5)
 
-    # Rows covering every delay-cause component and the wider delay buckets.
     add(
         reporting_airline="B6",
         origin="BOS",
@@ -290,7 +269,6 @@ def _materialize(frame: Any) -> list[tuple]:
     if hasattr(native, "collect"):
         native = native.collect()
     if isinstance(native, list):
-        # DataFusion collects to a list of RecordBatches; reassemble first.
         pa = pytest.importorskip("pyarrow")
         frame = pa.Table.from_batches(native).to_pandas()
     return materialize_rows(frame)
@@ -354,7 +332,6 @@ class TestHourBucketing:
         hours = [row[position] for row in expected]
         assert hours == sorted(hours)
         assert all(float(hour).is_integer() for hour in hours)
-        # 559 and 560 share hour 5; a fractional grouping would emit 5.59/5.6.
         assert 5 in hours
         assert not any(isinstance(hour, float) and not float(hour).is_integer() for hour in hours)
 
@@ -397,8 +374,6 @@ class TestHalfAwayRounding:
         position = columns.index("total_cascade_minutes")
         expected = _reference_rows(duckdb_conn, "cascade-delays")
         wn_sql = next(row for row in expected if row[0] == "WN")
-        # 10.2 + 10.3 sums to exactly 20.5; half-away rounding yields 21 while
-        # the engines' native half-even round would yield 20.
         assert wn_sql[position] == 21
 
         expression_rows = _materialize(query.get_impl_for_family("expression")(polars_ctx))
@@ -414,11 +389,6 @@ class TestHalfAwayRounding:
         [(2.5, 0, 3.0), (-2.5, 0, -3.0), (0.125, 2, 0.13), (-0.125, 2, -0.13), (2.45, 1, 2.5)],
     )
     def test_helpers_match_duckdb_round_at_halves(self, value, digits, expected):
-        """Direct helper-vs-SQL agreement on exact-half inputs.
-
-        The SQL literal is cast to DOUBLE so both sides round binary floating
-        point (a bare literal would exercise DECIMAL rounding instead).
-        """
         pd = pytest.importorskip("pandas")
 
         from benchbox.core.flightdata.dataframe_queries import _pandas_round_half_away
@@ -468,9 +438,6 @@ class TestCsvNullDialect:
         handler = DuckDBNativeHandler(",", None, benchmark, null_marker="")
         assert "nullstr=''" in handler._pipe_nullstr_config()
 
-        # End to end at the SQL layer: the external-scan builder must turn a
-        # healed manifest into nullstr='' while a stale manifest keeps the
-        # no-conversion sentinel (an empty VARCHAR then loads as "", not NULL).
         import json
 
         from benchbox.platforms.base.data_loading import (
@@ -512,7 +479,6 @@ class TestCsvNullDialect:
             conn.close()
 
     def test_stale_manifest_backfilled_in_place(self, tmp_path):
-        """Caches generated before the null-marker fix are healed in place."""
         import json
 
         from benchbox.core.flightdata.downloader import FlightDataDownloader
@@ -551,7 +517,6 @@ class TestCsvNullDialect:
         assert json.loads(manifest_path.read_text(encoding="utf-8")) == manifest
 
     def test_ensure_auxiliary_files_heals_stale_manifest(self, tmp_path, monkeypatch):
-        """The reuse hook runs the backfill when no layout repair applies."""
         import json
 
         from benchbox.core.flightdata.benchmark import FlightDataBenchmark
@@ -582,10 +547,6 @@ class TestCsvNullDialect:
 
 
 class TestOutputContractInvariants:
-    """Static guards so the two implicit contracts stay enforceable."""
-
-    # The tiebreaker tail each top-N ORDER BY must end with: dimension keys
-    # that make the order total within the query's grouping.
     _TOP_N_TIEBREAKERS = {
         "delay-by-airport": ["origin"],
         "best-routes": ["origin", "dest"],
@@ -610,7 +571,6 @@ class TestOutputContractInvariants:
         return keys
 
     def test_top_n_orders_end_in_unique_key(self, tmp_path):
-        """Every ORDER BY ... LIMIT ends in its documented tiebreaker tail."""
         sql_by_key = self._catalog_sql(tmp_path)
         assert set(self._TOP_N_TIEBREAKERS) <= set(sql_by_key), "tiebreaker map covers every top-N query"
         for key, tiebreakers in self._TOP_N_TIEBREAKERS.items():
@@ -621,7 +581,6 @@ class TestOutputContractInvariants:
             assert keys[-len(tiebreakers) :] == tiebreakers, f"{key}: ORDER BY must end in {tiebreakers}: {order!r}"
 
     def test_no_float_sum_rounding_in_sql(self, tmp_path):
-        """ROUND(SUM(<float>), 0) flips on summation order; totals use integer tenths (L3)."""
         for key, sql in self._catalog_sql(tmp_path).items():
             assert "ROUND(SUM(" not in sql, f"{key}: float-sum rounding must use integer tenths"
 

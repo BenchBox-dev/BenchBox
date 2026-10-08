@@ -1,16 +1,4 @@
 #!/usr/bin/env python3
-"""CI smoke for the DuckDB community `datasketches` extension.
-
-Installs the extension fresh and probes one representative function per
-family BenchBox plans on. Exits non-zero if any planned family raises a
-new Catalog Error -- the failure mode the 2026-05-02 audit caught after
-the extension silently dropped `theta` and `frequent_items` between two
-builds on the same day. Known upstream drift for a reviewed extension
-version is reported but does not block unrelated PRs.
-
-Network failures fetching the extension are reported but non-fatal,
-per the TODO's must_preserve.
-"""
 
 from __future__ import annotations
 

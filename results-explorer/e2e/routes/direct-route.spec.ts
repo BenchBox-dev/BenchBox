@@ -20,7 +20,6 @@ test.describe("direct route parity", () => {
     await page.goto("/results/p/polars/");
     await waitForShell(page);
     await waitForDataElement(page, page.getByRole("heading", { name: /^Polars Results$/ }));
-    // Genuine Polars source plus its tuned sibling.
     await expect(page.locator("main table tbody tr[data-testid]")).toHaveCount(2);
     await expectNoFalsePlatformEmpty(page);
 
@@ -87,9 +86,6 @@ test.describe("direct route parity", () => {
   });
 
   test("direct route compare warning copy uses singular and plural labels", async ({ page }) => {
-    // Native and tuned DuckDB runs share platform and driver versions, so
-    // tuning remains the sole comparability warning. Cross-engine comparison
-    // now also exposes the distinct platform and driver version evidence.
     await page.goto(`/results/compare?ids=${SHORT_DUCKDB},${SHORT_DUCKDB_TUNED}`);
     await waitForShell(page);
     await waitForDataElement(page, page.getByRole("heading", { name: /^TPC-H Comparison$/ }));

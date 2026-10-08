@@ -1,12 +1,6 @@
-"""dsdgen options use the platform's option prefix.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-The Windows TPC-DS tools parse only ``/`` prefixed options and ignore ``-``
-prefixed ones, so a ``-scale 0.01`` command generated scale factor 1 there.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -46,7 +40,7 @@ def test_file_based_dsdgen_passes_scale_and_terminate_with_the_platform_prefix(m
     )
     try:
         runner.DsdgenRunnerMixin._run_file_based_dsdgen(generator, tmp_path)
-    except Exception:  # noqa: BLE001 - only the issued command matters here
+    except Exception:
         pass
 
     assert commands, "dsdgen was not invoked"

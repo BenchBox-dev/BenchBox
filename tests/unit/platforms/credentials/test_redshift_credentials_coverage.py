@@ -1,9 +1,6 @@
-"""Coverage tests for Redshift credential setup, validation, and diagnostics.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -35,12 +32,12 @@ pytestmark = [
 
 
 def _console_output(console: MagicMock) -> str:
-    """Collect all console.print call args into a single string for assertions."""
+
     return " ".join(str(c) for c in console.print.call_args_list)
 
 
 def _empty_diagnostics() -> dict:
-    """Return a minimal diagnostics dict with all fields at their null defaults."""
+
     return {
         "error": None,
         "workgroup_name": None,
@@ -49,11 +46,6 @@ def _empty_diagnostics() -> dict:
         "vpc_id": None,
         "security_group_ids": [],
     }
-
-
-# ---------------------------------------------------------------------------
-# _is_timeout_error
-# ---------------------------------------------------------------------------
 
 
 class TestIsTimeoutError:
@@ -71,11 +63,6 @@ class TestIsTimeoutError:
 
     def test_empty_string(self) -> None:
         assert _is_timeout_error("") is False
-
-
-# ---------------------------------------------------------------------------
-# _is_retryable_error
-# ---------------------------------------------------------------------------
 
 
 class TestIsRetryableError:
@@ -96,11 +83,6 @@ class TestIsRetryableError:
 
     def test_cluster_not_found_not_retryable(self) -> None:
         assert _is_retryable_error("cluster not found") is False
-
-
-# ---------------------------------------------------------------------------
-# _format_redshift_validation_error
-# ---------------------------------------------------------------------------
 
 
 class TestFormatRedshiftValidationError:
@@ -142,11 +124,6 @@ class TestFormatRedshiftValidationError:
         assert "some unexpected driver error" in msg
 
 
-# ---------------------------------------------------------------------------
-# _auto_detect_redshift
-# ---------------------------------------------------------------------------
-
-
 class TestAutoDetectRedshift:
     def test_all_required_env_vars_present(self) -> None:
         console = MagicMock()
@@ -164,7 +141,7 @@ class TestAutoDetectRedshift:
         assert result["username"] == "admin"
         assert result["password"] == "secret"
         assert result["database"] == "dev"
-        assert result["port"] == 5439  # default
+        assert result["port"] == 5439
 
     def test_port_converted_to_int(self) -> None:
         console = MagicMock()
@@ -215,7 +192,7 @@ class TestAutoDetectRedshift:
             result = _auto_detect_redshift(console)
 
         assert result is None
-        # Should print warning about missing vars
+
         output = _console_output(console)
         assert "Missing" in output or "REDSHIFT_HOST" in output
 
@@ -258,11 +235,6 @@ class TestAutoDetectRedshift:
         assert result["aws_region"] == "eu-west-1"
 
 
-# ---------------------------------------------------------------------------
-# _test_tcp_connectivity
-# ---------------------------------------------------------------------------
-
-
 class TestTcpConnectivity:
     def test_success_when_connect_returns_zero(self) -> None:
         mock_sock = MagicMock()
@@ -277,7 +249,7 @@ class TestTcpConnectivity:
 
     def test_failure_when_connect_returns_nonzero(self) -> None:
         mock_sock = MagicMock()
-        mock_sock.connect_ex.return_value = 111  # ECONNREFUSED
+        mock_sock.connect_ex.return_value = 111
 
         with patch("benchbox.platforms.credentials.redshift.socket.socket", return_value=mock_sock):
             success, error = _test_tcp_connectivity("my-cluster.redshift.amazonaws.com", 5439)
@@ -314,11 +286,6 @@ class TestTcpConnectivity:
 
         assert success is False
         assert "Network error" in error
-
-
-# ---------------------------------------------------------------------------
-# _get_public_ip
-# ---------------------------------------------------------------------------
 
 
 class TestGetPublicIp:
@@ -365,11 +332,6 @@ class TestGetPublicIp:
             ip = _get_public_ip()
 
         assert ip is None
-
-
-# ---------------------------------------------------------------------------
-# _diagnose_redshift_connectivity
-# ---------------------------------------------------------------------------
 
 
 class TestDiagnoseRedshiftConnectivity:
@@ -504,7 +466,6 @@ class TestDiagnoseRedshiftConnectivity:
                 "us-west-2",
             )
 
-        # Verify client was called with explicit credentials
         call_kwargs = mock_boto3.client.call_args[1]
         assert call_kwargs.get("aws_access_key_id") == "MY_KEY_ID"
         assert call_kwargs.get("aws_secret_access_key") == "MY_SECRET"
@@ -532,11 +493,6 @@ class TestDiagnoseRedshiftConnectivity:
         assert result["vpc_id"] is None
         assert result["security_group_ids"] == []
         assert result["subnet_ids"] == []
-
-
-# ---------------------------------------------------------------------------
-# _format_diagnostic_output
-# ---------------------------------------------------------------------------
 
 
 class TestFormatDiagnosticOutput:
@@ -655,11 +611,6 @@ class TestFormatDiagnosticOutput:
         assert "9.10.11.12" in output
 
 
-# ---------------------------------------------------------------------------
-# _format_remediation_steps
-# ---------------------------------------------------------------------------
-
-
 class TestFormatRemediationSteps:
     @pytest.fixture(autouse=True)
     def _no_public_ip(self) -> None:
@@ -717,7 +668,7 @@ class TestFormatRemediationSteps:
         }
         _format_remediation_steps(console, "endpoint", 5439, "us-east-1", diagnostics, False)
         output = _console_output(console)
-        # First step is security group (step 1)
+
         assert "1. Configure" in output or "1." in output
 
     def test_security_group_ids_listed(self) -> None:
@@ -801,11 +752,6 @@ class TestFormatRemediationSteps:
         assert "your-ip" in output or "<your-ip>" in output
 
 
-# ---------------------------------------------------------------------------
-# _build_redshift_adapter
-# ---------------------------------------------------------------------------
-
-
 class TestBuildRedshiftAdapter:
     def test_builds_adapter_with_required_creds(self) -> None:
         creds = {
@@ -850,11 +796,6 @@ class TestBuildRedshiftAdapter:
         assert "password" in call_kwargs
 
 
-# ---------------------------------------------------------------------------
-# _probe_redshift_connection
-# ---------------------------------------------------------------------------
-
-
 class TestProbeRedshiftConnection:
     def test_executes_smoke_queries_and_closes(self) -> None:
         mock_cursor = MagicMock()
@@ -894,20 +835,14 @@ class TestProbeRedshiftConnection:
         mock_adapter = MagicMock()
         mock_adapter._create_direct_connection.return_value = mock_connection
 
-        # Should not raise from close errors, only from the query failure
         with pytest.raises(Exception, match="query failed"):
             _probe_redshift_connection(mock_adapter, database="dev", connect_timeout=10)
-
-
-# ---------------------------------------------------------------------------
-# validate_redshift_credentials
-# ---------------------------------------------------------------------------
 
 
 class TestValidateRedshiftCredentials:
     @pytest.fixture(autouse=True)
     def _no_sleep(self) -> None:
-        """Prevent actual sleep delays in retry tests."""
+
         with patch("benchbox.platforms.credentials.redshift.time.sleep"):
             yield
 
@@ -981,7 +916,7 @@ class TestValidateRedshiftCredentials:
             patch("benchbox.platforms.credentials.redshift._build_redshift_adapter", return_value=MagicMock()),
             patch("benchbox.platforms.credentials.redshift._test_tcp_connectivity", return_value=(False, "TCP error")),
         ):
-            success, error = validate_redshift_credentials(mock_manager)  # no console
+            success, error = validate_redshift_credentials(mock_manager)
 
         assert success is False
 
@@ -1086,7 +1021,7 @@ class TestValidateRedshiftCredentials:
             success, error = validate_redshift_credentials(mock_manager)
 
         assert success is False
-        assert call_count == 1  # Should not retry non-retryable errors
+        assert call_count == 1
 
     def test_retry_shows_attempt_message_with_console(self) -> None:
         mock_manager = MagicMock()

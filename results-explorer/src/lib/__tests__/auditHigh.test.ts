@@ -26,7 +26,6 @@ function bracesAdvisory(overrides: Record<string, unknown> = {}) {
   };
 }
 
-// braces is reported directly; chokidar and tailwindcss are reached through it.
 function auditWithBraces(extra: Record<string, unknown> = {}) {
   return {
     auditReportVersion: 2,

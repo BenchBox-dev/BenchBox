@@ -98,21 +98,16 @@ Exploded fact table with 1-5 lines per order.
 ```python
 from benchbox import CoffeeShop
 
-# Initialize benchmark
 benchmark = CoffeeShop(scale_factor=1.0)
 
-# Generate data
 benchmark.generate_data()
 
-# Get schema
 schema = benchmark.get_schema()
 
-# Load data to database
 import duckdb
 conn = duckdb.connect(":memory:")
 benchmark.load_data_to_database(conn)
 
-# Run a query
 query = benchmark.get_query("SA1", params={"start_date": "2023-01-01", "end_date": "2023-01-31"})
 result = conn.execute(query).fetchdf()
 print(result)
@@ -130,14 +125,13 @@ The scale factor controls the volume of data generated. SF=1 targets approximate
 
 ## CLI Usage
 
+The first command generates CoffeeShop data (and runs the benchmark). The second runs specific queries. The third runs the sales analysis queries by listing them, because there is no pattern option.
+
 ```bash
-# Generate CoffeeShop data
 benchbox run --benchmark coffeeshop --platform duckdb --scale 1.0
 
-# Run specific queries
 benchbox run --benchmark coffeeshop --platform duckdb --queries SA1,SA2,PR1
 
-# Run the sales analysis queries (list them; there is no pattern option)
 benchbox run --benchmark coffeeshop --platform duckdb --queries SA1,SA2,SA3
 ```
 
@@ -167,8 +161,9 @@ Validate performance with:
 
 ### Sales Analysis
 
+SA1: daily revenue and order volume by region.
+
 ```sql
--- SA1: Daily revenue and order volume by region
 SELECT
     ol.order_date,
     dl.region,
@@ -184,8 +179,9 @@ ORDER BY ol.order_date, dl.region;
 
 ### Product Analysis
 
+PR1: product mix and revenue by subcategory.
+
 ```sql
--- PR1: Product mix and revenue by subcategory
 SELECT
     dp.subcategory,
     COUNT(DISTINCT dp.product_id) AS active_products,
@@ -244,25 +240,24 @@ ORDER BY revenue DESC;
 
 ```python
 class CoffeeShop(BaseBenchmark):
-    """CoffeeShop point-of-sale and analytics benchmark."""
 
     def __init__(self, scale_factor: float = 1.0, output_dir: Optional[str] = None, **kwargs):
-        """Initialize CoffeeShop benchmark."""
+        pass
 
     def generate_data(self) -> list[Path]:
-        """Generate CoffeeShop data files."""
+        pass
 
     def get_queries(self, dialect: Optional[str] = None) -> dict[str, str]:
-        """Get all queries, optionally translated to target dialect."""
+        pass
 
     def get_query(self, query_id: str, *, params: Optional[dict] = None) -> str:
-        """Get a specific query by ID with optional parameter substitution."""
+        pass
 
     def get_schema(self) -> list[dict]:
-        """Get schema definition."""
+        pass
 
     def get_create_tables_sql(self, dialect: str = "standard") -> str:
-        """Get CREATE TABLE statements for the schema."""
+        pass
 ```
 
 ## Related Documentation

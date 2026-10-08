@@ -1,28 +1,3 @@
-# Vendor pricing observations backing the generated sections of pricing_data.yaml.
-#
-# Each entry records the vendor-native observation for one emitted value: the
-# source API, the SKU or meter identifier, the region, the currency, and the
-# retrieval date. scripts/generate_pricing_data.py applies deterministic
-# derivation rules (region-to-tier mapping, DWU linear scaling, `other` bucket
-# selection, tier-independent meter reuse) to render the BenchBox-shaped
-# tables; `make pricing-data-check` fails when the committed tables diverge
-# from what these observations derive.
-#
-# Only individually selected values are vendored here, each with
-# per-value provenance. Bulk snapshots of either vendor catalog are out of
-# scope. Redistribution of these derived values in the wheel and the repo
-# ships under the accepted project-owner risk recorded in
-# _project/decisions/pricing-vendor-api-redistribution-aws-azure-2026-09-18.md
-# (landed via the redistribution-check item; this file assumes that
-# determination). That decision, not this file, is the authority to emit
-# vendor-derived values.
-#
-# Layout is one observation per line so the scheduled refresh job diffs
-# cell-by-cell. --refresh edits this file in place and preserves these
-# comments; its rule is: a fetched price numerically equal to the recorded
-# one keeps its recorded `retrieved` date, so an unchanged upstream
-# regenerates byte-identical output. A changed price takes the fetched value
-# with `retrieved` set to the refresh date.
 meta:
   evidence_version: 1
   currency: USD
@@ -177,9 +152,6 @@ athena_price_per_tb:
   match_product_family: 'Athena Queries'
   match_term: 'OnDemand'
   match_unit: 'Terabytes'
-  # Every observed region below renders as a cell of the region-keyed table;
-  # pricing.py resolves each run by region key (sa-east-1 bills $9.00/TB
-  # against $5.00 elsewhere), so the `regions` map is the emitted table.
   regions:
     us-east-1: '5.0'
     eu-west-1: '5.0'
@@ -218,9 +190,6 @@ synapse_serverless_price_per_tb:
   match_product: 'Azure Synapse Analytics Serverless SQL Pool'
   match_meter: 'Standard Data Processed'
   match_unit: '1 TB'
-  # Every observed region below renders as a cell of the region-keyed table;
-  # pricing.py resolves each run by region key, so the `regions` map is the
-  # emitted table (see the Athena note above).
   regions:
     eastus: '5.0'
     westeurope: '5.0'

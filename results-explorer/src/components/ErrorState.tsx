@@ -3,9 +3,7 @@ import { useId } from "preact/hooks";
 
 interface ErrorStateProps {
   title: ComponentChildren;
-  /** Short description; rendered below the title. */
   description?: ComponentChildren;
-  /** Optional pre-formatted detail block (e.g. server message, exception). */
   detail?: string;
   action?: ComponentChildren;
   class?: string;

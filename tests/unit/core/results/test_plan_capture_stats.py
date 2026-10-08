@@ -1,5 +1,3 @@
-"""Unit tests for shared plan capture statistics computation."""
-
 from __future__ import annotations
 
 import pytest

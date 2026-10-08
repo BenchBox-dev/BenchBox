@@ -1,32 +1,3 @@
-"""Snowflake query plan parser.
-
-Parses the JSON emitted by ``EXPLAIN USING JSON <query>`` on Snowflake into the
-harmonized :class:`QueryPlanDAG` structure.
-
-Snowflake's ``EXPLAIN USING JSON`` returns a single JSON object::
-
-    {
-      "GlobalStats": {"partitionsTotal": 1, "partitionsAssigned": 1, "bytesAssigned": 1024},
-      "Operations": [
-        [
-          {"id": 0, "operation": "Result", "expressions": ["O_ORDERKEY", "REVENUE"]},
-          {"id": 1, "operation": "Aggregate", "parentOperators": [0], "expressions": ["SUM(...)"]},
-          {"id": 2, "operation": "Join", "parentOperators": [1], "expressions": ["O_ORDERKEY = L_ORDERKEY"]},
-          {"id": 3, "operation": "TableScan", "parentOperators": [2], "objects": ["TPCH.ORDERS"]},
-          {"id": 4, "operation": "TableScan", "parentOperators": [2], "objects": ["TPCH.LINEITEM"]}
-        ]
-      ]
-    }
-
-``Operations`` is a list of plan steps; each step is a list of operator nodes.
-Each node carries an integer ``id``, an ``operation`` name, a ``parentOperators``
-list (the ids of the operators this node feeds into — the root ``Result`` node
-has none), and optional ``objects`` (scanned tables) and ``expressions`` detail.
-The tree is reconstructed from the ``parentOperators`` edges: the node with no
-parent is the root, and a node's children are the operators that name it as a
-parent.
-"""
-
 from __future__ import annotations
 
 import json
@@ -45,12 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 class SnowflakeQueryPlanParser(QueryPlanParser):
-    """Parser for Snowflake ``EXPLAIN USING JSON`` output."""
-
-    # Ordered (substring, type) pairs; the first substring found in the
-    # lower-cased operation name wins, so more specific names precede the generic
-    # ones they may contain. ``JoinFilter`` is a bloom filter pushed to the scan
-    # side, so it must resolve to SCAN before the generic ``join`` rule.
     _OPERATOR_KEYWORDS: tuple[tuple[str, LogicalOperatorType], ...] = (
         ("joinfilter", LogicalOperatorType.SCAN),
         ("tablescan", LogicalOperatorType.SCAN),
@@ -107,7 +72,6 @@ class SnowflakeQueryPlanParser(QueryPlanParser):
 
     @staticmethod
     def _collect_nodes(payload: Any) -> dict[int, dict[str, Any]]:
-        """Flatten ``Operations`` (a list of step lists) into an id -> node map."""
         if not isinstance(payload, dict):
             return {}
         operations = payload.get("Operations")
@@ -141,13 +105,6 @@ class SnowflakeQueryPlanParser(QueryPlanParser):
         return result
 
     def _find_root(self, nodes: dict[int, dict[str, Any]]) -> dict[str, Any] | None:
-        """The root is the parentless node whose subtree reaches the most operators.
-
-        A well-formed Snowflake plan has a single parentless ``Result`` node, but
-        a multi-statement / union-style payload can expose several parentless
-        nodes. Picking the one with the largest reachable subtree (lowest id on a
-        tie) avoids silently dropping the main plan's operators.
-        """
         roots = [node for node in nodes.values() if not self._parent_ids(node)]
         if not roots:
             return None
@@ -156,7 +113,6 @@ class SnowflakeQueryPlanParser(QueryPlanParser):
         return max(roots, key=lambda n: (self._reachable_count(int(n.get("id", 0)), nodes), -int(n.get("id", 0))))
 
     def _reachable_count(self, node_id: int, nodes: dict[int, dict[str, Any]]) -> int:
-        """Number of operators reachable from ``node_id`` following child edges."""
         seen: set[int] = set()
         stack = [node_id]
         while stack:
@@ -176,7 +132,6 @@ class SnowflakeQueryPlanParser(QueryPlanParser):
         node_id = int(node.get("id", -1))
         visited = visited | {node_id}
 
-        # Children are the operators that feed into this node (name it as a parent).
         child_nodes = [
             other for other_id, other in nodes.items() if node_id in self._parent_ids(other) and other_id not in visited
         ]

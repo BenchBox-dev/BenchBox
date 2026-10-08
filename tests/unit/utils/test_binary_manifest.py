@@ -1,5 +1,3 @@
-"""Check the shipped manifest against tampered trees and distribution archives."""
-
 from __future__ import annotations
 
 import hashlib

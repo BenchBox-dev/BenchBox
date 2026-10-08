@@ -1,14 +1,6 @@
-"""PySpark execution tests for Read Primitives DataFrame queries.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Covers the map/fulltext/window/array expression gaps: every expression_impl
-in the targeted slice must execute through the PySpark adapter and return
-values matching the pandas reference impls. Also pins the PySpark skip list
-so raw-Polars impls cannot silently re-enter the runnable set.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -34,8 +26,8 @@ _SKIP_REASON = pyspark_skip_reason() or "PySpark is usable"
 
 if PYSPARK_AVAILABLE:
     from benchbox.platforms.dataframe.pyspark_df import PySparkDataFrameAdapter
-else:  # pragma: no cover - import guard for environments without PySpark
-    PySparkDataFrameAdapter = None  # type: ignore[assignment,misc]
+else:  # pragma: no cover
+    PySparkDataFrameAdapter = None
 
 from benchbox.core.read_primitives.dataframe_queries import (
     REGISTRY,
@@ -48,11 +40,6 @@ from benchbox.platforms.dataframe.unified_frame import UnifiedLazyFrame
 
 pytestmark = pytestmark + [pytest.mark.skipif(_SKIP_PYSPARK, reason=_SKIP_REASON)]
 
-# All queries that should execute on PySpark right now: every registered query
-# with an expression impl, minus the expression-family, dataframe-mode, and
-# PySpark-specific skips. Deriving the list from the registry (instead of a
-# hardcoded slice) means a new query using an unsupported API fails here
-# until it is ported or explicitly skipped.
 PYSPARK_SKIP_SET = (
     {q.upper() for q in SKIP_FOR_EXPRESSION_FAMILY}
     | {q.upper() for q in SKIP_FOR_DATAFRAME}
@@ -60,32 +47,26 @@ PYSPARK_SKIP_SET = (
 )
 RUNNABLE_QUERY_IDS = [qid for qid in REGISTRY.get_query_ids() if qid.upper() not in PYSPARK_SKIP_SET]
 
-# Runnable queries that legitimately return zero rows on the tiny TPC-H
-# fixture: their predicates target production-scale values (selective filters,
-# nationkey/regionkey/dates absent from the 5-row dimensions), or the reference
-# itself documents an empty cell (json_extract_nested). The sweep asserts a
-# non-empty result for every other query.
 KNOWN_EMPTY_ON_FIXTURE = frozenset(
     {
-        "filter_selective",  # l_quantity > 45 never true (fixture max 39)
-        "filter_bigint_selective",  # o_orderkey == 1234567
-        "filter_decimal_selective",  # l_extendedprice == 12345.67
-        "filter_string_selective",  # c_name == "Customer#000001234"
-        "predicate_ordering_costs",  # same selective predicate as filter_selective
-        "optimizer_aggregate_pushdown",  # c_nationkey == 15, absent from fixture
-        "optimizer_column_pruning",  # c_nationkey == 15, absent from fixture
-        "optimizer_predicate_pushdown",  # c_nationkey == 15, absent from fixture
-        "optimizer_runtime_filter",  # no STEEL part with size 10-20 in fixture
-        "optimizer_join_reordering",  # 6-order customer sits in region 0, filter wants region 1
-        "array_of_struct",  # o_orderdate == 1995-03-15, absent from fixture
-        "json_extract_nested",  # documented empty: TPC-H comments are never JSON
-        "shuffle_1mb_rows",  # no (partkey, shipdate) collisions in 24-row fixture
+        "filter_selective",
+        "filter_bigint_selective",
+        "filter_decimal_selective",
+        "filter_string_selective",
+        "predicate_ordering_costs",
+        "optimizer_aggregate_pushdown",
+        "optimizer_column_pruning",
+        "optimizer_predicate_pushdown",
+        "optimizer_runtime_filter",
+        "optimizer_join_reordering",
+        "array_of_struct",
+        "json_extract_nested",
+        "shuffle_1mb_rows",
     }
 )
 
 
 def _create_tpch_test_data(spark):
-    """Create minimal TPC-H test data as Spark DataFrames."""
     import pandas as pd
 
     def frame(data):
@@ -157,10 +138,6 @@ def _create_tpch_test_data(spark):
             "p_comment": ["STEEL comment1", "comment2", "comment3", "COPPER comment4", "c5", "c6", "c7", "c8"],
         }
     )
-    # Rows deliberately interleaved so input order differs from key-sorted order:
-    # array_agg_simple's sort_by must reorder them (plain collect_list would not).
-    # (ps_partkey, ps_supplycost) pairs are preserved for the map tests, and
-    # per-supplier counts stay 3/2/2/2/1 for the array_length test.
     partsupp = frame(
         {
             "ps_partkey": [2, 5, 1, 3, 1, 4, 2, 5, 3, 4],
@@ -185,7 +162,6 @@ def _create_tpch_test_data(spark):
             "r_comment": ["region a", "region b", "region c", "region d", "region e"],
         }
     )
-    # Customer 1 holds six orders so array_slice (cnt >= 5) is non-empty.
     orders = frame(
         {
             "o_orderkey": list(range(1, 13)),
@@ -236,7 +212,6 @@ def _create_tpch_test_data(spark):
 
 @pytest.fixture(scope="module")
 def pyspark_ctx(pyspark_test_environment):
-    """Create a PySpark adapter context with TPC-H test data registered."""
     adapter = PySparkDataFrameAdapter(
         master="local[2]",
         app_name="BenchBox-ReadPrim-PySpark",
@@ -251,12 +226,6 @@ def pyspark_ctx(pyspark_test_environment):
 
 
 def _collect(result):
-    """Collect a query result to pandas regardless of wrapper type.
-
-    Caps Spark results at 500 rows: the fixture tables are far smaller, so a
-    truncated assertion would mean the fixture grew without this cap being
-    revisited.
-    """
     native = result.native if isinstance(result, UnifiedLazyFrame) else result
     if hasattr(native, "toPandas"):
         return native.limit(500).toPandas()
@@ -264,13 +233,6 @@ def _collect(result):
 
 
 class TestAllRunnableQueriesExecute:
-    """Every non-skipped expression_impl query must execute on PySpark.
-
-    This is the key regression test. If a new query is added that uses an
-    unsupported API (e.g. raw Polars), it fails here unless it is ported or
-    added to SKIP_FOR_PYSPARK.
-    """
-
     @pytest.mark.parametrize("query_id", RUNNABLE_QUERY_IDS, ids=lambda qid: qid)
     def test_expression_impl_executes(self, pyspark_ctx, query_id):
         query = REGISTRY.get(query_id)
@@ -283,8 +245,6 @@ class TestAllRunnableQueriesExecute:
 
 
 class TestArrayOrdering:
-    """Array aggregation must honor the requested element order on PySpark."""
-
     def test_array_agg_simple_collects_sorted_parts(self, pyspark_ctx):
         pdf = _collect(REGISTRY.get("array_agg_simple").expression_impl(pyspark_ctx))
         by_suppkey = {row.ps_suppkey: list(row.supplied_parts) for row in pdf.itertuples()}
@@ -315,8 +275,6 @@ class TestArrayOrdering:
 
 
 class TestMapConstruction:
-    """Map construction/access must match the pandas reference per key."""
-
     def test_map_construction_values(self, pyspark_ctx):
         pdf = _collect(REGISTRY.get("map_construction").expression_impl(pyspark_ctx))
         by_suppkey = {row.ps_suppkey: dict(row.part_costs) for row in pdf.itertuples()}
@@ -330,8 +288,6 @@ class TestMapConstruction:
 
 
 class TestFulltextScores:
-    """Fulltext relevance scores require bool-to-int casts on PySpark."""
-
     def test_boolean_search_scores(self, pyspark_ctx):
         pdf = _collect(REGISTRY.get("fulltext_boolean_search").expression_impl(pyspark_ctx))
         assert len(pdf) > 0
@@ -344,8 +300,6 @@ class TestFulltextScores:
 
 
 class TestWindowMethods:
-    """Previously missing window methods must execute with correct values."""
-
     def test_percent_rank_range_and_top_row(self, pyspark_ctx):
         pdf = _collect(REGISTRY.get("qualify_percentile").expression_impl(pyspark_ctx))
         assert len(pdf) > 0
@@ -360,12 +314,7 @@ class TestWindowMethods:
 
 
 class TestPySparkSkipList:
-    """The PySpark skip list must stay in sync with unified-API capabilities."""
-
     def test_skip_list_contains_raw_polars_impls(self):
-        # window_lead_lag_same_frame, qualify_lag_lead, and qualify_ntile were
-        # ported to the unified window helpers (composite ORDER BY) and run on
-        # PySpark now, so they are deliberately absent from this list.
         for query_id in (
             "window_moving_frame",
             "window_multiple_orderings",
@@ -391,9 +340,6 @@ class TestPySparkSkipList:
             try:
                 _collect(query.expression_impl(pyspark_ctx))
             except (NotImplementedError, PySparkTypeError, PySparkAttributeError):
-                # Expected: raw-Polars impls fail with one of these on PySpark.
-                # Anything else (e.g. KeyError from a fixture gap) propagates
-                # instead of silently counting as "correctly skipped".
                 continue
             unexpectedly_working.append(query_id)
         assert not unexpectedly_working, (
@@ -401,11 +347,6 @@ class TestPySparkSkipList:
         )
 
     def test_non_skipped_queries_do_not_use_unsupported_apis(self, pyspark_ctx):
-        """Non-skipped queries must not fail with unsupported-API errors.
-
-        This catches the case where a query uses raw Polars (``.native`` +
-        ``pl.col``) but was not added to the skip list.
-        """
         from pyspark.errors import PySparkAttributeError, PySparkTypeError
 
         failed_queries = []

@@ -1,29 +1,6 @@
-# CedarDB Docker Compose - DEVELOPMENT/TEST ONLY
-# CedarDB (formerly Umbra) - high-performance OLAP/OLTP with PostgreSQL wire protocol
-# Plaintext credentials below are for local testing only - do not use in production
-#
-# Usage:
-#   docker compose -f docker-compose.yml up -d
-#   benchbox run --platform cedardb --benchmark tpch --scale 0.01 \
-#     --platform-option host=localhost --platform-option port=5435 \
-#     --platform-option username=benchbox --platform-option password=Benchbox1!
-#
-# Ports:
-#   5435 - PostgreSQL wire protocol (host port; avoids conflict with postgresql/pg-duckdb on 5432)
-#
-# Default credentials:
-#   Username: benchbox (CEDAR_USER)
-#   Password: Benchbox1! (CEDAR_PASSWORD)
-#   Database: benchbox_test (created at startup)
-
-# The image is pinned by digest (server v2026-09-29) so a vendor change to the
-# floating tag cannot alter nightly results; update the digest deliberately.
 services:
   cedardb:
     image: cedardb/cedardb@sha256:dbbacb16b24421a9a123cd1d065e2a049c60b7cc6060d7db2f3cccbf69f5ff62
-    # CedarDB's startup io_uring buffers cannot be allocated in Mocker's
-    # default 1 GiB cgroup. Keep the measured 2 GiB minimum explicit so the
-    # UAT memory gate can admit or reject the platform before startup.
     mem_limit: 2g
     ports:
       - "5435:5432"

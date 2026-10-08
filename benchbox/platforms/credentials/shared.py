@@ -1,13 +1,6 @@
-"""Shared credential prompt utilities for cloud platform adapters.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Consolidates the duplicated ``_prompt_default_output_location`` pattern
-used by BigQuery and Redshift (and potentially others with simple
-bucket-based cloud storage paths).
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -33,23 +26,6 @@ def prompt_default_output_location(
     permission_note: str,
     bucket: Optional[str] = None,
 ) -> None:
-    """Prompt user for a default cloud output location.
-
-    Shared interactive flow for platforms using simple cloud-path storage
-    (e.g. ``gs://bucket/path`` or ``s3://bucket/path``).
-
-    Args:
-        cred_manager: Credential manager instance.
-        console: Rich console for output.
-        credentials: Current credentials dictionary (mutated in place).
-        platform_name: Human-readable platform name (e.g. ``"BigQuery"``).
-        path_scheme: URI scheme with ``://`` (e.g. ``"gs://"`` or ``"s3://"``).
-        storage_label: Label for the storage type header (e.g.
-            ``"Google Cloud Storage"`` or ``"S3 Staging Location"``).
-        permission_note: Permission hint (e.g. ``"storage.objects.create permission"``
-            or ``"s3:PutObject permission"``).
-        bucket: Optional configured bucket name for suggested defaults.
-    """
     from benchbox.security.credentials import CredentialStatus
     from benchbox.utils.cloud_storage import is_cloud_path
 

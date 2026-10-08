@@ -56,13 +56,6 @@ def _run_pytest_collect(repo_root: Path, markexpr: str) -> tuple[int, str]:
 
 
 class FastLaneCollectError(RuntimeError):
-    """The collect subprocess could not run, so the policy was never checked.
-
-    Distinct from a policy violation: nothing is known to be wrong with the
-    fast lane, we simply failed to measure it. Conflating the two reports a
-    green tree as several FAST_LANE_VIOLATIONs.
-    """
-
     def __init__(self, message: str, *, violations: list[str] | None = None) -> None:
         super().__init__(message)
         self.violations = list(violations or [])
@@ -71,7 +64,6 @@ class FastLaneCollectError(RuntimeError):
 def _collect_environment_error(
     markexpr: str, returncode: int, output: str, *, violations: list[str] | None = None
 ) -> FastLaneCollectError:
-    """Build an actionable error for a collect run that produced no count."""
     tail = "\n".join(line for line in output.strip().splitlines()[-5:])
     return FastLaneCollectError(
         f"could not run pytest --collect-only for '-m {markexpr}' "
@@ -149,9 +141,6 @@ def main() -> int:
     try:
         fast_lane_violations = _check_fast_lane_policy(repo_root, fast_lane_policy)
     except FastLaneCollectError as exc:
-        # Not a policy violation: the lane was never measured. Reported
-        # separately so a broken environment cannot masquerade as a set of
-        # fast-lane breaches.
         fast_lane_violations = exc.violations
         print(f"Fast lane policy violations: {len(fast_lane_violations)}")
         for violation in fast_lane_violations:

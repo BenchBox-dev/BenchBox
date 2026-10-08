@@ -59,7 +59,6 @@ def test_apply_driver_metadata_prefers_adapter_values() -> None:
 
 
 def test_apply_driver_metadata_config_only_when_no_adapter() -> None:
-    """When adapter is None, only config values are used."""
     result = SimpleNamespace(
         driver_package=None,
         driver_version_requested=None,
@@ -96,7 +95,6 @@ def test_apply_driver_metadata_config_only_when_no_adapter() -> None:
 
 
 def test_apply_driver_metadata_all_none_leaves_defaults() -> None:
-    """When both adapter and config have None values, defaults are preserved."""
     result = SimpleNamespace(
         driver_package=None,
         driver_version_requested=None,

@@ -1,11 +1,3 @@
-"""Docker compose lifecycle helpers for UAT-managed platform stacks.
-
-The UAT harness may start and stop Docker-backed platforms at execute-phase
-platform boundaries. This module owns the platform → compose-file mapping and
-keeps command construction small, deterministic, and safe to unit test without
-a live Docker daemon.
-"""
-
 from __future__ import annotations
 
 import functools
@@ -29,48 +21,15 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DOCKER_PLATFORM_SWITCH_MODES: tuple[str, ...] = ("off", "containers", "volumes", "images")
 DOCKER_FIXED_CONTAINER_NAME_POLICIES: tuple[str, ...] = ("fail", "override", "allow")
 
-# `_PROJECT_NAME_MAX_LEN` is compose's own project-name ceiling, but it is not
-# the identifier that actually gets constrained at runtime: compose derives
-# the CONTAINER name as `<project>-<service>-<replica>`, and mocker rejects
-# anything over `_CONTAINER_NAME_MAX_LEN` (uat-compose-project-name-overflows-
-# container-id-limit-20260805). Plain Docker's own limit is looser (~255), but
-# the bound below is intentionally the tighter mocker one applied everywhere.
-#
-# NOT "safe for Docker too" in the sense of unchanged: this tightens the
-# budget, so it RENAMES roughly half of the checked-in (config, platform)
-# project names (shorter, never longer -- never re-introduces an overflow).
-# A pre-upgrade sweep's containers are registered under the OLD, longer name;
-# `compose_project_name()` is deterministic on *current* code, so the next
-# sweep's exact `-p <new-name>` teardown will not match and tear down those
-# leftovers -- they keep holding host ports until removed separately. They
-# remain recoverable: `docker_cleanup.py`'s recovery inventory matches by the
-# `benchbox-uat` *prefix*, which this rename preserves (only the tail after
-# the prefix is truncated differently). This overflow is mocker-only, so
-# every affected operator is on macOS/mocker, where the default
-# `ENGINE=docker` cleanup pass alone is NOT sufficient: it degrades to
-# named-volumes-only inventory and reports no orphaned containers, leaving
-# them holding host ports for the next sweep to collide on. Recovery needs
-# BOTH `ENGINE=container APPLY=1` (containers/networks/images) and the
-# default `ENGINE=docker APPLY=1` pass (mocker-managed named volumes, which
-# `ENGINE=container` cannot see). See "Compose project naming and the
-# container-id limit" in docs/operations/uat-framework.md for the operator
-# recovery step.
 _CONTAINER_NAME_MAX_LEN = 64
-# Reserve room for a two-digit compose replica index ("-10".."-99"), not just
-# "-1": a scaled service silently overflows by one character the moment it
-# reaches its 10th replica if the budget only ever assumes a single digit.
 _REPLICA_SUFFIX_MAX_LEN = len("-99")
 _PROJECT_NAME_MAX_LEN = 63
 
-# Env override honored by resolve_container_cli() -- verbatim, no rewriting.
-# Mirrors the convention _project/scripts/build_joinorder_data.py:879-883
-# already uses for the joinorder Docker build path; this is the UAT-side
-# resolver for the same contract (uat-container-engine-routing prior_art).
 CONTAINER_CLI_ENV_VAR = "BENCHBOX_CONTAINER_CLI"
 
 
 class DockerAssetError(ValueError):
-    """Raised when a UAT Docker lifecycle request is unsafe or unsupported."""
+    pass
 
 
 CLICKHOUSE_MEMORY_LIMIT_ENV_VAR = "CLICKHOUSE_MEMORY_LIMIT"
@@ -98,7 +57,6 @@ _MEMORY_UNITS = {
 
 
 def parse_memory_bytes(value: str) -> int:
-    """Parse a positive Docker memory value without inventing a default."""
     if not isinstance(value, str):
         raise DockerAssetError(f"memory limit must be a string, got {type(value).__name__}")
     match = _MEMORY_VALUE_RE.fullmatch(value)
@@ -124,10 +82,6 @@ def parse_memory_bytes(value: str) -> int:
 def resolve_clickhouse_memory_limit(
     configured: str | None = None, *, env: dict[str, str] | None = None
 ) -> tuple[str, int]:
-    """Resolve and validate the calibrated ClickHouse memory request.
-
-    Environment wins over config; missing or malformed input fails before compose, with no 1 GiB fallback.
-    """
     environment = os.environ if env is None else env
     value = (
         environment[CLICKHOUSE_MEMORY_LIMIT_ENV_VAR] if CLICKHOUSE_MEMORY_LIMIT_ENV_VAR in environment else configured
@@ -144,7 +98,6 @@ def resolve_clickhouse_memory_limit(
 
 
 def compose_stats_command(spec: DockerPlatformSpec, project_name: str) -> list[str]:
-    """Build a portable no-stream stats command for the first compose service."""
     if not spec.services:
         raise DockerAssetError(f"Platform {spec.platform!r} has no compose services to inspect")
     return [
@@ -158,7 +111,6 @@ def compose_stats_command(spec: DockerPlatformSpec, project_name: str) -> list[s
 
 
 def parse_runtime_memory_limit(text: str) -> int | None:
-    """Extract the runtime memory limit from Docker or Mocker stats output."""
     usage: str | None = None
     limit: str | None = None
     for line in text.splitlines():
@@ -193,33 +145,15 @@ def parse_runtime_memory_limit(text: str) -> int | None:
 
 
 def _which_container_cli(cli: str) -> str | None:
-    """Thin ``shutil.which`` wrapper so tests can stub PATH lookups without touching the real ``shutil`` module."""
     return shutil.which(cli)
 
 
 def _current_platform() -> str:
-    """Thin ``sys.platform`` wrapper so tests can stub the OS without mutating the real ``sys`` module."""
     return sys.platform
 
 
 @functools.lru_cache(maxsize=1)
 def resolve_container_cli() -> str:
-    """Resolve the Docker-CLI-compatible binary UAT lifecycle commands should invoke.
-
-    Resolution order (uat-container-engine-routing, user decision
-    2026-07-11): ``BENCHBOX_CONTAINER_CLI`` env override, honored verbatim >
-    platform default: on macOS, ``mocker`` if it is on PATH, else ``docker``;
-    on every other platform, always ``docker`` (no mocker probing happens off
-    darwin -- this keeps a docker-only Linux host byte-identical to before
-    this resolver existed).
-
-    Resolved once per process and memoized (the engine does not change mid
-    sweep); call ``resolve_container_cli.cache_clear()`` to force
-    re-resolution -- tests use this, production code never does.
-
-    Raises DockerAssetError when the resolved binary is not on PATH -- a
-    missing engine is a hard stop, not a silent fallback.
-    """
     override = os.environ.get(CONTAINER_CLI_ENV_VAR)
     if override:
         candidate, source = override, f"{CONTAINER_CLI_ENV_VAR} override"
@@ -236,14 +170,6 @@ def resolve_container_cli() -> str:
 
 
 def container_engine_identity() -> tuple[str, str]:
-    """Return ``(binary, version_line)`` for the resolved container CLI.
-
-    ``version_line`` is the first line of ``<binary> --version`` output, or a
-    diagnostic placeholder if that command itself fails -- a failed version
-    probe still records engine identity, just without a version string.
-    Raises DockerAssetError (propagated from resolve_container_cli) when no
-    engine binary is available at all.
-    """
     binary = resolve_container_cli()
     try:
         completed = subprocess.run(
@@ -262,8 +188,6 @@ def container_engine_identity() -> tuple[str, str]:
 
 @dataclass(frozen=True)
 class DockerPlatformSpec:
-    """UAT-owned compose metadata for one Docker-backed platform."""
-
     platform: str
     compose_files: tuple[Path, ...]
     services: tuple[str, ...] = ()
@@ -275,8 +199,6 @@ class DockerPlatformSpec:
 
 @dataclass(frozen=True)
 class DockerCommandResult:
-    """Captured result from a Docker command invocation."""
-
     argv: tuple[str, ...]
     returncode: int
     stdout: str
@@ -287,12 +209,10 @@ class DockerCommandResult:
 
     @property
     def command(self) -> str:
-        """Shell-quoted command string for logs."""
         return shlex.join(self.argv)
 
     @property
     def succeeded(self) -> bool:
-        """Return True when the command completed successfully."""
         return self.returncode == 0 and not self.timed_out and self.error is None
 
 
@@ -303,8 +223,6 @@ def _repo_path(relative: str) -> Path:
     return REPO_ROOT / relative
 
 
-# Firebolt has a compose file but is intentionally not listed here: it is not
-# currently in matrix.PLATFORM_GROUPS["docker"] for UAT sweeps.
 _DOCKER_PLATFORM_SPECS: dict[str, DockerPlatformSpec] = {
     "clickhouse-server": DockerPlatformSpec(
         platform="clickhouse-server",
@@ -339,8 +257,6 @@ _DOCKER_PLATFORM_SPECS: dict[str, DockerPlatformSpec] = {
     "databend": DockerPlatformSpec(
         platform="databend",
         compose_files=(_repo_path("docker/databend/docker-compose.yml"),),
-        # All three declared services start together (no host-run subset like
-        # lakesail/velox below); "minio-setup" is the longest at 11 chars.
         services=("minio", "minio-setup", "databend"),
     ),
     "doris": DockerPlatformSpec(
@@ -396,30 +312,6 @@ _DOCKER_PLATFORM_SPECS: dict[str, DockerPlatformSpec] = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Single source of truth for platform connection facts.
-#
-# Host reachability ports are DERIVED from each platform's docker-compose
-# `ports:` mapping (honoring `${VAR:-default}` overrides), keyed by the
-# in-container service port each adapter declares via `default_service_port`.
-# This is the one fact a "lightweight user-exercising" layer needs and the one
-# most certain to rot; deriving it means an override like SINGLESTORE_HOST_PORT
-# flows through to both the reachability probe and the adapter `port=` option
-# without editing code.
-#
-# Endpoint roles are modeled explicitly: PLATFORM_SERVICE_PORT is the
-# container/service port (NOT the host port). Do not collapse the two.
-#
-# Secondary host ports and managed credentials derive from the registered
-# Compose files below. The small role/key maps identify which Compose fact an
-# adapter option consumes; they do not duplicate the values themselves.
-# ---------------------------------------------------------------------------
-
-
-# Platform -> in-container service port the adapter connects to. The host
-# reachability port is whatever the compose `ports:` mapping publishes for this
-# container port. AUTO-GENERATED from adapter defaults -- change the owning
-# adapter's `default_service_port`, never values here (manifest lookup keeps the global adapter registry cold).
 def _adapter_service_ports() -> dict[str, int]:
     from benchbox.core.platform_manifest import get_adapter_imports
 
@@ -439,15 +331,12 @@ _PLATFORM_STATIC_OPTS: dict[str, list[str]] = {
     "velox": ["--platform-option", "deployment=remote"],
 }
 
-# Platform -> adapter option -> in-container port. The host-side value is
-# resolved from Compose, including ${VAR:-default} overrides.
 _PLATFORM_SECONDARY_PORTS: dict[str, dict[str, int]] = {
     "questdb": {"http_port": 9000},
     "starrocks": {"http_port": 8040},
     "doris": {"http_port": 8030, "be_http_port": 8040},
 }
 
-# Platform -> Compose environment key whose value is the adapter password.
 _PLATFORM_PASSWORD_ENV_KEYS: dict[str, str] = {
     "clickhouse-server": "CLICKHOUSE_PASSWORD",
     "cedardb": "CEDAR_PASSWORD",
@@ -458,33 +347,15 @@ _PLATFORM_PASSWORD_ENV_KEYS: dict[str, str] = {
     "singlestore": "ROOT_PASSWORD",
 }
 
-# Platforms that pass the resolved host reachability port to the adapter as the
-# `port=` platform-option (kept first to preserve existing argv order).
 _PLATFORM_INJECT_HOST_PORT_OPT: frozenset[str] = frozenset({"clickhouse-server", "singlestore", "starrocks", "doris"})
 
-# Spark Connect platforms also need the adapter endpoint to follow the
-# compose-published host port. Otherwise an override such as SPARK_CONNECT_PORT
-# moves the reachability probe while the run still connects to :50051.
 _PLATFORM_INJECT_SPARK_CONNECT_ENDPOINT_OPT: frozenset[str] = frozenset({"lakesail", "velox"})
 
-# Local managed-Docker credentials, appended only when UAT manages the stack
-# (kept separate because PLATFORM options apply even for externally managed
-# local platforms).
-#
-# postgresql's compose stack (docker/postgresql/docker-compose.yml) sets
-# POSTGRES_USER=benchbox, which makes `benchbox` the ONLY superuser role the
-# official postgres image creates (POSTGRES_USER replaces the default
-# `postgres` role rather than adding alongside it) -- the adapter's own
-# `username` default ("postgres") does not exist in this container and
-# authentication fails outright. `username=benchbox` must be injected here
-# alongside `password=benchbox` for any docker-managed postgresql cell (e.g.
-# the throughput UAT cell) to connect at all.
 _PLATFORM_LOCAL_MANAGED_STATIC_OPTS: dict[str, list[str]] = {
     "cedardb": ["--platform-option", "username=benchbox", "--platform-option", "database=benchbox_test"],
     "postgresql": ["--platform-option", "username=benchbox"],
 }
 
-# A compose `ports:` entry: "[ip:]host:container", host may be ${VAR:-default}.
 _COMPOSE_PORT_MAPPING_RE = re.compile(r'^\s*-\s*"?(?P<mapping>[^"\s]+)"?\s*$')
 _ENV_DEFAULT_RE = re.compile(r"^\$\{(?P<var>[A-Za-z_][A-Za-z0-9_]*):-(?P<default>\d+)\}$")
 _ENV_BARE_RE = re.compile(r"^\$\{(?P<var>[A-Za-z_][A-Za-z0-9_]*)\}$")
@@ -492,7 +363,6 @@ _HOST_CONTAINER_RE = re.compile(r"^(?P<host>.+):(?P<container>\d+)$")
 
 
 def _resolve_host_token(token: str, env: dict[str, str]) -> int | None:
-    """Resolve a compose published-port token to a concrete host port."""
     token = token.strip().strip('"')
     m = _ENV_DEFAULT_RE.match(token)
     if m:
@@ -504,14 +374,12 @@ def _resolve_host_token(token: str, env: dict[str, str]) -> int | None:
         return int(raw) if raw and raw.isdigit() else None
     if token.isdigit():
         return int(token)
-    # ip:port form -> take the trailing published port.
     if ":" in token and token.rsplit(":", 1)[-1].isdigit():
         return int(token.rsplit(":", 1)[-1])
     return None
 
 
 def _iter_compose_port_mappings(compose_file: Path) -> Iterable[tuple[str, int]]:
-    """Yield (host_token, container_port) for every `- "host:container"` entry."""
     try:
         text = compose_file.read_text(encoding="utf-8")
     except OSError:
@@ -527,12 +395,6 @@ def _iter_compose_port_mappings(compose_file: Path) -> Iterable[tuple[str, int]]
 
 
 def resolve_published_host_port(platform: str, *, env: dict[str, str] | None = None) -> int | None:
-    """Return the host port that compose publishes for `platform`'s service port.
-
-    Matches the compose `ports:` entry whose *container* side equals
-    PLATFORM_SERVICE_PORT[platform], disambiguating sidecar ports (e.g. databend
-    MinIO, questdb REST) from the reachability endpoint.
-    """
     service_port = PLATFORM_SERVICE_PORT.get(platform)
     return resolve_published_host_port_for_container(platform, service_port, env=env)
 
@@ -543,7 +405,6 @@ def resolve_published_host_port_for_container(
     *,
     env: dict[str, str] | None = None,
 ) -> int | None:
-    """Resolve one Compose container port to its published host port."""
     env = os.environ if env is None else env
     spec = _DOCKER_PLATFORM_SPECS.get(platform)
     if container_port is None or spec is None:
@@ -569,7 +430,6 @@ def _compose_service_environment_value(
     *,
     env: dict[str, str] | None = None,
 ) -> str | None:
-    """Resolve a registered service's Compose environment value."""
     process_env = os.environ if env is None else env
     spec = _DOCKER_PLATFORM_SPECS.get(platform)
     if spec is None:
@@ -606,17 +466,11 @@ def _compose_service_environment_value(
 
 
 def host_reachability_endpoint(platform: str, *, env: dict[str, str] | None = None) -> str | None:
-    """Return ``"localhost:<host_port>"`` for `platform`, or None if not derivable."""
     host_port = resolve_published_host_port(platform, env=env)
     return None if host_port is None else f"localhost:{host_port}"
 
 
 def platform_extra_opts(platform: str, *, env: dict[str, str] | None = None) -> list[str]:
-    """Return the `--platform-option` argv for `platform`.
-
-    The reachability `port=` (for platforms that take one) is derived from the
-    compose-published host port; remaining options are static literals.
-    """
     opts: list[str] = []
     if platform in _PLATFORM_INJECT_HOST_PORT_OPT:
         host_port = resolve_published_host_port(platform, env=env)
@@ -639,7 +493,6 @@ def platform_extra_opts(platform: str, *, env: dict[str, str] | None = None) -> 
 
 
 def local_managed_platform_extra_opts(platform: str, *, env: dict[str, str] | None = None) -> list[str]:
-    """Return managed-Docker-only `--platform-option` argv (credentials)."""
     opts = list(_PLATFORM_LOCAL_MANAGED_STATIC_OPTS.get(platform, []))
     password_key = _PLATFORM_PASSWORD_ENV_KEYS.get(platform)
     if password_key is not None:
@@ -649,9 +502,6 @@ def local_managed_platform_extra_opts(platform: str, *, env: dict[str, str] | No
     return opts
 
 
-# Fill each spec's display probe label from the compose-derived endpoint (default
-# env). The live reachability probe re-resolves at call time so env overrides
-# (e.g. SINGLESTORE_HOST_PORT) still take effect after import.
 _DOCKER_PLATFORM_SPECS = {
     platform: replace(spec, tcp_probe_label=host_reachability_endpoint(platform))
     for platform, spec in _DOCKER_PLATFORM_SPECS.items()
@@ -659,17 +509,14 @@ _DOCKER_PLATFORM_SPECS = {
 
 
 def docker_platform_specs() -> dict[str, DockerPlatformSpec]:
-    """Return a copy of the UAT Docker platform mapping."""
     return dict(_DOCKER_PLATFORM_SPECS)
 
 
 def is_docker_platform(platform: str) -> bool:
-    """Return True iff `platform` has a UAT Docker compose mapping."""
     return platform in _DOCKER_PLATFORM_SPECS
 
 
 def docker_platform_spec(platform: str) -> DockerPlatformSpec:
-    """Return the compose spec for `platform` or raise DockerAssetError."""
     try:
         return _DOCKER_PLATFORM_SPECS[platform]
     except KeyError as exc:
@@ -677,16 +524,6 @@ def docker_platform_spec(platform: str) -> DockerPlatformSpec:
 
 
 def _max_declared_service_len(platform: str) -> int:
-    """Return the longest compose service name UAT can start for `platform`, or 0 if unknown.
-
-    Reads `spec.services`, populated once at module load for every registered
-    platform -- never the compose YAML itself, which would make this callable
-    from compose_project_name()'s hot teardown path without a per-call parse.
-    Unregistered platforms (e.g. a synthetic name in a unit test) return 0,
-    which leaves the project-name budget at its unconstrained `_PROJECT_NAME_MAX_LEN`
-    ceiling -- compose_project_name() is only ever invoked for real container
-    lifecycle work through a registered `is_docker_platform()` platform.
-    """
     spec = _DOCKER_PLATFORM_SPECS.get(platform)
     if spec is None or not spec.services:
         return 0
@@ -694,19 +531,9 @@ def _max_declared_service_len(platform: str) -> int:
 
 
 def _project_name_budget(platform: str, max_service_len: int | None = None) -> int:
-    """Return the max project-name length that still leaves room for the container id.
-
-    The constrained identifier is the derived CONTAINER id --
-    ``<project>-<service>-<replica>`` -- not the project name alone, so the
-    budget is derived from `_CONTAINER_NAME_MAX_LEN` minus the longest service
-    name this platform starts and a multi-digit replica suffix, capped at
-    compose's own `_PROJECT_NAME_MAX_LEN` ceiling (never looser than before).
-    """
     service_len = _max_declared_service_len(platform) if max_service_len is None else max_service_len
     if service_len <= 0:
         return _PROJECT_NAME_MAX_LEN
-    # -1 for the hyphen joining <project> and <service>; the replica suffix
-    # budget already accounts for its own leading hyphen.
     derived = _CONTAINER_NAME_MAX_LEN - service_len - _REPLICA_SUFFIX_MAX_LEN - 1
     return min(_PROJECT_NAME_MAX_LEN, derived)
 
@@ -718,17 +545,6 @@ def compose_project_name(
     *,
     max_service_len: int | None = None,
 ) -> str:
-    """Return a deterministic Docker compose project name for one UAT platform block.
-
-    The length budget is derived from the *container* id limit
-    (`_CONTAINER_NAME_MAX_LEN`), not just compose's project-name ceiling: a
-    project name that itself fits under 63 chars can still produce a
-    container id (`<project>-<service>-<replica>`) that overflows mocker's
-    64-char limit once the service name and replica suffix are appended.
-    `max_service_len` lets a caller override the auto-derived value (e.g. for
-    a service not yet in the registry); by default it is looked up from the
-    platform's registered `DockerPlatformSpec.services`.
-    """
     raw = f"{prefix}-{config_name}-{platform}".lower()
     name = re.sub(r"[^a-z0-9_-]+", "-", raw)
     name = re.sub(r"[-_]{2,}", "-", name).strip("-_")
@@ -743,19 +559,6 @@ def compose_project_name(
 
 
 def validate_project_name_budget(spec: DockerPlatformSpec, project_name: str) -> None:
-    """Raise DockerAssetError if `project_name` would overflow `spec.platform`'s container-id budget.
-
-    `compose_project_name()` always returns a name within budget, but an
-    operator-supplied project name (e.g. `--project-name` on
-    `scripts/uat-bring-up/uat_bring_up.py`) never goes through it, so it can
-    carry an arbitrary length. `_compose_base_command` calls this on every
-    UAT-managed compose verb (up/pull/build/down/ps) so the budget is enforced
-    at one chokepoint regardless of caller; a caller that accepts an operator-
-    supplied project name up front can also call this directly for a clear,
-    actionable error before any Docker command runs, instead of an oversized-
-    container-id failure well into `compose up`/`pull`/`build`
-    (uat-compose-project-name-budget-review-20260806 finding 4).
-    """
     budget = _project_name_budget(spec.platform)
     if len(project_name) > budget:
         raise DockerAssetError(
@@ -782,7 +585,6 @@ def compose_up_command(
     *,
     start_timeout_s: int = 300,
 ) -> list[str]:
-    """Build `docker compose up` argv for a UAT-owned platform project."""
     argv = _compose_base_command(spec, project_name)
     argv.extend(["up", "-d", "--wait", "--wait-timeout", str(start_timeout_s)])
     argv.extend(spec.services)
@@ -790,50 +592,18 @@ def compose_up_command(
 
 
 def compose_ps_command(spec: DockerPlatformSpec, project_name: str) -> list[str]:
-    """Build `docker compose ps -a` argv for a UAT-owned platform project.
-
-    `-a`/`--all` is load-bearing, not defensive. Plain `compose ps` lists
-    only RUNNING containers, so the one state this readiness check exists to
-    detect -- a service that started and then died -- is simply absent from
-    the output, and the check passes on an empty table. Live-observed
-    2026-08-04: mocker reported CedarDB Started, and `mocker compose ps -a`
-    showed it Exited.
-
-    Deliberately NOT `--format json`: mocker's `--format json` output is
-    non-Docker-compatible for several inventory verbs (see
-    `list_mocker_volumes_matching`'s docstring and docker_cleanup.py's
-    `--format json` note), so the readiness check parses the STATUS column of
-    the default table output instead (`compose_ps_unhealthy_services`).
-    """
     argv = _compose_base_command(spec, project_name)
     argv.extend(["ps", "-a"])
     return argv
 
 
-# Every `compose ps` STATUS that is not "this service is up and serving".
-#
-#   Exited      -- compose v2, the 2026-08-04 CedarDB state
-#   Exit 1      -- compose v1 spelling of the same thing
-#   Restarting  -- crash-looping; may be briefly listening, never stably
-#   Created     -- container exists but was never started
-#   Dead        -- engine could not remove/stop it cleanly
-#   Paused      -- SIGSTOPped; the port accepts nothing
-#   (unhealthy) -- "Up 30 seconds (unhealthy)": the engine's OWN healthcheck
-#                  says no. `(healthy)` and a bare `Up` do not match, since
-#                  the pattern requires the literal "un".
-#
-# Previously only Exited/Restarting were treated as not-ready, so the other
-# five states all passed the check.
 _UNHEALTHY_PS_STATE_RE = re.compile(r"\b(?:Exited|Restarting|Created|Dead|Paused)\b|\bExit\s+\d+|\(unhealthy\)")
 
-# Table headers: docker compose v2 emits "NAME  IMAGE  ...", compose v1
-# emits "Name  Command  ..." followed by a dashed separator row.
 _PS_HEADER_RE = re.compile(r"^\s*(?:NAME|Name)\b")
 _PS_SEPARATOR_RE = re.compile(r"^[\s\-+]+$")
 
 
 def compose_ps_service_rows(ps_stdout: str) -> tuple[str, ...]:
-    """Return the per-service rows of a `compose ps` table, header/separator stripped."""
     rows: list[str] = []
     for line in ps_stdout.splitlines():
         if not line.strip():
@@ -845,21 +615,6 @@ def compose_ps_service_rows(ps_stdout: str) -> tuple[str, ...]:
 
 
 def compose_ps_unhealthy_services(ps_stdout: str) -> tuple[str, ...]:
-    """Return the name column of every `compose ps -a` row whose STATUS is not up-and-serving.
-
-    The state vocabulary is `_UNHEALTHY_PS_STATE_RE` above. Matching is done
-    against the row with its FIRST column removed, so a container whose NAME
-    happens to contain a state word (`benchbox-uat-Created-1`) cannot
-    false-positive; only the status/command columns are considered.
-
-    Best-effort text parsing, not a strict table parser: an unexpected
-    `compose ps` layout that mentions none of these states reports no
-    unhealthy services rather than raising. Note that "no unhealthy rows" is
-    NOT by itself sufficient for readiness -- see
-    `compose_ps_service_rows`, and the empty-table branch in
-    `execute.py::_check_docker_platform_readiness`, which treats a project
-    with no rows at all as not ready.
-    """
     unhealthy: list[str] = []
     for line in compose_ps_service_rows(ps_stdout):
         columns = line.split(None, 1)
@@ -882,12 +637,6 @@ def _resolve_compose_memory_value(value: object, *, env: dict[str, str] | None) 
 
 
 def compose_declared_memory_limits(spec: DockerPlatformSpec, *, env: dict[str, str] | None = None) -> dict[str, str]:
-    """Return {service: declared-memory-limit} for services with an explicit compose memory cap.
-
-    Reads `mem_limit` or `deploy.resources.limits.memory` from the compose
-    YAML. Missing declarations remain distinct from runtime engine defaults;
-    callers log that distinction rather than inferring a cgroup limit.
-    """
     limits: dict[str, str] = {}
     for compose_file in spec.compose_files:
         try:
@@ -906,16 +655,6 @@ def compose_declared_memory_limits(spec: DockerPlatformSpec, *, env: dict[str, s
                 continue
             deploy = service.get("deploy")
             resources = deploy.get("resources") if isinstance(deploy, dict) else None
-            # Every level is isinstance-guarded rather than relying on
-            # `.get(key, {})` defaults: a default only applies when the key
-            # is ABSENT, so a compose file that writes `limits:` with no
-            # children yields an explicit None and `.get("memory")` on it
-            # raises AttributeError. That would escape this function's
-            # `except (OSError, yaml.YAMLError)` AND the caller's
-            # `except DockerAssetError` (execute.py's
-            # `_describe_platform_vm_request`) and abort the whole sweep
-            # from a logging helper. Same reasoning for a scalar or list
-            # under `limits:`.
             limits_block = resources.get("limits") if isinstance(resources, dict) else None
             declared = limits_block.get("memory") if isinstance(limits_block, dict) else None
             if declared:
@@ -924,13 +663,6 @@ def compose_declared_memory_limits(spec: DockerPlatformSpec, *, env: dict[str, s
 
 
 def compose_pull_command(spec: DockerPlatformSpec, project_name: str) -> list[str]:
-    """Build `docker compose pull --ignore-buildable` argv for a UAT-owned
-    platform project (uat-operator-provisioning w4).
-
-    `--ignore-buildable` skips services that declare only `build:` (no
-    `image:` to pull) instead of erroring on them -- pair with
-    ``compose_build_command`` to cover those.
-    """
     argv = _compose_base_command(spec, project_name)
     argv.extend(["pull", "--ignore-buildable"])
     argv.extend(spec.services)
@@ -938,11 +670,6 @@ def compose_pull_command(spec: DockerPlatformSpec, project_name: str) -> list[st
 
 
 def compose_build_command(spec: DockerPlatformSpec, project_name: str) -> list[str]:
-    """Build `docker compose build` argv for a UAT-owned platform project.
-
-    Covers services with a `build:` directive (e.g. LakeSail's PySail
-    image) that `compose_pull_command` deliberately skips.
-    """
     argv = _compose_base_command(spec, project_name)
     argv.append("build")
     argv.extend(spec.services)
@@ -950,7 +677,6 @@ def compose_build_command(spec: DockerPlatformSpec, project_name: str) -> list[s
 
 
 def compose_down_command(spec: DockerPlatformSpec, project_name: str, cleanup_mode: str) -> list[str]:
-    """Build targeted `docker compose down` argv for a UAT-owned project."""
     if cleanup_mode == "off":
         raise DockerAssetError("cleanup_mode='off' does not have a Docker teardown command")
     if cleanup_mode not in {"containers", "volumes", "images"}:
@@ -967,7 +693,6 @@ def compose_down_command(spec: DockerPlatformSpec, project_name: str, cleanup_mo
 
 
 def validate_managed_start_allowed(spec: DockerPlatformSpec, fixed_container_name_policy: str = "fail") -> None:
-    """Reject unsafe or unsupported UAT-managed Docker startup requests."""
     if fixed_container_name_policy not in DOCKER_FIXED_CONTAINER_NAME_POLICIES:
         raise DockerAssetError(
             f"Unknown fixed-container-name policy {fixed_container_name_policy!r}; "
@@ -996,33 +721,6 @@ def compose_environment(
     memory_limit: str | None = None,
     starrocks_memory_limit: str | None = "4g",
 ) -> dict[str, str]:
-    """Return environment overrides needed by a compose spec.
-
-    Raises DockerAssetError when ``benchmark_runs_dir`` is missing or not
-    absolute for a path-mirroring platform (lakesail, velox): their compose
-    files bind-mount BENCHBOX_DATA_DIR at the SAME absolute path inside the
-    container as on the host (the server resolves client-sent file paths
-    server-side), so a relative value -- or a caller that never resolved a
-    value at all -- silently breaks every file load instead of failing
-    loudly (lakesail-compose-nested-variable-default). A `None`
-    benchmark_runs_dir must NOT fall through to returning `{}` for these two
-    platforms: `run_docker_command` fills an omitted/empty ``env`` with
-    `os.environ.copy()`, so a `{}` return here would let the child process
-    silently inherit whatever ambient BENCHBOX_DATA_DIR happens to be set
-    (or unset) in the caller's shell instead of the resolved run directory.
-
-    This is the single choke point every UAT-managed bring-up path funnels
-    through -- tests/uat/phases/execute.py's up AND down calls, and
-    scripts/uat-bring-up/uat_bring_up.py -- unlike the Makefile's
-    require_data_dir_if_mounted, which only guards direct
-    `make test-docker-up-<platform>` invocations that never call this
-    function. Keep both: the Makefile check is defence-in-depth for the
-    shell entry point, this one is the enforcement point every Python entry
-    point actually reaches. Teardown callers that must not fail just because
-    BENCHBOX_DATA_DIR is unset or relative (``down`` never mounts anything)
-    should catch DockerAssetError and substitute a throwaway absolute value
-    rather than skip this validation.
-    """
     environment: dict[str, str] = {}
     if spec.platform == "clickhouse-server":
         resolved, _ = resolve_clickhouse_memory_limit(memory_limit)
@@ -1061,27 +759,10 @@ _FORBIDDEN_PRUNE_VERBS: frozenset[tuple[str, str]] = frozenset(
     }
 )
 
-# The Apple-native `container` CLI is exempt from the prune guard: its prune
-# verbs are deliberate, documented operator actions of `make uat-docker-cleanup
-# ENGINE=container MODE=max` (reclaiming the Apple container store), guarded by
-# container_cleanup._is_forbidden instead. The guard below protects the SHARED
-# docker/mocker host state, which the Apple store is not part of.
 _APPLE_CONTAINER_CLI = "container"
 
 
 def command_has_forbidden_prune(argv: Iterable[str]) -> bool:
-    """Return True when argv is a global prune against a shared container host.
-
-    Matches on the verb pair (e.g. ``volume prune``) in the tokens *after*
-    the binary name, not a ``"docker system prune"`` string literal -- the
-    binary is resolved (``docker``, ``mocker``, or a BENCHBOX_CONTAINER_CLI
-    override), so a literal-prefix match would silently stop catching
-    forbidden commands the moment the resolved engine is not ``docker``.
-    The Apple-native ``container`` CLI is exempt (see _APPLE_CONTAINER_CLI):
-    its max-mode prunes are a deliberate documented operator action with its
-    own guard, and blocking them here broke `make uat-docker-cleanup
-    ENGINE=container MODE=max APPLY=1` outright.
-    """
     tokens = list(argv)
     if len(tokens) < 3:
         return False
@@ -1092,22 +773,6 @@ def command_has_forbidden_prune(argv: Iterable[str]) -> bool:
 
 
 def list_mocker_volumes_matching(project_prefix: str, *, runner: DockerRunner | None = None) -> tuple[str, ...]:
-    """List (never remove) mocker volumes whose name starts with `project_prefix`.
-
-    ``mocker volume ls`` is the one Docker-shaped inventory verb mocker
-    implements faithfully as plain text (unlike ``container``/``image ls
-    --format json``, which echo the literal string ``json`` instead of
-    JSON -- live-validated in uat-container-engine-routing w0; see
-    container_cleanup.py's module docstring for the same finding on the
-    JSON verbs). No-op (empty) when the resolved engine is not mocker.
-
-    This is PREFIX-scoped by design: its consumer is docker_cleanup's
-    recovery inventory, whose ownership rule is the project *prefix*
-    (`_is_uat_owned`) spanning every project under it -- not one project's
-    exact volume set. For per-project teardown, use
-    `sweep_leaked_mocker_volumes`, which matches exact compose-declared
-    volume names and cannot touch a sibling project.
-    """
     if resolve_container_cli() != "mocker":
         return ()
     run = runner or run_docker_command
@@ -1125,7 +790,6 @@ def list_mocker_volumes_matching(project_prefix: str, *, runner: DockerRunner | 
 
 
 def compose_declared_volume_names(spec: DockerPlatformSpec) -> tuple[str, ...]:
-    """Return the top-level named-volume keys declared by the spec's compose files."""
     names: list[str] = []
     for compose_file in spec.compose_files:
         try:
@@ -1139,16 +803,6 @@ def compose_declared_volume_names(spec: DockerPlatformSpec) -> tuple[str, ...]:
 
 
 def expected_mocker_volume_names(project_name: str, spec: DockerPlatformSpec) -> tuple[str, ...]:
-    """Exact volume names one compose project can have created, for both joiners.
-
-    mocker 0.5.4 joins ``<project>-<volume-key>`` with a HYPHEN
-    (live-verified twice in uat-container-engine-routing: scratch project
-    ``sepcheck`` + volume key ``checkvol`` produced ``sepcheck-checkvol``,
-    and the postgresql stack's ``postgresql18-data`` key produced
-    ``benchbox-uat-manual-postgresql-postgresql18-data``); docker compose
-    joins with an underscore. Both joiners are generated so the exact-match
-    set stays correct if mocker ever aligns with docker's convention.
-    """
     names: list[str] = []
     for key in compose_declared_volume_names(spec):
         names.append(f"{project_name}-{key}")
@@ -1163,24 +817,6 @@ def sweep_leaked_mocker_volumes(
     runner: DockerRunner | None = None,
     dry_run: bool = False,
 ) -> tuple[str, ...]:
-    """Remove named volumes mocker 0.5.4's ``compose down -v`` leaks, for exactly one project.
-
-    Live-validated in uat-container-engine-routing w0: mocker's ``compose
-    down -v`` removes containers but leaves named volumes behind (docker's
-    does not). Matches EXACT names derived from the spec's compose-declared
-    volume keys (`expected_mocker_volume_names`), never a name-prefix scan --
-    a prefix scan on project ``p`` would also match a sibling project
-    ``p-ha``'s volumes (mocker joins project and volume key with ``-``, so
-    ``p-ha-data`` starts with ``p-``), and deleting a sibling's data is the
-    one thing a project-scoped sweep must never do. Never a global prune (w3
-    anti-pattern). No-op when the resolved engine is not mocker (docker
-    already removes named volumes on ``down -v``) or when `dry_run` is set
-    (nothing was actually started, so nothing can have leaked).
-
-    Returns the volume names actually removed; a single volume's removal
-    failure is swallowed (matches the Makefile's ``|| true``) so one stale
-    entry cannot abort the rest of the sweep.
-    """
     if dry_run or resolve_container_cli() != "mocker":
         return ()
     run = runner or run_docker_command
@@ -1206,7 +842,6 @@ def run_docker_command(
     cwd: Path | str | None = None,
     env: dict[str, str] | None = None,
 ) -> DockerCommandResult:
-    """Run a Docker command and capture result data without raising on setup failures."""
     argv_tuple = tuple(argv)
     if command_has_forbidden_prune(argv_tuple):
         return DockerCommandResult(

@@ -1,12 +1,5 @@
-"""Core result analytics — comparison, regressions, trends, aggregation.
-
-Previously lived in ``benchbox.mcp.tools.analytics``.  Moving it to core
-lets CLI, publishing, and other surfaces share the same assembly without
-re-implementing file iteration, filtering, and statistics.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -29,13 +22,11 @@ logger = logging.getLogger(__name__)
 
 
 def _list_result_files(results_dir: Path) -> list[Path]:
-    """List and sort result JSON files, excluding plans and tuning files."""
     result_files = [path for path in results_dir.glob("*.json") if not path.name.endswith(COMPANION_SUFFIXES)]
     return sorted(result_files, key=lambda p: p.stat().st_mtime, reverse=True)
 
 
 def _extract_measurement_timings(data: dict[str, Any]) -> list[float]:
-    """Extract measurement timings from result data."""
     timings: list[float] = []
     for query in data.get("queries", []):
         if query.get("run_type") != "measurement":
@@ -52,7 +43,6 @@ def _matches_filters(
     platform: str | None,
     benchmark: str | None,
 ) -> bool:
-    """Check if a run matches platform and benchmark filters."""
     if platform and platform.lower() not in run_platform.lower():
         return False
     if benchmark and benchmark.lower() not in run_benchmark.lower():
@@ -61,7 +51,6 @@ def _matches_filters(
 
 
 def _extract_run_identity(data: dict[str, Any]) -> tuple[str, dict[str, Any], str]:
-    """Extract platform name, benchmark block, and benchmark id from result data."""
     run_platform = data.get("platform", {}).get("name", "unknown")
     benchmark_block = data.get("benchmark", {}) if isinstance(data.get("benchmark"), dict) else {}
     run_benchmark = benchmark_block.get("id", "unknown")
@@ -69,7 +58,6 @@ def _extract_run_identity(data: dict[str, Any]) -> tuple[str, dict[str, Any], st
 
 
 def _extract_keyed_timings(run_data: dict) -> dict[str, float]:
-    """Extract query ID to timing mapping from result data."""
     timings: dict[str, float] = {}
     for query in run_data.get("queries", []):
         if query.get("run_type") != "measurement":
@@ -86,7 +74,6 @@ def _classify_query_changes(
     newer_timings: dict[str, float],
     threshold_percent: float,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
-    """Classify queries as regressions, improvements, or stable."""
     regressions: list[dict[str, Any]] = []
     improvements: list[dict[str, Any]] = []
     stable: list[str] = []
@@ -139,7 +126,6 @@ def _load_regression_runs(
     benchmark: str | None,
     lookback_runs: int,
 ) -> list[dict[str, Any]]:
-    """Load and filter result files for regression detection."""
     runs: list[dict[str, Any]] = []
     for file_path in result_files[: lookback_runs * 2]:
         try:
@@ -173,7 +159,6 @@ def _load_regression_runs(
 
 
 def _resolve_timestamp_str(timestamp: Any, file_path: Path) -> str:
-    """Resolve a timestamp value to an ISO format string."""
     if timestamp:
         try:
             if isinstance(timestamp, str):
@@ -192,7 +177,6 @@ def _load_trend_data_point(
     benchmark: str | None,
     metric_lower: str,
 ) -> dict[str, Any] | None:
-    """Load a single result file as a trend data point, or None if filtered/invalid."""
     try:
         with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
@@ -229,7 +213,6 @@ def _load_trend_data_point(
 
 
 def _resolve_date_group_key(data: dict[str, Any], file_path: Path) -> str:
-    """Resolve date-based group key from result data."""
     timestamp = data.get("run", {}).get("timestamp", file_path.stat().st_mtime)
     if isinstance(timestamp, str):
         try:
@@ -247,7 +230,6 @@ def _resolve_group_key(
     data: dict[str, Any],
     file_path: Path,
 ) -> str:
-    """Resolve group key based on the grouping strategy."""
     if group_by_lower == "platform":
         return run_platform
     elif group_by_lower == "benchmark":
@@ -256,7 +238,6 @@ def _resolve_group_key(
 
 
 def _compute_group_stats(runs: list[dict[str, Any]]) -> dict[str, Any]:
-    """Compute aggregate statistics for a group of runs."""
     all_timings = [t for run in runs for t in run["timings"]]
     total_times = [run["total_time"] for run in runs]
 
@@ -288,19 +269,6 @@ def compare_results(
     *,
     anonymize: bool = False,
 ) -> dict[str, Any]:
-    """Compare two benchmark result files (core-owned).
-
-    Args:
-        file1: Baseline result file path.
-        file2: Comparison result file path.
-        threshold_percent: Regression threshold.
-        anonymize: Whether to anonymize the comparison output.
-
-    Returns:
-        Comparison dict with ``query_comparisons``, ``regressions``,
-        ``improvements``, and ``summary`` keys; or ``{"error": ...}`` on
-        load failure.
-    """
     from benchbox.core.results.exporter import ResultExporter
     from benchbox.utils.printing import get_quiet_console
 
@@ -342,7 +310,6 @@ def detect_regressions(
     threshold_percent: float = 10.0,
     lookback_runs: int = 10,
 ) -> dict[str, Any]:
-    """Detect performance regressions across recent runs (core-owned)."""
     if not results_dir.exists():
         return {"status": "no_data", "message": f"No results directory found at {results_dir}", "regressions": []}
 
@@ -413,7 +380,6 @@ def get_performance_trends(
     metric: str = "geometric_mean",
     limit: int = 10,
 ) -> dict[str, Any]:
-    """Get performance trends over multiple benchmark runs (core-owned)."""
     valid_metrics = ["geometric_mean", "p50", "p95", "p99", "total_time"]
     metric_lower = metric.lower()
     if metric_lower not in valid_metrics:
@@ -468,7 +434,6 @@ def aggregate_results(
     benchmark: str | None = None,
     group_by: str = "platform",
 ) -> dict[str, Any]:
-    """Aggregate multiple benchmark results into summary statistics (core-owned)."""
     valid_group_by = ["platform", "benchmark", "date"]
     group_by_lower = group_by.lower()
     if group_by_lower not in valid_group_by:

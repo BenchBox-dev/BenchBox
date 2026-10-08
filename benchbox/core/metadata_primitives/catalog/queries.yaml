@@ -1,30 +1,5 @@
-# Metadata Primitives Query Catalog
-#
-# This catalog defines metadata introspection queries for testing cross-platform
-# catalog/schema discovery performance. Unlike Read/Write/Transaction primitives
-# that test data operations, this benchmark focuses on metadata operations critical for:
-#
-# - Data catalog integration
-# - Schema discovery tools
-# - IDE autocomplete performance
-# - BI tool connectivity
-# - Data governance workflows
-#
-# Query Categories:
-# - schema: Database/schema/table/view listing and discovery
-# - column: Column metadata, types, constraints
-# - stats: Table statistics, row counts, storage info
-# - query: Query execution plans and introspection
-#
-# Platform Support:
-# - All queries work against INFORMATION_SCHEMA (SQL standard)
-# - Platform-specific variants use native commands (SHOW, DESCRIBE, PRAGMA)
-# - skip_on marks queries unsupported on specific platforms
-#
 # Copyright 2026 Joe Harris / BenchBox Project
 # Licensed under the MIT License.
-#
-# NOTE: Catalog body is compact YAML; parsed data must remain identical.
 
 version: 1
 queries:

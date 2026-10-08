@@ -1,17 +1,6 @@
-"""benchbox publish command - publish schema-v2 result bundles to storage.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Publishes an already-exported result bundle to a local directory or cloud
-storage prefix. Tracks each publication in a persistent metadata store
-(~/.benchbox/published.json) so publication history survives process restart.
-
-Distinct from ``benchbox export``, which serialises live BenchmarkResults
-objects to disk. ``benchbox publish`` operates on already-exported files and
-adds addressability, deduplication, and persistent tracking on top.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -25,43 +14,45 @@ from benchbox.core.publishing.bundle_publisher import COMPANION_SUFFIXES, VALID_
 from benchbox.core.publishing.store import PublicationStore
 from benchbox.core.results.loader import ResultLoadError, UnsupportedSchemaError, load_result_file
 
-# ---------------------------------------------------------------------------
-# publish group
-# ---------------------------------------------------------------------------
 
-
-@click.group("publish")
+@click.group(
+    "publish",
+    help=(
+        "Publish and track schema-v2 result bundles.\n"
+        "\n"
+        "Copies an already-exported result bundle to a storage destination and\n"
+        "records a durable reference in the publication history. Distinct from\n"
+        "'benchbox export', which serialises live benchmark results to disk.\n"
+        "\n"
+        "\b\n"
+        "Backends and reference types:\n"
+        "  local path         -> file:///abs/path/to/bundle.json\n"
+        "  s3://bucket/prefix -> s3://bucket/prefix/bundle.json\n"
+        "  gs://bucket/prefix -> gs://bucket/prefix/bundle.json\n"
+        "  abfss://...        -> abfss://.../bundle.json\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "  benchbox publish results/tpch_sf1_duckdb.json\n"
+        "  benchbox publish results/tpch_sf1_duckdb.json --target /mnt/shared/benchbox\n"
+        "  benchbox publish results/tpch_sf1_duckdb.json --target s3://my-bucket/benchbox\n"
+        "  benchbox publish list\n"
+        "  benchbox publish show abc123def456\n"
+        "  benchbox publish remove abc123def456"
+    ),
+)
 def publish() -> None:
-    """Publish and track schema-v2 result bundles.
-
-    Copies an already-exported result bundle to a storage destination and
-    records a durable reference in the publication history. Distinct from
-    'benchbox export', which serialises live benchmark results to disk.
-
-    \b
-    Backends and reference types:
-      local path         -> file:///abs/path/to/bundle.json
-      s3://bucket/prefix -> s3://bucket/prefix/bundle.json
-      gs://bucket/prefix -> gs://bucket/prefix/bundle.json
-      abfss://...        -> abfss://.../bundle.json
-
-    \b
-    Examples:
-      benchbox publish results/tpch_sf1_duckdb.json
-      benchbox publish results/tpch_sf1_duckdb.json --target /mnt/shared/benchbox
-      benchbox publish results/tpch_sf1_duckdb.json --target s3://my-bucket/benchbox
-      benchbox publish list
-      benchbox publish show abc123def456
-      benchbox publish remove abc123def456
-    """
+    pass
 
 
-# ---------------------------------------------------------------------------
-# publish <result-file>
-# ---------------------------------------------------------------------------
-
-
-@publish.command("run")
+@publish.command(
+    "run",
+    help=(
+        "Publish a schema-v2 result bundle to a storage destination.\n"
+        "\n"
+        "RESULT_FILE: Path to the primary .json result file (optional; use --last for auto-select)."
+    ),
+)
 @click.argument("result_file", required=False, type=click.Path())
 @click.option(
     "--target",
@@ -86,16 +77,10 @@ def publish() -> None:
 @click.option("--dry-run", is_flag=True, help="Preview without publishing.")
 @click.pass_context
 def publish_run(ctx, result_file, target, label, last, benchmark, platform, dry_run):
-    """Publish a schema-v2 result bundle to a storage destination.
-
-    RESULT_FILE: Path to the primary .json result file (optional; use --last for auto-select).
-    """
     source_path = _resolve_source(result_file, last, benchmark, platform)
     if source_path is None:
         return
 
-    # Publish admission policy lives in core so any surface inherits it.
-    # CLI maps the structured decision to its user-facing messages/exit codes.
     try:
         _result, _ = load_result_file(source_path)
         _decision = publish_admission(_result, label)
@@ -115,7 +100,7 @@ def publish_run(ctx, result_file, target, label, last, benchmark, platform, dry_
                 )
             raise SystemExit(1)
     except (ResultLoadError, UnsupportedSchemaError, FileNotFoundError):
-        pass  # Let the publisher surface the error with a better message
+        pass
 
     if dry_run:
         console.print(f"[bold]Dry run - would publish:[/bold] {source_path}")
@@ -136,7 +121,6 @@ def publish_run(ctx, result_file, target, label, last, benchmark, platform, dry_
         raise SystemExit(1)
 
     if result.errors:
-        # Success but with warnings (e.g., store write failed)
         for err in result.errors:
             console.print(f"[yellow]Warning:[/yellow] {err}")
 
@@ -151,17 +135,11 @@ def publish_run(ctx, result_file, target, label, last, benchmark, platform, dry_
         console.print(f"  + {companion_count} companion file(s) also published")
 
 
-# ---------------------------------------------------------------------------
-# publish list
-# ---------------------------------------------------------------------------
-
-
-@publish.command("list")
+@publish.command("list", help=("List published artifacts from the publication history."))
 @click.option("--benchmark", type=str, help="Filter by benchmark name.")
 @click.option("--platform", type=str, help="Filter by platform name.")
 @click.option("--label", type=str, help="Filter by label.")
 def publish_list(benchmark, platform, label):
-    """List published artifacts from the publication history."""
     store = PublicationStore()
     records = store.list_all()
 
@@ -200,22 +178,15 @@ def publish_list(benchmark, platform, label):
 
         console.print(table)
     except Exception:
-        # Fallback if rich is not available in this context
         for rec in records:
             ts = rec.published_at[:19].replace("T", " ") if rec.published_at else ""
             console.print(f"  {rec.pub_id}  {rec.benchmark}/{rec.platform}  {ts}")
             console.print(f"    -> {rec.reference}")
 
 
-# ---------------------------------------------------------------------------
-# publish show <id>
-# ---------------------------------------------------------------------------
-
-
-@publish.command("show")
+@publish.command("show", help=("Show details of a published artifact by ID."))
 @click.argument("pub_id")
 def publish_show(pub_id):
-    """Show details of a published artifact by ID."""
     store = PublicationStore()
     rec = store.get(pub_id)
 
@@ -234,22 +205,20 @@ def publish_show(pub_id):
     console.print(f"  Reference:    {rec.reference}")
 
 
-# ---------------------------------------------------------------------------
-# publish remove <id>
-# ---------------------------------------------------------------------------
-
-
-@publish.command("remove")
+@publish.command(
+    "remove",
+    help=(
+        "Remove a publication record.\n"
+        "\n"
+        "This removes the metadata entry only. The underlying artifact files are\n"
+        "NOT deleted from the destination.\n"
+        "\n"
+        "PUB_ID: The publication ID to remove (from 'benchbox publish list')."
+    ),
+)
 @click.argument("pub_id")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt.")
 def publish_remove(pub_id, yes):
-    """Remove a publication record.
-
-    This removes the metadata entry only. The underlying artifact files are
-    NOT deleted from the destination.
-
-    PUB_ID: The publication ID to remove (from 'benchbox publish list').
-    """
     store = PublicationStore()
     rec = store.get(pub_id)
 
@@ -272,18 +241,12 @@ def publish_remove(pub_id, yes):
     console.print(f"[green]Removed publication {pub_id}[/green]")
 
 
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
-
-
 def _resolve_source(
     result_file: str | None,
     last: bool,
     benchmark: str | None,
     platform: str | None,
 ) -> Path | None:
-    """Resolve the source bundle path from arguments."""
     if result_file:
         path = Path(result_file)
         if not path.exists():
@@ -318,14 +281,8 @@ def _resolve_source(
 
 
 def _count_companions(source: Path) -> int:
-    """Count companion files beside a bundle."""
     stem = source.stem
     return sum(1 for s in COMPANION_SUFFIXES if (source.parent / (stem + s)).exists())
-
-
-# ---------------------------------------------------------------------------
-# Programmatic entry point for benchbox run --publish
-# ---------------------------------------------------------------------------
 
 
 def publish_bundle(
@@ -334,28 +291,12 @@ def publish_bundle(
     label: str = "maintainer-run",
     quiet: bool = False,
 ) -> str | None:
-    """Publish a bundle programmatically (used by benchbox run --publish).
-
-    Args:
-        source_bundle: Path to the primary .json result bundle.
-        target: Destination directory or cloud URI.
-        label: Trust label.
-        quiet: If True, suppress non-error output.
-
-    Returns:
-        The durable reference string on success, or None on failure.
-    """
-    # Guard: reject an out-of-vocabulary trust label with a clean message rather
-    # than letting it reach BundlePublisher (which raises) as a traceback. This
-    # is the programmatic entry point for `benchbox run --publish`, whose
-    # --publish-label option is not a click.Choice.
     if label not in VALID_LABELS:
         console.print(
             f"[red]Publish refused:[/red] invalid trust label '{label}'. Must be one of: {', '.join(VALID_LABELS)}."
         )
         return None
 
-    # Publish admission policy lives in core; programmatic entry mirrors the CLI gate.
     try:
         _result, _ = load_result_file(source_bundle)
         _decision = publish_admission(_result, label)

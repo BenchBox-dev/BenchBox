@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Compute median DuckDB version-matrix metrics from a run manifest."""
 
 from __future__ import annotations
 
@@ -12,6 +11,8 @@ import statistics
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
+
+CLI_DESCRIPTION = "Compute median DuckDB version-matrix metrics from a run manifest."
 
 EXPECTED_VERSIONS = ("1.0.0", "1.1.3", "1.2.2", "1.3.2", "1.4.4", "1.5.5", "1.6.0.dev365")
 EXPECTED_BENCHMARKS = ("tpch", "tpcds", "clickbench", "ssb")
@@ -104,7 +105,6 @@ def _query_key(query: dict[str, Any]) -> tuple[Any, ...]:
 
 
 def aggregate_payloads(payloads: list[dict[str, Any]], *, version: str, benchmark: str) -> dict[str, Any]:
-    """Create one Results Explorer bundle from the repetitions of one matrix cell."""
     if len(payloads) != EXPECTED_REPETITIONS:
         raise ValueError(f"expected {EXPECTED_REPETITIONS} repetitions for {version}/{benchmark}")
     if any(payload.get("summary", {}).get("validation") != "passed" for payload in payloads):
@@ -167,7 +167,6 @@ def _write_json(path: Path, payload: Any) -> None:
 
 
 def write_explorer_bundles(manifest_path: Path, output_dir: Path) -> list[Path]:
-    """Write one median bundle per version/benchmark cell for Explorer ingestion."""
     if output_dir.exists() and any(output_dir.iterdir()):
         raise ValueError(f"Explorer bundle output directory must be new or empty: {output_dir}")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -251,7 +250,7 @@ def write_outputs(result: dict[str, Any], output_dir: Path) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("manifest", type=Path, help="matrix-manifest.json emitted by the runner")
     parser.add_argument(
         "--explorer-bundles-dir",

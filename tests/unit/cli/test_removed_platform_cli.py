@@ -1,8 +1,5 @@
-"""Tests ensuring removed platform selectors are rejected at the CLI boundary.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License.
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock

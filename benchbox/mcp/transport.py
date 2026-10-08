@@ -1,5 +1,3 @@
-"""Transport configuration for the BenchBox MCP server."""
-
 from __future__ import annotations
 
 import os
@@ -19,14 +17,11 @@ MCPTransport = Literal["stdio", "streamable-http"]
 
 
 def is_supported_loopback_host(host: str) -> bool:
-    """Return whether *host* is a loopback spelling protected by the SDK policy."""
     return host.strip().lower() in {"127.0.0.1", "localhost", "::1"}
 
 
 @dataclass(frozen=True, slots=True)
 class MCPTransportSettings:
-    """Validated startup settings for stdio or localhost Streamable HTTP."""
-
     transport: MCPTransport = "stdio"
     host: str = "127.0.0.1"
     port: int = 8000
@@ -75,7 +70,6 @@ class MCPTransportSettings:
 
 
 def run_transport(server: MCPServer, settings: MCPTransportSettings) -> None:
-    """Run *server* through the SDK-owned transport implementation."""
     if settings.transport == "stdio":
         server.run(transport="stdio")
         return
@@ -99,14 +93,8 @@ def run_transport(server: MCPServer, settings: MCPTransportSettings) -> None:
         host=settings.host,
         port=settings.port,
         streamable_http_path=settings.streamable_http_path,
-        # Modern MCP is sessionless by construction. This flag also keeps the
-        # supported handshake-era HTTP leg stateless between requests.
         stateless_http=True,
-        # Keep the SDK's streaming-capable response mode for progress and
-        # future request-scoped notifications.
         json_response=False,
-        # Pass this explicitly for every accepted loopback address. The SDK's
-        # automatic policy covers only its three canonical host spellings.
         transport_security=TransportSecuritySettings(
             enable_dns_rebinding_protection=True,
             allowed_hosts=allowed_hosts,

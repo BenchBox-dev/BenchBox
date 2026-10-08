@@ -1,5 +1,3 @@
-"""JoinOrder synthetic cross-surface gate builder."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,7 +6,6 @@ from benchbox.core.equivalence.builders.base import CrossSurfaceData, _load_duck
 
 
 def build_joinorder_synthetic_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
-    """Generate synthetic Join Order data, load it into DuckDB, and wire both surfaces."""
     from benchbox.core.joinorder_synthetic.benchmark import JoinOrderSyntheticBenchmark
     from benchbox.core.joinorder_synthetic.dataframe_queries import JOINORDER_DATAFRAME_QUERIES
     from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator

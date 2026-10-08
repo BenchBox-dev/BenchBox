@@ -1,5 +1,3 @@
-"""Tests for blind-spot finding validation and sweep tooling."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -35,19 +33,15 @@ def test_blind_spot_command_uses_active_protocol() -> None:
     command_text = (REPO_ROOT / ".claude" / "commands" / "blind-spot.md").read_text(encoding="utf-8")
 
     assert "docs/agent/review-protocol.md" in command_text
-    # The superseded unabridged doc must not be a binding target.
     assert "docs/development/review-protocol.md" not in command_text
     assert "docs/development/agent-review-protocol.md" not in command_text
     assert "_project/blind-spots/README.md" in command_text
-    # findings-domain phase 1: capture now writes drafts OUT of the Git tree.
     assert "~/.benchbox/finding-drafts" in command_text
     assert ".claude/skills" not in command_text
     assert (REPO_ROOT / "docs" / "agent" / "review-protocol.md").is_file()
 
 
 def test_superseded_protocol_doc_is_demoted() -> None:
-    # Full retirement is a valid end state; while the file exists it must be
-    # unmistakably non-authoritative and must not claim to win conflicts.
     legacy = REPO_ROOT / "docs" / "agent" / "review-protocol-legacy.md"
     if not legacy.is_file():
         pytest.skip("legacy review-protocol.md fully retired")
@@ -59,8 +53,6 @@ def test_superseded_protocol_doc_is_demoted() -> None:
 
 
 def test_blind_spot_command_forbids_direct_db_write() -> None:
-    # The capture command must never land a finding straight into the tracker DB
-    # ([REVIEW-CAPTURE-001]); syncing is a separate authorized step.
     command_text = (REPO_ROOT / ".claude" / "commands" / "blind-spot.md").read_text(encoding="utf-8")
 
     assert "do not commit" in command_text
@@ -382,8 +374,6 @@ def test_report_oldest_section_surfaces_actionable_alongside_open(
     assert "2026-04-29-120022-already-dismissed" not in out
 
 
-# --- findings-domain phase 1: optional capture fields + drafts directory ---
-
 _DRAFT_BODY = """# Draft class finding
 
 ## Finding
@@ -474,8 +464,6 @@ def test_validator_rejects_bad_judgment_field(tmp_path: Path) -> None:
 
 
 def test_drafts_dir_absent_is_valid_zero_credential(tmp_path: Path, monkeypatch, capsys) -> None:
-    # Zero captured findings is a valid state: an absent drafts directory must
-    # exit 0 (capture needs no credentials and no network).
     missing = tmp_path / "no-such-drafts"
     monkeypatch.setattr(sys, "argv", ["validate_blind_spot.py", "--drafts-dir", str(missing)])
 

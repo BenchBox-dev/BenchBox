@@ -1,9 +1,6 @@
-"""Tests for TPC-H streams module.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -21,12 +18,7 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Permutation matrix tests
-# ---------------------------------------------------------------------------
 class TestPermutationMatrix:
-    """Tests for the TPC-H permutation matrix."""
-
     def test_matrix_has_41_rows(self):
         assert len(TPCHStreams.PERMUTATION_MATRIX) == 41
 
@@ -35,28 +27,20 @@ class TestPermutationMatrix:
             assert len(row) == 22, f"Row {i} has {len(row)} entries, expected 22"
 
     def test_each_row_is_permutation_of_1_to_22(self):
-        """Every row must be a permutation of integers 1-22."""
         expected = set(range(1, 23))
         for i, row in enumerate(TPCHStreams.PERMUTATION_MATRIX):
             assert set(row) == expected, f"Row {i} is not a permutation of 1-22"
 
     def test_first_row_matches_spec(self):
-        """Spot-check the first permutation row from the TPC-H spec."""
         expected = [14, 2, 9, 20, 6, 17, 18, 8, 21, 13, 3, 22, 16, 4, 11, 15, 1, 10, 19, 5, 7, 12]
         assert TPCHStreams.PERMUTATION_MATRIX[0] == expected
 
     def test_last_row_matches_spec(self):
-        """Spot-check the last (41st) permutation row from the TPC-H spec."""
         expected = [13, 15, 17, 1, 22, 11, 3, 4, 7, 20, 14, 21, 9, 8, 2, 18, 16, 6, 10, 12, 5, 19]
         assert TPCHStreams.PERMUTATION_MATRIX[40] == expected
 
 
-# ---------------------------------------------------------------------------
-# Stream permutation retrieval
-# ---------------------------------------------------------------------------
 class TestGetStreamPermutation:
-    """Tests for _get_stream_permutation."""
-
     @patch("benchbox.utils.tpc_compilation.get_tpc_templates_dir")
     def test_stream_0_returns_first_permutation(self, mock_templates):
         mock_templates.return_value = Path("/fake/templates")
@@ -66,22 +50,18 @@ class TestGetStreamPermutation:
 
     @patch("benchbox.utils.tpc_compilation.get_tpc_templates_dir")
     def test_stream_permutation_wraps_around(self, mock_templates):
-        """Stream IDs beyond 40 wrap around using modulo."""
         mock_templates.return_value = Path("/fake/templates")
         streams = TPCHStreams(num_streams=100, verbose=0)
 
-        # Stream 41 should wrap to index 0
         perm41 = streams._get_stream_permutation(41)
         perm0 = streams._get_stream_permutation(0)
         assert perm41 == perm0
 
-        # Stream 82 should also wrap to index 0
         perm82 = streams._get_stream_permutation(82)
         assert perm82 == perm0
 
     @patch("benchbox.utils.tpc_compilation.get_tpc_templates_dir")
     def test_stream_permutation_returns_copy(self, mock_templates):
-        """Returned list is a copy, not a reference."""
         mock_templates.return_value = Path("/fake/templates")
         streams = TPCHStreams(num_streams=1, verbose=0)
 
@@ -92,7 +72,6 @@ class TestGetStreamPermutation:
 
     @patch("benchbox.utils.tpc_compilation.get_tpc_templates_dir")
     def test_different_streams_different_permutations(self, mock_templates):
-        """Different stream IDs produce different permutations."""
         mock_templates.return_value = Path("/fake/templates")
         streams = TPCHStreams(num_streams=3, verbose=0)
 
@@ -104,7 +83,6 @@ class TestGetStreamPermutation:
 
     @patch("benchbox.utils.tpc_compilation.get_tpc_templates_dir")
     def test_permutation_always_22_elements(self, mock_templates):
-        """Every permutation has exactly 22 query IDs."""
         mock_templates.return_value = Path("/fake/templates")
         streams = TPCHStreams(num_streams=50, verbose=0)
 
@@ -113,12 +91,7 @@ class TestGetStreamPermutation:
             assert len(perm) == 22
 
 
-# ---------------------------------------------------------------------------
-# TPCHStreams initialization
-# ---------------------------------------------------------------------------
 class TestTPCHStreamsInit:
-    """Tests for TPCHStreams initialization."""
-
     @patch("benchbox.utils.tpc_compilation.get_tpc_templates_dir")
     def test_default_values(self, mock_templates):
         mock_templates.return_value = Path("/fake/templates")
@@ -158,12 +131,7 @@ class TestTPCHStreamsInit:
         assert streams.rng_seed == 1
 
 
-# ---------------------------------------------------------------------------
-# Stream info
-# ---------------------------------------------------------------------------
 class TestGetStreamInfo:
-    """Tests for get_stream_info and get_all_streams_info."""
-
     @patch("benchbox.utils.tpc_compilation.get_tpc_templates_dir")
     def test_stream_info_structure(self, mock_templates):
         mock_templates.return_value = Path("/fake/templates")
@@ -172,7 +140,7 @@ class TestGetStreamInfo:
         info = streams.get_stream_info(0)
         assert info["stream_id"] == 0
         assert info["scale_factor"] == 2.0
-        assert info["rng_seed"] == 10  # base_seed + stream_id = 10 + 0
+        assert info["rng_seed"] == 10
         assert info["query_count"] == 22
         assert info["permutation_index"] == 0
         assert len(info["query_order"]) == 22
@@ -180,7 +148,6 @@ class TestGetStreamInfo:
 
     @patch("benchbox.utils.tpc_compilation.get_tpc_templates_dir")
     def test_stream_info_seed_per_stream(self, mock_templates):
-        """Each stream gets rng_seed + stream_id as its seed."""
         mock_templates.return_value = Path("/fake/templates")
         streams = TPCHStreams(num_streams=5, rng_seed=100, verbose=0)
 
@@ -214,7 +181,6 @@ class TestGetStreamInfo:
 
     @patch("benchbox.utils.tpc_compilation.get_tpc_templates_dir")
     def test_stream_info_permutation_index_wraps(self, mock_templates):
-        """permutation_index wraps at 41."""
         mock_templates.return_value = Path("/fake/templates")
         streams = TPCHStreams(num_streams=50, verbose=0)
 
@@ -225,7 +191,6 @@ class TestGetStreamInfo:
 
     @patch("benchbox.utils.tpc_compilation.get_tpc_templates_dir")
     def test_stream_info_query_order_matches_permutation(self, mock_templates):
-        """query_order should match the correct permutation matrix row."""
         mock_templates.return_value = Path("/fake/templates")
         streams = TPCHStreams(num_streams=10, verbose=0)
 
@@ -235,12 +200,7 @@ class TestGetStreamInfo:
             assert info["query_order"] == expected_row
 
 
-# ---------------------------------------------------------------------------
-# TPCHStreamRunner
-# ---------------------------------------------------------------------------
 class TestTPCHStreamRunner:
-    """Tests for TPCHStreamRunner initialization."""
-
     def test_runner_initialization(self):
         runner = TPCHStreamRunner(
             connection_string="duckdb:///:memory:",
@@ -258,28 +218,13 @@ class TestTPCHStreamRunner:
         assert runner.dialect == "standard"
 
 
-# ---------------------------------------------------------------------------
-# Run stream (with mock file)
-# ---------------------------------------------------------------------------
 class TestRunStream:
-    """Tests for TPCHStreamRunner.run_stream.
-
-    NOTE: run_stream previously "executed" a stream by counting ``-- Query``
-    comment lines in the file and reporting every query as successful --
-    without ever running SQL against a database, despite this test suite's
-    ``connection_string="test://conn"`` fixtures implying otherwise. That was
-    the fake-success stub targeted by the concurrency-executor consolidation;
-    run_stream now raises NotImplementedError unconditionally instead.
-    """
-
     def test_run_stream_raises_not_implemented_for_missing_file(self):
-        """run_stream raises NotImplementedError even for a non-existent file."""
         runner = TPCHStreamRunner(connection_string="test://conn", verbose=0)
         with pytest.raises(NotImplementedError, match="does not execute SQL"):
             runner.run_stream(Path("/nonexistent/stream.sql"), stream_id=0)
 
     def test_run_stream_raises_not_implemented_for_valid_file(self, tmp_path):
-        """run_stream raises NotImplementedError even when the stream file is real."""
         stream_file = tmp_path / "stream_0.sql"
         stream_file.write_text(
             "-- TPC-H Stream 0\n"
@@ -296,7 +241,6 @@ class TestRunStream:
             runner.run_stream(stream_file, stream_id=0)
 
     def test_run_stream_raises_not_implemented_for_empty_file(self, tmp_path):
-        """run_stream raises NotImplementedError even for an empty stream file."""
         stream_file = tmp_path / "stream_empty.sql"
         stream_file.write_text("-- Empty stream\n")
 
@@ -305,16 +249,10 @@ class TestRunStream:
             runner.run_stream(stream_file, stream_id=0)
 
 
-# ---------------------------------------------------------------------------
-# Compile qgen (mocked)
-# ---------------------------------------------------------------------------
 class TestCompileQgen:
-    """Tests for _compile_qgen with mocked subprocess."""
-
     @patch("benchbox.utils.tpc_compilation.get_tpc_templates_dir")
     @patch("subprocess.run")
     def test_compile_qgen_failure_returns_none(self, mock_run, mock_templates, tmp_path):
-        """When compilation fails, _compile_qgen returns None."""
         import subprocess
 
         mock_templates.return_value = tmp_path / "templates"
@@ -332,21 +270,18 @@ class TestCompileQgen:
     @patch("benchbox.utils.tpc_compilation.get_tpc_templates_dir")
     @patch("subprocess.run")
     def test_compile_qgen_success_returns_path(self, mock_run, mock_templates, tmp_path):
-        """When compilation succeeds and exe exists, returns path."""
         import os
 
         templates_dir = tmp_path / "templates"
         templates_dir.mkdir()
         mock_templates.return_value = templates_dir
 
-        # Mock successful subprocess
         mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
 
         streams = TPCHStreams(num_streams=1, verbose=0)
         work_dir = tmp_path / "work"
         work_dir.mkdir()
 
-        # Seed the template directory with the platform-appropriate binary name.
         qgen_name = "qgen.exe" if os.name == "nt" else "qgen"
         qgen_exe = templates_dir / qgen_name
         qgen_exe.write_bytes(b"fake exe")
@@ -357,7 +292,6 @@ class TestCompileQgen:
     @patch("benchbox.utils.tpc_compilation.get_tpc_templates_dir")
     @patch("subprocess.run")
     def test_compile_qgen_no_exe_after_success(self, mock_run, mock_templates, tmp_path):
-        """When subprocess succeeds but exe doesn't exist, returns None."""
         templates_dir = tmp_path / "templates"
         templates_dir.mkdir()
         mock_templates.return_value = templates_dir
@@ -368,17 +302,11 @@ class TestCompileQgen:
         work_dir = tmp_path / "work"
         work_dir.mkdir()
 
-        # Don't create the exe file
         result = streams._compile_qgen(work_dir)
         assert result is None
 
 
-# ---------------------------------------------------------------------------
-# _compile_qgen platform detection
-# ---------------------------------------------------------------------------
 class TestCompileQgenPlatform:
-    """Tests for platform-specific compilation settings."""
-
     @patch("benchbox.utils.tpc_compilation.get_tpc_templates_dir")
     @patch("subprocess.run")
     @patch("platform.system", return_value="Linux")
@@ -394,21 +322,14 @@ class TestCompileQgenPlatform:
 
         streams._compile_qgen(work_dir)
 
-        # Verify the command was called with MACHINE=LINUX
         call_args = mock_run.call_args
         cmd = call_args[0][0] if call_args[0] else call_args.kwargs.get("args", [])
         assert "MACHINE=LINUX" in cmd
 
 
-# ---------------------------------------------------------------------------
-# qgen stream file assembly
-# ---------------------------------------------------------------------------
 class TestGenerateStreamQueriesQgen:
-    """Tests for assembling stream files from qgen outputs."""
-
     @patch("benchbox.utils.tpc_compilation.get_tpc_templates_dir")
     def test_generate_stream_queries_qgen_writes_permuted_stream_file(self, mock_templates, tmp_path):
-        """Generated query files should be merged into a permuted stream file."""
         mock_templates.return_value = Path("/fake/templates")
         streams = TPCHStreams(output_dir=tmp_path, scale_factor=0.01, rng_seed=7, verbose=2)
         work_dir = tmp_path / "work"
@@ -436,7 +357,6 @@ class TestGenerateStreamQueriesQgen:
 
     @patch("benchbox.utils.tpc_compilation.get_tpc_templates_dir")
     def test_generate_stream_queries_qgen_wraps_subprocess_failures(self, mock_templates, tmp_path):
-        """qgen execution failures should become a runtime error with stderr details."""
         mock_templates.return_value = Path("/fake/templates")
         streams = TPCHStreams(output_dir=tmp_path, verbose=0)
         error = subprocess.CalledProcessError(returncode=1, cmd=["qgen"], stderr="compile failed")
@@ -449,15 +369,9 @@ class TestGenerateStreamQueriesQgen:
             streams._generate_stream_queries_qgen(2, Path("/fake/qgen"), tmp_path)
 
 
-# ---------------------------------------------------------------------------
-# generate_streams orchestration
-# ---------------------------------------------------------------------------
 class TestGenerateStreams:
-    """Tests for end-to-end stream generation orchestration."""
-
     @patch("benchbox.utils.tpc_compilation.get_tpc_templates_dir")
     def test_generate_streams_skips_failed_streams_and_logs_summary(self, mock_templates, tmp_path):
-        """Per-stream failures should be logged while successful streams are returned."""
         mock_templates.return_value = Path("/fake/templates")
         output_dir = tmp_path / "streams"
         streams = TPCHStreams(num_streams=3, output_dir=output_dir, verbose=1)
@@ -484,7 +398,6 @@ class TestGenerateStreams:
 
     @patch("benchbox.utils.tpc_compilation.get_tpc_templates_dir")
     def test_generate_streams_wraps_compile_failures(self, mock_templates, tmp_path):
-        """Compilation failures should stop generation with build-tool guidance."""
         mock_templates.return_value = Path("/fake/templates")
         streams = TPCHStreams(output_dir=tmp_path, verbose=0)
 
@@ -495,14 +408,8 @@ class TestGenerateStreams:
             streams.generate_streams()
 
 
-# ---------------------------------------------------------------------------
-# Additional runner behavior
-# ---------------------------------------------------------------------------
 class TestTPCHStreamRunnerAdditional:
-    """Additional branch coverage for TPCHStreamRunner."""
-
     def test_run_stream_raises_not_implemented_when_verbose(self, tmp_path):
-        """run_stream raises NotImplementedError regardless of verbosity; it never logs fake success."""
         runner = TPCHStreamRunner(connection_string="duckdb:///:memory:", verbose=1)
         stream_file = tmp_path / "stream.sql"
         stream_file.write_text("-- Query 1 (Stream 0, Position 1)\nSELECT 1;\n")
@@ -511,7 +418,6 @@ class TestTPCHStreamRunnerAdditional:
             runner.run_stream(stream_file, stream_id=0)
 
     def test_run_concurrent_streams_raises_not_implemented_no_longer_uses_executor(self, tmp_path):
-        """run_concurrent_streams raises directly; the executor indirection is removed."""
         runner = TPCHStreamRunner(connection_string="duckdb:///:memory:", verbose=1)
         stream_file = tmp_path / "stream_0.sql"
         stream_file.write_text("-- Query 1 (Stream 0, Position 1)\nSELECT 1;\n")

@@ -4,29 +4,12 @@ import { buildComparabilityFields, type ComparabilityField } from "@/components/
 import { formatCpuIdentityProvenance } from "@/lib/hardwareProvenance";
 import { formatMemoryGb } from "@/lib/displayLabels";
 
-/**
- * The engine-and-hardware strip for a head-to-head comparison.
- *
- * Answers one question at a glance: of the things that could explain a
- * difference in these numbers, which ones ACTUALLY differ between these two
- * runs? A reader looking at a 1.4x speedup needs to know whether the engines
- * differ, or the hardware does, or only the engine version.
- *
- * It does NOT replace or duplicate the ComparabilityReceipt, which stays on
- * the page and remains the full record. The strip summarizes the
- * axes most likely to confound an engine comparison; the receipt covers
- * benchmark, scale, phase, query scope, dates, tuning, validation and cost as
- * well. Both read the SAME `buildComparabilityFields` output, so the strip can
- * never disagree with the receipt about whether an axis differs -- which is
- * exactly what a second, independently-derived summary would eventually do.
- */
 export interface IdentityDiffStripProps {
   results: DetailResult[];
   baselineIndex?: number;
   runLabels?: readonly string[];
 }
 
-/** The axes this strip reports, in reading order, by their receipt labels. */
 export const STRIP_AXES = [
   "Platform version",
   "Driver version",
@@ -74,7 +57,6 @@ export function identityStripFields(results: DetailResult[]): ComparabilityField
   );
 }
 
-/** How many of the strip's axes actually differ between the runs. */
 export function identityStripDiffCount(results: DetailResult[]): number {
   return identityStripFields(results).filter((field) => field.status === "diff").length;
 }

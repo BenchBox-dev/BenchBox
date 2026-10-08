@@ -2,15 +2,6 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const TIMESTAMP_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})?$/;
 
-/**
- * Formats the elapsed UTC calendar days since a result run.
- *
- * Plain ``YYYY-MM-DD`` values are explicit UTC calendar days. Complete ISO
- * timestamps with an offset or ``Z`` are converted to their UTC calendar day;
- * legacy timestamps without an offset are interpreted as UTC. The optional
- * reference time keeps callers and tests deterministic. Invalid or missing
- * values are intentionally omitted rather than rendered as a misleading age.
- */
 export function formatRunAge(runDate: string | null | undefined, reference = new Date()): string | null {
   const runDay = utcCalendarDay(runDate);
   const referenceDay = utcCalendarDay(reference);
@@ -24,14 +15,12 @@ export function formatRunAge(runDate: string | null | undefined, reference = new
   return `in ${Math.abs(days)} days`;
 }
 
-/** Formats a strict run timestamp as its UTC calendar date for display. */
 export function formatRunDate(runDate: string | null | undefined): string {
   const runDay = utcCalendarDay(runDate);
   if (runDay === null) return runDate ?? "Not recorded";
   return new Date(runDay).toISOString().slice(0, 10);
 }
 
-/** Formats a run's UTC calendar date and its informational age in one label. */
 export function formatRunDateWithAge(runDate: string | null | undefined, reference = new Date()): string {
   const date = formatRunDate(runDate);
   const age = formatRunAge(runDate, reference);

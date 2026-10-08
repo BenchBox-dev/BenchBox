@@ -1,5 +1,3 @@
-"""Tests for scripts/publication/validator_parity.py (A2 w4)."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -30,7 +28,6 @@ def test_validator_parity_script_exists() -> None:
 
 
 def test_validator_parity_executable_and_parses_args() -> None:
-    # --help should exit 0 and mention required flags
     result = subprocess.run(
         [sys.executable, str(SCRIPT), "--help"],
         capture_output=True,
@@ -45,7 +42,6 @@ def test_validator_parity_executable_and_parses_args() -> None:
 
 
 def test_validator_parity_needs_base_and_merge_sha(tmp_path: Path) -> None:
-    # Missing SHAs should exit 2 (usage error)
     result = subprocess.run(
         [sys.executable, str(SCRIPT)],
         capture_output=True,
@@ -81,7 +77,6 @@ def _git(repo: Path, *args: str) -> str:
 
 
 def _minimal_bundle_dict() -> dict:
-    """Minimal schema-v2 bundle that benchbox validate_bundles accepts."""
     return {
         "version": "2.1",
         "run": {"id": "abc123", "timestamp": "2026-04-01T12:00:00", "total_duration_ms": 5000},
@@ -94,7 +89,6 @@ def _minimal_bundle_dict() -> dict:
 
 
 def _init_fixture_repo(repo: Path, rel: str) -> str:
-    """Init a git repo with one valid bundle commit; return that commit SHA."""
     repo.mkdir(parents=True, exist_ok=True)
     _git(repo, "init", "-b", "main")
     _git(repo, "config", "user.email", "test@example.com")
@@ -108,11 +102,6 @@ def _init_fixture_repo(repo: Path, rel: str) -> str:
 
 
 def test_head_vs_merge_real_payloads_diverge_when_head_missing(tmp_path: Path, monkeypatch) -> None:
-    """Two real payloads, no extractor mock: bundle valid at merge SHA, absent at head.
-
-    The head run must fail closed (rc 1, "No bundles extracted") so compare
-    reports divergence instead of a vacuous "Parity OK" over two zeros.
-    """
     parity = _load_parity_module()
     repo = tmp_path / "fixture-repo"
     rel = "results-data/bundles/tpch_result.json"
@@ -133,7 +122,6 @@ def test_head_vs_merge_real_payloads_diverge_when_head_missing(tmp_path: Path, m
 
 
 def test_head_vs_merge_real_payloads_agree_when_identical(tmp_path: Path, monkeypatch) -> None:
-    """Two real payloads, no extractor mock: valid bundle present at both SHAs."""
     parity = _load_parity_module()
     repo = tmp_path / "fixture-repo"
     rel = "results-data/bundles/tpch_result.json"
@@ -149,7 +137,6 @@ def test_head_vs_merge_real_payloads_agree_when_identical(tmp_path: Path, monkey
 
 @pytest.mark.parametrize("case", ["identical", "invalid_head", "missing_head", "missing_runtime"])
 def test_parity_executes_real_payloads_in_an_isolated_slim_checkout(tmp_path: Path, case: str) -> None:
-    """The mirrored runtime must validate payloads without the installed package."""
     repo = tmp_path / "slim"
     rel = "results-data/bundles/tpch_result.json"
     base = _init_fixture_repo(repo, rel)
@@ -216,7 +203,6 @@ def test_parity_executes_real_payloads_in_an_isolated_slim_checkout(tmp_path: Pa
 
 
 def test_missing_payload_at_requested_sha_fails_closed(tmp_path: Path, monkeypatch) -> None:
-    """Non-empty bundle list with nothing extractable is rc 1, not a silent pass."""
     parity = _load_parity_module()
     repo = tmp_path / "fixture-repo"
     rel = "results-data/bundles/tpch_result.json"
@@ -235,7 +221,6 @@ def test_validator_parity_corpus_missing_file_is_error(tmp_path: Path) -> None:
         pytest.skip("no HEAD")
     sha = base.stdout.strip()
     missing = tmp_path / "missing.txt"
-    # File does not exist -> should error 1
     result = subprocess.run(
         [
             sys.executable,
@@ -274,7 +259,6 @@ def test_head_vs_merge_divergence_fails(monkeypatch) -> None:
 
     def fake_validate(bundle_paths, sha, require_manifest=False, allow_partial=False):
         calls.append(sha)
-        # First call (merge) succeeds, second (head) fails
         if sha == "merge" * 8:
             return 0, "merge ok"
         return 1, "head fail"
@@ -318,5 +302,4 @@ def test_validate_submission_corpus_flag_exists() -> None:
     from scripts.validate_submission import _validate_corpus_changed_paths_file
 
     assert callable(_validate_corpus_changed_paths_file)
-    # None -> continue
     assert _validate_corpus_changed_paths_file(None) is None

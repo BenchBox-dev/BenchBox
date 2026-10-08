@@ -1,5 +1,3 @@
-"""Protocol-level coverage for localhost stateless Streamable HTTP."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -53,7 +51,7 @@ def test_modern_discovery_and_tool_call_are_sessionless(tmp_path: Path) -> None:
 
     anyio.run(exercise)
 
-    assert len(request_headers) >= 3  # discover, tools/list, and tools/call
+    assert len(request_headers) >= 3
     assert all("mcp-session-id" not in headers for headers in request_headers)
     assert all("mcp-session-id" not in headers for headers in response_headers)
 
@@ -83,7 +81,7 @@ def test_modern_prompt_list_and_get_are_sessionless(tmp_path: Path) -> None:
 
     anyio.run(exercise)
 
-    assert len(request_headers) >= 3  # discover, prompts/list, and prompts/get
+    assert len(request_headers) >= 3
     assert all("mcp-session-id" not in headers for headers in request_headers)
     assert all("mcp-session-id" not in headers for headers in response_headers)
 

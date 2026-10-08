@@ -1,24 +1,4 @@
 #!/usr/bin/env python3
-"""Audit open corpus-mirror PRs for content-equivalence against the protected base.
-
-For each open mirror PR targeting the protected publication branch, this tool
-compares the *blob content* (git blob SHA) of every mirrored path the PR
-touches against the base branch tree, and classifies the PR:
-
-    ADDITIVE  - adds at least one mirrored path that is new to the base
-    MUTATING  - adds no new path, but changes the content of, or removes, an
-                existing mirrored path (a genuine refresh — NOT retire-able)
-    NOOP      - every mirrored path it touches already exists on base with
-                byte-identical content (pure redundant re-mirror)
-    EMPTY     - touches no mirrored path at all
-    ERROR     - the PR could not be audited (operational failure)
-
-Only NOOP and EMPTY are retire-able. This is a reporting tool, not a gate: by
-default it exits 0 even when it finds retire-able PRs. Pass ``--strict-union``
-to exit 3 when any NOOP/EMPTY PR is present.
-
-Runs read-only against GitHub; requires a ``gh`` CLI on PATH.
-"""
 
 from __future__ import annotations
 
@@ -33,10 +13,6 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# Every path that .github/workflows/sync-results-data-to-published.yml mirrors
-# from develop onto published-results (drift-detection + build-overlay lists).
-# A mirror PR that only touches paths outside this set is EMPTY, not
-# retire-able-because-empty in a way that discards corpus content.
 MIRRORED_PREFIXES: tuple[str, ...] = (
     "results-data/bundles/",
     "results-data/corpus-inventory.json",
@@ -75,7 +51,6 @@ class MirrorPRAudit:
 
 
 def _run(args: list[str], env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
-    """Run a subprocess against REPO_ROOT with text output (no raise-on-failure)."""
     merged_env = dict(os.environ)
     if env:
         merged_env.update(env)
@@ -132,11 +107,6 @@ def _list_open_prs(repo: str, base: str) -> list[dict[str, Any]]:
 
 
 def _list_pr_files(repo: str, number: int) -> list[dict[str, Any]]:
-    """Return every changed file for a PR, following pagination fully.
-
-    ``gh pr list --json files`` silently caps at 100 files; the REST
-    ``pulls/{n}/files`` endpoint with ``--paginate`` does not.
-    """
     out = _run_checked(
         [
             "gh",
@@ -156,7 +126,6 @@ def _list_pr_files(repo: str, number: int) -> list[dict[str, Any]]:
 
 
 def _base_blob_shas(repo: str, base: str) -> dict[str, str]:
-    """Map mirrored path -> git blob SHA on the base branch tree."""
     if not base:
         raise RuntimeError("empty base ref provided; cannot compute the protected base")
     out = _run_checked(
@@ -194,9 +163,6 @@ def _audit_pr(pr: dict[str, Any], base_shas: dict[str, str], repo: str) -> Mirro
         mirrored_file_count=0,
     )
 
-    # Only the synchronizer's machine-owned head namespace is authoritative
-    # mirror provenance.  Unrelated PRs must never become retire-able EMPTY
-    # records merely because they target the same base branch.
     try:
         expected_owner, expected_repo = repo.split("/", 1)
     except ValueError:
@@ -262,7 +228,6 @@ def _audit_pr(pr: dict[str, Any], base_shas: dict[str, str], repo: str) -> Mirro
 
 
 def audit_mirror_prs(repo: str, base: str) -> list[MirrorPRAudit]:
-    """Audit every open mirror PR against the base branch's mirrored content."""
     base_shas = _base_blob_shas(repo, base)
     prs = _list_open_prs(repo, base)
     return [_audit_pr(pr, base_shas, repo) for pr in prs]

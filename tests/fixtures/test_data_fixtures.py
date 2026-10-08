@@ -1,12 +1,6 @@
-"""Shared test data fixtures for BenchBox tests.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides session-scoped fixtures that generate test data once
-and reuse it across all tests, significantly improving test performance.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import csv
 import tempfile
@@ -18,17 +12,8 @@ import pytest
 
 @pytest.fixture(scope="session")
 def tpch_sample_data_session() -> Generator[Path, None, None]:
-    """Create TPC-H sample data once per test session for reuse across all tests.
-
-    This fixture creates a temporary directory with sample TPC-H data that
-    persists for the entire test session, eliminating redundant data generation.
-
-    Returns:
-        Path: Directory containing generated CSV files
-    """
     temp_dir = Path(tempfile.mkdtemp(prefix="benchbox_test_data_"))
 
-    # Create sample region data
     region_file = temp_dir / "region.csv"
     region_data = [
         ["0", "AFRICA", "lar deposits. blithely final packages cajole"],
@@ -42,7 +27,6 @@ def tpch_sample_data_session() -> Generator[Path, None, None]:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(region_data)
 
-    # Create sample nation data
     nation_file = temp_dir / "nation.csv"
     nation_data = [
         ["0", "ALGERIA", "0", "haggle. carefully final deposits detect"],
@@ -57,7 +41,6 @@ def tpch_sample_data_session() -> Generator[Path, None, None]:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(nation_data)
 
-    # Create sample customer data
     customer_file = temp_dir / "customer.csv"
     customer_data = [
         [
@@ -116,7 +99,6 @@ def tpch_sample_data_session() -> Generator[Path, None, None]:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(customer_data)
 
-    # Create sample orders data
     orders_file = temp_dir / "orders.csv"
     orders_data = [
         [
@@ -140,7 +122,6 @@ def tpch_sample_data_session() -> Generator[Path, None, None]:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(orders_data)
 
-    # Create sample lineitem data
     lineitem_file = temp_dir / "lineitem.csv"
     lineitem_data = [
         [
@@ -241,7 +222,6 @@ def tpch_sample_data_session() -> Generator[Path, None, None]:
 
     yield temp_dir
 
-    # Cleanup after session
     import shutil
 
     shutil.rmtree(temp_dir, ignore_errors=True)
@@ -249,17 +229,8 @@ def tpch_sample_data_session() -> Generator[Path, None, None]:
 
 @pytest.fixture(scope="session")
 def tpch_detailed_data_session() -> Generator[Path, None, None]:
-    """Create detailed TPC-H sample data once per test session.
-
-    This fixture creates comprehensive TPC-H test data including all standard
-    tables with more records for complex query testing.
-
-    Returns:
-        Path: Directory containing generated CSV files
-    """
     temp_dir = Path(tempfile.mkdtemp(prefix="benchbox_detailed_data_"))
 
-    # Region data
     region_file = temp_dir / "region.csv"
     region_data = [
         [
@@ -293,7 +264,6 @@ def tpch_detailed_data_session() -> Generator[Path, None, None]:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(region_data)
 
-    # Nation data (expanded)
     nation_file = temp_dir / "nation.csv"
     nation_data = [
         ["0", "ALGERIA", "0", "haggle. carefully final deposits detect slyly against the furiously regular foxes"],
@@ -342,7 +312,6 @@ def tpch_detailed_data_session() -> Generator[Path, None, None]:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(nation_data)
 
-    # Supplier data
     supplier_file = temp_dir / "supplier.csv"
     supplier_data = [
         [
@@ -396,7 +365,6 @@ def tpch_detailed_data_session() -> Generator[Path, None, None]:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(supplier_data)
 
-    # Part data
     part_file = temp_dir / "part.csv"
     part_data = [
         [
@@ -460,7 +428,6 @@ def tpch_detailed_data_session() -> Generator[Path, None, None]:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(part_data)
 
-    # Customer data (expanded with 10 customers)
     customer_file = temp_dir / "customer.csv"
     customer_data = [
         [
@@ -569,7 +536,6 @@ def tpch_detailed_data_session() -> Generator[Path, None, None]:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(customer_data)
 
-    # Orders data (expanded with 10 orders)
     orders_file = temp_dir / "orders.csv"
     orders_data = [
         [
@@ -688,7 +654,6 @@ def tpch_detailed_data_session() -> Generator[Path, None, None]:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(orders_data)
 
-    # PartSupp data
     partsupp_file = temp_dir / "partsupp.csv"
     partsupp_data = [
         ["1", "1", "325", "771.64", "even, express ideas haggle blithely"],
@@ -705,7 +670,6 @@ def tpch_detailed_data_session() -> Generator[Path, None, None]:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(partsupp_data)
 
-    # Lineitem data (expanded)
     lineitem_file = temp_dir / "lineitem.csv"
     lineitem_data = [
         [
@@ -932,7 +896,6 @@ def tpch_detailed_data_session() -> Generator[Path, None, None]:
 
     yield temp_dir
 
-    # Cleanup after session
     import shutil
 
     shutil.rmtree(temp_dir, ignore_errors=True)
@@ -940,31 +903,9 @@ def tpch_detailed_data_session() -> Generator[Path, None, None]:
 
 @pytest.fixture
 def sample_data_dir(tpch_sample_data_session: Path) -> Path:
-    """Provide per-test access to session-scoped sample data.
-
-    This function-scoped fixture provides access to the session-scoped data
-    directory, making it easy to use in tests without changing test signatures.
-
-    Args:
-        tpch_sample_data_session: Session-scoped fixture with sample data
-
-    Returns:
-        Path: Directory containing sample CSV files
-    """
     return tpch_sample_data_session
 
 
 @pytest.fixture
 def detailed_data_dir(tpch_detailed_data_session: Path) -> Path:
-    """Provide per-test access to session-scoped detailed data.
-
-    This function-scoped fixture provides access to the session-scoped detailed
-    data directory, making it easy to use in tests without changing test signatures.
-
-    Args:
-        tpch_detailed_data_session: Session-scoped fixture with detailed data
-
-    Returns:
-        Path: Directory containing detailed CSV files
-    """
     return tpch_detailed_data_session

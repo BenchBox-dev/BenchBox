@@ -1,5 +1,3 @@
-"""Validate the independent publication authority decision records."""
-
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]

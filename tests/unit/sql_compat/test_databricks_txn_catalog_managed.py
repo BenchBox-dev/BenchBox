@@ -1,13 +1,3 @@
-"""Unit tests for the Databricks txn_staging_catalog_managed DDL_OPTIMIZE rule.
-
-The Transaction Primitives schema emitter declares the catalogManaged Delta
-table feature on Databricks staging DDL. That behavior is governed by a
-benchmark-scoped registry rule (not a bare ``dialect == "databricks"``
-branch), so the generated compatibility docs and the DDL drift check stay
-accurate, and ``REGISTRY.resolve()`` keeps returning a single winner at the
-platform-wide tier instead of raising ``CompatibilityRegistryConflict``.
-"""
-
 from __future__ import annotations
 
 import importlib
@@ -42,7 +32,6 @@ def _ctx(benchmark: str) -> CompatibilityContext:
 
 
 def test_txn_ctx_resolves_to_catalog_managed_rule():
-    """The benchmark-scoped rule wins for transaction_primitives without conflict."""
     decision = REGISTRY.resolve(_ctx("transaction_primitives"))
 
     assert decision is not None
@@ -53,7 +42,6 @@ def test_txn_ctx_resolves_to_catalog_managed_rule():
 
 
 def test_platform_wide_tier_still_has_single_winner():
-    """Other benchmarks keep resolving to convert_to_delta_table, not a conflict."""
     decision = REGISTRY.resolve(_ctx("write_primitives"))
 
     assert decision is not None

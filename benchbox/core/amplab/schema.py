@@ -1,5 +1,3 @@
-"""AMPLab Big Data Benchmark schema definitions."""
-
 from pathlib import Path
 from typing import Any, cast
 
@@ -27,20 +25,7 @@ def get_create_table_sql(
     enable_primary_keys: bool = True,
     enable_foreign_keys: bool = True,
 ) -> str:
-    """Generate CREATE TABLE SQL for a given table.
 
-    Args:
-        table_name: Name of the table to create
-        dialect: SQL dialect to use (standard, postgres, mysql, etc.)
-        enable_primary_keys: Whether to include primary key constraints
-        enable_foreign_keys: Whether to include foreign key constraints
-
-    Returns:
-        CREATE TABLE SQL statement
-
-    Raises:
-        ValueError: If table_name is not valid
-    """
     if table_name not in TABLES:
         raise ValueError(f"Unknown table: {table_name}")
 
@@ -65,16 +50,7 @@ def get_all_create_table_sql(
     enable_primary_keys: bool = True,
     enable_foreign_keys: bool = True,
 ) -> str:
-    """Generate CREATE TABLE SQL for all AMPLab tables.
 
-    Args:
-        dialect: SQL dialect to use
-        enable_primary_keys: Whether to include primary key constraints
-        enable_foreign_keys: Whether to include foreign key constraints
-
-    Returns:
-        Complete SQL schema creation script
-    """
     from benchbox.core.schema_utils import collect_create_table_sql
 
     return collect_create_table_sql(
@@ -87,17 +63,9 @@ def get_all_create_table_sql(
 
 
 def get_tunings() -> BenchmarkTunings:
-    """Get the default tuning configurations for AMPLab tables.
 
-    These tunings are optimized for the big data analytics workloads
-    typical in the AMPLab benchmark, focusing on scan and join performance.
-
-    Returns:
-        BenchmarkTunings containing tuning configurations for AMPLab tables
-    """
     tunings = BenchmarkTunings("amplab")
 
-    # Rankings table - distribute by page URL, sort by page rank for analytics
     rankings_tuning = TableTuning(
         table_name="rankings",
         distribution=[TuningColumn("pageURL", "VARCHAR(300)", 1)],
@@ -108,7 +76,6 @@ def get_tunings() -> BenchmarkTunings:
     )
     tunings.add_table_tuning(rankings_tuning)
 
-    # UserVisits table - partition by visit date, cluster by country and source
     uservisits_tuning = TableTuning(
         table_name="uservisits",
         partitioning=[TuningColumn("visitDate", "DATE", 1)],
@@ -123,7 +90,6 @@ def get_tunings() -> BenchmarkTunings:
     )
     tunings.add_table_tuning(uservisits_tuning)
 
-    # Documents table - distribute by URL for join performance
     documents_tuning = TableTuning(table_name="documents", distribution=[TuningColumn("url", "VARCHAR(300)", 1)])
     tunings.add_table_tuning(documents_tuning)
 

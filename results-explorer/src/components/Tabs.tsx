@@ -13,7 +13,6 @@ interface TabsProps<T extends string> {
   items: TabItem<T>[];
   value: T;
   onChange: (value: T) => void;
-  /** id of the tabpanel controlled by this tablist (for aria-controls). */
   controls?: string;
   class?: string;
 }

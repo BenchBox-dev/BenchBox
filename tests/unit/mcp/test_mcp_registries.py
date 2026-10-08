@@ -1,9 +1,3 @@
-"""Tests for MCP resource and prompt registry modules.
-
-Tests that register_all_resources and register_all_prompts publish correct
-output through MCPServer's public APIs.
-"""
-
 import json
 import sys
 from pathlib import Path
@@ -24,31 +18,17 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def _make_mcp():
-    """Create a real MCPServer instance for registration testing."""
     from mcp.server.mcpserver import MCPServer
 
     return MCPServer("test-benchbox", version="test")
 
 
-# ---------------------------------------------------------------------------
-# resources/registry.py
-# ---------------------------------------------------------------------------
-
-
 class TestRegisterAllResources:
-    """Test that register_all_resources registers functions on the MCP server."""
-
     def test_registration_completes(self):
         from benchbox.mcp.resources.registry import register_all_resources
 
         mcp = _make_mcp()
-        # Should not raise
         register_all_resources(mcp, results_dir=Path("benchmark_runs/results"))
 
     def test_list_benchmarks_resource(self):
@@ -63,7 +43,6 @@ class TestRegisterAllResources:
         assert "benchmarks" in data
         assert "count" in data
         assert data["count"] > 0
-        # Should include known benchmarks
         names = [b["name"] for b in data["benchmarks"]]
         assert "tpch" in names
 
@@ -138,7 +117,6 @@ class TestRegisterAllResources:
         assert data["runs"] == []
 
     def test_recent_results_with_files(self, tmp_path):
-        # Create a mock result file
         result_data = {
             "platform": {"name": "duckdb"},
             "benchmark": {"id": "tpch", "scale_factor": 0.01},
@@ -173,14 +151,7 @@ class TestRegisterAllResources:
         assert data["cpu"]["threads"] > 0
 
 
-# ---------------------------------------------------------------------------
-# prompts/registry.py
-# ---------------------------------------------------------------------------
-
-
 class TestRegisterAllPrompts:
-    """Test that register_all_prompts registers prompt functions."""
-
     def test_registration_completes(self):
         from benchbox.mcp.prompts.registry import register_all_prompts
 

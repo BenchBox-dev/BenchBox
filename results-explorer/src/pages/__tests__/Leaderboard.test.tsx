@@ -103,7 +103,6 @@ describe("Leaderboard", () => {
 
     await waitFor(() => expect(resultCalls).toBe(1));
     await waitFor(() => expect(screen.getByText("Initializing static DuckDB snapshot...")).toBeTruthy());
-    // Headline stability is enforced by LEADERBOARD_SHELL_GEOMETRY_CLASSES.
     expect(screen.getByRole("heading", { level: 1, name: "Compare benchmark results" })).toBeTruthy();
     expect(screen.getByRole("region", { name: "Cross-benchmark leaderboard loading" })).toHaveAttribute(
       "aria-busy",
@@ -216,10 +215,6 @@ describe("Leaderboard", () => {
 
 
   it("carries the provenance legend at the bottom of the data surface, since Leaderboard is /results/compare's empty-selection state", async () => {
-    // Home no longer renders this legend (it moved here); Compare's loaded-
-    // comparison branch still renders its own copy. Leaderboard is the
-    // component Compare falls back to when nothing is selected, so
-    // /results/compare needs the legend in both states.
     render(<Leaderboard />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
@@ -632,8 +627,6 @@ describe("Leaderboard", () => {
 
 describe("toggleFacetValue (w13)", () => {
   it("removes a value when it is already selected, leaving siblings intact", () => {
-    // Pre-w13 the dropdown handler did `[value]` (single-element replacement),
-    // collapsing ?bm=tpch,clickbench to just one entry on any subsequent click.
     expect(toggleFacetValue(["tpch", "clickbench"], "tpch")).toEqual(["clickbench"]);
     expect(toggleFacetValue(["tpch", "clickbench"], "clickbench")).toEqual(["tpch"]);
   });

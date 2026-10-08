@@ -1,17 +1,3 @@
-"""TPC-DS Official Benchmark Implementation.
-
-This module provides the official TPC-DS benchmark implementation that follows
-the TPC-DS specification exactly, including all test phases, with Power@Size
-and Throughput@Size.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DS specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
-
 import contextlib
 from dataclasses import dataclass
 from datetime import datetime
@@ -35,8 +21,6 @@ if TYPE_CHECKING:
 
 @dataclass
 class TPCDSOfficialBenchmarkConfig:
-    """Configuration for TPC-DS Official Benchmark."""
-
     scale_factor: float = 1.0
     num_streams: int = 4
     power_test_enabled: bool = True
@@ -50,8 +34,6 @@ class TPCDSOfficialBenchmarkConfig:
 
 @dataclass
 class TPCDSOfficialBenchmarkResult:
-    """Result of TPC-DS Official Benchmark."""
-
     config: TPCDSOfficialBenchmarkConfig
     start_time: str
     end_time: str
@@ -68,7 +50,6 @@ class TPCDSOfficialBenchmarkResult:
 
 
 def _extract_metric(result: Any, attr: str, default: float = 0.0) -> float:
-    """Extract a numeric metric from a result that may be a dataclass or dict."""
     if hasattr(result, attr):
         val = getattr(result, attr)
         if val is not None:
@@ -88,7 +69,6 @@ def _close_quietly(connection: Any) -> None:
 
 
 def _phase_succeeded(result: Any) -> bool:
-    """Return a phase's explicit outcome for either mapping or object results."""
     if isinstance(result, dict):
         return result.get("success") is not False
     return getattr(result, "success", None) is not False
@@ -103,8 +83,6 @@ def _power_phase_complete(result: Any) -> bool:
 
 
 class TPCDSOfficialBenchmark:
-    """TPC-DS Official Benchmark implementation following TPC-DS specification."""
-
     def __init__(
         self,
         scale_factor: float = 1.0,
@@ -113,22 +91,12 @@ class TPCDSOfficialBenchmark:
         dialect: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
-        """Initialize TPC-DS Official Benchmark.
-
-        Args:
-            scale_factor: Scale factor for the benchmark (1.0 = ~1GB)
-            output_dir: Directory for benchmark results and audit trail
-            verbose: Enable verbose logging
-            dialect: SQL dialect for query translation (e.g., 'bigquery', 'snowflake')
-            **kwargs: Additional benchmark configuration options
-        """
         benchmark_kwargs = dict(kwargs)
         benchmark_kwargs.setdefault("official", True)
         self.benchmark = TPCDSBenchmark(
             scale_factor=scale_factor, output_dir=output_dir, verbose=verbose, **benchmark_kwargs
         )
 
-        # Store target dialect for query translation
         self.dialect = dialect
 
         self.config = TPCDSOfficialBenchmarkConfig(
@@ -145,23 +113,6 @@ class TPCDSOfficialBenchmark:
         *,
         adapter: Any = None,
     ) -> TPCDSOfficialBenchmarkResult:
-        """Run the complete TPC-DS Official Benchmark.
-
-        This method executes all phases of the TPC-DS benchmark according
-        to the official specification and reports Power@Size and Throughput@Size.
-        The composite QphDS@Size is not computed because the TPC-DS formula is not implemented.
-
-        Args:
-            connection_factory: Factory function to create database connections
-            config: Optional benchmark configuration (uses default if not provided)
-
-        Returns:
-            Complete benchmark results
-
-        Raises:
-            RuntimeError: If benchmark execution fails
-            ValueError: If configuration is invalid
-        """
         if config is None:
             config = self.config
 
@@ -185,7 +136,6 @@ class TPCDSOfficialBenchmark:
         )
 
         try:
-            # Phase 1: Power Test (single stream execution)
             if config.power_test_enabled:
                 try:
                     from benchbox.core.tpcds.power_test import TPCDSPowerTest
@@ -210,7 +160,6 @@ class TPCDSOfficialBenchmark:
                     result.errors.append(f"Power Test failed: {e}")
                     result.success = False
 
-            # Phase 2: Throughput Test (concurrent streams)
             if config.throughput_test_enabled:
                 try:
                     require_stream_minimum(config.num_streams, "num_streams")
@@ -228,9 +177,6 @@ class TPCDSOfficialBenchmark:
                     finally:
                         _close_quietly(shared_connection)
                     result.throughput_test_result = throughput_result
-                    # Publish the metric only when the phase explicitly
-                    # succeeded; a timed-out or otherwise failed phase must
-                    # not export its numeric sentinel as a measurement.
                     throughput_metric = _extract_metric(throughput_result, "throughput_at_size")
                     if not _phase_succeeded(throughput_result) or throughput_metric <= 0:
                         result.errors.append("Throughput Test failed: Throughput@Size withheld from results.")
@@ -242,9 +188,6 @@ class TPCDSOfficialBenchmark:
                     result.errors.append(f"Throughput Test failed: {e}")
                     result.success = False
 
-            # Phase 3: Maintenance Test -- refused while throughput work is
-            # outstanding, so maintenance never overlaps leaked streams or
-            # reuses their still-owned resources for measured work.
             if config.maintenance_test_enabled:
                 boundary = check_phase_boundary(result.throughput_test_result)
                 if not boundary.proceed:
@@ -290,22 +233,12 @@ class TPCDSOfficialBenchmark:
             return result
 
     def validate_compliance(self, result: TPCDSOfficialBenchmarkResult) -> bool:
-        """Validate benchmark results against TPC-DS specification.
-
-        Args:
-            result: Benchmark results to validate
-
-        Returns:
-            True if compliant with TPC-DS specification, False otherwise
-        """
-        # Basic compliance checks
         if not result.success:
             return False
 
         if result.power_at_size <= 0 or result.throughput_at_size <= 0:
             return False
 
-        # Additional specification compliance checks would go here
         return True
 
     def generate_audit_trail(
@@ -313,15 +246,6 @@ class TPCDSOfficialBenchmark:
         result: TPCDSOfficialBenchmarkResult,
         output_file: Optional[Union[str, Path]] = None,
     ) -> Path:
-        """Generate audit trail for TPC-DS certification.
-
-        Args:
-            result: Benchmark results to document
-            output_file: Optional output file path
-
-        Returns:
-            Path to generated audit trail file
-        """
         return generate_official_benchmark_audit_trail(
             result=result,
             benchmark_title="TPC-DS",

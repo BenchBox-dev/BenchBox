@@ -1,7 +1,4 @@
-"""Unit tests for H2ODB DataFrame query implementations.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -19,8 +16,6 @@ ALL_QUERY_IDS = [f"Q{i}" for i in range(1, 11)]
 
 
 class TestH2ODBQueryRegistry:
-    """Tests for H2ODB DataFrame query registry."""
-
     def test_registry_imports_successfully(self):
         from benchbox.core.h2odb.dataframe_queries import H2ODB_DATAFRAME_QUERIES
 
@@ -90,8 +85,6 @@ class TestH2ODBQueryRegistry:
 
 
 class TestH2ODBQueryCategories:
-    """Tests for H2ODB query category assignments."""
-
     def test_basic_queries_have_aggregate(self):
         from benchbox.core.h2odb.dataframe_queries import get_h2odb_query
 
@@ -115,8 +108,6 @@ class TestH2ODBQueryCategories:
 
 
 class TestH2ODBBenchmarkRegistry:
-    """Tests for H2ODB DataFrame support in benchmark registry."""
-
     def test_h2odb_supports_dataframe(self):
         from benchbox.core.benchmark_registry import get_benchmark_metadata
 

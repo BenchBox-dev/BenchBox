@@ -1,12 +1,6 @@
-"""Tests for cloud Spark DDL and config mixins.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Covers SparkTuningMixin, CloudSparkConfigMixin, SparkDDLGeneratorMixin,
-and SparkTableFormat enum.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -34,18 +28,11 @@ from benchbox.platforms.base.cloud_spark.mixins import (
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
-# ---------------------------------------------------------------------------
-# Minimal stub classes to host each mixin without a full adapter hierarchy
-# ---------------------------------------------------------------------------
-
-
 class StubSparkTuning(SparkTuningMixin):
-    """Minimal stub to test SparkTuningMixin in isolation."""
+    pass
 
 
 class StubCloudSparkConfig(CloudSparkConfigMixin):
-    """Minimal stub to test CloudSparkConfigMixin in isolation."""
-
     cloud_platform = CloudPlatform.DATAPROC_SERVERLESS
     _benchmark_type: str | None = None
     _scale_factor: float = 1.0
@@ -53,38 +40,23 @@ class StubCloudSparkConfig(CloudSparkConfigMixin):
 
 
 class StubSparkDDL(SparkDDLGeneratorMixin):
-    """Minimal stub to test SparkDDLGeneratorMixin with default PARQUET format."""
-
     table_format = SparkTableFormat.PARQUET
 
 
 class StubDeltaDDL(SparkDDLGeneratorMixin):
-    """DDL stub using DELTA format."""
-
     table_format = SparkTableFormat.DELTA
 
 
 class StubIcebergDDL(SparkDDLGeneratorMixin):
-    """DDL stub using ICEBERG format."""
-
     table_format = SparkTableFormat.ICEBERG
 
 
 class StubHudiDDL(SparkDDLGeneratorMixin):
-    """DDL stub using HUDI format."""
-
     table_format = SparkTableFormat.HUDI
 
 
 class StubHiveDDL(SparkDDLGeneratorMixin):
-    """DDL stub using HIVE format."""
-
     table_format = SparkTableFormat.HIVE
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _col(name: str, col_type: str = "INTEGER", order: int = 1) -> TuningColumn:
@@ -98,7 +70,6 @@ def _table_tuning(
     distribution=None,
     sorting=None,
 ) -> TableTuning:
-    """Build a minimal TableTuning with at least one non-None list."""
     return TableTuning(
         table_name="test_table",
         partitioning=partitioning,
@@ -106,11 +77,6 @@ def _table_tuning(
         distribution=distribution,
         sorting=sorting,
     )
-
-
-# ---------------------------------------------------------------------------
-# SparkTuningMixin
-# ---------------------------------------------------------------------------
 
 
 class TestSparkTuningMixin:
@@ -190,13 +156,7 @@ class TestSparkTuningMixin:
 
     def test_apply_constraint_configuration_none_configs(self):
         mixin = StubSparkTuning()
-        # Should not raise
         mixin.apply_constraint_configuration(None, None, connection=None)
-
-
-# ---------------------------------------------------------------------------
-# CloudSparkConfigMixin
-# ---------------------------------------------------------------------------
 
 
 class TestCloudSparkConfigMixin:
@@ -285,11 +245,6 @@ class TestCloudSparkConfigMixin:
         assert mixin._spark_config == {"k": "v2"}
 
 
-# ---------------------------------------------------------------------------
-# SparkTableFormat
-# ---------------------------------------------------------------------------
-
-
 class TestSparkTableFormat:
     def test_enum_values(self):
         assert SparkTableFormat.DELTA.value == "delta"
@@ -300,11 +255,6 @@ class TestSparkTableFormat:
 
     def test_is_str_enum(self):
         assert isinstance(SparkTableFormat.DELTA, str)
-
-
-# ---------------------------------------------------------------------------
-# SparkDDLGeneratorMixin - get_table_format
-# ---------------------------------------------------------------------------
 
 
 class TestGetTableFormat:
@@ -332,11 +282,6 @@ class TestGetTableFormat:
         opts.table_format = None
         result = mixin.get_table_format(opts)
         assert result == SparkTableFormat.PARQUET
-
-
-# ---------------------------------------------------------------------------
-# SparkDDLGeneratorMixin - generate_tuning_clauses routing
-# ---------------------------------------------------------------------------
 
 
 class TestGenerateTuningClausesRouting:
@@ -374,11 +319,6 @@ class TestGenerateTuningClausesRouting:
         mixin.get_table_format = _fake_get_table_format
         clauses = mixin.generate_tuning_clauses(None)
         assert clauses.is_empty()
-
-
-# ---------------------------------------------------------------------------
-# Delta tuning
-# ---------------------------------------------------------------------------
 
 
 class TestDeltaTuning:
@@ -437,11 +377,6 @@ class TestDeltaTuning:
         tt = _table_tuning(partitioning=[_col("l_shipdate", "DATE", order=1)])
         clauses = mixin._generate_delta_tuning(tt, opts)
         assert "delta.autoOptimize.optimizeWrite" not in clauses.table_properties
-
-
-# ---------------------------------------------------------------------------
-# Iceberg tuning
-# ---------------------------------------------------------------------------
 
 
 class TestIcebergTuning:
@@ -521,11 +456,6 @@ class TestIcebergTuning:
         assert "months(o_orderdate)" in clauses.partition_by
 
 
-# ---------------------------------------------------------------------------
-# Hudi tuning
-# ---------------------------------------------------------------------------
-
-
 class TestHudiTuning:
     def test_no_tuning_sets_required_properties(self):
         mixin = StubHudiDDL()
@@ -571,11 +501,6 @@ class TestHudiTuning:
         tt = _table_tuning(clustering=[_col("l_orderkey", "BIGINT", order=1)])
         clauses = mixin._generate_hudi_tuning(tt)
         assert clauses.table_properties["hoodie.clustering.inline"] == "true"
-
-
-# ---------------------------------------------------------------------------
-# Parquet tuning
-# ---------------------------------------------------------------------------
 
 
 class TestParquetTuning:
@@ -634,11 +559,6 @@ class TestParquetTuning:
         assert clauses.sort_by == "SORTED BY (l_orderkey)"
 
 
-# ---------------------------------------------------------------------------
-# Hive tuning
-# ---------------------------------------------------------------------------
-
-
 class TestHiveTuning:
     def test_no_tuning_defaults_stored_as_parquet(self):
         mixin = StubHiveDDL()
@@ -695,11 +615,6 @@ class TestHiveTuning:
         assert "INTO 8 BUCKETS" in clauses.distribute_by
 
 
-# ---------------------------------------------------------------------------
-# generate_create_table_ddl
-# ---------------------------------------------------------------------------
-
-
 class TestGenerateCreateTableDDL:
     def _columns(self):
         return [
@@ -735,7 +650,7 @@ class TestGenerateCreateTableDDL:
 
     def test_tblproperties_rendered(self):
         mixin = StubDeltaDDL()
-        tuning = mixin.generate_tuning_clauses(None)  # adds auto-optimize props
+        tuning = mixin.generate_tuning_clauses(None)
         ddl = mixin.generate_create_table_ddl("lineitem", self._columns(), tuning=tuning)
         assert "TBLPROPERTIES" in ddl
 
@@ -743,7 +658,6 @@ class TestGenerateCreateTableDDL:
         mixin = StubSparkDDL()
         empty_tuning = TuningClauses()
         ddl = mixin.generate_create_table_ddl("my_table", self._columns(), tuning=empty_tuning)
-        # Empty tuning - no extra clauses
         assert "TBLPROPERTIES" not in ddl
         assert "USING" not in ddl
 
@@ -768,11 +682,6 @@ class TestGenerateCreateTableDDL:
         assert tuning.cluster_by is not None
         ddl = mixin.generate_create_table_ddl("lineitem", self._columns(), tuning=tuning)
         assert "CLUSTER BY" in ddl
-
-
-# ---------------------------------------------------------------------------
-# get_post_load_statements
-# ---------------------------------------------------------------------------
 
 
 class TestGetPostLoadStatements:
@@ -814,11 +723,6 @@ class TestGetPostLoadStatements:
         assert len(result) == 2
         assert "OPTIMIZE orders" in result[0]
         assert "ANALYZE TABLE orders" in result[1]
-
-
-# ---------------------------------------------------------------------------
-# supports_tuning_type
-# ---------------------------------------------------------------------------
 
 
 class TestSupportsTuningType:

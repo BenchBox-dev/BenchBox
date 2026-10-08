@@ -19,6 +19,26 @@ This guide summarizes the organization of the runtime-focused modules after the 
 - New commands should live in `benchbox/cli/commands/` and only import shared utilities from `benchbox.cli.shared` or other command modules.
 - Presentation-only helpers should live under `benchbox/cli/presentation/` to keep command modules focused on business logic.
 
+## Runtime user-facing output
+
+Route runtime user-facing output through `benchbox.utils.printing` so
+`--quiet` / `-q` suppresses normal user output consistently.
+
+Use these patterns in order of preference:
+
+1. `emit(message)` for text and Rich renderables.
+2. A module-level console alias backed by `quiet_console` when CLI commands
+   need Rich keyword arguments such as `style`, `justify` or `end`.
+3. An injected `self.console` for display and handler classes that need
+   isolated tests; its default must be `quiet_console`.
+
+Raw `print()`, `sys.stdout.write()` and `logging.*` must not carry runtime
+user-facing messages because they bypass this channel's quiet policy.
+MCP and tooling callers can use `get_quiet_console()` or
+`silence_output()` to guard transitive stdout/stderr writes. Their actual
+stream and override boundaries are documented in the
+[utilities API](../reference/python-api/utilities.md#runtime-toggles-and-output).
+
 ## TPC-DS package
 
 - `benchbox/core/tpcds/benchmark/`: `config.py`, `results.py`, `phases.py`, and `runner.py` implement the benchmark orchestration. `__init__.py` re-exports `TPCDSBenchmark` and data classes.

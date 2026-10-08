@@ -1,7 +1,7 @@
 # Post-load introspection receipts
 
-Design note for TODO `tuning-introspection-receipts-20260716`. Builds on
-the applied-tuning ledger (ADR-001,
+Design note for post-load catalog introspection. It builds on the
+applied-tuning ledger (ADR-001,
 `docs/development/tuning-adr-001-trust-and-hash-semantics.md`) and the
 `benchbox.core.tuning.applied_ledger` module.
 
@@ -70,26 +70,10 @@ unchanged: it returns the status untouched unless the derived status is
 `applied_unverified`, and any introspector or corroboration error leaves the
 status as it was and logs at debug level.
 
-These files are soundness-manifest paths (`.github/soundness-paths.txt`), so a
-change to any of them needs the external soundness review before it is armed:
-`benchbox/platforms/base/tuning_trust.py`,
-`benchbox/core/tuning/introspection.py`, `applied_ledger.py`,
-`capability_registry.py`, `metadata.py`,
-`benchbox/platforms/*_introspection.py`,
-`benchbox/platforms/clickhouse/introspection.py`, and
-`benchbox/platforms/dataframe/tuning_trust.py`. The manifest cannot name a
-region of a file, which is why the logic sits in its own modules instead of
-making all of `adapter.py` (or the DataFrame mixins) a soundness path.
-
-What is *not* gated: the adapter files themselves (`adapter.py`,
-`duckdb.py`, `clickhouse/adapter.py`, `snowflake.py`, the DataFrame mixins)
-stay outside the manifest. Their trust-relevant methods are one-line
-delegates pinned by tests -- a change that routes around the gated module
-fails the suite -- but the manifest alone does not flag edits there, so those
-pins are load-bearing. Likewise the `benchbox/platforms/*_introspection.py`
-glob uses `fnmatch` semantics, where `*` crosses `/`: it also matches nested
-`benchbox/platforms/<sub>/*_introspection.py` files, not just the top-level
-modules.
+The adapter files themselves (`adapter.py`, `duckdb.py`,
+`clickhouse/adapter.py`, `snowflake.py`, the DataFrame mixins) keep their
+trust-relevant methods as one-line delegates pinned by tests, so a change that
+routes around these modules fails the suite.
 
 ## Statement classes (per phase x mechanism)
 
@@ -288,7 +272,7 @@ corroborate, and upgrade to `applied_verified` iff the receipt corroborates.
 The receipt rides inside the applied ledger
 (`AppliedTuningLedger.to_payload(status=..., receipt=...)`), which the bundle
 carries at `platform.tuning.applied` -- no file of its own, and no new plumbing
-through the CODEOWNERS-locked `result_capture.py`. It shipped in a
+through `result_capture.py`. It shipped in a
 `.applied.json` companion until that was retired into the bundle; bundles
 published earlier still carry it there and are still read.
 

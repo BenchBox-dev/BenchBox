@@ -1,20 +1,6 @@
-"""DataFusion write SQL transformer for bulk_load COPY→EXTERNAL TABLE rewriting.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Rewrites COPY-based bulk load SQL into DataFusion-compatible
-CREATE EXTERNAL TABLE + INSERT INTO patterns. Called by the DataFusion
-adapter's preprocess_operation_sql() to keep platform-specific logic
-in the adapter layer rather than the core benchmark.
-
-Import discipline: DataFusion adapter imports ``transform_write_sql`` lazily inside
-``preprocess_operation_sql``. Tests should patch this source-module name
-(``benchbox.platforms.datafusion_write_transformer.transform_write_sql``) before
-calling the adapter method; there is no stable module-level binding on
-``benchbox.platforms.datafusion`` to patch.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -27,20 +13,6 @@ def transform_write_sql(
     sql: str,
     file_dependencies: list[str] | None = None,
 ) -> str:
-    """Transform write SQL for DataFusion compatibility.
-
-    Rewrites COPY-based bulk loads to CREATE EXTERNAL TABLE pattern.
-    Returns original SQL unchanged for non-bulk_load operations.
-
-    Args:
-        operation_id: Operation identifier (e.g. 'bulk_load_csv_small_uncompressed')
-        category: Operation category (e.g. 'bulk_load')
-        sql: Original write SQL
-        file_dependencies: List of file names the operation depends on
-
-    Returns:
-        Transformed SQL string compatible with DataFusion
-    """
     if category.lower() != "bulk_load":
         return sql
 
@@ -48,7 +20,6 @@ def transform_write_sql(
 
 
 def _rewrite_multi_file(ext_base: str, files: list[str]) -> str:
-    """Build UNION ALL across explicit file list."""
     stmts: list[str] = []
     selects: list[str] = []
     for idx, file_name in enumerate(files):
@@ -65,7 +36,6 @@ def _rewrite_multi_file(ext_base: str, files: list[str]) -> str:
 
 
 def _rewrite_copy_based(ext_base: str, remaining_sql: str) -> str | None:
-    """Rewrite COPY-based bulk loads to CREATE EXTERNAL TABLE pattern."""
     copy_match = re.search(
         r"COPY\s+bulk_load_ops_target\s+FROM\s+'(?P<path>[^']+)'\s*(?P<opts>\([^)]*\)|WITH\s*\([^)]*\))?",
         remaining_sql,
@@ -100,7 +70,6 @@ _OPT_PATTERNS = [
 
 
 def _collect_csv_options(option_parts: list[str], source_path: str, opts: str) -> None:
-    """Collect CSV-specific external table options."""
     option_parts.append("'has_header' 'true'")
     for ext, comp in _COMPRESSION_MAP.items():
         if source_path.endswith(ext):
@@ -114,7 +83,6 @@ def _collect_csv_options(option_parts: list[str], source_path: str, opts: str) -
 
 
 def _rewrite_csv_auto(ext_base: str, remaining_sql: str) -> str | None:
-    """Rewrite read_csv_auto-based operations to external table pattern."""
     csv_auto_match = re.search(r"FROM\s+read_csv_auto\('(?P<path>[^']+)'\)", remaining_sql, flags=re.IGNORECASE)
     if not csv_auto_match:
         return None
@@ -136,10 +104,8 @@ def _rewrite_csv_auto(ext_base: str, remaining_sql: str) -> str | None:
 
 
 def _rewrite_bulk_load_sql(operation_id: str, sql: str, files: list[str]) -> str:
-    """Rewrite bulk-load SQL to external-table based ingest."""
     ext_base = f"bb_df_ext_{operation_id}".replace("-", "_")
 
-    # Strip TRUNCATE statements (DataFusion doesn't support TRUNCATE)
     statements = [stmt.strip() for stmt in sql.split(";") if stmt.strip()]
     non_truncate = [stmt for stmt in statements if not stmt.upper().startswith("TRUNCATE")]
 

@@ -1,11 +1,7 @@
-"""Test fixtures package for BenchBox tests.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
-
-# Import all fixtures to make them available when importing from fixtures
 from .benchmark_fixtures import (
     benchmark_comparison_data,
     benchmark_error_scenarios,
@@ -34,14 +30,12 @@ from .database_fixtures import (
 )
 
 __all__ = [
-    # Database fixtures
     "duckdb_memory_db",
     "duckdb_file_db",
     "setup_duckdb_extensions",
     "duckdb_with_extensions",
     "database_config",
     "configured_duckdb",
-    # Benchmark fixtures
     "tpch_benchmark",
     "tpch_benchmark_medium",
     "tpcds_benchmark",
@@ -51,7 +45,6 @@ __all__ = [
     "benchmark_test_queries",
     "benchmark_error_scenarios",
     "benchmark_comparison_data",
-    # Data fixtures
     "small_tpch_data",
     "sample_queries",
     "duckdb_with_tpch_data",

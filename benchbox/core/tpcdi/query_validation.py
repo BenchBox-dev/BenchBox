@@ -1,19 +1,9 @@
-"""TPC-DI data quality validation query suite.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides comprehensive data quality validation queries for TPC-DI
-including referential integrity checks, completeness validation, SCD Type 2
-verification, data consistency checks, and business rule compliance.
+# TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-DI specification.
 
-The validation queries cover all 16 tables in the complete TPC-DI schema
-and provide detailed data quality metrics for ETL validation.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DI specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import json
 from functools import lru_cache
@@ -59,8 +49,6 @@ def _validation_query_data() -> dict[str, Any]:
 
 
 class TPCDIValidationQueries(ParameterizedQueryManager):
-    """TPC-DI data quality validation query manager."""
-
     invalid_query_label = "validation query"
 
     def __init__(self) -> None:

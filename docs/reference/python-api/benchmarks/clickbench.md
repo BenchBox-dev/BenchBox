@@ -21,17 +21,16 @@ ClickBench is a systematic analytics benchmark designed to test analytical datab
 
 ## Quick Start
 
+The example creates the benchmark, generates the data and runs it on a platform.
+
 ```python
 from benchbox import ClickBench
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Create benchmark
 benchmark = ClickBench(scale_factor=0.01)
 
-# Generate data
 benchmark.generate_data()
 
-# Run on platform
 adapter = DuckDBAdapter()
 results = benchmark.run_with_platform(adapter)
 
@@ -109,8 +108,9 @@ Output on 0.4.1:
 ```python
 data_files = benchmark.generate_data()
 print(f"Generated {len(data_files)} data files")
-# Generated 1 data files
 ```
+
+The example prints `Generated 1 data files`.
 
 ### get_query(query_id, \*, params=None)
 
@@ -125,10 +125,12 @@ print(f"Generated {len(data_files)} data files")
 
 Raises `ValueError` for an unknown id (`Invalid query ID '1'. Available queries: [...]`) and for any non-`None` `params` (`ClickBench queries are static and don't accept parameters`).
 
+The three queries below are `SELECT COUNT(*) FROM hits;` (Q1), `SELECT COUNT(*) FROM hits WHERE AdvEngineID <> 0;` (Q2) and `SELECT COUNT(*) FROM hits WHERE URL LIKE '%google%';` (Q21).
+
 ```python
-q1 = benchmark.get_query("Q1")    # SELECT COUNT(*) FROM hits;
-q2 = benchmark.get_query("Q2")    # SELECT COUNT(*) FROM hits WHERE AdvEngineID <> 0;
-q21 = benchmark.get_query("Q21")  # SELECT COUNT(*) FROM hits WHERE URL LIKE '%google%';
+q1 = benchmark.get_query("Q1")
+q2 = benchmark.get_query("Q2")
+q21 = benchmark.get_query("Q21")
 ```
 
 ### get_queries(dialect=None)
@@ -142,9 +144,10 @@ With a `dialect`, each query is translated with SQLGlot, reading ClickHouse SQL.
 ```python
 queries = benchmark.get_queries()
 print(f"Total queries: {len(queries)}")
-# Total queries: 43
 queries_bq = benchmark.get_queries(dialect="bigquery")
 ```
+
+The example prints `Total queries: 43`.
 
 ### get_query_categories()
 
@@ -180,8 +183,9 @@ for category, query_ids in categories.items():
 schema = benchmark.get_schema()
 for table in schema:
     print(f"{table['name']}: {len(table['columns'])} columns")
-# hits: 105 columns
 ```
+
+The example prints `hits: 105 columns`.
 
 ### get_create_tables_sql(dialect="standard", tuning_config=None)
 
@@ -200,8 +204,9 @@ from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 create_sql = benchmark.get_create_tables_sql()
 create_sql_pk = benchmark.get_create_tables_sql(tuning_config=UnifiedTuningConfiguration())
 print("PRIMARY KEY" in create_sql, "PRIMARY KEY" in create_sql_pk)
-# False True
 ```
+
+The example prints `False True`.
 
 ### translate_query(query_id, dialect)
 
@@ -259,7 +264,7 @@ Every other member comes from `BaseBenchmark`. See {doc}`/reference/python-api/b
 | Data and configuration | <span id="benchbox.clickbench.ClickBench.output_dir"></span>`output_dir` | property | The resolved directory from the constructor argument. |
 | Data and configuration | <span id="benchbox.clickbench.ClickBench.run_with_platform_api_surface"></span>`run_with_platform_api_surface` | class attribute | |
 | Data and configuration | <span id="benchbox.clickbench.ClickBench.scale_factor"></span>`scale_factor` | instance attribute | The constructor argument. |
-| Data and configuration | <span id="benchbox.clickbench.ClickBench.SKIP_DATA_LOADING"></span>`SKIP_DATA_LOADING` | class attribute | Not defined in the released 0.4.1 wheel. Source builds after 0.4.1 define it on `BaseBenchmark`, default `False`. |
+| Data and configuration | <span id="benchbox.clickbench.ClickBench.SKIP_DATA_LOADING"></span>`SKIP_DATA_LOADING` | class attribute | Defined on `BaseBenchmark` from 0.4.2, default `False`. Set it to `True` for a benchmark that needs schema objects but no data files. |
 | Data and configuration | <span id="benchbox.clickbench.ClickBench.tables"></span>`tables` | property | Empty until `generate_data()` has run, then the table-to-path mapping. |
 
 ## Query Categories
@@ -268,14 +273,13 @@ ClickBench organizes its 43 queries into the eight categories that `get_query_ca
 
 ### Scan Queries (Q1, Q2, Q7)
 
-Tests basic table scanning and filtering performance.
+Tests basic table scanning and filtering performance. Execute each query on your platform in the loop.
 
 ```python
 scan_queries = ["Q1", "Q2", "Q7"]
 
 for query_id in scan_queries:
     query = benchmark.get_query(query_id)
-    # Execute query...
 ```
 
 **Query Characteristics**:
@@ -286,14 +290,13 @@ for query_id in scan_queries:
 
 ### Aggregation Queries (Q3-Q6)
 
-Tests aggregation function performance.
+Tests aggregation function performance. Execute each query on your platform in the loop.
 
 ```python
 agg_queries = ["Q3", "Q4", "Q5", "Q6"]
 
 for query_id in agg_queries:
     query = benchmark.get_query(query_id)
-    # Execute query...
 ```
 
 **Query Characteristics**:
@@ -305,14 +308,13 @@ for query_id in agg_queries:
 
 ### Grouping Queries (Q8-Q19)
 
-Tests GROUP BY and ORDER BY performance.
+Tests GROUP BY and ORDER BY performance. Execute each query on your platform in the loop.
 
 ```python
 grouping_queries = [f"Q{i}" for i in range(8, 20)]
 
 for query_id in grouping_queries:
     query = benchmark.get_query(query_id)
-    # Execute query...
 ```
 
 **Query Characteristics**:
@@ -323,14 +325,13 @@ for query_id in grouping_queries:
 
 ### String Operations Queries (Q20-Q29)
 
-Tests string processing and pattern matching.
+Tests string processing and pattern matching. Execute each query on your platform in the loop.
 
 ```python
 string_queries = [f"Q{i}" for i in range(20, 30)]
 
 for query_id in string_queries:
     query = benchmark.get_query(query_id)
-    # Execute query...
 ```
 
 **Query Characteristics**:
@@ -342,14 +343,13 @@ for query_id in string_queries:
 
 ### Complex Analytics Queries (Q30-Q43)
 
-Tests complex analytical operations.
+Tests complex analytical operations. Execute each query on your platform in the loop.
 
 ```python
 complex_queries = [f"Q{i}" for i in range(30, 44)]
 
 for query_id in complex_queries:
     query = benchmark.get_query(query_id)
-    # Execute query...
 ```
 
 **Query Characteristics**:
@@ -362,21 +362,19 @@ for query_id in complex_queries:
 
 ### Basic Benchmark Run
 
+Scale factor 0.01 creates 10,000 rows. The example generates the data, runs the benchmark on DuckDB and prints the results.
+
 ```python
 from benchbox import ClickBench
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Create benchmark with scale factor 0.01 (10,000 rows)
 benchmark = ClickBench(scale_factor=0.01)
 
-# Generate data
 benchmark.generate_data()
 
-# Run on DuckDB
 adapter = DuckDBAdapter()
 results = benchmark.run_with_platform(adapter)
 
-# Print results
 print(f"Benchmark: {results.benchmark_name}")
 print(f"Total time: {results.total_execution_time:.2f}s")
 print(f"Queries: {results.successful_queries}/{results.total_queries}")
@@ -384,6 +382,8 @@ print(f"Avg query time: {results.average_query_time:.3f}s")
 ```
 
 ### Category-Based Execution
+
+The example loads the data, gets the query categories and runs each category. It then prints a category summary.
 
 ```python
 from benchbox import ClickBench
@@ -396,14 +396,11 @@ benchmark.generate_data()
 adapter = DuckDBAdapter()
 conn = adapter.create_connection()
 
-# Load data
 adapter.create_schema(benchmark, conn)
 adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-# Get query categories
 categories = benchmark.get_query_categories()
 
-# Run each category
 category_results = {}
 
 for category_name, query_ids in categories.items():
@@ -426,13 +423,14 @@ for category_name, query_ids in categories.items():
         "query_count": len(query_ids)
     }
 
-# Print category summary
 print("\nCategory Summary:")
 for category, stats in category_results.items():
     print(f"{category}: {stats['avg_time']:.3f}s avg ({stats['query_count']} queries)")
 ```
 
 ### Performance Analysis
+
+The example sets up the data and runs each query for several iterations. It then prints a performance summary and the geometric mean of the median times.
 
 ```python
 from benchbox import ClickBench
@@ -443,13 +441,11 @@ from statistics import geometric_mean, mean, median
 benchmark = ClickBench(scale_factor=0.01)
 adapter = DuckDBAdapter()
 
-# Setup
 benchmark.generate_data()
 conn = adapter.create_connection()
 adapter.create_schema(benchmark, conn)
 adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-# Run with multiple iterations
 iterations = 3
 all_results = {}
 
@@ -477,7 +473,6 @@ for query_id in [f"Q{i}" for i in range(1, 44)]:
             "times": times
         }
 
-# Print performance summary
 print("Performance Summary (3 iterations):")
 print(f"{'Query':<8} {'Mean':<10} {'Median':<10} {'Min':<10} {'Max':<10}")
 print("-" * 50)
@@ -486,7 +481,6 @@ for query_id, stats in all_results.items():
     print(f"{query_id:<8} {stats['mean']:<10.4f} {stats['median']:<10.4f} "
           f"{stats['min']:<10.4f} {stats['max']:<10.4f}")
 
-# Calculate geometric mean of the median times
 all_times = [stats["median"] for stats in all_results.values()]
 print(f"\nGeometric mean query time: {geometric_mean(all_times):.4f}s")
 ```
@@ -538,24 +532,25 @@ from benchbox import ClickBench
 benchmark = ClickBench(scale_factor=0.01)
 ddl = benchmark.get_create_tables_sql()
 print(ddl.splitlines()[:3])
-# ['CREATE TABLE hits (', '  WatchID BIGINT NOT NULL,', '  JavaEnable SMALLINT NOT NULL,']
 ```
+
+The example prints `['CREATE TABLE hits (', '  WatchID BIGINT NOT NULL,', '  JavaEnable SMALLINT NOT NULL,']`.
 
 The script is the same for every dialect, so platform-specific column codecs or sort keys have to be applied by the platform adapter or by your own statements after `create_schema()`.
 
 ### Query Translation Example
+
+The original ClickBench queries are in the ClickHouse dialect. The example translates one query to other dialects.
 
 ```python
 from benchbox import ClickBench
 
 benchmark = ClickBench(scale_factor=0.01)
 
-# Original query
 q1_original = benchmark.get_query("Q1")
 print("Original:")
 print(q1_original)
 
-# Translate to different dialects
 q1_duckdb = benchmark.translate_query("Q1", "duckdb")
 print("\nDuckDB:")
 print(q1_duckdb)
@@ -587,6 +582,8 @@ SELECT COUNT(*) FROM `hits`
 
 ### Selective Query Execution
 
+The example runs only the fast queries (scan and simple aggregation), and then only the string operations queries.
+
 ```python
 from benchbox import ClickBench
 from benchbox.platforms.duckdb import DuckDBAdapter
@@ -594,13 +591,11 @@ from benchbox.platforms.duckdb import DuckDBAdapter
 benchmark = ClickBench(scale_factor=0.01)
 adapter = DuckDBAdapter()
 
-# Setup
 benchmark.generate_data()
 conn = adapter.create_connection()
 adapter.create_schema(benchmark, conn)
 adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-# Run only fast queries (scan + simple aggregation)
 fast_queries = ["Q1", "Q2", "Q3", "Q4", "Q7"]
 
 print("Running fast queries:")
@@ -609,7 +604,6 @@ for query_id in fast_queries:
     result = adapter.execute_query(conn, query, query_id)
     print(f"{query_id}: {result['execution_time_seconds']:.3f}s ({result['status']})")
 
-# Run only string operations queries
 string_queries = [f"Q{i}" for i in range(20, 30)]
 
 print("\nRunning string operations queries:")

@@ -1,5 +1,3 @@
-"""Shared config builder for BenchBox platform adapters."""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
@@ -49,31 +47,6 @@ def build_platform_config(
     field_defaults: dict[str, Any] | None = None,
     consume_explicit_options: bool = False,
 ) -> Any:
-    """Build a DatabaseConfig with credential loading and option merging.
-
-    Shared implementation for platform adapters that follow the standard
-    config construction pattern (credential merge → option merge → DatabaseConfig).
-
-    Args:
-        platform_type: Config type identifier (e.g. "velox", "lakesail").
-        credential_key: Key for CredentialManager lookup.
-        default_display_name: Fallback display name if info is None.
-        default_driver_package: Fallback driver package if info is None.
-        platform_fields: Field names to extract from merged_options.
-        options: CLI platform options dict.
-        overrides: Runtime override dict.
-        info: Platform info from registry (has .display_name, .driver_package).
-        base_options: Optional seed values applied before options (lowest priority).
-            Used by platforms that need a fixed default (e.g. schema="public")
-            that options/credentials/overrides should still be able to override.
-        field_defaults: Optional field-level defaults that are not inserted into
-            config.options.
-        consume_explicit_options: Preserve older builders that removed
-            _explicit_platform_options from overrides before merging.
-
-    Returns:
-        A DatabaseConfig instance.
-    """
     from benchbox.core.schemas import DatabaseConfig
     from benchbox.security.credentials import CredentialManager
 
@@ -87,10 +60,10 @@ def build_platform_config(
     )
 
     merged_options: dict[str, Any] = dict(base_options or {})
-    merged_options.update(options)  # registered defaults (lowest priority)
-    merged_options.update(saved_creds)  # saved credentials win over defaults
-    merged_options.update(explicit_options)  # explicit CLI flags win over credentials
-    merged_options.update(overrides)  # runtime overrides (highest priority)
+    merged_options.update(options)
+    merged_options.update(saved_creds)
+    merged_options.update(explicit_options)
+    merged_options.update(overrides)
 
     name = info.display_name if info else default_display_name
     driver_package = info.driver_package if info else default_driver_package
@@ -136,7 +109,6 @@ def make_platform_config_builder(
     consume_explicit_options: bool = False,
     postprocess: PlatformConfigPostprocess | None = None,
 ) -> PlatformConfigBuilder:
-    """Create a named platform config builder around build_platform_config."""
     fields = tuple(platform_fields)
     name = function_name or f"_build_{platform_type.replace('-', '_')}_config"
     platform_credential_key = credential_key or platform_type
@@ -162,7 +134,6 @@ def make_platform_config_builder(
     _builder.__name__ = name
     _builder.__qualname__ = name
     _builder.__module__ = module_name
-    _builder.__doc__ = f"Build {default_display_name} database configuration with credential loading."
     return _builder
 
 
@@ -174,7 +145,6 @@ def make_registered_platform_config_builder(
     platform_fields: Iterable[str],
     **kwargs: Any,
 ) -> PlatformConfigBuilder:
-    """Create and register a platform config builder with PlatformHookRegistry."""
     builder = make_platform_config_builder(
         registry_platform,
         module_name,
@@ -192,10 +162,6 @@ def make_registered_platform_config_builder(
     return builder
 
 
-# Tuning provenance/config keys established by the direct-CLI-path tuning fix
-# (see w0 of the tuning-from-config-forwarding-sweep TODO). Every from_config
-# implementation must forward these verbatim when present in the input config
-# -- no per-platform bespoke channel names.
 TUNING_FORWARD_KEYS: tuple[str, ...] = (
     "tuning_config",
     "tuning_enabled",
@@ -205,11 +171,6 @@ TUNING_FORWARD_KEYS: tuple[str, ...] = (
 )
 
 
-# Plan display/capture keys established alongside TUNING_FORWARD_KEYS. Every
-# from_config implementation built on build_adapter_config forwards these
-# verbatim when present in the input config -- no per-platform bespoke channel
-# names. ``None`` means unset and is skipped so adapter defaults apply (this
-# matters for the int-coerced keys, where an explicit None would crash).
 PLAN_FORWARD_KEYS: tuple[str, ...] = (
     "show_query_plans",
     "capture_plans",
@@ -230,7 +191,6 @@ def build_adapter_config(
     fields: Iterable[str] = (),
     include_none: bool = True,
 ) -> dict[str, Any]:
-    """Build common adapter constructor kwargs from unified config."""
     adapter_config: dict[str, Any] = {}
     if generated_key:
         if config.get(generated_key):
@@ -249,16 +209,10 @@ def build_adapter_config(
         if key in config and (include_none or config[key] is not None):
             adapter_config[key] = config[key]
 
-    # Always forward tuning provenance/config keys when present, regardless of
-    # whether the caller listed them in `fields`. See TUNING_FORWARD_KEYS.
     for key in TUNING_FORWARD_KEYS:
         if key in config:
             adapter_config[key] = config[key]
 
-    # Same contract for plan display/capture keys: a from_config built on this
-    # helper must not silently drop --show-plans/--capture-plans. See
-    # PLAN_FORWARD_KEYS. None means unset and is skipped so adapter defaults
-    # (including int-coerced timeouts) apply.
     for key in PLAN_FORWARD_KEYS:
         if key in config and config[key] is not None:
             adapter_config[key] = config[key]

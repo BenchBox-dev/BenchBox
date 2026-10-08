@@ -1,22 +1,6 @@
-"""Registry-completeness and NoOp-fallback tests for get_ddl_generator().
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Covers the 2026-07-12 tuning review finding R2: questdb, pg_duckdb, and
-pg_mooncake shipped dedicated DDL generators (with their own unit tests) that
-were never wired into get_ddl_generator()'s platform mapping, so callers
-silently got an empty-clauses NoOpDDLGenerator instead. These tests:
-
-1. Pin the fix for the three specific platforms (registration + NoOp
-   fallback is no longer silent for platforms that should have a real
-   generator).
-2. Add a general regression guard so a future generator module can't be
-   added to benchbox/core/tuning/generators/ without being registered in
-   get_ddl_generator(), by statically inspecting the function's own mapping
-   literal rather than re-implementing (and risking drift from) its logic.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -45,16 +29,6 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-# Generator classes intentionally NOT reachable via get_ddl_generator()'s
-# platform-key dispatch. Keep this empty unless a generator is genuinely
-# selected some other way - document the reason inline when adding an entry.
-#
-# IcebergDDLGenerator / ParquetDDLGenerator / HiveDDLGenerator: these are
-# Spark table-format variants selected via SparkDDLGeneratorMixin's own
-# SparkTableFormat dispatch (benchbox/platforms/base/cloud_spark/mixins.py),
-# not via a get_ddl_generator() platform key. Only the Delta variant is
-# reachable through get_ddl_generator (as "databricks"/"spark"/"delta"/
-# "fabric_warehouse") because it is also usable standalone for dry-run.
 _EXEMPT_GENERATOR_CLASSES: frozenset[str] = frozenset(
     {
         "IcebergDDLGenerator",
@@ -65,15 +39,6 @@ _EXEMPT_GENERATOR_CLASSES: frozenset[str] = frozenset(
 
 
 def _discover_concrete_generator_classes() -> dict[str, type[BaseDDLGenerator]]:
-    """Find every concrete BaseDDLGenerator subclass defined in a module
-    under benchbox/core/tuning/generators/.
-
-    Walks the actual submodules (not just generators/__init__.py's __all__)
-    so a new generator module is picked up even before anyone remembers to
-    export it. Only classes *defined* in the module (not merely imported,
-    e.g. PostgreSQLDDLGenerator reused by timescaledb.py) are counted, and
-    abstract classes (e.g. SparkBaseDDLGenerator) are excluded.
-    """
     discovered: dict[str, type[BaseDDLGenerator]] = {}
     for module_info in pkgutil.iter_modules(generators_pkg.__path__, prefix=f"{generators_pkg.__name__}."):
         module = import_module(module_info.name)
@@ -89,14 +54,6 @@ def _discover_concrete_generator_classes() -> dict[str, type[BaseDDLGenerator]]:
 
 
 def _registered_generator_class_names() -> set[str]:
-    """Statically extract the class names in get_ddl_generator()'s `generators`
-    mapping literal, by parsing the function's own source with `ast`.
-
-    This deliberately does not re-import or redeclare the mapping (that would
-    just be a second copy that could drift from the real one) - it inspects
-    the actual dict literal inside get_ddl_generator() itself, so this test
-    fails the moment a class stops being referenced there.
-    """
     source = inspect.getsource(get_ddl_generator)
     tree = ast.parse(source)
     function_node = tree.body[0]
@@ -104,9 +61,6 @@ def _registered_generator_class_names() -> set[str]:
 
     class_names: set[str] = set()
     for node in ast.walk(function_node):
-        # `generators: dict[str, type[BaseDDLGenerator]] = {...}` is an
-        # annotated assignment (ast.AnnAssign, single `target`), not a plain
-        # ast.Assign (which has a `targets` list) - handle both forms.
         if (
             isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
@@ -130,14 +84,7 @@ def _registered_generator_class_names() -> set[str]:
 
 
 class TestDDLGeneratorRegistryCompleteness:
-    """Every concrete generator module must be reachable via get_ddl_generator()."""
-
     def test_exempt_list_has_no_stale_entries(self) -> None:
-        """Every exemption must correspond to a real, currently-unregistered generator.
-
-        Keeps _EXEMPT_GENERATOR_CLASSES honest: if a class is registered later,
-        its exemption entry must be removed too.
-        """
         discovered = _discover_concrete_generator_classes()
         registered = _registered_generator_class_names()
         unregistered = set(discovered) - registered
@@ -146,13 +93,6 @@ class TestDDLGeneratorRegistryCompleteness:
         assert not stale, f"Stale exemptions (already registered or no longer exist): {sorted(stale)}"
 
     def test_every_generator_module_class_is_registered(self) -> None:
-        """Every exported, concrete DDL generator class must have a platform key.
-
-        Regression guard for review finding R2: questdb.py, pg_duckdb.py, and
-        pg_mooncake.py shipped generator classes with dedicated unit tests but
-        no entry in get_ddl_generator()'s mapping, so get_ddl_generator()
-        silently returned NoOpDDLGenerator for those platforms.
-        """
         discovered = _discover_concrete_generator_classes()
         assert discovered, "Expected to discover at least one concrete DDL generator class"
 
@@ -167,8 +107,6 @@ class TestDDLGeneratorRegistryCompleteness:
 
 
 class TestNewPlatformGeneratorRegistration:
-    """Pin the specific w1 registrations from review finding R2."""
-
     def test_questdb_is_registered(self) -> None:
         generator = get_ddl_generator("questdb")
         assert isinstance(generator, QuestDBDDLGenerator)
@@ -187,23 +125,11 @@ class TestNewPlatformGeneratorRegistration:
         assert not isinstance(generator, NoOpDDLGenerator)
 
     def test_starrocks_is_registered(self) -> None:
-        """StarRocks now has a real generator (StarRocksDDLGenerator) reachable via
-        get_ddl_generator, so dry-run preview and the workload's schema-creation
-        path render tuned PARTITION BY / DISTRIBUTED BY / ORDER BY through the same
-        single renderer. Previously this fell through to a warning NoOp fallback.
-        """
         generator = get_ddl_generator("starrocks")
         assert isinstance(generator, StarRocksDDLGenerator)
         assert not isinstance(generator, NoOpDDLGenerator)
 
     def test_clickhouse_cloud_is_registered(self) -> None:
-        """PR #1180 review: clickhouse-cloud was missing from the registry, so
-        dry-run preview (core/dryrun.py's get_ddl_generator(database_config.type))
-        silently rendered no PARTITION/ORDER clauses for it, while live execution
-        (workload.py, which always resolves the "clickhouse" generator regardless
-        of variant) applied them - a dry-run/execution parity break for a
-        first-class platform.
-        """
         generator = get_ddl_generator("clickhouse-cloud")
         assert isinstance(generator, ClickHouseDDLGenerator)
         assert not isinstance(generator, NoOpDDLGenerator)
@@ -215,11 +141,6 @@ class TestNewPlatformGeneratorRegistration:
 
 
 class TestNoOpFallbackWarning:
-    """w2: NoOp fallback must warn for platforms that aren't known tuning-free,
-    but must never raise, and must stay silent for genuinely tuning-free
-    platforms.
-    """
-
     def test_unknown_platform_still_returns_noop_without_raising(self, caplog: pytest.LogCaptureFixture) -> None:
         with caplog.at_level(logging.WARNING, logger="benchbox.core.tuning.ddl_generator"):
             generator = get_ddl_generator("totally-unregistered-platform-xyz")
@@ -247,10 +168,6 @@ class TestNoOpFallbackWarning:
             "polars",
             "datafusion",
             "pyspark",
-            # DataFrame-mode spellings resolve behind the same registry-owned
-            # path and stay silent exactly when their base engine is tuning-free.
-            # "lakesail-df" is deliberately absent: bare "lakesail" is a SQL
-            # engine with real tuning output, so it (and its df spelling) warn.
             "polars-df",
             "pandas-df",
             "cudf-df",
@@ -275,15 +192,10 @@ class TestNoOpFallbackWarning:
     @pytest.mark.parametrize(
         "platform_key",
         [
-            # Undeclared affix combinations must never resolve to an unrelated
-            # real generator - they take the warning/NoOp path instead.
             "snowflake-df",
             "dataframe-snowflake",
             "duckdb-df",
             "dataframe-bigquery",
-            # Bare lakesail/velox are SQL engines with real tuning output
-            # (PARTITIONED BY); the warning exposes the preview-versus-
-            # execution gap until they get real registry generators.
             "lakesail",
             "velox",
             "lakesail-df",
@@ -304,14 +216,11 @@ class TestNoOpFallbackWarning:
         )
 
     def test_databricks_df_resolves_to_delta_generator(self) -> None:
-        """ "databricks-df" is a declared manifest key whose base engine has a
-        real generator, so DataFrame-mode Databricks renders Delta DDL."""
         from benchbox.core.tuning.generators.spark_family import DeltaDDLGenerator
 
         assert isinstance(get_ddl_generator("databricks-df"), DeltaDDLGenerator)
 
     def test_dataframe_variant_matches_base_engine(self) -> None:
-        """DataFrame-mode spellings resolve to the same generator as the base engine."""
         assert type(get_ddl_generator("polars-df")).__name__ == type(get_ddl_generator("polars")).__name__
         assert type(get_ddl_generator("dataframe-polars")).__name__ == type(get_ddl_generator("polars")).__name__
         assert type(get_ddl_generator("datafusion-df")).__name__ == type(get_ddl_generator("datafusion")).__name__
@@ -324,12 +233,6 @@ class TestNoOpFallbackWarning:
 
 
 class TestDataframeBaseSetsMatchDeclarations:
-    """_DATAFRAME_SUFFIX_BASES/_DATAFRAME_PREFIX_BASES gate affix-stripping, so
-    they must match the spellings the manifest and packaging extras actually
-    declare. A stale entry would either resurrect the undeclared-combination
-    hijack (extra base) or warn for a declared spelling (missing base).
-    """
-
     def test_suffix_bases_match_manifest_df_spellings(self) -> None:
         from benchbox.core.platform_manifest import PLATFORM_MANIFEST
 
@@ -355,9 +258,6 @@ class TestDataframeBaseSetsMatchDeclarations:
         with open(repo_root / "pyproject.toml", "rb") as handle:
             pyproject = tomllib.load(handle)
         extras = pyproject["project"]["optional-dependencies"]
-        # "dataframe-all" and the "dataframe-*-family" bundles install engine
-        # groups; they are not platform spellings, so "all" must never strip
-        # to a (nonexistent) base engine key.
         non_spelling_extras = {"dataframe-all"}
         expected = {
             name[len("dataframe-") :]

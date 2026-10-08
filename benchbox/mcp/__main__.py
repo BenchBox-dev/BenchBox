@@ -1,5 +1,3 @@
-"""Entry point for running the BenchBox MCP server."""
-
 from __future__ import annotations
 
 import sys

@@ -1,12 +1,3 @@
-/**
- * Runtime tests for the measurement-basis model.
- *
- * The type-level half of the invariant lives in measurementBasis.types.test.ts
- * and is enforced by tsc. This file covers the parts a type cannot express:
- * runtime cardinality, the URL grammar, and the round-trip guarantee that a
- * shared link reproduces exactly the figures the sender saw.
- */
-
 import { describe, expect, it } from "vitest";
 
 import {
@@ -41,8 +32,6 @@ describe("basis predicates", () => {
   });
 
   it("does not treat a different statistic over the same passes as the default", () => {
-    // This distinction is load-bearing: only the default basis may read the
-    // published display_ms. Anything else must be computed from raw rows.
     expect(isDefaultBasis(MIN_ALL_WARM)).toBe(false);
   });
 
@@ -112,15 +101,12 @@ describe("within-run comparison construction", () => {
 
 describe("URL grammar", () => {
   it("spells the default basis as `default`, not as all_warm:median", () => {
-    // One spelling per basis keeps shared links stable and comparable.
     expect(encodeBasis(DEFAULT_BASIS)).toBe("default");
     expect(decodeBasis("all_warm:median")).toEqual(DEFAULT_BASIS);
     expect(encodeBasis(decodeBasis("all_warm:median")!)).toBe("default");
   });
 
   it("uses the read model's own basis vocabulary", () => {
-    // These tokens are exactly result_basis_availability.available_bases, so
-    // an availability check is a token comparison and not a translation.
     expect(encodeBasis(MIN_ALL_WARM)).toBe("all_warm:min");
     expect(encodeBasis(WARMUP_BASIS)).toBe("warmup");
     expect(encodeBasis(PASS_2)).toBe("warm_pass_2");
@@ -133,14 +119,6 @@ describe("URL grammar", () => {
   });
 
   it("spells the statistic on every pass selection, including single-pass ones", () => {
-    // Regression for a review finding. This grammar previously rejected
-    // `warmup:min`, reasoning that median and min over a sample of one are the
-    // same number -- but nothing guarantees a sample of one. A throughput run
-    // records one warmup execution PER STREAM, so `warmup` can select several
-    // rows and the two statistics genuinely differ. Dropping the statistic
-    // made {warmup, min} encode to "warmup" and decode back as
-    // {warmup, median}: a shared link showing different numbers than the
-    // sender saw.
     const minWarmup: MeasurementBasis = { passes: WARMUP, statistic: "min" };
     const minPass2: MeasurementBasis = { passes: warmPass(2), statistic: "min" };
     expect(encodeBasis(minWarmup)).toBe("warmup:min");
@@ -162,9 +140,6 @@ describe("URL grammar", () => {
   });
 
   it("round-trips every basis the model can construct", () => {
-    // The must-preserve rule: a shared link reproduces exactly the figures the
-    // sender saw. That holds only if encode/decode is lossless for every
-    // (passes, statistic) pair, not just the ones a control happens to offer.
     const selections = [ALL_WARM, WARMUP, warmPass(1), warmPass(2), warmPass(17)];
     for (const passes of selections) {
       for (const statistic of ["median", "min"] as const) {
@@ -175,7 +150,6 @@ describe("URL grammar", () => {
   });
 
   it("rejects malformed tokens instead of falling back to the default", () => {
-    // A silent fallback would relabel someone else's figures as the default.
     for (const raw of ["", "warm", "warm_pass_", "warm_pass_0", "warm_pass_-1", "all_warm:mean", "a:b:c"]) {
       expect(decodeBasis(raw)).toBeNull();
     }
@@ -193,8 +167,6 @@ describe("URL grammar", () => {
   });
 
   it("invalidates the whole bases list when one token is unparseable", () => {
-    // Dropping the bad token would render a three-series link as two series
-    // with no indication that anything was lost.
     expect(basesSerde.decode("default,nonsense,warm_pass_2")).toBeNull();
     expect(basesSerde.decode("")).toEqual([]);
   });

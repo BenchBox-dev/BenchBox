@@ -1,5 +1,3 @@
-"""Tests for the corpus-mirror PR content-equivalence auditor."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -25,7 +23,6 @@ spec.loader.exec_module(audit_mirror_prs)
 CID = "benchbox-dev/BenchBox"
 BASE = "published-results"
 
-# path -> blob sha on the base branch tree
 BASE_TREE = {
     "results-data/bundles/existing.json": "aaaa1111",
     "results-data/corpus-inventory.json": "bbbb2222",
@@ -48,8 +45,6 @@ def _pr_file(path: str, sha: str, status: str = "modified") -> dict:
 
 
 class _FakeRunner:
-    """Dispatches gh calls: pr list, git trees, and per-PR pulls/N/files."""
-
     def __init__(
         self,
         prs: list[dict],
@@ -154,7 +149,6 @@ def test_noop_pr_identical_blob(capsys):
 
 
 def test_mutating_pr_rewrites_existing_path_content(capsys):
-    """A PR that rewrites an existing path with new bytes must NOT be retire-able."""
     fake = _FakeRunner(
         prs=[_pr(14)],
         tree=BASE_TREE,
@@ -168,10 +162,6 @@ def test_mutating_pr_rewrites_existing_path_content(capsys):
 
 
 def test_validator_only_mirror_is_mutating_not_empty(capsys):
-    """Regression: a validator-only mirror PR used to classify EMPTY (retire-able)
-    because CORPUS_PREFIXES covered only results-data/. The mirror workflow also
-    mirrors scripts/validate_submission.py etc., so a content change there is a
-    real refresh."""
     fake = _FakeRunner(
         prs=[_pr(15)],
         tree=BASE_TREE,
@@ -241,7 +231,6 @@ def test_removed_mirrored_path_is_mutating(capsys):
 
 
 def test_large_pr_files_are_fully_paginated(capsys):
-    """>100 mirrored files; a new bundle past file 100 must still be seen."""
     files = [_pr_file(f"results-data/bundles/b{i:04d}.json", f"sha{i}", status="added") for i in range(150)]
     fake = _FakeRunner(prs=[_pr(19)], tree=BASE_TREE, pr_files={19: files})
     assert _run_main(["--repo", CID, "--base", BASE, "--json"], fake) == 0
@@ -282,7 +271,6 @@ def test_per_pr_files_failure_is_isolated_error_verdict(capsys):
     payload = json.loads(capsys.readouterr().out)
     verdicts = {p["number"]: p["verdict"] for p in payload["prs"]}
     assert verdicts[22] == "ERROR"
-    # exit nonzero because a PR could not be audited
     assert exit_code == 1
     assert payload["errored"] == [22, 23]
 

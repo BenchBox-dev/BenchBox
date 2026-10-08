@@ -1,5 +1,3 @@
-"""Security regression tests for TPC-H HTML report rendering."""
-
 from html import escape as html_escape
 from types import SimpleNamespace
 

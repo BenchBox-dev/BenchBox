@@ -1,5 +1,3 @@
-"""Tests for scripts/_compose_joinorder_hero.py."""
-
 from __future__ import annotations
 
 import _compose_joinorder_hero as compose_joinorder_hero

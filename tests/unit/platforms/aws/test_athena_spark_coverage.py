@@ -1,5 +1,3 @@
-"""Additional coverage tests for Athena Spark adapter."""
-
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -75,11 +73,6 @@ def test_apply_tuning_configuration_collects_results() -> None:
     assert result["platform_optimizations"] == {"opt": 1}
 
 
-# ---------------------------------------------------------------------------
-# State enum coverage
-# ---------------------------------------------------------------------------
-
-
 def test_athena_spark_session_states_defined() -> None:
     from benchbox.platforms.aws.athena_spark_adapter import AthenaSparkSessionState
 
@@ -100,11 +93,6 @@ def test_athena_spark_calculation_states_defined() -> None:
     assert AthenaSparkCalculationState.CANCELED == "CANCELED"
     assert "COMPLETED" in AthenaSparkCalculationState.TERMINAL_STATES
     assert "COMPLETED" in AthenaSparkCalculationState.SUCCESS_STATES
-
-
-# ---------------------------------------------------------------------------
-# _wait_for_session_ready polling
-# ---------------------------------------------------------------------------
 
 
 def test_wait_for_session_ready_succeeds_on_idle_state() -> None:
@@ -148,11 +136,6 @@ def test_wait_for_session_ready_raises_on_timeout() -> None:
             adapter._wait_for_session_ready(timeout_seconds=1)
 
 
-# ---------------------------------------------------------------------------
-# _wait_for_calculation_complete polling
-# ---------------------------------------------------------------------------
-
-
 def test_wait_for_calculation_complete_returns_completed() -> None:
     adapter = _adapter()
     client = MagicMock()
@@ -177,22 +160,12 @@ def test_wait_for_calculation_complete_raises_on_timeout() -> None:
             adapter._wait_for_calculation_complete("calc-1", timeout_seconds=1)
 
 
-# ---------------------------------------------------------------------------
-# get_platform_info basic coverage
-# ---------------------------------------------------------------------------
-
-
 def test_get_platform_info_basic_fields() -> None:
     adapter = _adapter()
     info = adapter.get_platform_info()
     assert info["platform"] == "athena-spark"
     assert info["vendor"] == "AWS"
     assert "workgroup" in info
-
-
-# ---------------------------------------------------------------------------
-# create_connection: reuse existing session
-# ---------------------------------------------------------------------------
 
 
 def test_create_connection_reuses_existing_session() -> None:
@@ -229,7 +202,6 @@ def test_create_connection_raises_on_client_error() -> None:
     adapter = _adapter()
     client = MagicMock()
 
-    # Make ClientError a real exception with the expected response structure
     client.start_session.side_effect = type(
         "ClientError",
         (Exception,),
@@ -238,14 +210,9 @@ def test_create_connection_raises_on_client_error() -> None:
 
     with (
         patch.object(adapter, "_get_athena_client", return_value=client),
-        pytest.raises(Exception),  # Either ClientError or ConfigurationError
+        pytest.raises(Exception),
     ):
         adapter.create_connection()
-
-
-# ---------------------------------------------------------------------------
-# create_schema: database exists vs. needs creation
-# ---------------------------------------------------------------------------
 
 
 def test_create_schema_database_already_exists() -> None:
@@ -255,7 +222,7 @@ def test_create_schema_database_already_exists() -> None:
     glue.exceptions.EntityNotFoundException = type("ENFE", (Exception,), {})
 
     with patch.object(adapter, "_get_glue_client", return_value=glue):
-        adapter.create_schema(_benchmark(), None)  # should not raise
+        adapter.create_schema(_benchmark(), None)
 
     glue.create_database.assert_not_called()
 
@@ -270,11 +237,6 @@ def test_create_schema_creates_database_when_missing() -> None:
         adapter.create_schema(_benchmark(), None)
 
     glue.create_database.assert_called_once()
-
-
-# ---------------------------------------------------------------------------
-# _submit_calculation
-# ---------------------------------------------------------------------------
 
 
 def test_submit_calculation_raises_without_session() -> None:
@@ -338,15 +300,9 @@ def test_submit_calculation_python_code_type() -> None:
         calc_id, state = adapter._submit_calculation("print('hello')", code_type="PYTHON", wait_for_completion=False)
 
     assert calc_id == "calc-2"
-    # Verify code was NOT wrapped in spark.sql()
     call_code = client.start_calculation_execution.call_args[1]["CodeBlock"]
     assert "print('hello')" in call_code
     assert "spark.sql" not in call_code
-
-
-# ---------------------------------------------------------------------------
-# _get_calculation_result and _fetch_results_from_s3
-# ---------------------------------------------------------------------------
 
 
 def test_get_calculation_result_from_s3_uri() -> None:
@@ -423,11 +379,6 @@ def test_fetch_results_from_s3_returns_empty_on_error() -> None:
     assert results == []
 
 
-# ---------------------------------------------------------------------------
-# load_data
-# ---------------------------------------------------------------------------
-
-
 def test_load_data_skips_when_tables_exist(tmp_path) -> None:
     adapter = _adapter()
     adapter._session_id = "sess-1"
@@ -466,11 +417,6 @@ def test_load_data_raises_on_missing_dir() -> None:
         adapter.load_data(_benchmark("lineitem"), None, "/nonexistent/path")
 
 
-# ---------------------------------------------------------------------------
-# execute_query
-# ---------------------------------------------------------------------------
-
-
 def test_execute_query_returns_results() -> None:
     adapter = _adapter()
     adapter._session_id = "sess-1"
@@ -497,20 +443,10 @@ def test_execute_query_raises_on_failed_state() -> None:
     assert "calculation failed" in result["error"]
 
 
-# ---------------------------------------------------------------------------
-# close with execution time logging
-# ---------------------------------------------------------------------------
-
-
 def test_close_logs_execution_time() -> None:
     adapter = _adapter()
     adapter._total_execution_time_seconds = 15.0
-    adapter.close()  # no session, should just log
-
-
-# ---------------------------------------------------------------------------
-# add_cli_arguments
-# ---------------------------------------------------------------------------
+    adapter.close()
 
 
 def test_add_cli_arguments_registers_options() -> None:
@@ -523,11 +459,6 @@ def test_add_cli_arguments_registers_options() -> None:
     assert group.add_argument.call_count >= 5
 
 
-# ---------------------------------------------------------------------------
-# from_config
-# ---------------------------------------------------------------------------
-
-
 def test_from_config_creates_adapter() -> None:
     from benchbox.platforms.aws import AthenaSparkAdapter
 
@@ -535,11 +466,6 @@ def test_from_config_creates_adapter() -> None:
     adapter = AthenaSparkAdapter.from_config(config)
     assert adapter.workgroup == "my-wg"
     assert adapter.region == "us-west-2"
-
-
-# ---------------------------------------------------------------------------
-# apply_tuning_configuration and get_target_dialect
-# ---------------------------------------------------------------------------
 
 
 def test_apply_tuning_configuration_sets_scale_factor() -> None:

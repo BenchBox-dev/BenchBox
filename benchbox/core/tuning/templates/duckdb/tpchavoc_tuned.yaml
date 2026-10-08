@@ -1,8 +1,3 @@
-# DuckDB TPC-Havoc Tuned Configuration
-# This configuration enables all DuckDB-supported optimizations for TPC-Havoc Benchmark
-# Provides maximum performance with constraints and table-level tunings enabled
-# Note: TPC-Havoc uses TPC-H schema with query optimizer stress testing
-
 primary_keys:
   enabled: true
   enforce_uniqueness: true

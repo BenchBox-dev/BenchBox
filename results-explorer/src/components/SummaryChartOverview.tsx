@@ -48,23 +48,12 @@ import { SaveChartView } from "@/components/SaveChartView";
 interface Props {
   context: Extract<ChartContext, { kind: "summary" }>;
   excludeChartIds?: readonly string[];
-  /** Maps a chart id to a DOM id placed on that card's <details>, for deep links. */
   cardAnchors?: Readonly<Record<string, string>>;
-  /** Chart id to open (and keep open) on mount / when it changes, e.g. from a hash deep link. */
   forceOpenChartId?: string | null;
-  /**
-   * When set, the `rank_table` card shows `RankGateNotice` instead of the
-   * rank table, and its thumbnail avoids implying a ranking exists.
-   * Mirrors `formatCohortExclusion` from `@/lib/displayEligibility`.
-   */
   rankGateReason?: string | null;
   rankGateContext?: { benchmark: string; scaleFactor: string; phase: string };
 }
 
-// These are the secondary views that carry useful analytical information in
-// the long summary layout. They are deliberately ordered like the current
-// chart navigation and remain visible as unavailable cards when a cohort does
-// not contain the required data (for example, normalized cost or history).
 const LONG_LAYOUT_CHART_IDS = [
   "query_heatmap",
   "percentile_ladder",
@@ -495,10 +484,6 @@ function renderExpandedChart(
     case "query_heatmap":
       return <QueryHeatmap summary={summary} variant="card" highContrast={options.highContrast} />;
     case "percentile_ladder": {
-      // Use the same cohort-aware identity labels as the other expanded
-      // charts (query heatmap, CDF, etc.) instead of the bare platform
-      // name, which collapses to indistinguishable "DuckDB", "DuckDB 2"
-      // rows once two runs share a platform.
       const cohortLabels = formatRunIdentitiesForCohort(
         summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
         "chart",

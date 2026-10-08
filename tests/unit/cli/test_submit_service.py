@@ -1,5 +1,3 @@
-"""Unit tests for hosted submit transport."""
-
 from __future__ import annotations
 
 import json
@@ -311,8 +309,7 @@ def test_submit_hosted_bundle_validation_error_with_non_json_body_reports_422(tm
 
 
 def test_submit_hosted_bundle_5xx_retry_exhaustion_surfaces_server_message(tmp_path: Path) -> None:
-    """N2 fix: a 5xx response with an informative JSON body must not have
-    that body discarded after retry exhaustion."""
+
     source, companions = _bundle(tmp_path)
     opener = FakeOpener(
         FakeResponse(503, payload={"message": "ingest-cluster restarting"}),

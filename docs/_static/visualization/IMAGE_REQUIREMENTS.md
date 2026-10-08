@@ -26,11 +26,9 @@ These images are essential - users choose chart types based on visual examples.
 | `chart-query-heatmap.png` | Query x Platform heatmap | `benchbox visualize --chart-type query_heatmap` with 3+ platforms |
 | `chart-distribution-box.png` | Latency distribution box plot | `benchbox visualize --chart-type distribution_box` with 3 platforms |
 
-**Generation approach:**
+**Generation approach:** generate sample data first, then run the command below for each chart type and capture a terminal screenshot of the output.
 ```bash
-# Generate sample data first, then capture terminal screenshots:
 benchbox visualize samples/*.json --chart-type performance_bar
-# Screenshot the terminal output for each chart type
 ```
 
 ---

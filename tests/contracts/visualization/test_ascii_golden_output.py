@@ -1,19 +1,3 @@
-"""Golden-output snapshot tests for all 15 ASCII chart types.
-
-These tests establish a byte-identical parity baseline before extracting
-the charting code into the standalone `textcharts` library.  After extraction,
-running these same tests against `textcharts` proves that rendering is unchanged.
-
-Fixed options: ChartOptions(use_color=False, use_unicode=True, width=80)
-
-Usage:
-    # Normal run - compare against stored golden files
-    uv run -- python -m pytest tests/contracts/visualization/test_ascii_golden_output.py -q
-
-    # Regenerate golden files after intentional rendering changes
-    uv run -- python -m pytest tests/contracts/visualization/test_ascii_golden_output.py -q --update-golden
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -47,20 +31,13 @@ pytestmark = pytest.mark.fast
 
 GOLDEN_DIR = Path(__file__).resolve().parent.parent.parent / "fixtures" / "golden" / "ascii"
 
-# Deterministic options - no color, unicode on, fixed width.
 OPTS = ChartOptions(use_color=False, use_unicode=True, width=80)
 
-# Fixed capabilities so golden-output tests are platform-independent.
-# On Windows, detect_terminal_capabilities() would set unicode_support=False
-# (because LANG/LC_ALL/LC_CTYPE env vars are typically unset), causing charts
-# to fall back to ASCII box-drawing characters (+|-) and fail every comparison
-# against the Unicode golden files.
 _DETERMINISTIC_CAPS = TerminalCapabilities(width=80, unicode_support=True)
 
 
 @pytest.fixture(autouse=True)
 def _force_unicode_capabilities():
-    """Patch terminal detection so every chart renders with Unicode on all platforms."""
     with patch(
         "textcharts.base.detect_terminal_capabilities",
         return_value=_DETERMINISTIC_CAPS,
@@ -71,11 +48,6 @@ def _force_unicode_capabilities():
 @pytest.fixture
 def update_golden(request: pytest.FixtureRequest) -> bool:
     return bool(request.config.getoption("--update-golden", default=False))
-
-
-# ---------------------------------------------------------------------------
-# Chart fixture builders - each returns (chart_name, rendered_string)
-# ---------------------------------------------------------------------------
 
 
 def _bar_chart() -> tuple[str, str]:
@@ -298,7 +270,6 @@ def _rank_table() -> tuple[str, str]:
     return "rank_table", chart.render()
 
 
-# Collect all chart builders
 ALL_CHART_BUILDERS = [
     _bar_chart,
     _histogram,
@@ -319,26 +290,11 @@ ALL_CHART_BUILDERS = [
 
 
 def _normalize(text: str) -> str:
-    """Normalize text for comparison: strip trailing whitespace per line, ensure final newline.
-
-    This matches what pre-commit hooks (trailing-whitespace, end-of-file-fixer) do
-    to committed files, so golden snapshots survive hook processing.
-    """
     lines = [line.rstrip() for line in text.splitlines()]
     return "\n".join(lines) + "\n"
 
 
 def _compare_or_fail(chart_name: str, normalized: str, golden_path: Path, update_golden: bool) -> None:
-    """Compare rendered output against a golden file, or regenerate it.
-
-    - If `update_golden` is set, unconditionally (re)write the golden file and
-      `pytest.skip` - this is the ONLY path allowed to create or modify golden
-      files, whether the file is brand-new or previously existed.
-    - Otherwise, a missing golden file is a hard failure with zero writes:
-      the test must never silently self-heal a lost/deleted golden fixture by
-      writing whatever the current render happens to produce.
-    - Otherwise, compare content and fail normally on mismatch.
-    """
     if update_golden:
         golden_path.parent.mkdir(parents=True, exist_ok=True)
         golden_path.write_text(normalized, encoding="utf-8")
@@ -364,7 +320,6 @@ def _compare_or_fail(chart_name: str, normalized: str, golden_path: Path, update
     ids=[fn.__name__.lstrip("_") for fn in ALL_CHART_BUILDERS],
 )
 def test_golden_output(builder, update_golden: bool) -> None:
-    """Verify chart output matches golden snapshot (or update it)."""
     chart_name, rendered = builder()
     normalized = _normalize(rendered)
     golden_path = GOLDEN_DIR / f"{chart_name}.txt"
@@ -373,13 +328,6 @@ def test_golden_output(builder, update_golden: bool) -> None:
 
 
 def test_missing_golden_file_hard_fails_without_writing(tmp_path: Path) -> None:
-    """A missing golden file must hard-fail with zero side effects (no self-heal).
-
-    Regression test for the bug where the "golden file simply missing" branch
-    unconditionally wrote the golden file before failing once, causing the
-    very next run to pass by construction with no real parity check ever
-    having happened.
-    """
     golden_path = tmp_path / "some_chart.txt"
     assert not golden_path.exists()
 

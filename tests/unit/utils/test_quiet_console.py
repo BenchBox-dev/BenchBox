@@ -22,5 +22,4 @@ def test_quiet_console_respects_quiet_flag() -> None:
     assert sink_console is not get_console(quiet=False)
     quiet_console.print("silent")
 
-    # Reset global state for other tests
     set_quiet(False)

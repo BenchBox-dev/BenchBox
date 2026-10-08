@@ -64,7 +64,6 @@ describe("Dashboards page", () => {
     render(<Dashboards />);
 
     const detail = screen.getByTestId("dashboard-detail");
-    // First Rename button is the dashboard rename; per-view Renames follow.
     fireEvent.click(within(detail).getAllByRole("button", { name: "Rename" })[0]!);
     fireEvent.input(screen.getByLabelText("Dashboard name"), { target: { value: "Renamed board" } });
     fireEvent.click(within(detail).getAllByRole("button", { name: "Rename" })[0]!);
@@ -72,7 +71,6 @@ describe("Dashboards page", () => {
 
     fireEvent.click(within(detail).getAllByRole("button", { name: "Rename" })[1]!);
     fireEvent.input(screen.getByLabelText("Saved view name"), { target: { value: "New view" } });
-    // The view confirm is now second: the dashboard Rename button precedes it.
     fireEvent.click(within(detail).getAllByRole("button", { name: "Rename" })[1]!);
     expect(within(detail).getByRole("link", { name: "New view" })).toBeTruthy();
   });

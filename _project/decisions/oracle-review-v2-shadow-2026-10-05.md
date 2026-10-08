@@ -64,13 +64,18 @@ have usage left.
 
 ## What shadow mode does and does not do
 
-The workflow posts a separate, non-required `oracle-review-shadow` status and,
-for failures, pending results and findings, one pull request comment. It posts
-findings as a comment rather than review threads, because the ruleset requires
-every review thread to be resolved and shadow findings must not block merges.
-`findings_delivery: review` posts review threads instead; switching to it is a
-deliberate step that makes oracle threads binding and starts the parity period
-before the cut-over.
+The workflow posts a separate, non-required `oracle-review-shadow` status and
+its findings. Shadow mode first posted findings as one pull request comment
+rather than review threads, because the ruleset requires every review thread
+to be resolved and shadow findings were not to block merges.
+
+Parity period (from 2026-10-07): the policy uses `findings_delivery: review`.
+Each run posts a pull request review on the head, with a thread per finding
+on a diff line, and those threads must be resolved before a merge, like the
+connector's. The status stays non-required and the required check still
+requires the connector; each `oracle-review` run logs the oracle's verdict on
+`parity:` lines for comparison. Setting `findings_delivery: comment` ends the
+period and makes findings advisory again.
 
 It does not change the required `oracle-review` check, the ruleset, the digest
 or the soundness manifest. It does not post a pending status when a run
@@ -106,7 +111,9 @@ it logs the result and succeeds.
 
 ## Cut-over
 
-A later change renames the context to `oracle-review`, retires the connector
-check and the stand-in marker, switches findings to review threads, adds the
-gate files to `.github/soundness-paths.txt`, and pins the context to the App's
-integration ID in the ruleset.
+A later change sets `mode: enforce` and passes `--signal oracle` to the
+required check, retires the connector, adds the gate files to
+`.github/soundness-paths.txt`, and pins the context to the App's integration
+ID in the ruleset. Renaming the status context also needs `ORACLE_CONTEXT` in
+`_project/scripts/oracle_review_check.py` changed to match; a test enforces
+it. Findings already go to review threads from the parity period.

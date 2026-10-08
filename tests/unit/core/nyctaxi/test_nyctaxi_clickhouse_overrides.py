@@ -1,9 +1,3 @@
-"""Unit tests for NYC Taxi ClickHouse dialect overrides.
-
-Verifies that the four queries using EXTRACT(DOW/EPOCH/HOUR …) are replaced
-with native ClickHouse functions when dialect='clickhouse' is requested.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -27,11 +21,6 @@ def _bench():
     return NYCTaxiBenchmark()
 
 
-# ---------------------------------------------------------------------------
-# trips-by-day-of-week
-# ---------------------------------------------------------------------------
-
-
 def test_trips_by_dow_clickhouse_uses_todayofweek():
     q = _bench().get_queries(dialect="clickhouse")["trips-by-day-of-week"]
     assert "toDayOfWeek(" in q, f"Expected toDayOfWeek(), got:\n{q}"
@@ -48,11 +37,6 @@ def test_trips_by_dow_base_retains_extract():
     assert "EXTRACT" in q.upper(), f"Base query must use EXTRACT(DOW …), got:\n{q}"
 
 
-# ---------------------------------------------------------------------------
-# weekday-weekend-comparison
-# ---------------------------------------------------------------------------
-
-
 def test_weekday_weekend_clickhouse_uses_todayofweek_and_tohour():
     q = _bench().get_queries(dialect="clickhouse")["weekday-weekend-comparison"]
     assert "toDayOfWeek(" in q, f"Expected toDayOfWeek(), got:\n{q}"
@@ -64,11 +48,6 @@ def test_weekday_weekend_clickhouse_preserves_day_type_column():
     q = _bench().get_queries(dialect="clickhouse")["weekday-weekend-comparison"]
     assert "day_type" in q, f"Must preserve day_type column alias, got:\n{q}"
     assert "'weekend'" in q and "'weekday'" in q, f"Must categorize weekend/weekday, got:\n{q}"
-
-
-# ---------------------------------------------------------------------------
-# rush-hour-analysis
-# ---------------------------------------------------------------------------
 
 
 def test_rush_hour_clickhouse_uses_tohour_and_datediff():
@@ -89,11 +68,6 @@ def test_trip_duration_clickhouse_uses_datediff():
     q = _bench().get_queries(dialect="clickhouse")["trip-duration-analysis"]
     assert "dateDiff('second'" in q, f"Expected dateDiff('second', ...), got:\n{q}"
     assert "EXTRACT" not in q.upper(), f"Must not use EXTRACT for ClickHouse, got:\n{q}"
-
-
-# ---------------------------------------------------------------------------
-# fhv-base-volume (FHV-enabled benchmark)
-# ---------------------------------------------------------------------------
 
 
 def _fhv_bench():
@@ -120,11 +94,6 @@ def test_fhv_base_volume_starrocks_uses_timestampdiff():
 def test_fhv_base_volume_base_retains_extract():
     q = _fhv_bench().get_queries()["fhv-base-volume"]
     assert "EXTRACT" in q.upper(), f"Base query must use EXTRACT(EPOCH …), got:\n{q}"
-
-
-# ---------------------------------------------------------------------------
-# Other queries unaffected
-# ---------------------------------------------------------------------------
 
 
 def test_non_overridden_queries_present_in_clickhouse_dialect():

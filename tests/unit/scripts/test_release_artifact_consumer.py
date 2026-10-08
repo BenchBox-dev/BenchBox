@@ -1,5 +1,3 @@
-"""Reject stale producer attempts and altered release artifact bytes."""
-
 from __future__ import annotations
 
 import copy

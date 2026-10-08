@@ -31,19 +31,17 @@ def test_quote_identifier_various_platforms():
 
 def test_tolerance_small_tables_uses_absolute_threshold():
     dv = make_validator()
-    # absolute_tolerance = 100, threshold for small tables = 1000
-    # difference within tolerance
+
     assert not dv._is_tolerance_exceeded(500, 590, 90, 18.0)
-    # difference beyond tolerance
+
     assert dv._is_tolerance_exceeded(500, 701, 201, 40.2)
 
 
 def test_tolerance_large_tables_uses_percentage():
     dv = make_validator()
-    # For large table, use percentage (0.1%)
-    # 10/20000 = 0.05% -> within tolerance
+
     assert not dv._is_tolerance_exceeded(20000, 20010, 10, 0.05)
-    # 40/20000 = 0.2% -> exceeds tolerance
+
     assert dv._is_tolerance_exceeded(20000, 20040, 40, 0.2)
 
 
@@ -51,7 +49,7 @@ def test_count_query_platform_specific():
     dv = make_validator()
     assert dv._get_count_query("t", "clickhouse") == "SELECT COUNT(*) FROM t"
     assert dv._get_count_query("t", "duckdb") == "SELECT COUNT(*) FROM t"
-    # default path
+
     assert dv._get_count_query("t", "postgresql") == 'SELECT COUNT(*) FROM "t"'
 
 
@@ -86,7 +84,7 @@ def test_get_actual_row_counts_happy_path_and_approximate():
             return None
 
     dv = DataValidator(FakeAdapter("clickhouse"))
-    # Force approximate path by lowering threshold
+
     dv.large_table_threshold = 0
     counts = dv.get_actual_row_counts(FakeConn(10), ["tbl"])
     assert counts["tbl"] >= 0
@@ -94,22 +92,19 @@ def test_get_actual_row_counts_happy_path_and_approximate():
 
 def test_create_discrepancy_status_assignment():
     dv = make_validator()
-    # Exact match -> PASSED
+
     d0 = dv._create_discrepancy("t", 1000, 1000)
     assert d0.status == ValidationStatus.PASSED
     assert not d0.tolerance_exceeded
 
-    # Within absolute tolerance -> WARNING
-    d1 = dv._create_discrepancy("t", 900, 980)  # diff = 80
+    d1 = dv._create_discrepancy("t", 900, 980)
     assert d1.status == ValidationStatus.WARNING
     assert not d1.tolerance_exceeded
 
-    # Beyond tolerance -> FAILED
-    d2 = dv._create_discrepancy("t", 900, 1105)  # diff = 205
+    d2 = dv._create_discrepancy("t", 900, 1105)
     assert d2.status == ValidationStatus.FAILED
     assert d2.tolerance_exceeded
 
-    # expected_count=0 and actual>0 -> percentage inf path
     d3 = dv._create_discrepancy("t", 0, 5)
     assert d3.tolerance_exceeded is False
     assert d3.status == ValidationStatus.WARNING
@@ -118,16 +113,16 @@ def test_create_discrepancy_status_assignment():
 def test_compare_row_counts_includes_missing_tables_as_failed():
     dv = make_validator()
     discrepancies = dv.compare_row_counts({"a": 10, "b": 20}, {"a": 10, "c": 5})
-    # Two discrepancies expected: a (match), b (missing)
+
     assert len(discrepancies) == 2
-    # Find entries
+
     by_tbl = {d.table_name: d for d in discrepancies}
     assert by_tbl["a"].status in (ValidationStatus.PASSED, ValidationStatus.WARNING)
     assert by_tbl["b"].status == ValidationStatus.FAILED
 
 
 def test_get_table_exists_status_and_integrity_checks():
-    # Fake adapter/connection/cursor
+
     class FakeCursor:
         def __init__(self, table_exists: bool = True, retval=(1,)):
             self.table_exists = table_exists
@@ -136,7 +131,7 @@ def test_get_table_exists_status_and_integrity_checks():
 
         def execute(self, sql):
             self.executed.append(sql)
-            # Simulate raise for non-existent tables
+
             if "MISSING_TABLE" in sql:
                 raise Exception("no such table")
 
@@ -171,12 +166,10 @@ def test_get_table_exists_status_and_integrity_checks():
     assert status["EXISTS_TABLE"] is True
     assert status["MISSING_TABLE"] is False
 
-    # Integrity checks: one True, one False, one None result
     class FakeConn2(FakeConn):
         def __init__(self):
             self.calls = []
 
-            # single persistent cursor instance
             class C:
                 def __init__(self, outer):
                     self.outer = outer

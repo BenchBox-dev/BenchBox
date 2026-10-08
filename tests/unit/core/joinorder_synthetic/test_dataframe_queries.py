@@ -1,9 +1,6 @@
-"""Tests for JoinOrder DataFrame queries.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -16,7 +13,7 @@ pytestmark = [
 
 
 def _assert_both_families_match_sql(benchmark, query_id, tables) -> None:
-    """Execute the public registry against the instance's unchanged SQL."""
+
     from types import SimpleNamespace
 
     import duckdb
@@ -101,8 +98,6 @@ def test_large_comma_join_query_category_counts_actual_tables(query_id) -> None:
 
 
 class TestQueryRegistration:
-    """Tests for query registration and metadata."""
-
     def test_all_113_queries_registered(self):
         from benchbox.core.joinorder_synthetic.dataframe_queries import get_dataframe_queries
 
@@ -154,11 +149,9 @@ class TestQueryRegistration:
 
 
 class TestPandasImplExecute:
-    """Tests that pandas_impl functions run on synthetic data."""
-
     @pytest.fixture
     def pandas_ctx(self):
-        """Minimal pandas DataFrameContext with schema-shaped synthetic data."""
+
         pytest.importorskip("pandas")
         import pandas as pd
 
@@ -491,7 +484,7 @@ class TestPandasImplExecute:
         assert "drama_horror_movie" in result
 
     def test_results_are_dataframes(self, pandas_ctx):
-        """All JoinOrder pandas impls return DataFrames."""
+
         import pandas as pd
 
         from benchbox.core.joinorder_synthetic.dataframe_queries import (

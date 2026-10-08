@@ -1,10 +1,3 @@
-"""Tests for the ``raw_explain_output`` retention policy on captured query plans.
-
-The policy governs only the verbatim EXPLAIN text retained on a ``QueryPlanDAG``;
-the structured logical DAG and the ``plan_fingerprint`` must be retained under
-every policy value. See ``benchbox/core/results/query_plan_models.py``.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -70,9 +63,9 @@ class TestPlanRawOutputPolicy:
         plan.apply_raw_output_policy("truncated", max_bytes=256)
         out = plan.raw_explain_output
         assert out is not None
-        # The retained prefix is exactly max_bytes of the original text.
+
         assert out.startswith("A" * 256)
-        # A marker documents the truncation and the byte accounting.
+
         assert "truncated" in out
         assert "10000 bytes" in out
 
@@ -94,24 +87,23 @@ class TestPlanRawOutputPolicy:
         assert plan.raw_explain_output is None
 
     def test_truncation_handles_multibyte_boundary(self):
-        # A cap that splits a 3-byte char must not crash and must yield valid UTF-8.
-        raw = "€" * 1000  # each '€' is 3 bytes in UTF-8
+
+        raw = "€" * 1000
         plan = _make_plan(raw)
-        plan.apply_raw_output_policy("truncated", max_bytes=100)  # 100 is not a multiple of 3
+        plan.apply_raw_output_policy("truncated", max_bytes=100)
         out = plan.raw_explain_output
         assert out is not None
-        # Must be valid (round-trippable) UTF-8 with no replacement chars from a split char.
+
         out.encode("utf-8")
         assert "�" not in out
-        # The trailing partial 3-byte char is dropped, so the marker reports 99 (not 100)
-        # retained bytes — the byte accounting reflects the actually-kept prefix.
+
         assert "retained 99 of 3000 bytes" in out
 
     def test_unknown_policy_falls_back_to_truncated(self):
         raw = "C" * 10_000
         plan = _make_plan(raw)
         plan.apply_raw_output_policy("bogus", max_bytes=256)
-        # Falls back to the default (truncated), so the text is capped, not retained whole.
+
         assert plan.raw_explain_output is not None
         assert len(plan.raw_explain_output) < len(raw)
         assert RAW_OUTPUT_TRUNCATED in plan.raw_explain_output

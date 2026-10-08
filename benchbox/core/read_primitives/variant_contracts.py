@@ -1,5 +1,3 @@
-"""Static checks for read_primitives query variant comparability."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -15,8 +13,6 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class VariantContractIssue:
-    """One static comparability issue for a base query or platform variant."""
-
     query_id: str
     dialect: str | None
     kind: str
@@ -54,7 +50,6 @@ def collect_variant_contract_issues(
     *,
     require_contracts: bool = True,
 ) -> list[VariantContractIssue]:
-    """Return static comparability issues for read_primitives platform variants."""
     issues: list[VariantContractIssue] = []
 
     for query_id, entry in catalog.queries.items():
@@ -92,7 +87,6 @@ def collect_variant_contract_issues(
 
 
 def extract_projection_names(sql: str, *, dialect: str) -> tuple[str, ...] | None:
-    """Return top-level projection names for *sql*, or None when unsupported."""
     try:
         expression = sqlglot.parse_one(sql, read=_DIALECT_READ.get(dialect, "duckdb"))
     except sqlglot.errors.SqlglotError:
@@ -211,19 +205,6 @@ def _requires_result_contract(entry: PrimitiveQuery) -> bool:
 
 
 def summarize_variant_comparability(catalog=None) -> dict:
-    """Return a JSON-serializable comparability summary for the catalog.
-
-    Loads the default primitives catalog when none is supplied. The summary
-    names per-query variant dialects and the static contract issues from
-    :func:`collect_variant_contract_issues`, so CLI output and persisted
-    result artifacts can report what was compared without re-running the
-    lint.
-
-    ``comparable`` reports static contract status only (no contract issues
-    found in the catalog lint) — it is not runtime evidence that two
-    executions were like-for-like. Best-effort: callers treat an empty
-    issue list as comparable.
-    """
     if catalog is None:
         import copy as _copy
 
@@ -233,7 +214,6 @@ def summarize_variant_comparability(catalog=None) -> dict:
 
 @lru_cache(maxsize=1)
 def _default_comparability_summary() -> dict:
-    """Cached summary for the default catalog (stable per process)."""
     from benchbox.core.read_primitives.catalog.loader import load_primitives_catalog
 
     return _summarize_catalog(load_primitives_catalog())

@@ -1,15 +1,11 @@
-"""Tests for BenchBox MCP prompts.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import sys
 
 import pytest
 
-# Skip all tests if Python < 3.10
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
@@ -17,11 +13,7 @@ pytestmark = [
 
 
 class TestAnalyzeResultsPrompt:
-    """Tests for analyze_results prompt."""
-
     def test_prompt_returns_text(self):
-        """Test that prompt returns text content."""
-        # Test the prompt template logic
         benchmark = "tpch"
         platform = "duckdb"
         focus = "slowest_queries"
@@ -34,7 +26,6 @@ class TestAnalyzeResultsPrompt:
         assert "slowest_queries" in focus_text
 
     def test_prompt_without_focus(self):
-        """Test prompt without focus parameter."""
         benchmark = "tpcds"
         platform = "polars-df"
         focus = None
@@ -47,10 +38,7 @@ class TestAnalyzeResultsPrompt:
 
 
 class TestComparePlatformsPrompt:
-    """Tests for compare_platforms prompt."""
-
     def test_prompt_parses_platforms(self):
-        """Test that platforms are parsed correctly."""
         platforms_str = "duckdb,polars-df,datafusion"
         platform_list = [p.strip() for p in platforms_str.split(",")]
 
@@ -60,7 +48,6 @@ class TestComparePlatformsPrompt:
         assert "datafusion" in platform_list
 
     def test_prompt_includes_scale_factor(self):
-        """Test that scale factor is included."""
         scale_factor = 0.1
         prompt_text = f"Scale Factor: {scale_factor}"
 
@@ -68,10 +55,7 @@ class TestComparePlatformsPrompt:
 
 
 class TestIdentifyRegressionsPrompt:
-    """Tests for identify_regressions prompt."""
-
     def test_prompt_with_specific_runs(self):
-        """Test prompt with specific baseline and comparison runs."""
         baseline_run = "run1.json"
         comparison_run = "run2.json"
         threshold_percent = 10.0
@@ -83,7 +67,6 @@ class TestIdentifyRegressionsPrompt:
         assert "10.0" in prompt_text
 
     def test_prompt_without_specific_runs(self):
-        """Test prompt for automatic run detection."""
         baseline_run = None
         comparison_run = None
 
@@ -92,17 +75,13 @@ class TestIdentifyRegressionsPrompt:
 
 
 class TestBenchmarkPlanningPrompt:
-    """Tests for benchmark_planning prompt."""
-
     def test_prompt_includes_time_budget(self):
-        """Test that time budget is included."""
         time_budget_minutes = 30
         prompt_text = f"Time Budget: {time_budget_minutes} minutes"
 
         assert "30 minutes" in prompt_text
 
     def test_prompt_includes_use_case(self):
-        """Test that use case is included."""
         use_case = "regression"
         prompt_text = f"Use Case: {use_case}"
 
@@ -110,10 +89,7 @@ class TestBenchmarkPlanningPrompt:
 
 
 class TestTroubleshootFailurePrompt:
-    """Tests for troubleshoot_failure prompt."""
-
     def test_prompt_with_error_message(self):
-        """Test prompt with error message."""
         error_message = "Connection refused"
         platform = "snowflake"
         benchmark = "tpch"
@@ -133,7 +109,6 @@ class TestTroubleshootFailurePrompt:
         assert "tpch" in context_str
 
     def test_prompt_without_context(self):
-        """Test prompt without specific context."""
         error_message = None
         platform = None
         benchmark = None

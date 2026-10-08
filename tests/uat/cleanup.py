@@ -1,17 +1,3 @@
-"""Reuse-aware cleanup of `~/Developer/benchmark_runs/databases/`.
-
-Implements the cleanup discipline the 2026-05-02 sweep operator
-performed manually: preserve `datagen/` while later platforms can
-reuse it, prune `databases/` only at safe reuse boundaries.
-
-Source/scale boundary rule (from
-_project/handoffs/results-explorer-uat-retrospective-20260502.md):
-TPC-H loaded databases are reused by `read_primitives`,
-`write_primitives`, `transaction_primitives`, and `ai_primitives`,
-so a TPC-H load is only safe to prune after all consumers for that
-scale have completed.
-"""
-
 from __future__ import annotations
 
 import shutil
@@ -31,8 +17,6 @@ class CellKey:
 
 @dataclass(frozen=True)
 class CleanupDecision:
-    """Decision for a single (platform, source_benchmark, scale) prune candidate."""
-
     safe_to_prune: bool
     reason: str
 
@@ -45,7 +29,6 @@ def remaining_consumers(
     platform: str,
     scale: float,
 ) -> list[CellKey]:
-    """Return pending cells (same platform, same scale) that consume `source_benchmark`."""
     consumers = source_reuse_graph().get(source_benchmark, (source_benchmark,))
     out = []
     for cell in pending_cells:
@@ -59,7 +42,6 @@ def remaining_consumers(
 
 
 def source_reuse_graph() -> dict[str, tuple[str, ...]]:
-    """Return source benchmark → same-source consumers from registry metadata."""
     consumers_by_source: defaultdict[str, list[str]] = defaultdict(list)
     for benchmark_id, meta in BENCHMARK_METADATA.items():
         data_source = meta.get("data_source")
@@ -79,7 +61,6 @@ def can_prune(
     pending_cells: list[CellKey],
     completed_cells: list[CellKey],
 ) -> CleanupDecision:
-    """Return a CleanupDecision for whether the loaded DB for (platform, source_benchmark, scale) can be pruned."""
     remaining = remaining_consumers(
         source_benchmark,
         completed_cells,
@@ -107,11 +88,6 @@ def prune_database_dir(
     scale: float,
     dry_run: bool = False,
 ) -> int:
-    """Remove loaded-database artefacts under databases_root for (platform, benchmark, scale).
-
-    Returns the bytes-freed estimate (du-style sum). dry_run=True only
-    measures and does not delete.
-    """
     target = databases_root / platform / benchmark / str(scale)
     if not target.exists():
         return 0

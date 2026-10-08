@@ -1,16 +1,6 @@
-"""Polars execution tests for Read Primitives DataFrame queries.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests that expression_impl queries actually execute successfully through the
-Polars adapter with the unified expression API. These tests catch:
-- Missing methods on UnifiedExpr/UnifiedStrExpr/ExpressionFamilyContext
-- Column naming issues after joins (Polars drops right join keys)
-- Expression join syntax issues
-- Skip list consistency (all non-skipped queries must run)
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -26,8 +16,8 @@ try:
     POLARS_AVAILABLE = True
 except ImportError:
     POLARS_AVAILABLE = False
-    pl = None  # type: ignore[assignment]
-    PolarsDataFrameAdapter = None  # type: ignore[assignment, misc]
+    pl = None
+    PolarsDataFrameAdapter = None
 
 from benchbox.core.read_primitives.dataframe_queries import (
     REGISTRY,
@@ -43,8 +33,6 @@ pytestmark = [
 ]
 
 
-# All queries that should execute on expression-family platforms right now.
-# Include Polars-specific skips since this test file runs on Polars.
 EXPRESSION_SKIP_SET = (
     {q.upper() for q in SKIP_FOR_EXPRESSION_FAMILY}
     | {q.upper() for q in SKIP_FOR_DATAFRAME}
@@ -54,13 +42,7 @@ ALL_QUERY_IDS = REGISTRY.get_query_ids()
 RUNNABLE_QUERY_IDS = [qid for qid in ALL_QUERY_IDS if qid.upper() not in EXPRESSION_SKIP_SET]
 
 
-# =============================================================================
-# Test data fixture
-# =============================================================================
-
-
 def _create_tpch_test_data() -> dict[str, pl.LazyFrame]:
-    """Create minimal TPC-H test data for all tables used by read_primitives queries."""
     nation = pl.DataFrame(
         {
             "n_nationkey": [0, 1, 2, 3, 4],
@@ -177,7 +159,6 @@ def _create_tpch_test_data() -> dict[str, pl.LazyFrame]:
         }
     ).lazy()
 
-    # Orders with dates spanning 1992-1998 (TPC-H range)
     orders = pl.DataFrame(
         {
             "o_orderkey": list(range(1, 21)),
@@ -234,7 +215,6 @@ def _create_tpch_test_data() -> dict[str, pl.LazyFrame]:
         }
     ).lazy()
 
-    # Lineitem with full column set
     n_lineitem = 40
     lineitem = pl.DataFrame(
         {
@@ -275,7 +255,6 @@ def _create_tpch_test_data() -> dict[str, pl.LazyFrame]:
 
 @pytest.fixture(scope="module")
 def polars_ctx():
-    """Create a Polars adapter context with TPC-H test data registered."""
     adapter = PolarsDataFrameAdapter()
     ctx = adapter.create_context()
     for name, df in _create_tpch_test_data().items():
@@ -285,35 +264,19 @@ def polars_ctx():
 
 @pytest.fixture(scope="module")
 def polars_adapter():
-    """Create a Polars adapter for testing."""
     return PolarsDataFrameAdapter()
 
 
-# =============================================================================
-# Test: All non-skipped expression_impl queries execute on Polars
-# =============================================================================
-
-
 class TestAllRunnableQueriesExecute:
-    """Verify every non-skipped expression_impl query runs without error on Polars.
-
-    This is the key regression test. If a new query is added that uses an
-    unsupported API (e.g., .list, .str.split(), ctx.struct), it will fail
-    here unless added to SKIP_FOR_EXPRESSION_FAMILY.
-    """
-
     @pytest.mark.parametrize("query_id", RUNNABLE_QUERY_IDS, ids=lambda qid: qid)
     def test_expression_impl_executes(self, polars_ctx, polars_adapter, query_id):
-        """Expression impl for {query_id} should execute without error on Polars."""
         query = REGISTRY.get(query_id)
         assert query is not None, f"Query {query_id} not found in registry"
         assert query.has_expression_impl(), f"Query {query_id} has no expression_impl"
 
-        # Execute the expression_impl through the context
         impl = query.expression_impl
         result = impl(polars_ctx)
 
-        # Collect the result to verify it doesn't fail during execution
         from benchbox.platforms.dataframe.unified_frame import UnifiedLazyFrame
 
         if isinstance(result, UnifiedLazyFrame):
@@ -323,26 +286,12 @@ class TestAllRunnableQueriesExecute:
         else:
             collected = result
 
-        # Verify we got a non-None result with rows
         assert collected is not None, f"Query {query_id} returned None"
 
 
-# =============================================================================
-# Test: Column naming after Polars joins
-# =============================================================================
-
-
 class TestJoinColumnNaming:
-    """Test that queries correctly handle Polars join column naming.
-
-    Polars drops the right-side join key after a join:
-      df1.join(df2, left_on="a", right_on="b") -> result has "a" NOT "b"
-
-    Queries must reference columns by the LEFT join key name.
-    """
-
     def test_polars_drops_right_join_key(self, polars_ctx):
-        """Verify Polars join behavior: right join key is dropped from result."""
+
         partsupp = polars_ctx.get_table("partsupp")
         part = polars_ctx.get_table("part")
 
@@ -350,15 +299,11 @@ class TestJoinColumnNaming:
         collected = merged.native.collect()
         columns = collected.columns
 
-        # ps_partkey should be in result (left join key)
         assert "ps_partkey" in columns, "Left join key 'ps_partkey' should be in result"
-        # p_partkey should NOT be in result (right join key dropped by Polars)
         assert "p_partkey" not in columns, "Right join key 'p_partkey' should be dropped by Polars"
-        # Other right-side columns should be present
         assert "p_name" in columns, "Non-key right column 'p_name' should be present"
 
     def test_chained_joins_drop_both_right_keys(self, polars_ctx):
-        """Chained joins drop multiple right join keys."""
         partsupp = polars_ctx.get_table("partsupp")
         part = polars_ctx.get_table("part")
         supplier = polars_ctx.get_table("supplier")
@@ -375,7 +320,6 @@ class TestJoinColumnNaming:
         assert "s_suppkey" not in columns, "s_suppkey should be dropped (right key of second join)"
 
     def test_max_by_with_ties_uses_left_join_keys(self, polars_ctx):
-        """max_by_with_ties should use ps_partkey (left key), not p_partkey (dropped right key)."""
         from benchbox.core.read_primitives.dataframe_queries import max_by_with_ties_expression_impl
 
         result = max_by_with_ties_expression_impl(polars_ctx)
@@ -389,7 +333,6 @@ class TestJoinColumnNaming:
         assert "ps_partkey" in collected.columns or "max_supply_cost" in collected.columns
 
     def test_min_by_with_ties_uses_left_join_keys(self, polars_ctx):
-        """min_by_with_ties should use ps_partkey (left key), not p_partkey (dropped right key)."""
         from benchbox.core.read_primitives.dataframe_queries import min_by_with_ties_expression_impl
 
         result = min_by_with_ties_expression_impl(polars_ctx)
@@ -403,16 +346,8 @@ class TestJoinColumnNaming:
         assert "ps_partkey" in collected.columns or "min_supply_cost" in collected.columns
 
 
-# =============================================================================
-# Test: ASOF join fix
-# =============================================================================
-
-
 class TestAsofJoinFix:
-    """Test that asof_join_basic uses equi-join syntax, not expression join."""
-
     def test_asof_join_basic_executes(self, polars_ctx):
-        """asof_join_basic should execute without 'list index out of range' error."""
         from benchbox.core.read_primitives.dataframe_queries import asof_join_basic_expression_impl
 
         result = asof_join_basic_expression_impl(polars_ctx)
@@ -424,23 +359,14 @@ class TestAsofJoinFix:
             collected = result.collect()
 
         assert collected is not None
-        # Should have the expected columns
         expected_cols = {"l_orderkey", "l_shipdate", "o_orderdate", "o_totalprice", "days_to_ship"}
         assert expected_cols.issubset(set(collected.columns)), (
             f"Missing columns: {expected_cols - set(collected.columns)}"
         )
 
 
-# =============================================================================
-# Test: UnifiedDtExpr.total_days()
-# =============================================================================
-
-
 class TestUnifiedDtExprTotalDays:
-    """Test the total_days() method added to UnifiedDtExpr."""
-
     def test_total_days_returns_correct_values(self):
-        """total_days() should return the number of days in a duration."""
         from benchbox.platforms.dataframe.unified_frame import UnifiedExpr
 
         df = pl.DataFrame(
@@ -454,15 +380,12 @@ class TestUnifiedDtExprTotalDays:
         assert result["days"].to_list() == [10, 14]
 
     def test_total_days_through_unified_expr(self, polars_ctx):
-        """total_days() should work through the UnifiedExpr wrapper."""
         from benchbox.platforms.dataframe.unified_frame import UnifiedExpr
 
-        # Create a simple computation using the unified API
         orders = polars_ctx.get_table("orders")
         lineitem = polars_ctx.get_table("lineitem")
         col = polars_ctx.col
 
-        # Join and compute date difference
         result = (
             lineitem.join(orders, left_on="l_orderkey", right_on="o_orderkey")
             .with_columns((col("l_shipdate") - col("o_orderdate")).dt.total_days().alias("days_diff"))
@@ -480,20 +403,8 @@ class TestUnifiedDtExprTotalDays:
         assert collected.height > 0
 
 
-# =============================================================================
-# Test: Skip list consistency
-# =============================================================================
-
-
 class TestSkipListConsistency:
-    """Ensure skip lists stay in sync with the registry and unified API capabilities."""
-
     def test_skipped_queries_actually_fail_on_polars(self, polars_ctx):
-        """Queries in SKIP_FOR_POLARS should actually fail (or be unsupported).
-
-        Currently only map queries are skipped because Polars has no native Map dtype.
-        These should raise NotImplementedError from map_from_entries() or UnifiedMapExpr.
-        """
         queries_that_now_work = []
         for query_id in SKIP_FOR_POLARS:
             query = REGISTRY.get(query_id)
@@ -507,10 +418,8 @@ class TestSkipListConsistency:
                     result.native.collect()
                 elif hasattr(result, "collect"):
                     result.collect()
-                # If we get here, the query succeeded - it should be removed from skip list
                 queries_that_now_work.append(query_id)
             except (AttributeError, NotImplementedError, TypeError):
-                # Expected - map queries fail on Polars (no native Map dtype)
                 pass
 
         if queries_that_now_work:
@@ -519,11 +428,6 @@ class TestSkipListConsistency:
             )
 
     def test_non_skipped_queries_do_not_use_unsupported_apis(self, polars_ctx):
-        """Non-skipped queries should not fail with AttributeError on unsupported APIs.
-
-        This catches the case where a query uses .list, .str.split(), ctx.struct,
-        etc. but wasn't added to the skip list.
-        """
         failed_queries = []
         for query_id in RUNNABLE_QUERY_IDS:
             query = REGISTRY.get(query_id)

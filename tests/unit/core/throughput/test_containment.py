@@ -1,16 +1,6 @@
-"""Phase-boundary containment for timed-out throughput work.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Proves, with a controllable running query, that StreamRunner.execute()
-returns bounded while work is still active, that the timed-out result
-carries outstanding-stream ownership state, that queued work is cancelled
-(never outstanding), that running work stays owned until termination, and
-that combined runners refuse the next measured phase until cleanup observes
-termination.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -38,8 +28,6 @@ TINY_TIMEOUT = 0.2
 
 
 class _Config:
-    """Minimal config satisfying the StreamRunner structural protocol."""
-
     def __init__(self, num_streams=2, max_workers=None, stream_timeout=0, cancel_on_timeout=False):
         self.num_streams = num_streams
         self.max_workers = max_workers
@@ -75,7 +63,6 @@ def _make_stream_result(stream_id: int) -> ThroughputStreamResult:
 
 
 def _blocking_stream_fn(release: threading.Event):
-    """Stream function where stream 1 blocks until released; stream 2 is fast."""
 
     def _fn(stream_id: int, seed: int, config: _Config) -> ThroughputStreamResult:
         if stream_id == 1:
@@ -98,11 +85,9 @@ class TestOutstandingOwnershipState:
         finally:
             release.set()
 
-        # Bounded return: well before any full hang, while work is active.
         assert elapsed_seconds(start) < 5.0
         assert result.streams_executed == 2
         assert result.streams_successful == 1
-        # Stream 1 is still owned by its worker; stream 0 settled normally.
         assert result.outstanding_stream_ids == [1]
         assert result.has_outstanding_work is True
         assert result.cleanup_state == "outstanding"
@@ -133,7 +118,6 @@ class TestOutstandingOwnershipState:
 
         assert result.streams_executed == 1
         assert len(result.errors) == 2
-        # Stream 1 leaked while running; stream 2 never started and was cancelled.
         assert result.outstanding_stream_ids == [1]
         assert result.cancelled_stream_ids == [2]
         assert result.cleanup_state == "outstanding"
@@ -164,13 +148,11 @@ class TestAwaitQuiescence:
         try:
             StreamRunner.execute(_blocking_stream_fn(release), config, result, logger)
 
-            # Still running: bounded wait expires, boundary stays contained.
             assert await_quiescence(result, timeout=0.1) is False
             assert result.has_outstanding_work is True
             assert check_phase_boundary(result).proceed is False
 
             release.set()
-            # Termination observed: boundary releases only now.
             assert await_quiescence(result, timeout=10.0) is True
             assert result.outstanding_stream_ids == []
             assert result.has_outstanding_work is False
@@ -180,8 +162,6 @@ class TestAwaitQuiescence:
             release.set()
 
     def test_unobservable_work_stays_contained(self) -> None:
-        # A result carrying outstanding ids without worker handles (e.g.
-        # deserialized) cannot prove termination: containment must hold.
         result = _make_result()
         result.outstanding_stream_ids = [3]
         result.cleanup_state = "outstanding"

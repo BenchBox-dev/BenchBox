@@ -2,23 +2,17 @@
 
 # Copyright 2026 Joe Harris / BenchBox Project. Licensed under the MIT License.
 
-# Compile TPC binaries for multiple platforms using Docker
-# This script implements the research findings for TPC-DS compilation fixes
-
 set -euo pipefail
 
-# Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Logging functions
 log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
 }
@@ -35,26 +29,6 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Resolve a container engine for the Linux/Windows builds.
-#
-# The engines share a Docker-style CLI for native-arch work, but they are NOT
-# interchangeable when the target arch differs from the host:
-#
-#   docker/podman  Emulate linux/amd64 transparently (binfmt/qemu). No flags.
-#   container      (Apple) Needs `run --rosetta` to execute an amd64 image;
-#                  without it the image dies with "Exec format error". Its
-#                  `--platform`/`--arch` flags are *rejected* for locally built
-#                  images, because `container build` stamps the image metadata
-#                  arm64 even when the Dockerfile says
-#                  `FROM --platform=linux/amd64` (the rootfs is still amd64).
-#   mocker         Cannot execute amd64 at all.
-#
-# Preference is therefore capability-ordered, not availability-ordered: prefer
-# the Apple-native `container` on macOS, fall back to docker/podman, and take
-# `mocker` only as a last resort (it can build the arm64 targets, and
-# _assert_engine_supports_arch below hard-fails on the amd64 ones). CI Linux
-# runners ship only `docker`, so this still resolves correctly there.
-# Override with BENCHBOX_CONTAINER_ENGINE when needed.
 CONTAINER_ENGINE="${BENCHBOX_CONTAINER_ENGINE:-}"
 if [ -z "$CONTAINER_ENGINE" ]; then
     for _engine in container docker podman mocker; do
@@ -68,7 +42,6 @@ if [ -z "$CONTAINER_ENGINE" ]; then
     done
 fi
 
-# Host architecture, normalised to the names used in PLATFORMS/_binaries.
 _host_arch() {
     case "$(uname -m)" in
         arm64 | aarch64) echo "arm64" ;;
@@ -77,9 +50,6 @@ _host_arch() {
     esac
 }
 
-# Abort early, with an actionable message, if the resolved engine cannot
-# execute images for $1. Called before the image build so a doomed run fails
-# loudly up front instead of deep inside a compile step.
 _assert_engine_supports_arch() {
     local target_arch=$1
 
@@ -93,9 +63,6 @@ _assert_engine_supports_arch() {
     fi
 }
 
-# Extra `run` flags needed to execute a $1-arch image on this host. Echoes an
-# empty string when the target is native or the engine emulates transparently.
-# Callers must leave the expansion unquoted so an empty result vanishes.
 _engine_run_flags() {
     local target_arch=$1
 
@@ -106,7 +73,6 @@ _engine_run_flags() {
     fi
 }
 
-# Platform configurations for all supported targets
 PLATFORMS=(
     "darwin:arm64:native"
     "darwin:x86_64:cross"
@@ -116,28 +82,21 @@ PLATFORMS=(
     "windows:arm64:docker"
 )
 
-# Function to compile TPC-H for macOS ARM64 natively
 compile_tpch_macos_native() {
     log_info "Compiling TPC-H natively for macOS ARM64..."
 
     local platform_dir="$PROJECT_ROOT/_binaries/tpc-h/darwin-arm64"
     local temp_build="/tmp/tpch-build-native-$$"
 
-    # Create temporary build directory
     mkdir -p "$temp_build"
     cp -r "$PROJECT_ROOT/_sources/tpc-h/dbgen"/* "$temp_build/"
 
-    # Build using native macOS clang.
-    # EOL_HANDLING (no trailing field separator) comes from makefile.suite's
-    # default CFLAGS -- BenchBox's canonical framing convention.
     cd "$temp_build"
     make -f makefile.suite clean || true
     make -f makefile.suite CC=clang MACHINE=LINUX DATABASE=ORACLE WORKLOAD=TPCH
 
-    # Copy binaries and required files
     cp dbgen qgen dists.dss "$platform_dir/"
 
-    # Generate checksums
     cd "$platform_dir"
     if command -v md5 >/dev/null 2>&1; then
         md5 -r dbgen qgen dists.dss > checksums.md5
@@ -145,21 +104,16 @@ compile_tpch_macos_native() {
         md5sum dbgen qgen dists.dss > checksums.md5
     fi
 
-    # Cleanup
     rm -rf "$temp_build"
 
     log_success "TPC-H native macOS ARM64 compilation completed"
 }
 
-# Deploy freshly compiled TPC-DS binaries into benchbox/_binaries/ so that
-# ensure_tpc_binaries() picks them up at runtime (priority-1 path).
-# Must be called after checksums.md5 has been generated in the build dir.
 _deploy_tpcds_to_package() {
-    local platform_name="$1"  # e.g., darwin-arm64, linux-x86_64, windows-x86_64
+    local platform_name="$1"
     local source_dir="$PROJECT_ROOT/_binaries/tpc-ds/${platform_name}"
     local package_dir="$PROJECT_ROOT/benchbox/_binaries/tpc-ds/${platform_name}"
 
-    # Windows binaries use .exe extension
     local exe_ext=""
     if echo "$platform_name" | grep -q "windows"; then
         exe_ext=".exe"
@@ -176,7 +130,6 @@ _deploy_tpcds_to_package() {
         chmod +x "$package_dir/dsdgen" "$package_dir/dsqgen"
     fi
 
-    # Regenerate checksums.md5 for the package directory
     cd "$package_dir"
     if command -v md5sum >/dev/null 2>&1; then
         md5sum "dsdgen${exe_ext}" "dsqgen${exe_ext}" tpcds.dst tpcds.idx > checksums.md5
@@ -188,55 +141,43 @@ _deploy_tpcds_to_package() {
     log_success "Deployed to benchbox/_binaries/tpc-ds/${platform_name}"
 }
 
-# Function to compile TPC-DS for macOS ARM64 natively
 compile_tpcds_macos_native() {
     log_info "Compiling TPC-DS natively for macOS ARM64..."
 
     local platform_dir="$PROJECT_ROOT/_binaries/tpc-ds/darwin-arm64"
     local temp_build="/tmp/tpcds-build-native-$$"
 
-    # Create temporary build directory
     mkdir -p "$temp_build"
     cp -r "$PROJECT_ROOT/_sources/tpc-ds/tools"/* "$temp_build/"
 
-    # Apply TPC-DS fixes for macOS
     cd "$temp_build"
 
-    # Fix MAXINT issue by ensuring proper includes
     if ! grep -q "#include <limits.h>" genrand.c; then
         sed -i '' '1i\
 #include <limits.h>
 ' genrand.c
     fi
 
-    # Build using native macOS clang
     make clean || true
 
-    # First build distcomp and generate tpcds.idx
     make CC=clang distcomp CFLAGS="-O2 -DMACOS -DMAXINT=INT_MAX -fcommon" LDFLAGS=""
     ./distcomp -i tpcds.dst -o tpcds.idx
 
-    # Now build the main tools
     make CC=clang dsdgen dsqgen CFLAGS="-O2 -DMACOS -DMAXINT=INT_MAX -fcommon" LDFLAGS=""
 
-    # Copy binaries and required files
     cp dsdgen dsqgen tpcds.dst tpcds.idx "$platform_dir/"
     cp -r "$PROJECT_ROOT/_sources/tpc-ds/query_templates" "$platform_dir/"
 
-    # Generate checksums
     cd "$platform_dir"
     find . -type f -name "*.dst" -o -name "*.idx" -o -name "*gen" | xargs md5 -r > checksums.md5
 
-    # Cleanup
     rm -rf "$temp_build"
 
-    # Deploy into the benchbox package directory (runtime priority-1 path)
     _deploy_tpcds_to_package "darwin-arm64"
 
     log_success "TPC-DS native macOS ARM64 compilation completed"
 }
 
-# Function to compile TPC-H for macOS with cross-compilation
 compile_tpch_macos_cross() {
     local target_arch="$1"
     log_info "Cross-compiling TPC-H for macOS ${target_arch}..."
@@ -244,20 +185,17 @@ compile_tpch_macos_cross() {
     local platform_dir="$PROJECT_ROOT/_binaries/tpc-h/darwin-${target_arch}"
     mkdir -p "$platform_dir"
 
-    # Create temporary build directory
     local build_dir="/tmp/tpch-cross-${target_arch}-$$"
     rm -rf "$build_dir"
     cp -r "$PROJECT_ROOT/_sources/tpc-h/dbgen" "$build_dir"
 
     cd "$build_dir"
 
-    # Set cross-compilation flags
     local cross_flags=""
     if [ "$target_arch" = "x86_64" ]; then
         cross_flags="-arch x86_64"
     fi
 
-    # Clean and compile
     make -f makefile.suite clean || true
     make -f makefile.suite \
         CC="clang $cross_flags" \
@@ -272,21 +210,17 @@ compile_tpch_macos_cross() {
             return 1
         }
 
-    # Copy binaries and required files
     cp dbgen qgen dists.dss "$platform_dir/"
     chmod +x "$platform_dir/dbgen" "$platform_dir/qgen"
 
-    # Generate checksums
     cd "$platform_dir"
     md5 * > checksums.md5
 
-    # Clean up
     rm -rf "$build_dir"
 
     log_success "TPC-H cross-compilation completed for macOS ${target_arch}"
 }
 
-# Function to compile TPC-DS for macOS with cross-compilation
 compile_tpcds_macos_cross() {
     local target_arch="$1"
     log_info "Cross-compiling TPC-DS for macOS ${target_arch}..."
@@ -294,28 +228,23 @@ compile_tpcds_macos_cross() {
     local platform_dir="$PROJECT_ROOT/_binaries/tpc-ds/darwin-${target_arch}"
     mkdir -p "$platform_dir"
 
-    # Create temporary build directory
     local build_dir="/tmp/tpcds-cross-${target_arch}-$$"
     rm -rf "$build_dir"
     cp -r "$PROJECT_ROOT/_sources/tpc-ds/tools" "$build_dir"
 
     cd "$build_dir"
 
-    # Set cross-compilation flags
     local cross_flags=""
     if [ "$target_arch" = "x86_64" ]; then
         cross_flags="-arch x86_64"
     fi
 
-    # Apply TPC-DS fixes
     sed -i '' '1i\
 #include <limits.h>
 ' genrand.c
 
-    # Clean and compile
     make clean || true
 
-    # First build distcomp and generate tpcds.idx
     make distcomp \
         CC="clang $cross_flags" \
         CFLAGS="-O2 -DMACOS -DMAXINT=INT_MAX -fcommon $cross_flags" \
@@ -328,7 +257,6 @@ compile_tpcds_macos_cross() {
 
     ./distcomp -i tpcds.dst -o tpcds.idx
 
-    # Now build the main tools
     make dsdgen dsqgen \
         CC="clang $cross_flags" \
         CFLAGS="-O2 -DMACOS -DMAXINT=INT_MAX -fcommon $cross_flags" \
@@ -339,29 +267,24 @@ compile_tpcds_macos_cross() {
             return 1
         }
 
-    # Copy binaries and required files
     cp dsdgen dsqgen tpcds.dst tpcds.idx "$platform_dir/"
     cp -r "$PROJECT_ROOT/_sources/tpc-ds/query_templates" "$platform_dir/"
     chmod +x "$platform_dir/dsdgen" "$platform_dir/dsqgen"
 
-    # Generate checksums
     cd "$platform_dir"
     find . -type f -name '*.dst' -o -name '*.idx' -o -name '*gen' | xargs md5 > checksums.md5
 
-    # Clean up
     rm -rf "$build_dir"
 
-    # Deploy into the benchbox package directory (runtime priority-1 path)
     _deploy_tpcds_to_package "darwin-${target_arch}"
 
     log_success "TPC-DS cross-compilation completed for macOS ${target_arch}"
 }
 
-# Function to compile binaries using Docker
 compile_with_docker() {
     local platform=$1
     local arch=$2
-    local benchmark=$3  # tpc-h or tpc-ds
+    local benchmark=$3
 
     local benchmark_upper=$(echo "$benchmark" | tr '[:lower:]' '[:upper:]')
     log_info "Compiling ${benchmark_upper} for ${platform}-${arch} using ${CONTAINER_ENGINE}..."
@@ -370,8 +293,6 @@ compile_with_docker() {
 
     local platform_dir="$PROJECT_ROOT/_binaries/${benchmark}/${platform}-${arch}"
 
-    # Build the container image. The target arch comes from the Dockerfile's
-    # `FROM --platform=`, so no --platform flag is passed here.
     local image_name="benchbox/${benchmark}-${platform}-${arch}"
     "$CONTAINER_ENGINE" build -f "$PROJECT_ROOT/_sources/compilation/docker/Dockerfile.${platform}-${arch}" \
                  -t "$image_name" \
@@ -381,20 +302,16 @@ compile_with_docker() {
         compile_tpch_docker "$platform" "$arch" "$image_name" "$platform_dir"
     else
         compile_tpcds_docker "$platform" "$arch" "$image_name" "$platform_dir"
-        # Deploy into the benchbox package directory (runtime priority-1 path)
         _deploy_tpcds_to_package "${platform}-${arch}"
     fi
 }
 
-# Function to compile TPC-H using Docker
 compile_tpch_docker() {
     local platform=$1
     local arch=$2
     local image_name=$3
     local platform_dir=$4
 
-    # Unquoted on purpose: empty unless the engine needs cross-arch flags.
-    # shellcheck disable=SC2046
     "$CONTAINER_ENGINE" run --rm $(_engine_run_flags "$arch") \
         -v "$PROJECT_ROOT/_sources/tpc-h/dbgen:/build/source" \
         -v "$platform_dir:/build/output" \
@@ -429,15 +346,12 @@ compile_tpch_docker() {
     log_success "TPC-H Docker compilation completed for ${platform}-${arch}"
 }
 
-# Function to compile TPC-DS using Docker with fixes
 compile_tpcds_docker() {
     local platform=$1
     local arch=$2
     local image_name=$3
     local platform_dir=$4
 
-    # Unquoted on purpose: empty unless the engine needs cross-arch flags.
-    # shellcheck disable=SC2046
     "$CONTAINER_ENGINE" run --rm $(_engine_run_flags "$arch") \
         -v "$PROJECT_ROOT/_sources/tpc-ds/tools:/build/source" \
         -v "$PROJECT_ROOT/_sources/tpc-ds/query_templates:/build/query_templates" \
@@ -506,8 +420,6 @@ compile_tpcds_docker() {
     log_success "TPC-DS Docker compilation completed for ${platform}-${arch}"
 }
 
-# Compile TPC binaries for the current host platform only (no Docker required).
-# Writes to _binaries/ and deploys to benchbox/_binaries/ for immediate use.
 compile_native_only() {
     log_info "Compiling for native platform only (no Docker required)..."
     cd "$PROJECT_ROOT"
@@ -526,24 +438,19 @@ compile_native_only() {
     log_success "Native compilation complete."
 }
 
-# Function to compile all platforms
 compile_all_platforms() {
     log_info "Starting compilation for all target platforms..."
 
-    # Compile for each platform
     for platform_config in "${PLATFORMS[@]}"; do
         IFS=':' read -r platform arch method <<< "$platform_config"
 
         if [ "$method" = "native" ] && [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ]; then
-            # Native macOS ARM64 compilation
             compile_tpch_macos_native
             compile_tpcds_macos_native
         elif [ "$method" = "cross" ] && [ "$(uname -s)" = "Darwin" ]; then
-            # Cross-compilation on macOS
             compile_tpch_macos_cross "$arch"
             compile_tpcds_macos_cross "$arch"
         elif [ "$method" = "docker" ]; then
-            # Docker-based compilation
             compile_with_docker "$platform" "$arch" "tpc-h"
             compile_with_docker "$platform" "$arch" "tpc-ds"
         else
@@ -554,7 +461,6 @@ compile_all_platforms() {
     log_success "All platform compilation completed!"
 }
 
-# Function to verify all binaries
 verify_all_binaries() {
     log_info "Verifying all compiled binaries..."
 
@@ -566,7 +472,6 @@ verify_all_binaries() {
         IFS=':' read -r platform arch method <<< "$platform_config"
         local platform_name="${platform}-${arch}"
 
-        # TPC-H verification
         local tpch_dir="$PROJECT_ROOT/_binaries/tpc-h/${platform_name}"
         if [ -d "$tpch_dir" ] && [ -f "$tpch_dir/checksums.md5" ]; then
             cd "$tpch_dir"
@@ -581,7 +486,6 @@ verify_all_binaries() {
             log_warning "TPC-H binaries or checksums missing for ${platform_name}"
         fi
 
-        # TPC-DS verification
         local tpcds_dir="$PROJECT_ROOT/_binaries/tpc-ds/${platform_name}"
         if [ -d "$tpcds_dir" ] && [ -f "$tpcds_dir/checksums.md5" ]; then
             cd "$tpcds_dir"
@@ -608,7 +512,6 @@ verify_all_binaries() {
     fi
 }
 
-# Function to display compilation summary
 display_summary() {
     log_info "=== Compilation Summary ==="
 
@@ -619,7 +522,6 @@ display_summary() {
         IFS=':' read -r platform arch method <<< "$platform_config"
         local platform_name="${platform}-${arch}"
 
-        # Check TPC-H
         local tpch_dir="$PROJECT_ROOT/_binaries/tpc-h/${platform_name}"
         if [ -d "$tpch_dir" ] && [ -n "$(ls -A "$tpch_dir" 2>/dev/null)" ]; then
             local tpch_status="${GREEN}✅${NC}"
@@ -628,7 +530,6 @@ display_summary() {
             local tpch_status="${RED}❌${NC}"
         fi
 
-        # Check TPC-DS
         local tpcds_dir="$PROJECT_ROOT/_binaries/tpc-ds/${platform_name}"
         if [ -d "$tpcds_dir" ] && [ -n "$(ls -A "$tpcds_dir" 2>/dev/null)" ]; then
             local tpcds_status="${GREEN}✅${NC}"
@@ -653,11 +554,9 @@ display_summary() {
     log_info "  • Docker-based cross-compilation for Linux platforms"
 }
 
-# Main execution
 main() {
     local mode="${1:-}"
 
-    # --native / --native-only: compile for the current host platform without Docker
     if [[ "$mode" == "--native" || "$mode" == "--native-only" ]]; then
         log_info "Starting native-only TPC binary compilation..."
         cd "$PROJECT_ROOT"
@@ -668,10 +567,8 @@ main() {
 
     log_info "Starting TPC binary compilation with TPC-DS fixes..."
 
-    # Change to project root
     cd "$PROJECT_ROOT"
 
-    # Check container-engine availability for the Linux/Windows builds.
     if [ -z "$CONTAINER_ENGINE" ]; then
         log_error "No container engine found (looked for: container, docker, podman, mocker)"
         log_info "Install one, set BENCHBOX_CONTAINER_ENGINE=<engine>, or run with"
@@ -687,5 +584,4 @@ main() {
     log_success "Build process completed successfully with TPC-DS compilation fixes applied!"
 }
 
-# Execute main function
 main "$@"

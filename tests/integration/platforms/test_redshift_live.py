@@ -1,30 +1,6 @@
-"""Live integration tests for Amazon Redshift.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-These tests are SKIPPED by default and only run when credentials are available.
-They execute real queries against a live Redshift cluster.
-
-Setup (either source works):
-1. Credentials file: benchbox platforms setup --platform redshift
-   Stores connection params in ~/.benchbox/credentials.yaml
-2. Environment variables:
-   - REDSHIFT_HOST: Cluster endpoint (e.g., my-cluster.xxx.us-east-1.redshift.amazonaws.com)
-   - REDSHIFT_PORT: Port (default 5439)
-   - REDSHIFT_USER: Database user
-   - REDSHIFT_PASSWORD: Database password
-   - REDSHIFT_DATABASE: Database name
-   - REDSHIFT_S3_BUCKET: S3 bucket used for COPY staging
-   - REDSHIFT_IAM_ROLE: Optional COPY role if cluster default role is not configured
-   - AWS credentials resolvable by boto3 for S3 uploads
-     (for example AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY[/AWS_SESSION_TOKEN]
-     or AWS_PROFILE / shared credentials file)
-3. Run: make test-live-redshift
-
-Cost: All tests use scale_factor=0.01 (~10MB) for minimal cost.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import contextlib
 import uuid
@@ -50,8 +26,6 @@ pytestmark = [
 
 
 class _RedshiftStagedCopyBenchmark:
-    """Minimal benchmark object for staged Redshift COPY validation."""
-
     def __init__(self, table_files: list[Path]) -> None:
         self.tables = {"test_copy": table_files}
 
@@ -68,7 +42,7 @@ class _RedshiftStagedCopyBenchmark:
 def _build_redshift_staging_config(
     base_credentials: dict[str, Any], schema_name: str
 ) -> tuple[dict[str, Any], str, str]:
-    """Create a per-test staging prefix without mutating shared credentials."""
+
     staging_root = base_credentials.get("staging_root")
     if staging_root:
         path_info = get_cloud_path_info(staging_root)
@@ -89,7 +63,7 @@ def _build_redshift_staging_config(
 
 
 def _write_copy_test_chunks(output_dir: Path) -> list[Path]:
-    """Create two small CSV chunks so live tests exercise upload + manifest COPY."""
+
     output_dir.mkdir(parents=True, exist_ok=True)
 
     chunk_one = output_dir / "test_copy_part1.csv"
@@ -100,7 +74,7 @@ def _write_copy_test_chunks(output_dir: Path) -> list[Path]:
 
 
 def _delete_s3_prefix(s3_client: Any, bucket: str, prefix: str) -> None:
-    """Best-effort cleanup for staged S3 objects created by the live test."""
+
     continuation_token = None
     while True:
         request = {"Bucket": bucket, "Prefix": prefix}
@@ -121,10 +95,8 @@ def _delete_s3_prefix(s3_client: Any, bucket: str, prefix: str) -> None:
 
 
 class TestLiveRedshiftConnection:
-    """Test basic Redshift connectivity."""
-
     def test_connection(self, live_redshift_adapter):
-        """Verify Redshift connection works."""
+
         connection = live_redshift_adapter.create_connection()
         try:
             result = live_redshift_adapter.execute_query(
@@ -135,7 +107,7 @@ class TestLiveRedshiftConnection:
             live_redshift_adapter.close_connection(connection)
 
     def test_platform_info(self, live_redshift_adapter):
-        """Verify Redshift platform info."""
+
         connection = live_redshift_adapter.create_connection()
         try:
             info = live_redshift_adapter.get_platform_info(connection)
@@ -145,10 +117,8 @@ class TestLiveRedshiftConnection:
 
 
 class TestLiveRedshiftQueryExecution:
-    """Test Redshift query execution capabilities."""
-
     def test_create_schema(self, live_redshift_adapter):
-        """Test schema creation on Redshift."""
+
         connection = live_redshift_adapter.create_connection()
         try:
             live_redshift_adapter.execute_query(
@@ -167,7 +137,7 @@ class TestLiveRedshiftQueryExecution:
             live_redshift_adapter.close_connection(connection)
 
     def test_execute_analytical_query(self, live_redshift_adapter):
-        """Test analytical query execution."""
+
         connection = live_redshift_adapter.create_connection()
         try:
             result = live_redshift_adapter.execute_query(
@@ -183,8 +153,6 @@ class TestLiveRedshiftQueryExecution:
 
 
 class TestLiveRedshiftDataLoading:
-    """Test staged Redshift COPY loading against real S3 and Redshift."""
-
     def test_s3_upload_and_copy_load(
         self,
         redshift_staging_credentials,
@@ -192,7 +160,7 @@ class TestLiveRedshiftDataLoading:
         test_output_dir,
         cleanup_test_schema,
     ):
-        """Upload test data to S3, load it with COPY, and verify the staged objects exist."""
+
         adapter_config, bucket, prefix = _build_redshift_staging_config(
             redshift_staging_credentials, unique_test_schema
         )
@@ -253,8 +221,6 @@ def capture_adapter(redshift_credentials):
 
 
 class TestLiveRedshiftQueryPlanCapture:
-    """Live plan-capture verification against a real Redshift cluster (SELECT 1 only)."""
-
     def test_get_query_plan_returns_text(self, capture_adapter):
         connection = capture_adapter.create_connection()
         try:
@@ -281,7 +247,7 @@ class TestLiveRedshiftQueryPlanCapture:
             plan, _ = capture_adapter.capture_query_plan(connection, "SELECT 1", "q_fp")
             assert plan is not None
             assert plan.plan_fingerprint
-            assert len(plan.plan_fingerprint) == 64  # SHA256 hex
+            assert len(plan.plan_fingerprint) == 64
         finally:
             capture_adapter.close_connection(connection)
 

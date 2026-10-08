@@ -39,7 +39,6 @@ from benchbox.core.validation.cross_platform import (
     tolerance_for,
 )
 
-# Strict by default.
 report = compare_query_results(
     query_id="Q1",
     reference_platform="duckdb",
@@ -49,7 +48,6 @@ report = compare_query_results(
 )
 assert report.matched, report.summary()
 
-# Loosen per-query with a spec-anchored rationale.
 register_query_tolerance(
     "tpch",
     "Q1",
@@ -61,6 +59,8 @@ register_query_tolerance(
 tol = tolerance_for("tpch", "Q1")
 ```
 
+`compare_query_results` is strict by default. `register_query_tolerance` loosens the comparison for one query and needs a rationale tied to the specification.
+
 `ComparisonReport.summary()` prints up to five sample divergences with
 row/column locators; the rest are counted.
 
@@ -69,10 +69,6 @@ row/column locators; the rest are counted.
 ```
 uv run -- python -m pytest tests/unit/core/test_cross_platform_validation.py -q
 ```
-
-The integration matrix (DuckDB × ClickHouse-local / DataFusion / Polars-DF)
-and the nightly GitHub Actions workflow are tracked in a follow-up TODO:
-`quality-cross-platform-validation-integration-matrix`.
 
 ## Adding a new platform
 

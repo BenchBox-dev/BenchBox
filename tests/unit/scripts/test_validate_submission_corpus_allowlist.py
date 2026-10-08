@@ -1,13 +1,3 @@
-"""Positive corpus path/file-type allowlist (A2 corpus trust isolation).
-
-A corpus submission PR must contain only data: ``.json`` result bundles,
-companions, sidecar manifests, and the inventory -- regular files, never
-symlinks or executables, under the ``results-data/bundles/`` root. Anything
-else (workflows, scripts, package files, path escapes, hidden control dirs)
-is rejected by a positive allowlist, not a deny-list of executables: new
-unexpected surfaces fail by default.
-"""
-
 from __future__ import annotations
 
 import os
@@ -84,7 +74,6 @@ def test_rejects_non_json_data_files(path, tmp_path, monkeypatch) -> None:
     ["package.json", "package-lock.json", "tsconfig.json", "npm-shrinkwrap.json", "composer.json"],
 )
 def test_rejects_json_named_non_data_manifest(name, tmp_path, monkeypatch) -> None:
-    """A ``.json`` leaf that is a package/tool manifest is not corpus data."""
     (tmp_path / "results-data" / "bundles").mkdir(parents=True)
     (tmp_path / "results-data" / "bundles" / name).write_text("{}")
     monkeypatch.chdir(tmp_path)

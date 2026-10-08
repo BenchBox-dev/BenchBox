@@ -1,5 +1,3 @@
-"""Tests for CLI system-profile display helpers."""
-
 from datetime import datetime
 from io import StringIO
 

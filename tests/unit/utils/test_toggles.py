@@ -1,5 +1,3 @@
-"""Unit tests for layer-neutral toggle normalization."""
-
 from __future__ import annotations
 
 import pytest

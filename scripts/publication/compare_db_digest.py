@@ -1,29 +1,4 @@
 #!/usr/bin/env python3
-"""Canonical content digest for explorer results.duckdb files (G2 root-neutrality gate).
-
-Exact file bytes can never match across builds: the pipeline stamps every
-build with a wall-clock ``generated_at``
-(``_project/scripts/explorer_pipeline/pipeline.py``) and float aggregates
-such as ``geomean_ms`` drift by 1 ULP across runners (libm/CPU), e.g.
-``50.5278141562074`` vs ``50.52781415620743``. Both were observed live:
-two same-input builds 60s apart hash differently while holding identical
-logical content.
-
-This script hashes canonical logical content instead: ordered tables,
-schema-ordered columns, rows sorted by full content, floats rounded to
-``--float-sig-digits`` significant digits, and ``--exclude-column``
-build-stamp columns (default: ``generated_at``) dropped. Two databases
-built from the same corpus agree on this digest even when their bytes
-differ. Any added/removed table, column, row, or material value change
-fails the comparison.
-
-Usage:
-  uv run python scripts/publication/compare_db_digest.py digest FILE
-  uv run python scripts/publication/compare_db_digest.py compare REBUILT LIVE
-
-Exit codes: 0 match; 1 content mismatch; 2 unusable input (missing file,
-unreadable database, empty table set).
-"""
 
 from __future__ import annotations
 
@@ -37,7 +12,6 @@ DEFAULT_FLOAT_SIG_DIGITS = 9
 
 
 def _canonical_value(value: object, float_sig_digits: int) -> str:
-    """Render one cell deterministically with float tolerance."""
     if isinstance(value, bool):
         return f"bool:{value!r}"
     if isinstance(value, int):
@@ -54,7 +28,6 @@ def canonical_digest(
     exclude_columns: tuple[str, ...] = DEFAULT_EXCLUDE_COLUMNS,
     float_sig_digits: int = DEFAULT_FLOAT_SIG_DIGITS,
 ) -> str:
-    """Hash canonical logical content of every table in ``db_path``."""
     import duckdb
 
     excluded = set(exclude_columns)
@@ -91,7 +64,6 @@ def compare_databases(
     exclude_columns: tuple[str, ...] = DEFAULT_EXCLUDE_COLUMNS,
     float_sig_digits: int = DEFAULT_FLOAT_SIG_DIGITS,
 ) -> list[str]:
-    """Diff two databases; empty list means digest-equivalent."""
     for label, path in (("rebuilt", rebuilt), ("live", live)):
         if not path.is_file():
             return [f"{label} database missing: '{path}' (refusing comparison)"]

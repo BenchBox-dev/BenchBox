@@ -574,7 +574,7 @@ Q1 total time above 1 ms: True
 
 ### Statistical Analysis
 
-Percentiles from few observations are rough: the single 0.50 s outlier below moves the mean to 0.158 s while the median stays at 0.120 s.
+Percentiles from few observations are rough: the single 0.50 s outlier below moves the mean to 0.158 s while the median stays at 0.120 s. Run the query multiple times for stable timing.
 
 ```python
 from benchbox.monitoring import PerformanceMonitor
@@ -683,7 +683,7 @@ unknown_metric: insufficient data
 
 ### Performance Dashboard
 
-The history file is JSON, so a dashboard can read the latest entry from it directly:
+The history file is JSON, so a dashboard can read the latest entry from it directly. The function analyzes each timing metric in the latest entry and keeps the last 20 values of each metric's history:
 
 ```python
 import json
@@ -786,6 +786,8 @@ Performance check passed
 
 1. **Use Context Managers for Timing**
 
+   The first form (automatic timing) is preferred. Avoid the second form, manual timing, because it is error-prone:
+
    ```python
    import time
 
@@ -810,6 +812,8 @@ Performance check passed
 
 2. **Record Metadata**
 
+   Always record context:
+
    ```python
    from datetime import datetime
 
@@ -824,6 +828,8 @@ Performance check passed
    ```
 
 3. **Use Appropriate Metric Types**
+
+   Use counters for things that accumulate, gauges for current values, and timings for operations with a duration:
 
    ```python
    current_memory = 2048.0
@@ -846,20 +852,19 @@ Performance check passed
 
 4. **Set Appropriate Regression Thresholds**
 
-   Thresholds are fractions of the previous value:
+   Thresholds are fractions of the previous value. The three examples are, in order, conservative (10%), moderate (15%) and permissive (25%):
 
    ```python
-   # Conservative: 10% threshold
    thresholds = {"query_time": 0.10}
 
-   # Moderate: 15% threshold
    thresholds = {"query_time": 0.15}
 
-   # Permissive: 25% threshold
    thresholds = {"query_time": 0.25}
    ```
 
 5. **Maintain History Rolling Window**
+
+   Keep a manageable history of 50-100 entries. `max_entries=100` keeps about 100 recent runs:
 
    ```python
    history = PerformanceHistory(

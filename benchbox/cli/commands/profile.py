@@ -1,5 +1,3 @@
-"""System profiling command implementation."""
-
 import click
 from rich.panel import Panel
 from rich.text import Text
@@ -8,18 +6,21 @@ from benchbox.cli.shared import console
 from benchbox.cli.system import SystemProfiler
 
 
-@click.command("profile")
+@click.command(
+    "profile",
+    help=(
+        "Profile the current system and provide optimization recommendations.\n"
+        "\n"
+        "Analyzes CPU, memory, disk space, and system configuration to recommend\n"
+        "appropriate scale factors and benchmark configurations.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox profile"
+    ),
+)
 @click.pass_context
 def profile(ctx):
-    """Profile the current system and provide optimization recommendations.
-
-    Analyzes CPU, memory, disk space, and system configuration to recommend
-    appropriate scale factors and benchmark configurations.
-
-    \b
-    Examples:
-        benchbox profile
-    """
     console.print(Panel.fit(Text("System Profile", style="bold green"), style="green"))
 
     profiler = SystemProfiler()

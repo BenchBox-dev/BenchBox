@@ -1,5 +1,3 @@
-"""Unit tests for publication metadata Git journal CAS module (scripts/publication/journal.py)."""
-
 from __future__ import annotations
 
 import json
@@ -20,19 +18,16 @@ def valid_receipt_contract(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def git_repo(tmp_path: Path) -> Path:
-    """Create a temporary initialized Git repository with an initial commit."""
     repo = tmp_path / "repo"
     repo.mkdir()
     subprocess.run(["git", "init", "-b", "main"], cwd=repo, check=True, capture_output=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo, check=True)
     subprocess.run(["git", "config", "user.email", "test@benchbox.dev"], cwd=repo, check=True)
 
-    # Initial commit on main
     (repo / "README.md").write_text("# Test Repo\n", encoding="utf-8")
     subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
     subprocess.run(["git", "commit", "-m", "initial commit"], cwd=repo, check=True, capture_output=True)
 
-    # Branch publication off main
     subprocess.run(["git", "branch", "publication"], cwd=repo, check=True)
     remote = tmp_path / "remote.git"
     subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
@@ -54,7 +49,6 @@ def genesis_tx() -> tx_mod.Transaction:
         artifact={"artifact_id": 1, "archive_sha256": "g_art" * 16},
         transaction_id="genesis-tx-0001",
     )
-    # Mark as durable genesis
     attestation = {
         "target": tx.target,
         "generation": tx.generation,
@@ -88,13 +82,11 @@ def test_init_genesis_and_read(git_repo: Path, genesis_tx: tx_mod.Transaction) -
     assert state.active_transaction_id is None
     assert state.tip_commit_oid == commit_oid
 
-    # Read state back
     loaded_state = journal_mod.read_journal_state(git_repo, ref="publication")
     assert loaded_state.next_generation == 2
     assert loaded_state.durable_transaction_id == "genesis-tx-0001"
     assert loaded_state.tip_commit_oid == commit_oid
 
-    # Read transaction back
     loaded_tx = journal_mod.read_transaction(git_repo, "genesis-tx-0001", ref="publication")
     assert loaded_tx.transaction_id == "genesis-tx-0001"
     assert loaded_tx.generation == 1
@@ -119,7 +111,6 @@ def test_write_journal_update_happy_path(git_repo: Path, genesis_tx: tx_mod.Tran
         ref="publication",
     )
 
-    # Next transaction
     tx2, _ = tx_mod.prepare_promotion(
         target=target,
         generation=2,
@@ -154,7 +145,6 @@ def test_write_journal_update_happy_path(git_repo: Path, genesis_tx: tx_mod.Tran
     assert updated_state.active_transaction_id == "tx-0002"
     assert updated_state.tip_commit_oid == new_commit_oid
 
-    # Verify both transactions are readable
     t1 = journal_mod.read_transaction(git_repo, "genesis-tx-0001", ref="publication")
     t2 = journal_mod.read_transaction(git_repo, "tx-0002", ref="publication")
     assert t1.transaction_id == "genesis-tx-0001"
@@ -188,7 +178,6 @@ def test_cas_conflict_detection(git_repo: Path, genesis_tx: tx_mod.Transaction) 
         ref="publication",
     )
 
-    # Writer 1 prepares an update
     state_writer_1 = journal_mod.JournalState(
         target=target,
         next_generation=3,
@@ -198,7 +187,6 @@ def test_cas_conflict_detection(git_repo: Path, genesis_tx: tx_mod.Transaction) 
         policy_digest="p-w1",
         tip_commit_oid=genesis_commit_oid,
     )
-    # Writer 2 also prepares from the same genesis_commit_oid
     state_writer_2 = journal_mod.JournalState(
         target=target,
         next_generation=3,
@@ -209,7 +197,6 @@ def test_cas_conflict_detection(git_repo: Path, genesis_tx: tx_mod.Transaction) 
         tip_commit_oid=genesis_commit_oid,
     )
 
-    # Writer 1 commits first
     _, w1_commit = journal_mod.write_journal_update(
         repo_path=git_repo,
         expected_parent_oid=genesis_commit_oid,
@@ -217,7 +204,6 @@ def test_cas_conflict_detection(git_repo: Path, genesis_tx: tx_mod.Transaction) 
         ref="publication",
     )
 
-    # Writer 2 attempts to commit using old parent -> MUST fail with CasConflictError
     with pytest.raises(journal_mod.CasConflictError, match="CAS update on remote ref 'publication' failed"):
         journal_mod.write_journal_update(
             repo_path=git_repo,
@@ -329,7 +315,6 @@ def test_timeout_resolution(git_repo: Path, genesis_tx: tx_mod.Transaction, tmp_
 
 
 def test_corrupt_journal_fails_closed(git_repo: Path) -> None:
-    # On empty/uninitialized publication branch, read fails closed
     with pytest.raises(journal_mod.CorruptJournalError, match="Missing or invalid state.json"):
         journal_mod.read_journal_state(git_repo, ref="publication")
 
@@ -360,10 +345,8 @@ def test_read_transaction_rejects_invalid_contract(monkeypatch: pytest.MonkeyPat
 def test_historical_durable_transaction_reads_without_stale_receipt_error(
     git_repo: Path, genesis_tx: tx_mod.Transaction, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Historical durable transactions in the journal must not fail read due to wall-clock receipt age."""
     from scripts.publication.reconciliation import validate_live_receipt_contract as real_validate
 
-    # Restore the real validator to test real contract validation
     monkeypatch.setattr(tx_mod, "validate_live_receipt_contract", real_validate)
     monkeypatch.setattr("scripts.publication.reconciliation.verify_live_receipt_signature", lambda r: (True, None))
 
@@ -415,7 +398,6 @@ def test_historical_durable_transaction_reads_without_stale_receipt_error(
 def test_unfinalized_verified_transaction_with_stale_receipt_fails_read(
     git_repo: Path, genesis_tx: tx_mod.Transaction, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Unfinalized transactions in externally-verified state must NOT be exempt from receipt freshness."""
     from scripts.publication.reconciliation import validate_live_receipt_contract as real_validate
 
     monkeypatch.setattr(tx_mod, "validate_live_receipt_contract", real_validate)
@@ -463,7 +445,6 @@ def test_unfinalized_verified_transaction_with_stale_receipt_fails_read(
         ref="publication",
     )
 
-    # Transition an active transaction to externally-verified with the stale receipt
     from dataclasses import replace
 
     active_tx = replace(
@@ -489,6 +470,5 @@ def test_unfinalized_verified_transaction_with_stale_receipt_fails_read(
         ref="publication",
     )
 
-    # Reading the unfinalized transaction with an expired receipt must raise JournalError
     with pytest.raises(journal_mod.JournalError, match="stale"):
         journal_mod.read_transaction(git_repo, "tx-stale-unfinalized", ref="publication")

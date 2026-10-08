@@ -19,17 +19,16 @@ The TPC-H benchmark simulates a decision support system with 22 analytical queri
 
 ## Quick Start
 
+The example creates the benchmark, generates the data and runs it on a platform.
+
 ```python
 from benchbox import TPCH
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Create benchmark
 benchmark = TPCH(scale_factor=1.0)
 
-# Generate data
 benchmark.generate_data()
 
-# Run on platform
 adapter = DuckDBAdapter()
 results = benchmark.run_with_platform(adapter)
 
@@ -141,8 +140,9 @@ A second call finds the valid data in `output_dir` and returns at once, unless `
 ```python
 data_files = benchmark.generate_data()
 print(f"Generated {len(data_files)} table files")
-# Generated 8 table files
 ```
+
+The example prints `Generated 8 table files`.
 
 ### get_query(query_id, \*, params=None, seed=None, scale_factor=None, dialect=None)
 
@@ -161,14 +161,13 @@ print(f"Generated {len(data_files)} table files")
 
 Raises `TypeError` for a non-integer `query_id` or `seed` or a non-numeric `scale_factor`, and `ValueError` for a `query_id` outside 1 to 22 (`Query ID must be 1-22, got 0`) or a `scale_factor` that is not positive.
 
+The first call returns the default query, the second a translated dialect, and the third a query with seed 42 and scale factor 10 for parameter generation.
+
 ```python
-# Get query 1
 q1 = benchmark.get_query(1)
 
-# Get with dialect translation
 q1_bq = benchmark.get_query(1, dialect="bigquery")
 
-# Get with seeded random parameters at scale factor 10
 q1_param = benchmark.get_query(1, seed=42, scale_factor=10.0)
 ```
 
@@ -180,13 +179,12 @@ q1_param = benchmark.get_query(1, seed=42, scale_factor=10.0)
 
 With a `dialect`, each query is translated from `base_dialect` (default `netezza`) with SQLGlot.
 
+The first call gets all queries and prints `Total queries: 22`. The second gets them with dialect translation.
+
 ```python
-# Get all queries
 queries = benchmark.get_queries()
 print(f"Total queries: {len(queries)}")
-# Total queries: 22
 
-# Get with dialect translation
 queries_bq = benchmark.get_queries(dialect="bigquery")
 ```
 
@@ -200,14 +198,6 @@ queries_bq = benchmark.get_queries(dialect="bigquery")
 schema = benchmark.get_schema()
 for name, table in schema.items():
     print(f"{table['name']}: {len(table['columns'])} columns")
-# region: 3 columns
-# nation: 4 columns
-# supplier: 7 columns
-# part: 9 columns
-# partsupp: 5 columns
-# customer: 8 columns
-# orders: 9 columns
-# lineitem: 16 columns
 ```
 
 ### get_create_tables_sql(dialect="standard", tuning_config=None)
@@ -227,8 +217,9 @@ from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 create_sql = benchmark.get_create_tables_sql()
 create_sql_keys = benchmark.get_create_tables_sql(tuning_config=UnifiedTuningConfiguration())
 print(create_sql.count("PRIMARY KEY"), create_sql_keys.count("PRIMARY KEY"), create_sql_keys.count("FOREIGN KEY"))
-# 0 8 9
 ```
+
+The example prints `0 8 9`.
 
 ### generate_streams(num_streams=1, rng_seed=None, streams_output_dir=None)
 
@@ -362,27 +353,25 @@ Every other member comes from `BaseBenchmark`. See {doc}`/reference/python-api/b
 | Data and configuration | <span id="benchbox.tpch.TPCH.output_dir"></span>`output_dir` | property | The resolved directory from the constructor argument. |
 | Data and configuration | <span id="benchbox.tpch.TPCH.run_with_platform_api_surface"></span>`run_with_platform_api_surface` | class attribute | |
 | Data and configuration | <span id="benchbox.tpch.TPCH.scale_factor"></span>`scale_factor` | instance attribute | The constructor argument. |
-| Data and configuration | <span id="benchbox.tpch.TPCH.SKIP_DATA_LOADING"></span>`SKIP_DATA_LOADING` | class attribute | Not defined in the released 0.4.1 wheel. Source builds after 0.4.1 define it on `BaseBenchmark`, default `False`. |
+| Data and configuration | <span id="benchbox.tpch.TPCH.SKIP_DATA_LOADING"></span>`SKIP_DATA_LOADING` | class attribute | Defined on `BaseBenchmark` from 0.4.2, default `False`. Set it to `True` for a benchmark that needs schema objects but no data files. |
 
 ## Usage Examples
 
 ### Basic Benchmark Run
 
+Scale factor 1 is about 1 GB. The example generates the data, runs the benchmark on DuckDB and prints the results.
+
 ```python
 from benchbox import TPCH
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Create benchmark with scale factor 1 (about 1 GB)
 benchmark = TPCH(scale_factor=1.0)
 
-# Generate data
 benchmark.generate_data()
 
-# Run on DuckDB
 adapter = DuckDBAdapter()
 results = benchmark.run_with_platform(adapter)
 
-# Print results
 print(f"Benchmark: {results.benchmark_name}")
 print(f"Total time: {results.total_execution_time:.2f}s")
 print(f"Queries: {results.successful_queries}/{results.total_queries}")
@@ -411,6 +400,8 @@ for name, adapter in platforms.items():
 
 ### Specific Query Execution
 
+The example loads the data, then executes queries 1, 3, 6 and 10.
+
 ```python
 from benchbox import TPCH
 from benchbox.platforms.duckdb import DuckDBAdapter
@@ -421,11 +412,9 @@ benchmark.generate_data()
 adapter = DuckDBAdapter()
 conn = adapter.create_connection()
 
-# Load data
 adapter.create_schema(benchmark, conn)
 adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-# Execute specific queries
 for query_id in [1, 3, 6, 10]:
     query = benchmark.get_query(query_id)
     result = adapter.execute_query(conn, query, f"q{query_id}")
@@ -464,7 +453,7 @@ print(df)
 
 ### Official Benchmark Tests
 
-On 0.4.1 only the power test of the three official tests works through `TPCH`, and it needs a connection object (see the Test runners section). `run_maintenance_test` and `run_official_benchmark` raise, and there is no `run_throughput_test`.
+On 0.4.1 only the power test of the three official tests works through `TPCH`, and it needs a connection object (see the Test runners section). `run_maintenance_test` and `run_official_benchmark` raise, and there is no `run_throughput_test`. The last call below runs the power test.
 
 ```python
 from benchbox import TPCH
@@ -478,7 +467,6 @@ conn = adapter.create_connection()
 adapter.create_schema(benchmark, conn)
 adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-# Run the power test
 power_results = benchmark.run_power_test(conn, {"scale_factor": 0.01})
 print(power_results.queries_successful, f"{power_results.power_at_size:.1f}")
 ```

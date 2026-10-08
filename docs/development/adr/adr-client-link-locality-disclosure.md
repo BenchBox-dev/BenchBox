@@ -21,15 +21,15 @@ Without client-link locality disclosure:
 - Results collected under vastly different network topologies are compared as if they were identical setups.
 - Community and maintainer runs cannot be reliably reproduced without guessing client runner placement.
 
-## Reconciliation with ADR Decision w12 (DuckLake)
+## Reconciliation with the DuckLake Remote-Backed Results Decision
 
-BenchBox encountered a similar architectural challenge in ADR [`adr-ducklake-maturity-and-publishability.md`](adr-ducklake-maturity-and-publishability.md), where decision **w12** addressed whether DuckLake runs backed by remote S3 storage and PostgreSQL metadata catalogs could be published and ranked alongside runs on local NVMe disk:
+BenchBox encountered a similar architectural challenge in ADR [`adr-ducklake-maturity-and-publishability.md`](adr-ducklake-maturity-and-publishability.md), where the decision on remote-backed results addressed whether DuckLake runs backed by remote S3 storage and PostgreSQL metadata catalogs could be published and ranked alongside runs on local NVMe disk:
 
 > "The honest framing is that DuckLake's catalog backend and storage location are **part of the configuration under test**, exactly like a tuning profile or a scale factor — not a defect in the run.
 >
 > The real hazard is not publication, it is *comparison*: a DuckLake-on-S3 number partly measures object-store latency, so ranking it against DuckLake-on-local-disk as though they were the same system is the error. That is a comparison-grouping concern, addressed by recording the backing, not by suppressing the result."
 
-The governing principle ratified in decision w12 is: **"Disclose the topology; do not infer the distance."**
+The governing principle that decision establishes is: **"Disclose the topology; do not infer the distance."**
 
 BenchBox rejects attempting to mathematically adjust, subtract, or model network latency out of reported query timings. Latency subtraction is inherently speculative and risks masking engine-level stalls, connection teardowns, and driver inefficiencies. Instead, BenchBox discloses the empirical topology and network overhead directly:
 
@@ -137,7 +137,7 @@ All fields in `environment.client_link` are safe for public release in open repo
 
 - **Positive:**
   - Full transparency for cloud data warehouse benchmarks: network round trips can no longer be confused with platform query execution speed.
-  - Consistent adherence to ADR w12: topology is disclosed truthfully rather than estimated or suppressed.
+  - Consistent with the DuckLake remote-backed results decision: topology is disclosed truthfully rather than estimated or suppressed.
   - Clean separation of concerns: post-benchmark probe guarantees benchmark integrity while providing accurate protocol-level overhead figures.
   - Privacy-preserving: zero leakage of IPs, hostnames, VPCs, or instance IDs.
 - **Neutral:**

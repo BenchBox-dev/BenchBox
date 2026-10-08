@@ -1,5 +1,3 @@
-"""Tests for the cwd-independent repository root helper."""
-
 from __future__ import annotations
 
 import subprocess

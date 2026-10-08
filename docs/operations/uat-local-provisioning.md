@@ -37,8 +37,10 @@ Before a timed sweep, pre-fetch a slow stack's images/build ahead of time so a
 first-run download doesn't eat into `cleanup.docker_start_timeout_s`:
 
 ```bash
-make uat-prepull PLATFORM=<platform>   # compose pull --ignore-buildable + compose build
+make uat-prepull PLATFORM=<platform>
 ```
+
+This runs `compose pull --ignore-buildable` and then `compose build`.
 
 - `cedardb` — `localhost:5435`, compose file `docker/cedardb/docker-compose.yml`.
 - `clickhouse-server` — `localhost:9000`, compose file `docker/clickhouse/docker-compose.yml`; local password is `benchbox`.
@@ -71,31 +73,28 @@ startup instructions.
 - If a platform remains unreachable after bring-up, inspect the platform's
   compose logs and verify the endpoint in `local-platform-provisioning.tsv`.
 
-## Fresh machine checklist
+## First-run checklist
 
-Provisioning order for a second operator running the release-gate sweep
-(`docs/operations/uat-framework.md` "Three-stage UAT campaign") from scratch. Each
-item names the failure symptom if skipped. Evidenced on macOS only — Linux is
-untested territory (see the `uat-operator-provisioning` TODO).
+Setup to complete before the first UAT sweep on a new machine. Each item
+names the failure symptom if skipped. This list has been checked on macOS
+only.
 
-1. **`uv sync` + per-stage extras** (`tests/uat/matrix.py` `PLATFORM_UV_EXTRA`
-   is the source of truth). Stage 1 (native-sql + dataframe) needs
-   `clickhouse-local`; stage 2 (docker-fast) needs
-   `clickhouse-server` + `lakesail`; stage 3 (docker-slow) needs `databend` +
-   `influxdb` + `singlestore`. Cells invoke `uv run --extra <X> --`
-   per platform, so nothing needs pre-installing beyond a plain `uv sync` for
-   everything else. Skip this → the first cell for that platform records
-   `ModuleNotFoundError` as FAILED, silently breaching the validator
-   clean-rate floor.
+1. **`uv sync` + per-platform extras** (`tests/uat/matrix.py`
+   `PLATFORM_UV_EXTRA` is the source of truth):
+   `clickhouse-local`, `clickhouse-server`, `lakesail`, `databend`,
+   `influxdb` and `singlestore` each need an extra. Cells invoke
+   `uv run --extra <X> --` per platform, so nothing needs pre-installing
+   beyond a plain `uv sync` for everything else. Skip this → the first cell
+   for that platform records `ModuleNotFoundError` as FAILED, silently
+   breaching the validator clean-rate floor.
 2. **Container engine** — see "Container engine" above. Skip this →
    `resolve_container_cli()` raises before any compose command runs.
 3. **Docker/VM memory ≥ 12 GiB.** Docker Desktop: Settings → Resources →
-   Memory. Skip this → velox's Spark/Velox container fails a 3× SF=1 TPC-H
-   pass under the default ~11.7 GB ceiling (`tests/uat/matrix.py:29-34`;
-   already mitigated to one warmup + one measurement run, but headroom still
-   matters with other stacks running concurrently in a sweep). Apple
-   container/mocker sizes each container's VM independently — confirm the
-   host has equivalent headroom free rather than raising a shared ceiling.
+   Memory. Skip this → velox's Spark/Velox container can fail an SF=1 TPC-H
+   pass under the default ~11.7 GB ceiling, especially with other stacks
+   running in the same sweep. Apple container/mocker sizes each container's
+   VM independently — confirm the host has equivalent headroom free rather
+   than raising a shared ceiling.
 4. **Doris `vm.max_map_count` ≥ 2000000** — see `docs/platforms/doris.md`.
    Skip this → Doris fails its startup preflight check inside the container
    unless `DORIS_PRIVILEGED=true` is also set.
@@ -111,4 +110,4 @@ untested territory (see the `uat-operator-provisioning` TODO).
 7. **First-run costs.** Scale-1.0 TPC-H/TPC-DS datagen is CPU/disk-bound, not
    instant; LakeSail's first build additionally downloads a multi-GB PySail
    package tarball over the network (covered by step 5's prepull). Budget the
-   first sweep attempt's wall-clock time accordingly.
+   first sweep's wall-clock time accordingly.

@@ -1,5 +1,3 @@
-"""Tests for benchbox.core.comparison module (types, suite, plotter)."""
-
 import json
 import math
 
@@ -22,11 +20,6 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
-
-
-# ---------------------------------------------------------------------------
-# types.py - enums and constants
-# ---------------------------------------------------------------------------
 
 
 class TestPlatformType:
@@ -62,11 +55,6 @@ class TestConstants:
         assert DATAFRAME_PLATFORM_SUFFIX == "-df"
 
 
-# ---------------------------------------------------------------------------
-# types.py - detect_platform_type
-# ---------------------------------------------------------------------------
-
-
 class TestDetectPlatformType:
     def test_sql_platform(self):
         assert detect_platform_type("duckdb") == PlatformType.SQL
@@ -80,7 +68,7 @@ class TestDetectPlatformType:
         assert detect_platform_type("unknown-platform") == PlatformType.SQL
 
     def test_case_sensitivity(self):
-        # SQL_PLATFORMS is lowercase; detect_platform_type lowercases
+
         assert detect_platform_type("DuckDB") == PlatformType.SQL
 
 
@@ -109,11 +97,6 @@ class TestDetectPlatformTypes:
         ptype, inconsistent = detect_platform_types(["polars-df", "pandas-df", "duckdb"])
         assert ptype == PlatformType.DATAFRAME
         assert "duckdb" in inconsistent
-
-
-# ---------------------------------------------------------------------------
-# types.py - dataclasses
-# ---------------------------------------------------------------------------
 
 
 class TestUnifiedBenchmarkConfig:
@@ -167,9 +150,7 @@ class TestUnifiedPlatformResult:
         pr = UnifiedPlatformResult(platform="duckdb", platform_type=PlatformType.SQL)
         assert pr.query_results == []
         assert pr.total_time_ms == 0.0
-        # 0.0, not 100.0: a result that has not been aggregated has not
-        # demonstrated a single successful query. The old 100.0 default let a
-        # platform that failed outright be reported as fully successful.
+
         assert pr.success_rate == 0.0
 
     def test_to_dict(self):
@@ -206,14 +187,7 @@ class TestUnifiedComparisonSummary:
         assert len(d["query_winners"]) == 2
 
 
-# ---------------------------------------------------------------------------
-# suite.py - UnifiedBenchmarkSuite (unit-testable parts)
-# ---------------------------------------------------------------------------
-
-
 class TestUnifiedBenchmarkSuiteBuildResult:
-    """Test _build_platform_result which is a pure computation method."""
-
     def setup_method(self):
         from benchbox.core.comparison.suite import UnifiedBenchmarkSuite
 
@@ -296,7 +270,6 @@ class TestUnifiedBenchmarkSuiteGetSummary:
             self.suite.get_summary([])
 
     def test_get_summary_no_geomeans(self):
-        """Nothing timed successfully, so there is nothing to rank."""
         r1 = UnifiedPlatformResult(platform="p1", platform_type=PlatformType.SQL, geometric_mean_ms=0.0)
         summary = self.suite.get_summary([r1])
         assert summary.speedup_ratio is None
@@ -314,8 +287,6 @@ class TestUnifiedBenchmarkSuiteGetSummary:
 
 
 class TestUnifiedBenchmarkSuiteExport:
-    """Test export_results with JSON format (file-based, uses tmp_path)."""
-
     def setup_method(self):
         from benchbox.core.comparison.suite import UnifiedBenchmarkSuite
 
@@ -381,11 +352,6 @@ class TestUnifiedBenchmarkSuiteExport:
             self.suite.export_results([pr], tmp_path / "out.csv", format="csv")
 
 
-# ---------------------------------------------------------------------------
-# plotter.py - UnifiedComparisonPlotter
-# ---------------------------------------------------------------------------
-
-
 class TestUnifiedComparisonPlotter:
     def test_empty_results_raises(self):
         from benchbox.core.comparison.plotter import UnifiedComparisonPlotter
@@ -409,11 +375,6 @@ class TestUnifiedComparisonPlotter:
         assert plotter.theme == "dark"
 
 
-# ---------------------------------------------------------------------------
-# UnifiedBenchmarkSuite - get_available_platforms and _build_platform_result
-# ---------------------------------------------------------------------------
-
-
 class TestGetAvailablePlatforms:
     def setup_method(self):
         from benchbox.core.comparison.suite import UnifiedBenchmarkSuite
@@ -428,7 +389,7 @@ class TestGetAvailablePlatforms:
             ),
         )
         platforms = self.suite.get_available_platforms(PlatformType.SQL)
-        # Verify no DataFrame suffix platforms are returned
+
         for p in platforms:
             assert not p.endswith("-df") or p in platforms
 

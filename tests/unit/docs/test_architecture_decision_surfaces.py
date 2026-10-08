@@ -1,5 +1,3 @@
-"""Keep architecture-pilot decisions aligned with future-state planning docs."""
-
 from pathlib import Path
 
 import pytest
@@ -17,7 +15,6 @@ def _read(relative_path: str) -> str:
 
 
 def test_ssb_pilot_stop_is_reflected_in_future_state_surfaces() -> None:
-    """The SSB stop decision must close the one-pilot planning gate."""
 
     decision = _read("_project/decisions/arch-pilot-evaluation-2026-08-20.md")
     future_state = _read("docs/design/future-state/index.md")

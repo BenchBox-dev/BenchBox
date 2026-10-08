@@ -152,9 +152,11 @@ benchbox run --platform duckdb --benchmark tpch --scale 0.01 --phases power --no
 3. If you import BenchBox chart classes directly, confirm your imports still resolve:
 
 ```python
-from benchbox.core.visualization.ascii import ASCIIBarChart  # shim path, still works
-from textcharts import BarChart  # new canonical path
+from benchbox.core.visualization.ascii import ASCIIBarChart
+from textcharts import BarChart
 ```
+
+The first import is the shim path, which still works. The second is the new canonical path.
 
 4. If using table format loading, verify format support is reported for your target platform:
 

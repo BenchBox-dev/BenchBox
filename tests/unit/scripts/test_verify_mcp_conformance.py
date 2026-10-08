@@ -1,5 +1,3 @@
-"""Fail-closed coverage for the MCP conformance evidence generator."""
-
 from __future__ import annotations
 
 import json

@@ -20,20 +20,18 @@ LakeSail Sail is a Rust-based, drop-in replacement for Apache Spark built on Dat
 
 ## Quick Start
 
+The commands below install the Spark Connect-capable PySpark client and the Sail server, start a local Sail Spark Connect server, check client and endpoint readiness without starting a server, and then run the SQL and DataFrame benchmarks. Start the server in a separate terminal. SQL mode can start one for you, but DataFrame mode needs a running server.
+
 ```bash
-# Install the Spark Connect-capable PySpark client
 uv add benchbox --extra lakesail
+uv add pysail
 
-# Start a local Docker-backed Sail Spark Connect server
-make uat-bring-up PLATFORM=lakesail
+python -m pysail spark server --port 50051
 
-# Check client and endpoint readiness without starting a server
 benchbox platforms check lakesail-df
 
-# Run SQL benchmark
 benchbox run --platform lakesail --benchmark tpch --scale 1.0
 
-# Run DataFrame benchmark
 benchbox run --platform lakesail-df --benchmark tpch --scale 1.0
 ```
 
@@ -45,14 +43,13 @@ reachability; they do not instantiate the adapter or start a Sail server. SQL mo
 server when `pysail` is installed and the endpoint is unreachable, but DataFrame mode requires an already-running
 endpoint.
 
-For UAT and host-run local smoke tests, BenchBox includes `docker/lakesail/docker-compose.yml`. The compose service
+To run Sail in Docker from a BenchBox source checkout, use `docker/lakesail/docker-compose.yml`. The compose service
 builds a `benchbox-lakesail` image from the public PySail package and starts `sail spark server` on
 `sc://localhost:50051`. Like other Spark Connect backends, the server reads files by absolute path; the compose
 workflow mounts `BENCHBOX_DATA_DIR` at the same absolute path inside the container.
 
-`BENCHBOX_DATA_DIR` has **no default** and must be exported as an **absolute path** before invoking compose
-directly (`make uat-bring-up PLATFORM=lakesail` and the UAT harness set it for you). A relative value or a
-directory-relative default can never equal an absolute host path, breaking the mount above, so
+`BENCHBOX_DATA_DIR` has **no default** and must be exported as an **absolute path** before invoking compose.
+A relative value can never equal an absolute host path, which breaks the mount above.
 `make test-docker-up-lakesail` validates the variable is set and absolute before starting the stack:
 
 ```bash
@@ -102,41 +99,35 @@ adapter = LakeSailAdapter(
 
 ### SQL Mode
 
+The examples below run TPC-H at scale factor 1, TPC-DS at scale factor 10, a subset of TPC-H queries, and a dry run that previews execution. `driver_memory` and `shuffle_partitions` are adapter parameters, not CLI options.
+
 ```bash
-# TPC-H at scale factor 1
 benchbox run --platform lakesail --benchmark tpch --scale 1.0
 
-# TPC-DS at scale factor 10
-# (driver_memory / shuffle_partitions are adapter parameters, not CLI options)
 benchbox run --platform lakesail --benchmark tpcds --scale 10.0
 
-# Specific queries only
 benchbox run --platform lakesail --benchmark tpch --scale 1.0 --queries Q1,Q6,Q17
 
-# Dry run to preview execution
 benchbox run --dry-run ./preview --platform lakesail --benchmark tpch
 ```
 
 ### DataFrame Mode
 
+A custom endpoint or driver memory needs the Python adapter shown below.
+
 ```bash
-# TPC-H DataFrame benchmark
-# (a custom endpoint or driver memory needs the Python adapter below)
 benchbox run --platform lakesail-df --benchmark tpch --scale 1.0
 ```
 
 ### Comparison with Apache Spark
 
-Run the same benchmark on both platforms to compare performance:
+Run the same benchmark on LakeSail Sail and on Apache Spark, then compare the results:
 
 ```bash
-# LakeSail Sail
 benchbox run --platform lakesail --benchmark tpch --scale 10.0
 
-# Apache Spark (for comparison)
 benchbox run --platform spark --benchmark tpch --scale 10.0
 
-# Compare results
 benchbox compare lakesail_tpch_sf10.json spark_tpch_sf10.json
 ```
 
@@ -174,7 +165,6 @@ adapter = LakeSailDataFrameAdapter(
     enable_aqe=True,
 )
 
-# Use as context manager for automatic cleanup
 with adapter as ctx:
     df = ctx.read_parquet(Path("lineitem.parquet"))
     result = df.filter(df["l_quantity"] > 25).groupBy("l_returnflag").count()
@@ -224,10 +214,9 @@ LakeSail supports the following tuning types:
 
 ### Local Mode
 
-Single-node, multi-threaded execution. Best for development, testing, and small-to-medium scale benchmarks.
+Single-node, multi-threaded execution. Best for development, testing, and small-to-medium scale benchmarks. `local` is the default `sail_mode`.
 
 ```bash
-# local is the default sail_mode
 benchbox run --platform lakesail --benchmark tpch --scale 1.0
 ```
 
@@ -238,11 +227,9 @@ benchbox run --platform lakesail --benchmark tpch --scale 1.0
 
 ### Distributed Mode
 
-Multi-node cluster execution for large-scale benchmarks.
+Multi-node cluster execution for large-scale benchmarks. Distributed mode is selected through the Python adapter (`sail_mode="distributed"`, `sail_workers=4`), not through the CLI command below.
 
 ```bash
-# Distributed mode is selected through the Python adapter
-# (sail_mode="distributed", sail_workers=4)
 benchbox run --platform lakesail --benchmark tpch --scale 100.0
 ```
 

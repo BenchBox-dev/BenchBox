@@ -1,5 +1,3 @@
-"""Tests for scripts/path_filter_decision.py."""
-
 from __future__ import annotations
 
 import ast
@@ -312,11 +310,6 @@ def test_github_output_exposes_skill_integrity_lane(rules: dict[str, list[str]],
     assert "needs-code-ci=false\n" in text
 
 
-# F2 regression: docs/** glob originally treated all of docs/ as safe-content,
-# bypassing lint/test for Sphinx Python and config files. The narrowed rules
-# must keep prose safe but route Sphinx code through full CI.
-
-
 def test_docs_markdown_is_safe(rules: dict[str, list[str]]) -> None:
     decision = classify_paths(["docs/development/run-lifecycle-map.md"], rules)
     assert decision["safe_content_only"] is True
@@ -370,10 +363,6 @@ def test_docs_template_html_runs_code_ci(rules: dict[str, list[str]]) -> None:
 def test_docs_makefile_runs_code_ci(rules: dict[str, list[str]]) -> None:
     decision = classify_paths(["docs/Makefile"], rules)
     assert decision["needs_code_ci"] is True
-
-
-# F1 regression: git diff filter must include deletions so a PR that removes
-# a code file plus edits a safe-content path classifies as needs_code_ci.
 
 
 def test_classify_does_not_treat_deleted_code_as_safe(
@@ -458,10 +447,6 @@ def test_event_base_sha_stays_authoritative_when_origin_develop_moves(tmp_path: 
 
 
 def test_git_changed_paths_includes_deletions(tmp_path: Path) -> None:
-    # F1 regression. The diff filter must include D so a PR that removes a
-    # tracked code file is visible to the classifier even when the only other
-    # change is safe-content. Pre-fix, --diff-filter=ACMRT silently dropped
-    # deletions and a deleted Python module would be invisible to the gate.
     repo = tmp_path / "repo"
     repo.mkdir()
     _git(repo, "init", "--initial-branch=main", "-q")

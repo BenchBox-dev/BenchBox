@@ -135,29 +135,8 @@ export function buildComparabilityFields(results: DetailResult[]): Comparability
   return fields;
 }
 
-/**
- * The generation attributed to tuned runs that predate the ADR-3
- * tuning-policy generation marker (absent `tuning_policy_generation`). Unlike
- * the physical-mechanisms warning -- which treats `undefined` as "unknown, do
- * not compare" -- an absent generation is a *concrete* value here: two legacy
- * runs are same-generation (no warning), but a legacy run compared against a
- * marked run IS a cross-seam comparison (warning). See ADR-3.
- */
 const PRE_SEAM_GENERATION = "pre-seam";
 
-/**
- * ADR-3 seam: warn (never fail the match) when two or more `tuned` runs were
- * produced under different tuning-policy generations. Tuning policy evolves
- * across a generation seam (ADR-3's baseline redefinition + single-renderer
- * consolidation), so tuned results from different generations are not directly
- * comparable -- exactly the concern the cross-mechanism warning above handles
- * for physical mechanisms. Mirrors that warning's shape, with one deliberate
- * difference: an absent marker is the concrete "pre-seam" generation, not
- * "unknown" -- so two legacy runs stay same-generation (no warning), while a
- * legacy-vs-marked pair warns. Returns null when there's nothing to compare
- * (fewer than two `tuned` runs). This is a WARNING only: facet matching is
- * unchanged and the generation is never a match/dedup/grouping key.
- */
 function buildTuningPolicyGenerationField(results: DetailResult[]): ComparabilityField | null {
   const tunedResults = results.filter((result) => result.tuning_mode === "tuned");
   if (tunedResults.length < 2) return null;
@@ -186,16 +165,6 @@ function buildTuningPolicyGenerationField(results: DetailResult[]): Comparabilit
   };
 }
 
-/**
- * ADR-2 §3: warn (never fail the match) when two or more results labeled
- * `tuned` rendered different sets of physical tuning mechanisms (indexes,
- * clustering keys, distribution styles, etc.) -- e.g. one platform renders
- * six mechanisms for a template and another renders zero, invisibly to the
- * coarse `tuning_mode` facet. Returns null when there's nothing to compare:
- * fewer than two `tuned` results, or any of them predates ingest recording
- * `physical_mechanisms` (undefined, not merely empty -- an empty array is a
- * meaningful "rendered nothing" value, not "unknown").
- */
 function buildPhysicalMechanismsField(results: DetailResult[]): ComparabilityField | null {
   const tunedResults = results.filter((result) => result.tuning_mode === "tuned");
   if (tunedResults.length < 2) return null;
@@ -253,8 +222,6 @@ function getClientCloud(result: DetailResult): string | null {
   const c = result.environment?.client_cloud ?? result.client_cloud;
   if (!c || !String(c).trim()) return null;
   const token = String(c).trim().toLowerCase();
-  // "unknown" is the default when only --client-region is attested: it
-  // carries no cloud signal and must not force a cross-cloud verdict.
   if (token === "unknown" || token === "local" || token === "none") return null;
   return String(c).trim();
 }
@@ -272,10 +239,6 @@ function getOverheadMedian(result: DetailResult): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-// Region tokens arrive in provider-native spellings: Snowflake reports
-// `CURRENT_REGION()` as `AWS_US_EAST_1`, Azure as `East US 2`, GCP IMDS as
-// `us-east1`, AWS IMDS as `us-east-1`. Compare canonical forms so equal
-// footprints do not false-warn.
 function canonicalRegion(region: string): string {
   return region
     .toLowerCase()
@@ -297,9 +260,6 @@ function buildLocalityField(results: DetailResult[]): ComparabilityField {
           warn: true,
         };
       }
-      // Cloud identity is evidence independent of region spellings: a
-      // client attested on one cloud against a platform on another never
-      // shares a footprint, even when the region names normalize equally.
       const clientCloud = getClientCloud(result);
       const platformCloud = getPlatformCloud(result);
       if (
@@ -313,9 +273,6 @@ function buildLocalityField(results: DetailResult[]): ComparabilityField {
           warn: true,
         };
       }
-      // No platform region is no evidence: asserting collocation here
-      // would publish an unearned match (remote self-hosted platforms
-      // and cloud runs with uncaptured regions land in this branch).
       if (!platformReg) {
         return {
           platform: result.platform,
@@ -386,15 +343,6 @@ export function comparabilityWarningFields(fields: readonly ComparabilityField[]
   return fields.filter((field) => field.status === "diff");
 }
 
-/**
- * Warning-field labels ordered for a truncated summary (e.g. the guardrails
- * banner's "Warning classes: A, B, C, +N more"). A validation difference is
- * not equivalent to a cosmetic environment difference like "CPU model" or
- * "Driver version" - it means at least one candidate's numbers are unverified
- * - so it is always sorted to the front instead of risking getting folded
- * into "+N more" by field-build order. Relative order of the rest is
- * preserved.
- */
 export function orderWarningLabelsForSummary(warningFields: readonly ComparabilityField[]): string[] {
   const labels = warningFields.map((field) => field.label);
   const priority = labels.filter((label) => label === "Validation");
@@ -502,8 +450,6 @@ function compareHardwareValues(
     };
   }
 
-  // Pin no-flip guarantee: if any run lacks metadata on this hardware axis,
-  // report status "missing" ("Not recorded") rather than "diff" ("Differs").
   const anyMissing = values.some((value) => value === "Not recorded");
   if (anyMissing) {
     return {
@@ -535,12 +481,6 @@ function queryCount(result: DetailResult) {
 }
 
 function formatTuning(result: DetailResult) {
-  // The fingerprint is built from the ADR-1 bundle-emitted identities only:
-  // the canonical requested-config hash and the physical applied-ledger hash.
-  // The self-derived `tuning_hash` is NOT used here -- it must stay
-  // display-only and never act as a comparability key. When neither identity
-  // hash exists (legacy / mode-only bundles) the coarse `tuning_mode` is shown
-  // as a plain label, not dressed up as a hash-level fingerprint it isn't.
   const requestedHash = result.requested_config_hash;
   const appliedHash = result.applied_ledger_hash;
   if (!result.tuning_mode && !requestedHash && !appliedHash && !result.has_tuning) {
@@ -585,15 +525,7 @@ function formatPerPlatform(entries: { platform: string; value: string }[]) {
   return entries.map((entry) => `${entry.platform}: ${entry.value}`).join("; ");
 }
 
-/**
- * Reader-facing label for the receipt's Validation row, with the raw status
- * kept alongside it in parentheses - the receipt is exactly the "detail
- * field" surface the shared vocabulary is meant to keep precision available
- * on, per describeValidationStatus's contract.
- */
 function formatValidationStatusReceiptValue(status: string | null | undefined, overrideRules?: string[]) {
-  // An accepted override is never a clean pass: name the covered rules
-  // alongside the recorded status so an overridden run cannot read clean here.
   const suffix = overrideRules && overrideRules.length > 0 ? ` — overridden (${overrideRules.join(", ")})` : "";
   if (!status) return overrideRules && overrideRules.length > 0 ? `Not recorded${suffix}` : "Not recorded";
   const label = formatValidationStatus(status);
@@ -601,14 +533,6 @@ function formatValidationStatusReceiptValue(status: string | null | undefined, o
   return `${base}${suffix}`;
 }
 
-/**
- * Accepted plausibility overrides across the compared runs. Null when no
- * compared result carries override data (pre-v11 snapshots leave the fields
- * undefined — unknown, not "no override") or when every result is known to
- * have none, keeping the receipt quiet in the normal case. Otherwise a
- * warning naming the covered rules per platform; an override is a
- * comparability caveat, never a match/dedup key.
- */
 function buildOverrideField(results: DetailResult[]): ComparabilityField | null {
   if (results.some((result) => result.override_rules === undefined)) return null;
   const withRules = results.filter((result) => parseOverrideRules(result.override_rules).length > 0);

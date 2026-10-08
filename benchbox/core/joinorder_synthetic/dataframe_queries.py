@@ -1,13 +1,6 @@
-"""Synthetic JoinOrder DataFrame queries for Expression and Pandas families.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Implements the 113 canonical JoinOrder queries through a restricted
-JOB SQL-to-DataFrame translator sharing the canonical deterministic
-join planner.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -42,7 +35,6 @@ _QUERY_MANAGER = JoinOrderQueryManager()
 
 
 def _query_sql(query_id: str, query_manager: JoinOrderQueryManager | None = None) -> str:
-    """Translate the same predicates the SQL benchmark executes."""
     return (query_manager or _QUERY_MANAGER).get_query(query_id)
 
 
@@ -188,7 +180,6 @@ def _make_expression_impl(query_id: str, query_manager: JoinOrderQueryManager | 
         return _execute_joinorder_expression_query(ctx, query_id, query_manager)
 
     _impl.__name__ = f"q{query_id}_expression_impl"
-    _impl.__doc__ = f"{query_id}: generated synthetic JoinOrder DataFrame translation."
     return _impl
 
 
@@ -197,26 +188,18 @@ def _make_pandas_impl(query_id: str, query_manager: JoinOrderQueryManager | None
         return _execute_joinorder_pandas_query(ctx, query_id, query_manager)
 
     _impl.__name__ = f"q{query_id}_pandas_impl"
-    _impl.__doc__ = f"{query_id}: generated synthetic JoinOrder pandas translation."
     return _impl
 
 
-# Impls register here (keyed by "q<id>_<family>_impl") instead of mutating
-# module globals (F7), so the registry build is statically typed and the
-# generated names stay resolvable. See __getattr__ for name-based access.
 _IMPLS: dict[str, Any] = {}
 
 
 def __getattr__(name: str) -> Any:
-    """Resolve factory-built impl names from the registry (PEP 562)."""
     if name in _IMPLS:
         return _IMPLS[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-# All 113 canonical ids get generated DataFrame impls through the
-# restricted translator. SQL text comes from the canonical JOB queries
-# via the cached JoinOrderQueryManager.
 try:
     from benchbox.core.joinorder.queries import CANONICAL_JOINORDER_QUERIES as _CANONICAL_IDS
 
@@ -269,11 +252,6 @@ _QUERIES = [
 
 
 def _categories_for(query_id: str, query_sql: str) -> list[QueryCategory]:
-    """Classify a query by its parsed table aliases.
-
-    BenchBox convention: plain JOIN below 6 tables, MULTI_JOIN at 6+.
-    Every JOB query aggregates and filters.
-    """
     tables = len(_sql_tables(parse_one(query_sql, read="duckdb")))
     join_category = QueryCategory.MULTI_JOIN if tables >= 6 else QueryCategory.JOIN
     return ([join_category] if tables > 1 else []) + [QueryCategory.AGGREGATE, QueryCategory.FILTER]
@@ -297,7 +275,6 @@ for _query in _QUERIES:
 
 
 def get_dataframe_queries(query_manager: JoinOrderQueryManager | None = None) -> QueryRegistry:
-    """Get the shared canonical registry or bind a custom SQL snapshot."""
     if query_manager is None:
         return JOINORDER_DATAFRAME_QUERIES
     registry = QueryRegistry("JoinOrder DataFrame")

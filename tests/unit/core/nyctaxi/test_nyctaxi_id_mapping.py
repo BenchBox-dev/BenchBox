@@ -1,20 +1,4 @@
-"""SQL<->DataFrame query-id correspondence for NYCTaxi.
-
-The SQL surface names its 25 queries with slugs (``trips-per-hour``,
-``top-pickup-zones``, ...) while the DataFrame registry numbers them ``Q1``
-.. ``Q25``. Each DataFrame query carries a human-readable title in
-``_QUERY_METADATA`` that slugifies (lowercase, non-alphanumerics to hyphens)
-to exactly one SQL id, and every SQL id is covered -- a documented 1:1
-correspondence, not a guessed mapping. This locks that table so a future gate
-can wire it without re-proving it. Gating itself is out of scope here.
-
-Caveat for that future gate: nyctaxi's downloader always tries a network fetch
-at any scale factor and falls back to synthetic data only on failure
-(``benchbox/core/nyctaxi/downloader.py``), so unlike flightdata (which always
-synthesizes below SF=0.1) a nyctaxi gate is not offline by default.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -27,8 +11,6 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-# DataFrame id -> SQL id, one row per query. Titles come from the registry's
-# _QUERY_METADATA; each slugifies to its SQL counterpart.
 EXPECTED_MAPPING = {
     "Q1": "trips-per-hour",
     "Q2": "trips-per-day",
@@ -63,7 +45,6 @@ def _slug(title: str) -> str:
 
 
 def test_dataframe_titles_slugify_to_sql_ids() -> None:
-    """Every registry title slugifies to a real SQL query id (no guessing)."""
     from benchbox.core.benchmark_loader import get_core_benchmark_class
     from benchbox.core.nyctaxi.dataframe_queries import NYCTAXI_DATAFRAME_QUERIES
 
@@ -74,11 +55,6 @@ def test_dataframe_titles_slugify_to_sql_ids() -> None:
 
 
 def test_each_dataframe_id_maps_to_its_own_title_slug() -> None:
-    """Each DataFrame id maps to its own title's slug, not just any SQL id.
-
-    Comparing mapping keys and values as independent sets would still pass
-    if two rows were swapped, so pin the per-query correspondence directly.
-    """
     from benchbox.core.nyctaxi.dataframe_queries import NYCTAXI_DATAFRAME_QUERIES
 
     for query in NYCTAXI_DATAFRAME_QUERIES.get_all_queries():
@@ -89,7 +65,6 @@ def test_each_dataframe_id_maps_to_its_own_title_slug() -> None:
 
 
 def test_mapping_table_is_exact_and_total() -> None:
-    """The locked table covers every query on both surfaces exactly once."""
     from benchbox.core.benchmark_loader import get_core_benchmark_class
     from benchbox.core.nyctaxi.dataframe_queries import NYCTAXI_DATAFRAME_QUERIES
 

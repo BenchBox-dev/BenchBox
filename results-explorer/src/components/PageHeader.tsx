@@ -1,7 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { Breadcrumb, type Crumb } from "@/components/Breadcrumb";
 
-/** Shared type ramp so a page that builds its own hero still matches. */
 export const PAGE_HEADER_CLASSES = {
   eyebrow: "text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-muted)]",
   title: "text-3xl font-bold text-[var(--bb-data-fg-primary)]",
@@ -9,28 +8,14 @@ export const PAGE_HEADER_CLASSES = {
 } as const;
 
 interface PageHeaderProps {
-  /** Breadcrumb trail. Omit on pages that are not below an index. */
   crumbs?: Crumb[];
-  /** Short label above the title, e.g. the section a detail page belongs to. */
   eyebrow?: string;
   title: ComponentChildren;
-  /** One line of prose saying what the page is for. */
   subtitle?: ComponentChildren;
-  /** Counts and scope chips describing what is currently on the page. */
   meta?: ComponentChildren;
-  /** Controls that change what the page shows: switchers, filters, views. */
   actions?: ComponentChildren;
 }
 
-/**
- * One header treatment for every explorer page.
- *
- * Each page previously built its own: different heading sizes, some in an
- * elevated panel and some not, breadcrumbs on two of five, controls sometimes
- * beside the title and sometimes below it. The shape here is fixed - trail,
- * eyebrow, title, subtitle, scope, controls - and pages choose which parts
- * they have rather than how they look.
- */
 export function PageHeader({ crumbs, eyebrow, title, subtitle, meta, actions }: PageHeaderProps) {
   return (
     <header class="mb-6" data-testid="page-header">

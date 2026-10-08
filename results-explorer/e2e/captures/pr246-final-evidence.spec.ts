@@ -1,11 +1,3 @@
-/**
- * PR #246 final remediation evidence gate.
- *
- * Skipped by default; opt in with PR246_FINAL_CAPTURE=1. Captures the full
- * baseline screenshot matrix into one dated final-evidence directory and logs
- * route, console, network, and loaded-state evidence for closeout review.
- */
-
 import { execFileSync } from "child_process";
 import { appendFileSync, mkdirSync, writeFileSync } from "fs";
 import path from "path";

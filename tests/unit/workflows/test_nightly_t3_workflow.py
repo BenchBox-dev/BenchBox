@@ -1,11 +1,3 @@
-"""Contract tests for the nightly T3 workflow.
-
-The workflow splits Tier 3 validation into independent domain jobs and keeps one
-issue per domain label. These tests pin the properties that make that safe:
-triggers without branch filters, one job per domain, the cloud opt-in variable,
-issue-write permission held by the reporting job only, and SHA-pinned actions.
-"""
-
 from __future__ import annotations
 
 import json
@@ -28,7 +20,6 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 WORKFLOWS_DIR = REPO_ROOT / ".github" / "workflows"
 WORKFLOW = WORKFLOWS_DIR / "nightly-v2.yml"
 
-# Job id -> issue label.
 DOMAIN_JOBS = {
     "docker": "t3:docker",
     "cloud": "t3:cloud",
@@ -51,7 +42,6 @@ def _load(path: Path = WORKFLOW) -> dict[str, Any]:
 
 
 def _triggers(workflow: dict[str, Any]) -> dict[str, Any]:
-    # PyYAML parses the bare `on` key as boolean True.
     triggers = workflow.get("on", workflow.get(True))
     assert isinstance(triggers, dict), "workflow has no `on:` mapping"
     return triggers
@@ -131,7 +121,6 @@ def test_browser_covers_firefox_and_webkit() -> None:
 def test_cloud_job_is_gated_by_repository_variable() -> None:
     condition = str(_load()["jobs"]["cloud"]["if"])
     assert "vars.BENCHBOX_T3_CLOUD_ENABLED == 'true'" in condition
-    # The gate must be the whole condition: no `|| true` style escape hatches.
     assert "||" not in condition
 
 
@@ -352,7 +341,6 @@ def test_report_job_covers_every_domain_and_label() -> None:
     text = _run_text(report)
     for job in DOMAIN_JOBS:
         assert re.search(rf"\b{re.escape(job)}\b", text), f"report loop omits {job}"
-    # Labels are derived as t3:<domain>; the durations job maps to t3:durations.
     assert 'label="t3:${domain}"' in text
     assert "durations-refresh) domain=durations" in text
     assert "gh issue create" in text and "gh issue close" in text and "gh issue comment" in text

@@ -1,5 +1,3 @@
-"""Regenerate the committed per-test p95 artifact from T3 JUnit reports."""
-
 from __future__ import annotations
 
 import argparse
@@ -9,11 +7,13 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
-from tests.duration_policy import collect_junit_durations, write_duration_file  # noqa: E402
+from tests.duration_policy import collect_junit_durations, write_duration_file
+
+CLI_DESCRIPTION = "Regenerate the committed per-test p95 artifact from T3 JUnit reports."
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--input", type=Path, action="append", required=True, help="JUnit XML report to merge")
     parser.add_argument(
         "--output",

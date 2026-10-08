@@ -1,10 +1,3 @@
-"""Tests for WritePrimitivesBenchmark operation execution internals.
-
-Covers rows_affected extraction, validation query checking, cleanup SQL
-execution, load_data verification, reset flow, population SQL generation,
-and staging table lifecycle operations not covered by test_benchmark_execution.py.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -26,16 +19,13 @@ def wp(tmp_path: Path) -> WritePrimitivesBenchmark:
     return WritePrimitivesBenchmark(output_dir=tmp_path)
 
 
-# ---------------------------------------------------------------------------
-# _extract_rows_affected
-# ---------------------------------------------------------------------------
 class TestExtractRowsAffected:
     def test_normal_rowcount(self, wp: WritePrimitivesBenchmark):
         result = SimpleNamespace(rowcount=42)
         assert wp._extract_rows_affected(result, "OP_1") == 42
 
     def test_rowcount_none_returns_sentinel(self, wp: WritePrimitivesBenchmark):
-        result = SimpleNamespace()  # no rowcount attribute
+        result = SimpleNamespace()
         assert wp._extract_rows_affected(result, "OP_1") == -1
 
     def test_rowcount_minus_one_passthrough(self, wp: WritePrimitivesBenchmark):
@@ -47,9 +37,6 @@ class TestExtractRowsAffected:
         assert wp._extract_rows_affected(result, "OP_1") == 0
 
 
-# ---------------------------------------------------------------------------
-# _run_operation_validation
-# ---------------------------------------------------------------------------
 class TestRunOperationValidation:
     def test_passes_when_no_validation_queries(self, wp: WritePrimitivesBenchmark):
         operation = SimpleNamespace(validation_queries=[])
@@ -97,9 +84,6 @@ class TestRunOperationValidation:
         assert results[0]["passed"] is False
 
 
-# ---------------------------------------------------------------------------
-# _run_operation_cleanup
-# ---------------------------------------------------------------------------
 class TestRunOperationCleanup:
     def test_no_cleanup_sql_succeeds(self, wp: WritePrimitivesBenchmark):
         operation = SimpleNamespace(cleanup_sql=None)
@@ -127,9 +111,6 @@ class TestRunOperationCleanup:
         assert "table not found" in warning
 
 
-# ---------------------------------------------------------------------------
-# _get_population_sql
-# ---------------------------------------------------------------------------
 class TestGetPopulationSql:
     def test_returns_string(self, wp: WritePrimitivesBenchmark):
         sql = wp._get_population_sql("orders_stage", "orders")
@@ -141,13 +122,10 @@ class TestGetPopulationSql:
         assert "orders_stage" in sql.lower() or "orders" in sql.lower()
 
 
-# ---------------------------------------------------------------------------
-# load_data
-# ---------------------------------------------------------------------------
 class TestLoadData:
     def test_returns_dict(self, wp: WritePrimitivesBenchmark):
         conn = MagicMock()
-        # Mock table_exists to return True for all tables
+
         with pytest.MonkeyPatch.context() as mp:
             mp.setattr(
                 "benchbox.core.write_primitives.benchmark.table_exists",
@@ -158,9 +136,6 @@ class TestLoadData:
             assert isinstance(result, dict)
 
 
-# ---------------------------------------------------------------------------
-# OperationResult edge cases
-# ---------------------------------------------------------------------------
 class TestOperationResultEdgeCases:
     def test_skipped_status(self):
         result = OperationResult(
@@ -194,9 +169,6 @@ class TestOperationResultEdgeCases:
         assert result.cleanup_success is False
 
 
-# ---------------------------------------------------------------------------
-# Operation management edge cases
-# ---------------------------------------------------------------------------
 class TestOperationManagement:
     def test_get_operations_by_category_returns_subset(self, wp: WritePrimitivesBenchmark):
         categories = wp.get_operation_categories()
@@ -220,15 +192,8 @@ class TestOperationManagement:
         assert wp.get_data_source_benchmark() == "tpch"
 
 
-# ---------------------------------------------------------------------------
-# _get_effective_write_sql skip-order (audit finding N8)
-# ---------------------------------------------------------------------------
 class TestEffectiveWriteSqlSkipOrder:
-    """Skip decisions must precede the adapter sql_override short-circuit."""
-
     def test_null_override_skips_even_with_sql_override(self, wp: WritePrimitivesBenchmark):
-        """An op marked unsupported on a platform is skipped even when the adapter
-        returns preprocessed SQL for it (the override side-channel bypass)."""
         op = wp.get_operation("bulk_load_upsert_mode")
         assert op.platform_overrides.get("datafusion", "MISSING") is None
         effective_sql, skip_reason = wp._get_effective_write_sql(
@@ -241,9 +206,7 @@ class TestEffectiveWriteSqlSkipOrder:
         assert "unsupported on platform 'datafusion'" in skip_reason
 
     def test_sql_override_wins_when_op_is_runnable(self, wp: WritePrimitivesBenchmark):
-        """When the op is NOT skipped, adapter preprocessing still takes effect."""
-        # An op with no file dependencies and no override for this platform is
-        # runnable, so the supplied sql_override becomes the effective body.
+
         op = wp.get_operation("merge_scd_type2_basic")
         assert not getattr(op, "file_dependencies", None)
         assert "spark" not in (op.platform_overrides or {})
@@ -253,7 +216,6 @@ class TestEffectiveWriteSqlSkipOrder:
         assert effective_sql == rewritten
 
     def test_scd2_null_override_skips_on_datafusion(self, wp: WritePrimitivesBenchmark):
-        """SCD2 ops (category merge, no preprocess override) still skip on datafusion."""
         op = wp.get_operation("merge_scd_type2_basic")
         effective_sql, skip_reason = wp._get_effective_write_sql(op, platform_key="datafusion")
         assert effective_sql is None
@@ -327,9 +289,6 @@ def test_duckdb_sketch_parameter_sweeps_keep_catalog_sql(wp: WritePrimitivesBenc
     assert sql == operation.write_sql
 
 
-# ---------------------------------------------------------------------------
-# _get_effective_write_sql fallback key (shared-dialect override inheritance)
-# ---------------------------------------------------------------------------
 class TestEffectiveWriteSqlFallbackKey:
     def _op(self, **kw):
         base = {
@@ -360,14 +319,12 @@ class TestEffectiveWriteSqlFallbackKey:
         assert (sql, reason) == ("INSERT INTO t VALUES (3)", None)
 
     def test_duckdb_merge_gate_applies_via_fallback(self, wp: WritePrimitivesBenchmark):
-        """Bundled-DuckDB MERGE rejection applies to DuckLake (same engine)."""
         op = self._op(write_sql="MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN UPDATE SET x = 1")
         sql, reason = wp._get_effective_write_sql(op, platform_key="ducklake", platform_fallback_key="duckdb")
         assert sql is None
         assert reason is not None and "DuckDB" in reason
 
     def test_no_fallback_preserves_exact_match(self, wp: WritePrimitivesBenchmark):
-        """Without a fallback key the old exact-match behavior is unchanged."""
         op = self._op(platform_overrides={"duckdb": "INSERT INTO t VALUES (2)"})
         sql, reason = wp._get_effective_write_sql(op, platform_key="ducklake")
         assert (sql, reason) == ("INSERT INTO t VALUES (1)", None)

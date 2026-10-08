@@ -1,22 +1,3 @@
-"""MCP resources and discovery tools must derive from one payload builder.
-
-benchbox/mcp/resources/registry.py used to walk the registry a second time with
-a slightly different field set, so the two surfaces could describe the same
-benchmark differently -- and its query-id helper probed attribute names no
-benchmark class has, so `query_ids` was empty for every benchmark. They are now
-projections of one canonical payload.
-
-Building a benchmark payload instantiates the benchmark and loads its queries
-(2s for tpcds), so the shared-builder assertion is structural: it patches the
-canonical builder and checks both surfaces call it. Only the cheap benchmarks
-are exercised for real.
-
-The parametrized argument is deliberately `benchmark_id`, not `benchmark`:
-pytest-benchmark reserves `benchmark` as a fixture name and raises inside
-pytest_runtest_makereport when a parametrized value shadows it, which kills the
-whole session with an INTERNALERROR rather than failing one test.
-"""
-
 from __future__ import annotations
 
 import json
@@ -31,14 +12,10 @@ pytestmark = [
 
 pytest.importorskip("mcp", reason="MCP SDK not installed. Install with: uv add benchbox --extra mcp")
 
-# Cheap to build (<0.1s each) and structurally different: tpch is a TPC
-# benchmark with generated queries, coffeeshop is a plain SQL benchmark.
 CHEAP_BENCHMARKS = ["tpch", "coffeeshop"]
 
 
 class TestOneSharedBuilder:
-    """Structural: neither surface may build its own payload."""
-
     def test_resource_delegates_to_the_canonical_builder(self):
         from benchbox.mcp.resources import registry as registry_module
 
@@ -87,7 +64,6 @@ class TestBenchmarkProjections:
 
     @pytest.mark.parametrize("benchmark_id", CHEAP_BENCHMARKS)
     def test_resource_query_ids_are_populated(self, benchmark_id: str):
-        """They were empty for EVERY benchmark before the shared builder."""
         from benchbox.mcp.resources.registry import _build_benchmark_detail
 
         resource = json.loads(_build_benchmark_detail(benchmark_id))
@@ -95,7 +71,6 @@ class TestBenchmarkProjections:
         assert resource["query_ids"], f"{benchmark_id} reports no query ids"
 
     def test_the_tool_truncates_and_the_resource_does_not(self):
-        """Truncation is a tool-response-size concern, not a payload property."""
         from benchbox.mcp.resources import registry as registry_module
         from benchbox.mcp.tools import discovery as discovery_module
         from benchbox.mcp.tools.discovery import BENCHMARK_QUERY_ID_TOOL_LIMIT, build_benchmark_payload
@@ -124,7 +99,6 @@ class TestBenchmarkProjections:
         assert resource["available"] == tool["available_benchmarks"]
 
     def test_resource_keeps_its_own_field_names(self):
-        """The projection is not the tool payload under a different name."""
         from benchbox.mcp.resources.registry import _build_benchmark_detail
         from benchbox.mcp.tools.discovery import _get_benchmark_info_impl
 
@@ -150,7 +124,6 @@ class TestPlatformProjections:
                 assert resource_platform[field] == tool_platform[field], field
 
     def test_resource_omits_the_tool_only_fields(self):
-        """The projection is narrower on purpose, not accidentally."""
         from benchbox.mcp.resources.registry import _build_platforms_list
         from benchbox.mcp.tools.discovery import _list_platforms_impl
 
@@ -161,8 +134,6 @@ class TestPlatformProjections:
 
 
 class TestCredentialTableDerivation:
-    """setup.py's credential table is derived from the registry, not typed in."""
-
     def test_every_row_comes_from_a_registry_declaration(self):
         from benchbox.cli.commands.setup import credential_platforms
         from benchbox.core.platform_registry import PlatformRegistry

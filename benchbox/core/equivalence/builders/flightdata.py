@@ -1,5 +1,3 @@
-"""FlightData cross-surface gate builder."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,7 +6,6 @@ from benchbox.core.equivalence.builders.base import CrossSurfaceData, _load_duck
 
 
 def build_flightdata_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
-    """Generate FlightData data, load it into in-memory DuckDB, and wire both surfaces."""
     from benchbox.core.flightdata.benchmark import FlightDataBenchmark
     from benchbox.core.flightdata.dataframe_queries import get_dataframe_queries
 

@@ -1,9 +1,6 @@
-"""Tests for CloudSparkSessionManager session lifecycle management.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import time
 from unittest.mock import MagicMock, patch
@@ -27,10 +24,8 @@ pytestmark = [
 
 
 class TestSessionProtocol:
-    """Test SessionProtocol enum."""
-
     def test_protocol_values(self):
-        """Test all protocol values are defined."""
+
         assert SessionProtocol.LIVY.value == "livy"
         assert SessionProtocol.SPARK_CONNECT.value == "spark_connect"
         assert SessionProtocol.DATABRICKS_CONNECT.value == "databricks_connect"
@@ -38,10 +33,8 @@ class TestSessionProtocol:
 
 
 class TestSessionState:
-    """Test SessionState enum."""
-
     def test_state_values(self):
-        """Test all state values are defined."""
+
         assert SessionState.NOT_STARTED.value == "not_started"
         assert SessionState.STARTING.value == "starting"
         assert SessionState.IDLE.value == "idle"
@@ -52,10 +45,8 @@ class TestSessionState:
 
 
 class TestSessionConfig:
-    """Test SessionConfig dataclass."""
-
     def test_default_values(self):
-        """Test default configuration values."""
+
         config = SessionConfig(
             protocol=SessionProtocol.LIVY,
             endpoint="https://cluster.example.com",
@@ -75,7 +66,7 @@ class TestSessionConfig:
         assert config.cost_unit == "DBU"
 
     def test_custom_values(self):
-        """Test custom configuration values."""
+
         config = SessionConfig(
             protocol=SessionProtocol.DATABRICKS_CONNECT,
             endpoint="https://workspace.cloud.databricks.com",
@@ -99,52 +90,36 @@ class TestSessionConfig:
 
 
 class TestSessionMetrics:
-    """Test SessionMetrics dataclass."""
-
     def test_duration_not_started(self):
-        """Test duration when session not started."""
+
         metrics = SessionMetrics()
         assert metrics.duration_seconds == 0.0
 
     def test_duration_in_progress(self):
-        """Test duration while session is running (monotonic)."""
         from benchbox.utils.clock import mono_time
 
         metrics = SessionMetrics(start_time=mono_time() - 10)
 
-        # Should be approximately 10 seconds
         assert 9.5 <= metrics.duration_seconds <= 11.0
 
     def test_duration_completed(self):
-        """Test duration after session completed (monotonic)."""
         from benchbox.utils.clock import mono_time
 
         now = mono_time()
         metrics = SessionMetrics(start_time=now - 60, end_time=now - 30)
 
-        # Should be exactly 30 seconds (both endpoints are monotonic)
         assert metrics.duration_seconds == pytest.approx(30.0)
 
     def test_duration_fallback_for_legacy_wall_clock_values(self):
-        """Test backward-compat fallback when start/end are legacy wall-clock values.
-
-        Legacy code stored time.time() epoch values. The fallback path detects
-        negative elapsed (mono - wall_clock domain mismatch) and falls back to
-        wall-clock arithmetic.
-        """
         start = time.time() - 45.0
         end = time.time() - 15.0
 
         metrics = SessionMetrics(start_time=start, end_time=end)
 
-        # The primary path (elapsed_seconds) may return a large garbage value
-        # because start/end are wall-clock (~1.7B) while mono_time is small.
-        # BUT elapsed_seconds(wall, wall) returns wall - wall ≈ 30s which is >= 0,
-        # so the primary path actually works for wall-clock pairs too.
         assert 29.0 <= metrics.duration_seconds <= 31.0
 
     def test_default_counters(self):
-        """Test default counter values."""
+
         metrics = SessionMetrics()
 
         assert metrics.statements_executed == 0
@@ -154,10 +129,8 @@ class TestSessionMetrics:
 
 
 class TestCloudSparkSessionManagerFactories:
-    """Test CloudSparkSessionManager factory methods."""
-
     def test_for_emr(self):
-        """Test EMR session manager factory."""
+
         manager = CloudSparkSessionManager.for_emr(
             cluster_id="j-XXXXXXXXXXXXX",
             region="us-west-2",
@@ -170,7 +143,7 @@ class TestCloudSparkSessionManagerFactories:
         assert manager.config.credentials["region"] == "us-west-2"
 
     def test_for_dataproc(self):
-        """Test Dataproc session manager factory."""
+
         manager = CloudSparkSessionManager.for_dataproc(
             project_id="my-project",
             region="us-central1",
@@ -184,7 +157,7 @@ class TestCloudSparkSessionManagerFactories:
         assert manager.config.credentials["project_id"] == "my-project"
 
     def test_for_synapse(self):
-        """Test Synapse session manager factory."""
+
         manager = CloudSparkSessionManager.for_synapse(
             workspace_name="my-workspace",
             spark_pool_name="benchmark-pool",
@@ -197,7 +170,7 @@ class TestCloudSparkSessionManagerFactories:
         assert "azuresynapse.net" in manager.config.endpoint
 
     def test_for_databricks(self):
-        """Test Databricks session manager factory."""
+
         manager = CloudSparkSessionManager.for_databricks(
             host="https://workspace.cloud.databricks.com",
             cluster_id="1234-567890-abc123",
@@ -211,10 +184,8 @@ class TestCloudSparkSessionManagerFactories:
 
 
 class TestLivySessionManager:
-    """Test LivySessionManager implementation."""
-
     def test_initial_state(self):
-        """Test initial session state."""
+
         config = SessionConfig(
             protocol=SessionProtocol.LIVY,
             endpoint="https://cluster.example.com",
@@ -226,7 +197,6 @@ class TestLivySessionManager:
         assert manager.metrics.session_id is None
 
     def test_create_session(self):
-        """Test Livy session creation with mocked HTTP client."""
         config = SessionConfig(
             protocol=SessionProtocol.LIVY,
             endpoint="https://cluster.example.com",
@@ -234,12 +204,11 @@ class TestLivySessionManager:
         )
         manager = LivySessionManager(config)
 
-        # Mock HTTP client
         mock_client = MagicMock()
         mock_response = MagicMock()
         mock_response.json.side_effect = [
-            {"id": 42},  # Create session response
-            {"state": "idle"},  # Poll response
+            {"id": 42},
+            {"state": "idle"},
         ]
         mock_response.raise_for_status = MagicMock()
         mock_client.request.return_value = mock_response
@@ -253,7 +222,7 @@ class TestLivySessionManager:
         assert manager.metrics.session_id == "42"
 
     def test_execute_statement(self):
-        """Test statement execution in Livy session."""
+
         config = SessionConfig(
             protocol=SessionProtocol.LIVY,
             endpoint="https://cluster.example.com",
@@ -262,12 +231,11 @@ class TestLivySessionManager:
         manager._session_id = 42
         manager._state = SessionState.IDLE
 
-        # Mock HTTP client
         mock_client = MagicMock()
         mock_response = MagicMock()
         mock_response.json.side_effect = [
-            {"id": 1},  # Submit statement response
-            {"state": "available", "output": {"data": "result"}},  # Poll response
+            {"id": 1},
+            {"state": "available", "output": {"data": "result"}},
         ]
         mock_response.raise_for_status = MagicMock()
         mock_client.request.return_value = mock_response
@@ -280,7 +248,7 @@ class TestLivySessionManager:
         assert manager.state == SessionState.IDLE
 
     def test_execute_statement_no_session(self):
-        """Test error when executing without session."""
+
         config = SessionConfig(
             protocol=SessionProtocol.LIVY,
             endpoint="https://cluster.example.com",
@@ -291,7 +259,7 @@ class TestLivySessionManager:
             manager.execute_statement("SELECT 1")
 
     def test_close_session(self):
-        """Test session closure."""
+
         config = SessionConfig(
             protocol=SessionProtocol.LIVY,
             endpoint="https://cluster.example.com",
@@ -300,7 +268,6 @@ class TestLivySessionManager:
         manager._session_id = 42
         manager._state = SessionState.IDLE
 
-        # Mock HTTP client
         mock_client = MagicMock()
         mock_response = MagicMock()
         mock_response.json.return_value = {}
@@ -314,7 +281,7 @@ class TestLivySessionManager:
         assert manager.state == SessionState.DEAD
 
     def test_get_session_info_no_session(self):
-        """Test session info when no session active."""
+
         config = SessionConfig(
             protocol=SessionProtocol.LIVY,
             endpoint="https://cluster.example.com",
@@ -326,20 +293,19 @@ class TestLivySessionManager:
         assert info == {"state": "not_started"}
 
     def test_session_context_manager(self):
-        """Test session context manager."""
+
         config = SessionConfig(
             protocol=SessionProtocol.LIVY,
             endpoint="https://cluster.example.com",
         )
         manager = LivySessionManager(config)
 
-        # Mock session creation and closure
         mock_client = MagicMock()
         mock_response = MagicMock()
         mock_response.json.side_effect = [
-            {"id": 42},  # Create session
-            {"state": "idle"},  # Poll for ready
-            {},  # Close session
+            {"id": 42},
+            {"state": "idle"},
+            {},
         ]
         mock_response.raise_for_status = MagicMock()
         mock_client.request.return_value = mock_response
@@ -354,10 +320,8 @@ class TestLivySessionManager:
 
 
 class TestDatabricksConnectSessionManager:
-    """Test DatabricksConnectSessionManager implementation."""
-
     def test_initial_state(self):
-        """Test initial session state."""
+
         config = SessionConfig(
             protocol=SessionProtocol.DATABRICKS_CONNECT,
             endpoint="https://workspace.cloud.databricks.com",
@@ -370,7 +334,7 @@ class TestDatabricksConnectSessionManager:
         assert manager._spark is None
 
     def test_create_session_import_error(self):
-        """Test session creation when databricks-connect not installed."""
+
         config = SessionConfig(
             protocol=SessionProtocol.DATABRICKS_CONNECT,
             endpoint="https://workspace.cloud.databricks.com",
@@ -383,7 +347,6 @@ class TestDatabricksConnectSessionManager:
                 manager.create_session()
 
     def test_create_session_success(self):
-        """Test successful session creation with mocked Databricks Connect."""
         config = SessionConfig(
             protocol=SessionProtocol.DATABRICKS_CONNECT,
             endpoint="https://workspace.cloud.databricks.com",
@@ -391,7 +354,6 @@ class TestDatabricksConnectSessionManager:
         )
         manager = DatabricksConnectSessionManager(config)
 
-        # Mock DatabricksSession
         mock_spark = MagicMock()
         mock_builder = MagicMock()
         mock_builder.host.return_value = mock_builder
@@ -407,7 +369,7 @@ class TestDatabricksConnectSessionManager:
             assert result == mock_spark
 
     def test_execute_sql_statement(self):
-        """Test SQL statement execution."""
+
         config = SessionConfig(
             protocol=SessionProtocol.DATABRICKS_CONNECT,
             endpoint="https://workspace.cloud.databricks.com",
@@ -416,7 +378,6 @@ class TestDatabricksConnectSessionManager:
         manager = DatabricksConnectSessionManager(config)
         manager._state = SessionState.IDLE
 
-        # Mock Spark session
         mock_spark = MagicMock()
         mock_result = [MagicMock(asDict=lambda: {"col1": 1})]
         mock_spark.sql.return_value.collect.return_value = mock_result
@@ -429,7 +390,7 @@ class TestDatabricksConnectSessionManager:
         assert manager.metrics.statements_executed == 1
 
     def test_execute_statement_no_session(self):
-        """Test error when executing without session."""
+
         config = SessionConfig(
             protocol=SessionProtocol.DATABRICKS_CONNECT,
             endpoint="https://workspace.cloud.databricks.com",
@@ -441,7 +402,7 @@ class TestDatabricksConnectSessionManager:
             manager.execute_statement("SELECT 1")
 
     def test_close_session(self):
-        """Test session closure."""
+
         config = SessionConfig(
             protocol=SessionProtocol.DATABRICKS_CONNECT,
             endpoint="https://workspace.cloud.databricks.com",
@@ -461,7 +422,7 @@ class TestDatabricksConnectSessionManager:
         assert manager.metrics.end_time is not None
 
     def test_get_session_info_no_session(self):
-        """Test session info when no session active."""
+
         config = SessionConfig(
             protocol=SessionProtocol.DATABRICKS_CONNECT,
             endpoint="https://workspace.cloud.databricks.com",
@@ -474,7 +435,7 @@ class TestDatabricksConnectSessionManager:
         assert info == {"state": "not_started"}
 
     def test_get_session_info_active_session(self):
-        """Test session info with active session."""
+
         config = SessionConfig(
             protocol=SessionProtocol.DATABRICKS_CONNECT,
             endpoint="https://workspace.cloud.databricks.com",
@@ -496,10 +457,8 @@ class TestDatabricksConnectSessionManager:
 
 
 class TestSessionManagerIsActive:
-    """Test is_active property for different states."""
-
     def test_is_active_idle(self):
-        """Test is_active when idle."""
+
         config = SessionConfig(
             protocol=SessionProtocol.LIVY,
             endpoint="https://cluster.example.com",
@@ -510,7 +469,7 @@ class TestSessionManagerIsActive:
         assert manager.is_active is True
 
     def test_is_active_busy(self):
-        """Test is_active when busy."""
+
         config = SessionConfig(
             protocol=SessionProtocol.LIVY,
             endpoint="https://cluster.example.com",
@@ -521,7 +480,7 @@ class TestSessionManagerIsActive:
         assert manager.is_active is True
 
     def test_is_not_active_not_started(self):
-        """Test is_active when not started."""
+
         config = SessionConfig(
             protocol=SessionProtocol.LIVY,
             endpoint="https://cluster.example.com",
@@ -531,7 +490,7 @@ class TestSessionManagerIsActive:
         assert manager.is_active is False
 
     def test_is_not_active_dead(self):
-        """Test is_active when dead."""
+
         config = SessionConfig(
             protocol=SessionProtocol.LIVY,
             endpoint="https://cluster.example.com",

@@ -13,6 +13,8 @@ from collections import Counter
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from check_comment_policy import DIRECTIVES
+
 PYTHON_SUFFIXES = {".py", ".pyi"}
 SCOPE_NODES = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
 WORKTREE = "WORKTREE"
@@ -26,6 +28,12 @@ IGNORED_TOKENS = {
     tokenize.ENDMARKER,
 }
 ANCHOR_WIDTH = 4
+DIRECTIVE_COMMENT = re.compile(
+    rf"(?:{'|'.join(DIRECTIVES)}|# type:\s*ignore(?:\[[^\]\r\n]*\])?|# noqa|# (?:ruff|flake8): noqa)"
+    r"|#\s*(?:(?:ruff|flake8)\s*:\s*)?noqa"
+    r"(?::\s*[A-Z]+[0-9]+(?:[ \t,#][^\r\n]*)?|(?:[ \t]+[^\r\n]*)?)",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -92,7 +100,7 @@ def docstring_spans(tree: ast.AST) -> list[tuple[tuple[int, int], tuple[int, int
     return spans
 
 
-def comment_anchors(source: bytes, tree: ast.AST) -> list[tuple[str, bool, tuple[str, ...], tuple[str, ...]]]:
+def comment_anchors(source: bytes, tree: ast.AST) -> list[tuple[str, bool, int, tuple[str, ...], tuple[str, ...]]]:
     spans = docstring_spans(tree)
     code: list[str] = []
     seen: list[tuple[str, bool, int]] = []
@@ -112,9 +120,13 @@ def comment_anchors(source: bytes, tree: ast.AST) -> list[tuple[str, bool, tuple
             code.append(token.string)
             last_row = token.end[0]
     return [
-        (text, inline, tuple(code[max(0, at - ANCHOR_WIDTH) : at]), tuple(code[at : at + ANCHOR_WIDTH]))
+        (text, inline, at, tuple(code[max(0, at - ANCHOR_WIDTH) : at]), tuple(code[at : at + ANCHOR_WIDTH]))
         for text, inline, at in seen
     ]
+
+
+def directive_anchors(source: bytes, tree: ast.AST) -> list[tuple[str, bool, int, tuple[str, ...], tuple[str, ...]]]:
+    return [anchor for anchor in comment_anchors(source, tree) if DIRECTIVE_COMMENT.fullmatch(anchor[0])]
 
 
 ENCODING_COOKIE = re.compile(rb"^[ \t\f]*#.*?coding[:=][ \t]*[-\w.]+")
@@ -166,7 +178,7 @@ class DocstringStripper(ast.NodeTransformer):
         visited = super().generic_visit(node)
         if isinstance(visited, SCOPE_NODES) and leading_docstring(visited) is not None:
             del visited.body[0]
-            if not visited.body:
+            if not visited.body and not isinstance(visited, ast.Module):
                 visited.body.append(ast.Pass())
                 self.emptied += 1
         return visited
@@ -175,6 +187,9 @@ class DocstringStripper(ast.NodeTransformer):
 def normalized(tree: ast.AST) -> tuple[str, int]:
     stripper = DocstringStripper()
     stripped = stripper.visit(tree)
+    if isinstance(stripped, ast.Module):
+        for type_ignore in stripped.type_ignores:
+            type_ignore.lineno = 0
     return ast.dump(stripped, include_attributes=False), stripper.emptied
 
 
@@ -190,6 +205,10 @@ def compare_python(path: str, base: bytes, head: bytes) -> FileReport:
             Counter(comment_anchors(base, base_tree)),
             Counter(comment_anchors(head, head_tree)),
         )
+        base_directives, head_directives = (
+            Counter(directive_anchors(base, base_tree)),
+            Counter(directive_anchors(head, head_tree)),
+        )
         base_docs, head_docs = Counter(docstrings(base_tree)), Counter(docstrings(head_tree))
     except (SyntaxError, ValueError, tokenize.TokenError, MemoryError, RecursionError) as exc:
         report.status = "error"
@@ -200,6 +219,9 @@ def compare_python(path: str, base: bytes, head: bytes) -> FileReport:
     if base_dump != head_dump:
         report.status = "drift"
         report.problems.append("the executable syntax tree differs beyond removed docstrings and comments")
+    if base_directives != head_directives:
+        report.status = "drift"
+        report.problems.append("a syntax directive was removed, changed, or moved from its code anchor")
     if protected_lines(base) != protected_lines(head):
         report.status = "drift"
         report.problems.append("the shebang or encoding declaration changed")

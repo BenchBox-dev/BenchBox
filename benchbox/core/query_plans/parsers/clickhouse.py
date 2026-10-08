@@ -1,21 +1,3 @@
-"""ClickHouse query plan parser.
-
-Parses ClickHouse ``EXPLAIN PLAN`` output into the harmonized ``QueryPlanDAG``.
-``EXPLAIN PLAN`` emits an indentation-based logical-plan tree (two spaces per
-level), structurally similar to DuckDB's text plan, e.g.::
-
-    Expression ((Projection + Before ORDER BY))
-      Aggregating
-        Expression (Before GROUP BY)
-          Filter (WHERE)
-            ReadFromMergeTree (default.lineitem)
-
-Each line is ``<NodeName> [(<details>)]``; nesting is conveyed purely by leading
-whitespace. The parser also tolerates ``EXPLAIN PIPELINE`` output (where the
-logical node names appear in parentheses, e.g. ``(Aggregating)``) by stripping
-the wrapping parentheses before mapping.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -33,10 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 class ClickHouseQueryPlanParser(QueryPlanParser):
-    """Parser for ClickHouse ``EXPLAIN PLAN`` (and ``EXPLAIN PIPELINE``) text output."""
-
-    # Ordered (substring, type) pairs; first match in the lower-cased node name
-    # wins, so more specific names precede generic ones.
     _OPERATOR_KEYWORDS: tuple[tuple[str, LogicalOperatorType], ...] = (
         ("readfrommergetree", LogicalOperatorType.SCAN),
         ("readfrommemorystorage", LogicalOperatorType.SCAN),
@@ -48,8 +26,6 @@ class ClickHouseQueryPlanParser(QueryPlanParser):
         ("mergingaggregated", LogicalOperatorType.AGGREGATE),
         ("aggregating", LogicalOperatorType.AGGREGATE),
         ("aggregat", LogicalOperatorType.AGGREGATE),
-        # ArrayJoin is a single-input column-expansion operator, NOT a relational
-        # join; list it before "join" so the substring match does not misclassify it.
         ("arrayjoin", LogicalOperatorType.OTHER),
         ("join", LogicalOperatorType.JOIN),
         ("filter", LogicalOperatorType.FILTER),
@@ -67,7 +43,6 @@ class ClickHouseQueryPlanParser(QueryPlanParser):
         ("expression", LogicalOperatorType.PROJECT),
     )
 
-    # "NodeName (details...)" — capture the leading node name and optional parens.
     _NODE_PATTERN = re.compile(r"^(?P<name>[A-Za-z][\w]*)\s*(?:\((?P<details>.*)\))?\s*$")
 
     def __init__(self):
@@ -98,7 +73,6 @@ class ClickHouseQueryPlanParser(QueryPlanParser):
             indent = len(raw_line) - len(stripped)
 
             content = stripped.strip()
-            # EXPLAIN PIPELINE wraps logical node names in parens: "(Aggregating)".
             paren = re.match(r"^\((?P<inner>[A-Za-z][\w]*)\)$", content)
             if paren:
                 name, details = paren.group("inner"), ""
@@ -108,7 +82,6 @@ class ClickHouseQueryPlanParser(QueryPlanParser):
                     name = match.group("name")
                     details = (match.group("details") or "").strip()
                 else:
-                    # Fall back to the first token as the node name.
                     name = content.split()[0] if content.split() else content
                     details = content[len(name) :].strip()
             if not name:
@@ -125,8 +98,6 @@ class ClickHouseQueryPlanParser(QueryPlanParser):
             while stack and stack[-1][0] >= node["indent"]:
                 stack.pop()
             if not stack:
-                # First root wins; any later top-level node becomes its child so a
-                # single DAG is always returned (PIPELINE output can be flat-ish).
                 if root is None:
                     root = logical_op
                 else:
@@ -174,13 +145,6 @@ class ClickHouseQueryPlanParser(QueryPlanParser):
 
     @staticmethod
     def _extract_table(details: str) -> str | None:
-        """Extract the table name from a ReadFromMergeTree detail.
-
-        ClickHouse names the source as ``db.table`` (e.g. ``default.lineitem``).
-        Prefer a dotted identifier; otherwise accept a single bare identifier that
-        is the whole detail. Multi-word details (e.g. ``Sorting for ORDER BY``,
-        ``WHERE ...``) yield None rather than a garbage first token.
-        """
         if not details:
             return None
         dotted = re.search(r"\b([A-Za-z_]\w*\.[A-Za-z_][\w.]*)", details)

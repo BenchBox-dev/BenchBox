@@ -1,28 +1,8 @@
-"""Bind TPC-DS DataFrame query parameters to the values dsqgen substitutes into the SQL.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-The SQL surface takes its substitution values from dsqgen. The DataFrame surface reads its own
-parameter keys (``year``, ``months``, ``store_sk``) from ``default_parameters.yaml``, which holds
-representative values valid for scale factor 1 and does not follow dsqgen's seed or scale. An adapter
-maps what ``dsqgen -LOG`` reports for a query to the DataFrame keys for that query, so both surfaces
-can be run on the same parameters.
+# TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council
 
-A flat name map is not enough. Q39's SQL uses ``[MONTH]`` and ``[MONTH]+1``, ``-LOG`` records only
-``MONTH.01``, and the DataFrame implementation takes ``months: [m, m + 1]``, so an adapter reproduces
-the template's arithmetic. One adapter is written per query, and only for queries whose implementation
-reads every value the SQL varies: Q41 has none, because its implementation hard-codes colors and
-reads ``manufact_start`` with a literal fallback, so binding it would hide that gap.
-
-Each binding records where its values came from (the dsqgen binary, seed, scale factor and stream), so
-a result can be tied to the parameters that produced it. ``stream_id`` is dsqgen's ``-STREAMS``
-stream; ``DSQGenBinary.generate`` does not select a stream, so SQL for a stream above 0 has to be
-rendered from the same values (``DSQGenBinary.generate_with_parameters``).
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -38,8 +18,6 @@ Adapter = Callable[[Mapping[str, str]], dict[str, Any]]
 
 @dataclass(frozen=True)
 class ParameterBinding:
-    """DataFrame parameters for one query, with the dsqgen run they were derived from."""
-
     query_id: int
     scale_factor: float
     seed: int | None
@@ -54,7 +32,6 @@ def _year_and_month(values: Mapping[str, str]) -> tuple[int, int]:
 
 
 def _listed(values: Mapping[str, str], name: str, first: int = 1, last: int | None = None) -> list[str]:
-    """The values logged as ``NAME.nn`` for ``first`` through ``last`` (every one when ``last`` is omitted)."""
     prefix = f"{name}."
     numbered = sorted((int(key[len(prefix) :]), value) for key, value in values.items() if key.startswith(prefix))
     return [value for number, value in numbered if number >= first and (last is None or number <= last)]
@@ -70,27 +47,22 @@ def _demographics(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _dms(values: Mapping[str, str]) -> dict[str, Any]:
-    # Q65, Q67 and Q70 all test d_month_seq between DMS and DMS+11; the implementations add the 11.
     return {"dms": int(values["DMS.01"])}
 
 
 def _dms_value(values: Mapping[str, str]) -> int:
-    # The SQL spans [DMS] through [DMS]+11 (to +23 for Q59); the implementations add the offsets.
     return int(values["DMS.01"])
 
 
 def _dms_window(values: Mapping[str, str]) -> dict[str, Any]:
-    # Q51, Q53, Q62 and Q63 take one month sequence and read it as ``dms``.
     return {"dms": _dms_value(values)}
 
 
 def _month_seq(values: Mapping[str, str]) -> dict[str, Any]:
-    # Q86, Q87, Q97 and Q99 filter d_month_seq to DMS through DMS + 11; the implementations add the 11.
     return {"dms": int(values["DMS.01"])}
 
 
 def _q1(values: Mapping[str, str]) -> dict[str, Any]:
-    # STATE is derived from COUNTY inside the template; only the state reaches the SQL.
     return {
         "year": int(values["YEAR.01"]),
         "state": values["STATE.01"],
@@ -129,7 +101,6 @@ def _q7(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _q8(values: Mapping[str, str]) -> dict[str, Any]:
-    # The template draws 400 zip codes; every one reaches the SQL.
     return {"year": int(values["YEAR.01"]), "qoy": int(values["QOY.01"]), "zip_codes": _listed(values, "ZIP")}
 
 
@@ -143,7 +114,6 @@ def _q9(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _q10(values: Mapping[str, str]) -> dict[str, Any]:
-    # The template draws ten counties and its SQL uses the first five.
     return {
         "year": int(values["YEAR.01"]),
         "month": int(values["MONTH.01"]),
@@ -152,14 +122,11 @@ def _q10(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _q12(values: Mapping[str, str]) -> dict[str, Any]:
-    # YEAR only picks the date the template draws SDATE from; the SQL filters on the dates and categories.
     return {"item_categories": _listed(values, "CATEGORY"), "sales_date": values["SDATE.01"]}
 
 
 def _q13(values: Mapping[str, str]) -> dict[str, Any]:
-    # The SQL has three demographic groups, each a marital status, an education status and three states.
     marital, education, states = _listed(values, "MS"), _listed(values, "ES"), _listed(values, "STATE")
-    # The template fixes the year at 2001 rather than drawing it.
     parameters: dict[str, Any] = {"year": 2001}
     for group in range(3):
         parameters[f"demo{group + 1}_marital"] = marital[group]
@@ -183,7 +150,6 @@ def _q16(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _q17(values: Mapping[str, str]) -> dict[str, Any]:
-    # The quarters are fixed in the template (Q1 to Q3); only the year is drawn.
     return {"year": int(values["YEAR.01"]), "quarter": 1}
 
 
@@ -198,22 +164,18 @@ def _q18(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _q20(values: Mapping[str, str]) -> dict[str, Any]:
-    # SDATE is already the first day of the 30-day window; the implementation adds the 30 days.
     return {"item_categories": _listed(values, "CATEGORY"), "sales_date": values["SDATE.01"]}
 
 
 def _q21(values: Mapping[str, str]) -> dict[str, Any]:
-    # SALES_DATE is the pivot; the implementation reads the 30 days on either side from it.
     return {"sales_date": values["SALES_DATE.01"]}
 
 
 def _q22(values: Mapping[str, str]) -> dict[str, Any]:
-    # The SQL covers month sequences DMS through DMS+11; the implementation adds the 11.
     return {"dms": int(values["DMS.01"])}
 
 
 def _q23(values: Mapping[str, str]) -> dict[str, Any]:
-    # The SQL looks at years YEAR through YEAR+3 for frequent items and YEAR itself for the sales.
     year, month = _year_and_month(values)
     return {"year": year, "month": month, "top_percent": int(values["TOPPERCENT.01"])}
 
@@ -236,7 +198,6 @@ def _q26(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _q27(values: Mapping[str, str]) -> dict[str, Any]:
-    # The six states are logged under their own names (STATE_A to STATE_F), one value each.
     states = [values[f"STATE_{letter}.01"] for letter in "ABCDEF"]
     return {**_demographics(values), "states": states}
 
@@ -263,7 +224,6 @@ def _q31(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _q32(values: Mapping[str, str]) -> dict[str, Any]:
-    # The template's YEAR only feeds CSDATE, which is the first day of a 90-day window in the SQL.
     return {"manufact_id": int(values["IMID.01"]), "sales_date": values["CSDATE.01"]}
 
 
@@ -273,7 +233,6 @@ def _q33(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _q34(values: Mapping[str, str]) -> dict[str, Any]:
-    # The SQL tests d_year in (YEAR, YEAR+1, YEAR+2); the implementation adds the offsets itself.
     return {
         "year": int(values["YEAR.01"]),
         "counties": [values[f"COUNTY_{letter}.01"] for letter in "ABCDEFGH"],
@@ -305,7 +264,6 @@ def _q36(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _q37(values: Mapping[str, str]) -> dict[str, Any]:
-    # The SQL tests i_current_price between PRICE and PRICE+30.
     price = int(values["PRICE.01"])
     return {
         "current_price_min": price,
@@ -320,7 +278,6 @@ def _q38(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _q39(values: Mapping[str, str]) -> dict[str, Any]:
-    # The SQL compares month MONTH with month MONTH+1; the log has only MONTH.
     year, month = _year_and_month(values)
     return {"year": year, "months": [month, month + 1]}
 
@@ -377,13 +334,11 @@ def _q50(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _q54(values: Mapping[str, str]) -> dict[str, Any]:
-    # CINDX only picks CATEGORY and CLASS from the categories distribution; the SQL receives the names.
     year, month = _year_and_month(values)
     return {"year": year, "month": month, "category": values["CATEGORY.01"], "class": values["CLASS.01"]}
 
 
 def _q58(values: Mapping[str, str]) -> dict[str, Any]:
-    # YEAR only bounds the draw of SALES_DATE; the SQL receives the date.
     return {"sales_date": values["SALES_DATE.01"]}
 
 
@@ -393,7 +348,6 @@ def _q59(values: Mapping[str, str]) -> dict[str, Any]:
 
 def _q60(values: Mapping[str, str]) -> dict[str, Any]:
     year, month = _year_and_month(values)
-    # GMT is a whole number of hours in the fips_county distribution; the SQL compares it with a decimal column.
     return {"year": year, "month": month, "category": values["CATEGORY.01"], "gmt_offset": int(values["GMT.01"])}
 
 
@@ -402,8 +356,6 @@ def _q65(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _q66(values: Mapping[str, str]) -> dict[str, Any]:
-    # The SQL window is TIMEONE through TIMEONE+28800; the implementations add the 28800. The carrier
-    # order matters because the query reports it as ship_carriers.
     return {
         "year": int(values["YEAR.01"]),
         "time_start": int(values["TIMEONE.01"]),
@@ -480,7 +432,6 @@ def _q78(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _q79(values: Mapping[str, str]) -> dict[str, Any]:
-    # The SQL tests d_year in (YEAR, YEAR+1, YEAR+2); the implementations add the offsets.
     return {
         "year": int(values["YEAR.01"]),
         "dep_count": int(values["DEPCNT.01"]),
@@ -493,8 +444,6 @@ def _q81(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _q82(values: Mapping[str, str]) -> dict[str, Any]:
-    # The SQL tests i_current_price between PRICE and PRICE+30 and a 60-day window from INVDATE. YEAR only
-    # constrains how INVDATE was drawn, so it does not reach the SQL.
     price = int(values["PRICE.01"])
     return {
         "price_min": price,
@@ -505,12 +454,10 @@ def _q82(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _q83(values: Mapping[str, str]) -> dict[str, Any]:
-    # Three dates, in the order the template lists them.
     return {"dates": [values["RETURNED_DATE_ONE.01"], values["RETURNED_DATE_TWO.01"], values["RETURNED_DATE_THREE.01"]]}
 
 
 def _q84(values: Mapping[str, str]) -> dict[str, Any]:
-    # The SQL bounds the income band at INCOME and INCOME + 50000; the implementation adds the 50000.
     return {"city": values["CITY.01"], "income_band": int(values["INCOME.01"])}
 
 
@@ -536,7 +483,6 @@ def _q89(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _q90(values: Mapping[str, str]) -> dict[str, Any]:
-    # The SQL takes the two hours HOUR_AM and HOUR_AM + 1, and HOUR_PM and HOUR_PM + 1; the implementation adds the 1.
     return {
         "hour_am": int(values["HOUR_AM.01"]),
         "hour_pm": int(values["HOUR_PM.01"]),
@@ -555,7 +501,6 @@ def _q91(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _q92(values: Mapping[str, str]) -> dict[str, Any]:
-    # YEAR only bounds the draw of WSDATE; the SQL uses the manufacturer id and the date.
     return {"manufact_id": int(values["IMID.01"]), "sales_date": values["WSDATE.01"]}
 
 
@@ -573,7 +518,6 @@ def _q96(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _q98(values: Mapping[str, str]) -> dict[str, Any]:
-    # YEAR only bounds the draw of SDATE; the SQL uses the three categories and the date.
     return {"categories": _listed(values, "CATEGORY"), "sales_date": values["SDATE.01"]}
 
 
@@ -733,7 +677,6 @@ ADAPTERS: dict[int, Adapter] = {
 
 
 def adapter_query_ids() -> tuple[int, ...]:
-    """Queries that have an adapter, in ascending order."""
     return tuple(sorted(ADAPTERS))
 
 
@@ -750,12 +693,6 @@ def bind_parameters(
     stream_id: int = 0,
     dsqgen: Any | None = None,
 ) -> ParameterBinding:
-    """The DataFrame parameters for ``query_id`` that match dsqgen's SQL for the same seed, scale and stream.
-
-    Raises:
-        KeyError: If the query has no adapter (it must not silently fall back to the defaults).
-        ValueError: If dsqgen did not log a value the adapter needs.
-    """
     if query_id not in ADAPTERS:
         raise KeyError(f"Q{query_id} has no parameter adapter; adapters exist for {list(adapter_query_ids())}")
     if dsqgen is None:

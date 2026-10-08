@@ -1,5 +1,3 @@
-"""Deprecated compare-dataframes compatibility command."""
-
 import json
 import sys
 from pathlib import Path
@@ -9,7 +7,12 @@ import click
 from benchbox.cli.shared import console
 
 
-@click.command("compare-dataframes", hidden=True, deprecated=True)
+@click.command(
+    "compare-dataframes",
+    hidden=True,
+    deprecated=True,
+    help=("Compare DataFrame platform performance. Deprecated; use `benchbox compare`."),
+)
 @click.option("--platforms", "-p", multiple=True, help="DataFrame platforms to compare. Repeatable.")
 @click.option("--benchmark", "-b", default="tpch", show_default=True, type=click.Choice(["tpch"]))
 @click.option("--scale", "-s", default=0.01, show_default=True, type=float)
@@ -38,7 +41,6 @@ def compare_dataframes(
     theme,
     list_platforms,
 ):
-    """Compare DataFrame platform performance. Deprecated; use `benchbox compare`."""
     if list_platforms:
         _list_available_platforms()
         return

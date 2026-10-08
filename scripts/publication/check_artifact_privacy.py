@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""Scan assembled site artifacts for sensitive data, tokens, and unscrubbed private paths (A4 w1, w3).
-
-Usage:
-  uv run python scripts/publication/check_artifact_privacy.py [site_dir]
-"""
 
 from __future__ import annotations
 
@@ -13,7 +8,6 @@ import re
 import sys
 from pathlib import Path
 
-# Patterns that should never appear in public site output
 SENSITIVE_PATTERNS = (
     (re.compile(r"ghp_[0-9a-zA-Z]{36}"), "GitHub Personal Access Token (ghp_)"),
     (re.compile(r"github_pat_[0-9a-zA-Z_]{82}"), "GitHub Fine-Grained PAT"),
@@ -21,10 +15,6 @@ SENSITIVE_PATTERNS = (
     (re.compile(r"AKIA[0-9A-Z]{16}"), "AWS Access Key ID"),
 )
 
-# Verbatim example credentials published by AWS in their own documentation.
-# Zero entropy and publicly listed as examples; no real credential can equal
-# these strings, so they are exempt from the AKIA finding (docs prose and
-# generated API references embed them).
 AWS_EXAMPLE_TOKENS = frozenset(
     {
         "AKIAIOSFODNN7EXAMPLE",
@@ -32,16 +22,8 @@ AWS_EXAMPLE_TOKENS = frozenset(
     }
 )
 
-# Matches a single connection-string token and captures user/password/host.
-# Each component excludes whitespace, slashes, and '@' so the match cannot
-# slurp across prose: a bare "postgresql://...')" mention followed pages later
-# by an '@' must not count as credentials (observed in tpc-di docs).
 _CONNECTION_RE = re.compile(r"(?:postgresql|postgres|mysql)://([^\s/:@]+):([^\s/@]+)@([^\s/@]+)")
 
-# Literal placeholder passwords used in documentation examples. A connection
-# string whose password is exactly one of these (case-insensitive) is prose,
-# not a leak; any other password still fails. Deliberately narrow: a real
-# leaked credential never has the literal password "password".
 PLACEHOLDER_PASSWORDS = frozenset(
     {
         "password",
@@ -56,7 +38,6 @@ PLACEHOLDER_PASSWORDS = frozenset(
 
 
 def _connection_credential_leaks(content: str) -> int:
-    """Count connection strings with non-placeholder passwords."""
     leaks = 0
     for match in _CONNECTION_RE.finditer(content):
         if match.group(2).strip().lower() not in PLACEHOLDER_PASSWORDS:
@@ -64,7 +45,6 @@ def _connection_credential_leaks(content: str) -> int:
     return leaks
 
 
-# Text extensions to scan
 SCANNABLE_EXTENSIONS = (
     ".html",
     ".htm",
@@ -81,7 +61,6 @@ SCANNABLE_EXTENSIONS = (
 
 
 def scan_file_for_privacy(file_path: Path) -> list[str]:
-    """Scan a single file for sensitive content violations."""
     findings: list[str] = []
     try:
         content = file_path.read_text(encoding="utf-8", errors="ignore")
@@ -104,7 +83,6 @@ def scan_file_for_privacy(file_path: Path) -> list[str]:
 
 
 def scan_directory_for_privacy(target_dir: Path) -> list[str]:
-    """Recursively scan all text assets in target_dir for privacy and sensitivity leaks."""
     if not target_dir.exists():
         return [f"Target directory '{target_dir}' does not exist"]
 

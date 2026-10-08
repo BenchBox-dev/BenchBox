@@ -1,34 +1,6 @@
-"""Core DataFrame abstractions for BenchBox.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides the foundational abstractions for DataFrame benchmarking,
-enabling 95%+ code reuse across 8 dataframe platforms using a family-based
-architecture.
-
-Architecture:
-- DataFrameQuery: Query definition supporting dual-family implementations
-- DataFrameContext: Table access and expression helpers
-- DataFrameOps: Protocol defining common DataFrame operations
-- DataFrameGroupBy: Protocol for grouped operations
-
-Family-Based Design:
-Python dataframe libraries cluster into 2 syntactic families:
-1. Pandas-like: Pandas, cuDF, Vaex, Dask
-   - String-based column access: df['column']
-   - Boolean indexing: df[df['col'] > 5]
-   - Dict aggregation: .agg({'col': 'sum'})
-
-2. Expression-based: Polars, PySpark, DataFusion
-   - Expression column access: col('column')
-   - Expression filtering: df.filter(col('col') > 5)
-   - Expression aggregation: .agg(col('col').sum())
-
-Each query is implemented once per family, with platform differences
-isolated to thin adapters handling I/O and type conversions.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from benchbox.core.dataframe.benchmark_suite import (
     PLATFORM_CAPABILITIES,
@@ -138,17 +110,13 @@ from benchbox.core.dataframe.validation import (
 )
 
 __all__ = [
-    # Query definitions
     "DataFrameQuery",
     "QueryCategory",
     "QueryRegistry",
-    # Context
     "DataFrameContext",
     "DataFrameContextImpl",
-    # Protocols
     "DataFrameOps",
     "DataFrameGroupBy",
-    # Maintenance Operations
     "DataFrameMaintenanceOperations",
     "DataFrameMaintenanceCapabilities",
     "BaseDataFrameMaintenanceOperations",
@@ -156,18 +124,15 @@ __all__ = [
     "MaintenanceOperationType",
     "TransactionIsolation",
     "get_maintenance_operations_for_platform",
-    # Pre-defined capabilities
     "DELTA_LAKE_CAPABILITIES",
     "ICEBERG_CAPABILITIES",
     "PARQUET_CAPABILITIES",
     "POLARS_CAPABILITIES",
-    # Enums
     "JoinType",
     "AggregateFunction",
     "SortOrder",
     "DataFormat",
     "ExecutionModel",
-    # Capabilities
     "PlatformCapabilities",
     "MemoryEstimate",
     "MemoryCheckResult",
@@ -181,7 +146,6 @@ __all__ = [
     "validate_scale_factor",
     "format_memory_warning",
     "recommend_platform_for_sf",
-    # Validation
     "ValidationResult",
     "ValidationConfig",
     "ValidationLevel",
@@ -193,7 +157,6 @@ __all__ = [
     "validate_row_count",
     "validate_column_names",
     "fuzzy_float_compare",
-    # Data Loading
     "DataFrameDataLoader",
     "DataCache",
     "DataLoadResult",
@@ -204,7 +167,6 @@ __all__ = [
     "SchemaMapper",
     "get_tpch_column_names",
     "get_tpcds_column_names",
-    # Profiling
     "DataFrameProfiler",
     "QueryExecutionProfile",
     "QueryPlan",
@@ -221,7 +183,6 @@ __all__ = [
     "profile_query_execution",
     "track_memory",
     "get_current_memory_mb",
-    # Benchmark Suite
     "BenchmarkConfig",
     "ComparisonSummary",
     "DataFrameBenchmarkSuite",

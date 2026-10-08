@@ -1,19 +1,3 @@
-"""Build canonical JoinOrder IMDb data artifacts.
-
-This script is intentionally outside the BenchBox runtime package. It owns the
-network, Docker, and PostgreSQL tooling needed to turn the upstream Harvard
-Dataverse pg_dump into build artifacts consumed by the cutover TODO.
-
-Foundation scope:
-  - resolve and download the Harvard Dataverse pg_dump for doi:10.7910/DVN/2QYZBT
-  - compute and record the upstream sha256 in a local build manifest
-  - restore the custom-format pg_dump into a pinned PostgreSQL container
-  - validate expected JOB tables and row counts within the TODO's +/-1% gate
-  - extract CSV with explicit UTF-8/NULL semantics
-  - convert to zstd Parquet, assemble manifests, gates, cardinalities, archive
-  - stage the draft data release and emit the runtime data_manifest.toml
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -38,11 +22,6 @@ from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-# Shared, single-source-of-truth logical-hash algorithm. The build script runs
-# under the repo-root uv environment, so it imports the same primitives the
-# runtime loader/verifier use — build and runtime therefore cannot compute the
-# logical hash differently (see
-# _project/decisions/joinorder-logical-verification-2026-07-08.md).
 from benchbox.core.data_fetch.logical_hash import (
     LOGICAL_CONTENT_VERSION,
     LogicalColumn,
@@ -113,9 +92,6 @@ CANONICAL_NULL_COUNTS: dict[tuple[str, str], tuple[int, int]] = {
     ("title", "episode_of_id"): (985_048, 2_528_312),
 }
 
-# JOB / IMDb cardinalities published with the canonical CSV import flow and
-# cross-checked during w4 against the restored Dataverse pg_dump. Small lookup
-# tables effectively require exact matches under the +/-1% gate.
 EXPECTED_ROW_COUNTS: dict[str, int] = {
     "aka_name": 901_343,
     "aka_title": 361_472,
@@ -143,30 +119,46 @@ EXPECTED_ROW_COUNTS: dict[str, int] = {
 TABLE_NAMES = tuple(sorted(EXPECTED_ROW_COUNTS))
 
 
+CLI_DESCRIPTION = (
+    "Build canonical JoinOrder IMDb data artifacts.\n"
+    "\n"
+    "This script is intentionally outside the BenchBox runtime package. It owns the\n"
+    "network, Docker, and PostgreSQL tooling needed to turn the upstream Harvard\n"
+    "Dataverse pg_dump into build artifacts consumed by the cutover TODO.\n"
+    "\n"
+    "Foundation scope:\n"
+    "  - resolve and download the Harvard Dataverse pg_dump for doi:10.7910/DVN/2QYZBT\n"
+    "  - compute and record the upstream sha256 in a local build manifest\n"
+    "  - restore the custom-format pg_dump into a pinned PostgreSQL container\n"
+    "  - validate expected JOB tables and row counts within the TODO's +/-1% gate\n"
+    "  - extract CSV with explicit UTF-8/NULL semantics\n"
+    "  - convert to zstd Parquet, assemble manifests, gates, cardinalities, archive\n"
+    "  - stage the draft data release and emit the runtime data_manifest.toml\n"
+)
+
+
 class JoinOrderBuildError(RuntimeError):
-    """Raised when the canonical JoinOrder build pipeline cannot proceed."""
+    pass
 
 
 class DataverseMetadataError(JoinOrderBuildError):
-    """Raised when the Dataverse metadata does not expose the expected pg_dump."""
+    pass
 
 
 class DownloadIntegrityError(JoinOrderBuildError):
-    """Raised when a downloaded pg_dump fails declared Dataverse integrity checks."""
+    pass
 
 
 class DockerUnavailableError(JoinOrderBuildError):
-    """Raised when Docker is not available for the PostgreSQL restore step."""
+    pass
 
 
 class QueryImportError(JoinOrderBuildError):
-    """Raised when canonical JOB query import/validation fails."""
+    pass
 
 
 @dataclasses.dataclass(frozen=True)
 class DataverseFile:
-    """Dataverse file metadata needed to download and verify the upstream pg_dump."""
-
     file_id: int
     label: str
     filesize: int
@@ -177,8 +169,6 @@ class DataverseFile:
 
 @dataclasses.dataclass(frozen=True)
 class PgDumpArtifact:
-    """Local pg_dump file plus computed integrity data."""
-
     path: Path
     size: int
     sha256: str
@@ -188,8 +178,6 @@ class PgDumpArtifact:
 
 @dataclasses.dataclass(frozen=True)
 class RowCountFailure:
-    """A table whose restored row count is outside the allowed tolerance."""
-
     table: str
     expected: int
     actual: int
@@ -198,8 +186,6 @@ class RowCountFailure:
 
 @dataclasses.dataclass(frozen=True)
 class RestoreValidation:
-    """Validation result for the restored PostgreSQL database."""
-
     row_counts: dict[str, int]
     missing_tables: list[str]
     unexpected_tables: list[str]
@@ -212,8 +198,6 @@ class RestoreValidation:
 
 @dataclasses.dataclass(frozen=True)
 class ColumnSchema:
-    """Column metadata read from PostgreSQL information_schema."""
-
     table: str
     name: str
     postgres_type: str
@@ -228,8 +212,6 @@ class ColumnSchema:
 
 @dataclasses.dataclass(frozen=True)
 class TableFile:
-    """A generated per-table artifact and its integrity metadata."""
-
     table: str
     path: Path
     sha256: str
@@ -245,8 +227,6 @@ class CsvLogicalValue:
 
 @dataclasses.dataclass(frozen=True)
 class LogicalContentReport:
-    """CSV/Parquet logical content verification report."""
-
     aggregate_hash: str
     tables: list[dict[str, Any]]
     failures: list[str]
@@ -254,8 +234,6 @@ class LogicalContentReport:
 
 @dataclasses.dataclass(frozen=True)
 class QueryParts:
-    """Simple SELECT/FROM/WHERE split for canonical flat JOB SQL."""
-
     query_id: str
     select_part: str
     from_part: str
@@ -264,16 +242,12 @@ class QueryParts:
 
 @dataclasses.dataclass(frozen=True)
 class QueryAlias:
-    """One table alias from a JOB FROM list."""
-
     table: str
     alias: str
 
 
 @dataclasses.dataclass(frozen=True)
 class ForeignKey:
-    """Simple FK relation used to close the tiny fixture over parent rows."""
-
     child_table: str
     child_column: str
     parent_table: str
@@ -281,13 +255,11 @@ class ForeignKey:
 
 
 def utc_now_iso() -> str:
-    """Return a stable UTC timestamp string for provenance records."""
 
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def default_build_root() -> Path:
-    """Resolve the default build directory without adding a new env var."""
 
     output_root = os.environ.get("BENCHBOX_OUTPUT_DIR")
     base = Path(output_root).expanduser() if output_root else Path("~/Developer/benchmark_runs").expanduser()
@@ -345,7 +317,6 @@ def _load_json_url(url: str, *, timeout: float = 60.0) -> dict[str, Any]:
 
 
 def select_pgdump_file(metadata: Mapping[str, Any]) -> DataverseFile:
-    """Select the single custom-format pg_dump from a Dataverse dataset response."""
 
     try:
         files = metadata["data"]["latestVersion"]["files"]
@@ -430,7 +401,6 @@ def github_release_asset_url() -> str:
 
 
 def manifest_hash_input(raw: bytes) -> bytes:
-    """Match benchbox.core.data_fetch.manifest.compute_manifest_hash."""
 
     excluded_top_level_keys = {b"archive_sha256", b"manifest_hash"}
     lines: list[bytes] = []
@@ -452,48 +422,29 @@ def compute_manifest_hash(path: Path) -> str:
 
 
 def rendered_manifest_identity(manifest_path: Path) -> tuple[str, str]:
-    """Return the (manifest_hash, data_archive_hash) actually written to a
-    rendered manifest.
-
-    Build-manifest records and reference_cardinalities must reflect the identity
-    that shipped in data_manifest.toml. In logical mode those values come from
-    the logical-content hash, not the legacy text/byte hashes, so they are read
-    back from the rendered file rather than recomputed.
-    """
     raw = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
     return str(raw["manifest_hash"]), str(raw["data_archive_hash"])
 
 
 def aggregate_table_hash(table_files: Sequence[TableFile]) -> str:
-    """Stable data identity hash over table sha256s, independent of tar metadata."""
 
     payload = "\n".join(f"{entry.table}:{entry.sha256}" for entry in sorted(table_files, key=lambda f: f.table))
     return hashlib.sha256((payload + "\n").encode("utf-8")).hexdigest()
 
 
 def _logical_columns(columns: Sequence[ColumnSchema]) -> list[LogicalColumn]:
-    """Adapt build ColumnSchema to the shared LogicalColumn projection.
-
-    Integer-ness is derived from the PostgreSQL type — the same source the
-    runtime reads from the pinned manifest schema — so build and runtime agree.
-    """
     return [
         LogicalColumn(name=column.name, is_integer=is_integer_postgres_type(column.postgres_type)) for column in columns
     ]
 
 
 def _csv_value_to_plain(value: CsvLogicalValue) -> str | None:
-    r"""Collapse a CSV field to the plain value the shared row hash expects.
-
-    An unquoted ``\N`` is a SQL NULL; a quoted empty string is the empty string.
-    """
     if value.value == CSV_NULL and not value.quoted:
         return None
     return value.value
 
 
 def parse_postgres_csv_record(record: str) -> list[CsvLogicalValue]:
-    """Parse one PostgreSQL COPY CSV record while preserving field quotedness."""
 
     fields: list[CsvLogicalValue] = []
     field: list[str] = []
@@ -536,7 +487,6 @@ def parse_postgres_csv_record(record: str) -> list[CsvLogicalValue]:
 
 
 def iter_postgres_csv_records(path: Path) -> Iterator[list[CsvLogicalValue]]:
-    """Yield PostgreSQL COPY CSV records with quoted-field metadata."""
 
     record_parts: list[str] = []
     in_quotes = False
@@ -572,11 +522,6 @@ def iter_postgres_csv_records(path: Path) -> Iterator[list[CsvLogicalValue]]:
                 record_parts = []
                 at_field_start = True
                 if record == "":
-                    # Skip blank lines. A FORCE_QUOTE row is never empty, so an
-                    # empty record is a stray line — e.g. the trailing newline
-                    # that some container runtimes' `exec` stdout capture appends
-                    # to COPY output. Row-count validation guards against real
-                    # data loss.
                     continue
                 yield parse_postgres_csv_record(record)
         if record_parts:
@@ -634,12 +579,6 @@ def logical_content_table_report(
 
 
 def logical_table_hash_from_csv(csv_path: Path, columns: Sequence[ColumnSchema]) -> LogicalTableHash:
-    """Hash canonical CSV rows in id order.
-
-    The CSV source is expected to come from `copy_table_to_csv`, which orders by
-    `id`; validating monotonic ids keeps this hash a source-content contract
-    rather than an accidental file-byte contract.
-    """
 
     logical_columns = _logical_columns(columns)
     hasher = hashlib.sha256()
@@ -681,7 +620,6 @@ def logical_table_hash_from_parquet(
     columns: Sequence[ColumnSchema],
     batch_size: int = 100_000,
 ) -> LogicalTableHash:
-    """Hash canonical Parquet rows in id order via the shared runtime algorithm."""
 
     return _shared_logical_table_hash_from_parquet(
         con=con,
@@ -773,7 +711,6 @@ def validate_pgdump_file(path: Path, dataverse_file: DataverseFile) -> PgDumpArt
 
 
 def download_pgdump(work_dir: Path, *, force: bool = False) -> PgDumpArtifact:
-    """Download the Dataverse pg_dump, verify MD5, and record sha256 provenance."""
 
     dataverse_file = resolve_dataverse_file()
     source_dir = work_dir / "source"
@@ -873,12 +810,6 @@ def write_source_manifest(work_dir: Path, artifact: PgDumpArtifact, *, reused: b
 
 
 def container_cli() -> str:
-    """Container runtime CLI to shell out to.
-
-    Defaults to ``docker``; set ``BENCHBOX_CONTAINER_CLI`` to a Docker-CLI-
-    compatible runtime (e.g. ``mocker`` on Apple Containerization) to build
-    without Docker Desktop.
-    """
     return os.environ.get("BENCHBOX_CONTAINER_CLI", "docker")
 
 
@@ -985,7 +916,6 @@ def restore_pgdump(
     keep_container: bool = False,
     replace_existing: bool = True,
 ) -> RestoreValidation:
-    """Restore the pg_dump into a pinned PostgreSQL container and validate it."""
 
     require_docker()
     ensure_postgres_image(postgres_image)
@@ -1001,12 +931,6 @@ def restore_pgdump(
             replace_existing=replace_existing,
         )
         started = True
-        # Stream the dump straight into pg_restore over stdin rather than
-        # staging it inside the container: some runtimes' `cp` silently
-        # truncate large files (mocker/Apple Containerization delivers a
-        # 0-byte file for a ~1.2 GB dump), and `exec -i` avoids a second
-        # in-container copy of the dump entirely. pg_restore reads a serial
-        # custom-format archive from a pipe fine.
         with artifact.path.open("rb") as dump:
             stream_command(
                 [
@@ -1108,7 +1032,6 @@ def validate_row_counts(
     missing_tables: Sequence[str] | None = None,
     unexpected_tables: Sequence[str] | None = None,
 ) -> RestoreValidation:
-    """Validate restored row counts against the canonical JOB cardinalities."""
 
     missing = sorted(set(missing_tables or []) | (set(EXPECTED_ROW_COUNTS) - set(row_counts)))
     failures: list[RowCountFailure] = []
@@ -1663,10 +1586,6 @@ def render_data_manifest(
     query_import = manifest.get("query_import", {})
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Logical mode: if the logical-content gate has run and passed, pin per-table
-    # logical hashes and make manifest_hash / data_archive_hash logical (stable
-    # across a non-deterministic transport rebuild). Otherwise fall back to the
-    # legacy byte-based manifest so partial/older builds still render.
     logical_content = manifest.get("logical_content", {})
     logical_by_table = {t["table"]: t["parquet_logical_sha256"] for t in logical_content.get("tables", [])}
     logical_aggregate = logical_content.get("aggregate_hash")
@@ -1742,7 +1661,6 @@ def render_data_manifest(
 
     output_path.write_text("\n".join(lines), encoding="utf-8")
     if not logical_mode:
-        # Legacy: manifest_hash is a hash of the file text with itself excluded.
         digest = compute_manifest_hash(output_path)
         text = output_path.read_text(encoding="utf-8")
         output_path.write_text(text.replace('manifest_hash = "0"', f'manifest_hash = "{digest}"'), encoding="utf-8")
@@ -1798,7 +1716,6 @@ def strip_query_semicolon(sql: str) -> str:
 
 
 def duckdb_compatible_query_sql(sql: str) -> str:
-    """Apply runtime-only compatibility fixes for canonical PostgreSQL JOB SQL."""
 
     sql = re.sub(r"\bAS\s+at\b", 'AS "at"', sql, flags=re.IGNORECASE)
     return re.sub(r"\bat\.", '"at".', sql)
@@ -2289,7 +2206,6 @@ def verify_logical_content_hashes(
     work_dir: Path,
     schema: Mapping[str, Sequence[ColumnSchema]],
 ) -> LogicalContentReport:
-    """Verify that canonical CSV source rows and Parquet rows are logically equal."""
 
     try:
         import duckdb
@@ -2362,9 +2278,6 @@ def compute_reference_cardinalities(
             user=user,
             sql=f"SELECT row_to_json(benchbox_q)::text FROM ({sql}) AS benchbox_q ORDER BY 1 LIMIT 1",
         ).strip()
-        # Canonical JOB queries are single-row MIN(...) aggregates, so hashing
-        # that first row is a compact full-result oracle. Raw-row or multi-row
-        # variants need a full-result hash instead.
         first_row_sha256 = hashlib.sha256(first_row_json.encode("utf-8")).hexdigest() if first_row_json else None
         underlying_count = int(
             psql(
@@ -2409,12 +2322,6 @@ def verify_reference_results(
     user: str,
     expected_query_count: int | None = EXPECTED_QUERY_COUNT,
 ) -> dict[str, Any]:
-    """Verify the committed PostgreSQL oracle against a restored source database.
-
-    The JOB queries are aggregate queries and should each produce exactly one
-    row. The stored ``first_row_sha256`` is therefore a compact full-result
-    oracle: it hashes PostgreSQL's ``row_to_json`` text for that aggregate row.
-    """
     reference = json.loads(reference_path.read_text(encoding="utf-8"))
     expected_queries = reference.get("queries")
     if not isinstance(expected_queries, dict):
@@ -3129,18 +3036,6 @@ def query_dir_from_arg(raw: str | None) -> Path:
     )
 
 
-# ---------------------------------------------------------------------------
-# Allowed-dangling FK census (joinorder-fk-allowed-dangling-artifact)
-# ---------------------------------------------------------------------------
-# The canonical IMDb 2013 data has LEGITIMATE dangling references: foreign keys
-# are opt-in metadata, not load-time constraints (benchbox/core/joinorder/
-# schema.py). A full-archive FK-integrity test therefore needs a durable,
-# reviewed census of WHICH declared FKs dangle and by how much, so corruption
-# is distinguishable from known-source noise. The census is computed with DuckDB
-# over the sha256-verified shipped Parquet (no PostgreSQL container) and is
-# hash-locked to the manifest's data_archive_hash, so a future dataset version
-# cannot silently reuse a stale census.
-
 ALLOWED_DANGLING_FKS_SCHEMA_VERSION = 1
 FK_DECLARATION_RE = re.compile(
     r"FOREIGN KEY\s*\(\s*(\w+)\s*\)\s*REFERENCES\s*(\w+)\s*\(\s*(\w+)\s*\)",
@@ -3149,24 +3044,16 @@ FK_DECLARATION_RE = re.compile(
 
 
 def runtime_manifest_path() -> Path:
-    """Path to the shipped runtime data_manifest.toml the census hash-locks to."""
 
     return repo_root() / "benchbox" / "core" / "joinorder" / "data_manifest.toml"
 
 
 def allowed_dangling_fks_path() -> Path:
-    """Path to the committed allowed-dangling FK census artifact."""
 
     return repo_root() / "_project" / "joinorder" / "allowed_dangling_fks.json"
 
 
 def job_declared_foreign_keys() -> list[ForeignKey]:
-    """Return the JOB schema's declared foreign keys in a deterministic order.
-
-    Sourced from the committed schema_specs.yaml (via JoinOrderSchema, the same
-    loader the DDL uses), so the census pins exactly the FK set the schema
-    declares and needs no PostgreSQL container (unlike postgres_foreign_keys()).
-    """
 
     from benchbox.core.joinorder.schema import JoinOrderSchema
 
@@ -3217,13 +3104,6 @@ def _verify_canonical_parquet_hashes(parquet_dir: Path) -> None:
 
 
 def resolve_canonical_parquet_dir(data_dir: str | None) -> Path:
-    """Return a directory of sha256-verified canonical Parquet files.
-
-    With ``data_dir`` set, an already-extracted directory is used as-is (it must
-    contain all 21 tables). Otherwise the shipped archive is fetched and each
-    table sha256-verified through the runtime loader, reusing a pre-placed
-    archive when present (no re-download).
-    """
 
     if data_dir:
         resolved = Path(data_dir).expanduser().resolve()
@@ -3241,17 +3121,10 @@ def resolve_canonical_parquet_dir(data_dir: str | None) -> Path:
 
 
 def compute_fk_dangling_census(parquet_dir: Path) -> list[dict[str, Any]]:
-    """Count, per declared FK, child rows whose non-NULL FK value has no parent.
-
-    Child totals come from the child table alone and the dangling count from an
-    ``NOT EXISTS`` anti-join, so all three counts are exact regardless of whether
-    the parent key happens to be unique. Dangling = a non-NULL child value with
-    no matching parent row.
-    """
 
     try:
         import duckdb
-    except ImportError as exc:  # pragma: no cover - exercised only without duckdb
+    except ImportError as exc:  # pragma: no cover
         raise JoinOrderBuildError("duckdb is required in _project/scripts for the FK dangling census") from exc
 
     census: list[dict[str, Any]] = []
@@ -3272,7 +3145,7 @@ def compute_fk_dangling_census(parquet_dir: Path) -> list[dict[str, Any]]:
                 f"SELECT 1 FROM read_parquet({duckdb_literal(parent_path)}) AS p "
                 f"WHERE p.{parent_col} = c.{child_col})"
             ).fetchone()
-            if stats is None or dangling_row is None:  # pragma: no cover - count(*) always returns a row
+            if stats is None or dangling_row is None:  # pragma: no cover
                 raise JoinOrderBuildError(f"Empty census result for {fk.child_table}.{fk.child_column}")
             child_rows, child_non_null, dangling = int(stats[0]), int(stats[1]), int(dangling_row[0])
             census.append(
@@ -3297,7 +3170,6 @@ def compute_fk_dangling_census(parquet_dir: Path) -> list[dict[str, Any]]:
 
 
 def build_allowed_dangling_fks_payload(parquet_dir: Path) -> dict[str, Any]:
-    """Assemble the deterministic census artifact (no timestamp, so --check is idempotent)."""
 
     manifest_hash, data_archive_hash = rendered_manifest_identity(runtime_manifest_path())
     return {
@@ -3312,13 +3184,6 @@ def build_allowed_dangling_fks_payload(parquet_dir: Path) -> dict[str, Any]:
 
 
 def load_allowed_dangling_fks() -> dict[str, Any]:
-    """Load the committed FK census, verifying it is hash-locked to the manifest.
-
-    Consumers (e.g. the full-archive FK-integrity test) obtain the reviewed
-    allowed-dangling set through this helper so no test hardcodes the exception
-    policy. Raises if the artifact's data_archive_hash no longer matches the
-    shipped manifest -- i.e. the census is stale for the current dataset.
-    """
 
     artifact = json.loads(allowed_dangling_fks_path().read_text(encoding="utf-8"))
     _, data_archive_hash = rendered_manifest_identity(runtime_manifest_path())
@@ -3355,7 +3220,7 @@ def run_fk_dangling_census(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     download = subparsers.add_parser("download-pgdump", help="Download and verify the Dataverse pg_dump.")
@@ -3825,7 +3690,6 @@ def run_foundation(args: argparse.Namespace) -> int:
             manifest_path=manifest_path,
             cardinalities_path=cardinalities,
         )
-        # The runtime manifest can only contain the tarball sha after packaging.
         write_runtime_manifest(work_dir=work_dir, schema=schema)
         export_tiny_fixture(
             work_dir=work_dir,

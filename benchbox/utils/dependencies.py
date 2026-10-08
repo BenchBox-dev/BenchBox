@@ -1,12 +1,6 @@
-"""Dependency management utilities for BenchBox platform adapters.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides centralized dependency checking, error messages, and installation guidance
-for optional platform dependencies.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import os
 import sys
@@ -21,61 +15,36 @@ import yaml
 
 @lru_cache(maxsize=1)
 def is_development_install() -> bool:
-    """Detect if BenchBox is running from a development install.
-
-    Returns True if running from source (editable install), False if installed as a package.
-    """
     import benchbox
 
-    # Get the package location
     package_path = Path(benchbox.__file__).parent
 
-    # Check if pyproject.toml exists in parent (development install)
     project_root = package_path.parent
     if (project_root / "pyproject.toml").exists():
-        # Verify it's actually the benchbox project
         try:
-            # pyproject.toml is UTF-8 by specification (PEP 518); the read_text
-            # default is locale-dependent and cp1252 on Windows.
             content = (project_root / "pyproject.toml").read_text(encoding="utf-8")
             if 'name = "benchbox"' in content:
                 return True
         except Exception:
             pass
 
-    # Check if we're in site-packages (package install)
-    # Default to dev install if uncertain
     return "site-packages" not in str(package_path)
 
 
 @lru_cache(maxsize=1)
 def is_uv_tool_environment() -> bool:
-    """Detect whether BenchBox is running inside a uv tool virtual environment."""
     normalized_executable = str(Path(sys.executable)).replace("\\", "/").lower()
     return "/uv/tools/" in normalized_executable
 
 
-# Dependency catalog data is loaded after the lightweight value classes below.
 PLATFORM_TO_EXTRA: dict[str, str]
 
 
 def get_install_command(extra: str) -> str:
-    """Get the appropriate install command for an extra based on install type.
-
-    Args:
-        extra: The extra name or platform name (e.g., 'athena', 'dask', 'cloud')
-
-    Returns:
-        The appropriate install command string
-    """
-    # Map platform names to their actual extra names
     resolved_extra = PLATFORM_TO_EXTRA.get(extra.lower(), extra)
 
     if is_development_install():
         if is_uv_tool_environment():
-            # uv tool environments are isolated from project .venv state.
-            # Target the running interpreter explicitly so users install
-            # into the same environment that executes `benchbox`.
             return f'uv pip install --python "{sys.executable}" "benchbox[{resolved_extra}]"'
         return f"uv sync --extra {resolved_extra}"
     else:
@@ -83,17 +52,6 @@ def get_install_command(extra: str) -> str:
 
 
 def get_package_install_message(packages: str, description: str = "") -> str:
-    """Generate a user-friendly install message for raw Python packages.
-
-    Provides both standalone (pip) and project (uv add) installation options.
-
-    Args:
-        packages: Space-separated package names (e.g., 'boto3' or 'azure-storage-blob azure-identity')
-        description: Optional description of what the packages are for
-
-    Returns:
-        Multi-line install message with both options
-    """
     prefix = f"{description} " if description else ""
     return (
         f"{prefix}Install with:\n  pip install {packages}  # standalone\n  uv add {packages}       # inside a project"
@@ -101,17 +59,6 @@ def get_package_install_message(packages: str, description: str = "") -> str:
 
 
 def get_extra_install_message(extra_name: str, description: str = "") -> str:
-    """Generate a user-friendly install message for BenchBox extras.
-
-    Provides both standalone (pip install) and project (uv add) installation options.
-
-    Args:
-        extra_name: The BenchBox extra name (e.g., 'cloud', 'mcp', 'databricks')
-        description: Optional description prefix
-
-    Returns:
-        Multi-line install message with both options
-    """
     prefix = f"{description}\n" if description else ""
     return (
         f"{prefix}Install with:\n"
@@ -121,8 +68,6 @@ def get_extra_install_message(extra_name: str, description: str = "") -> str:
 
 
 class DependencyInfo:
-    """Information about a platform dependency group."""
-
     def __init__(
         self,
         name: str,
@@ -141,16 +86,6 @@ class DependencyInfo:
 
     @property
     def extra_name(self) -> str:
-        """The pip/uv extra this group actually installs.
-
-        Usually equal to ``name``, but a retained-alias group (e.g.
-        ``databricks-connect``, kept for backward-compatible dependency
-        lookups after its own extra was removed) points at a different
-        extra. Every catalog entry's ``install_command`` follows
-        ``uv add benchbox --extra <extra-name>``, so that is the source of
-        truth -- deriving from ``name`` instead silently recommends a
-        nonexistent extra whenever the two diverge.
-        """
         marker = "--extra "
         index = self.install_command.find(marker)
         if index == -1:
@@ -158,18 +93,10 @@ class DependencyInfo:
         return self.install_command[index + len(marker) :].split()[0]
 
     def get_install_message(self) -> str:
-        """Get a context-aware install message with both standalone and project options.
-
-        Returns:
-            Multi-line install message showing both installation options.
-        """
         return get_extra_install_message(self.extra_name)
 
 
-# Structured installation guidance for documentation and CLI matrix output
 class InstallationScenario:
-    """Represents a documented installation path for BenchBox."""
-
     def __init__(
         self,
         name: str,
@@ -195,7 +122,6 @@ class InstallationScenario:
 
     @property
     def uv_command(self) -> str:
-        """Modern uv add command (recommended)."""
         extras = self._extras_spec()
         if extras:
             extra_flags = " ".join(f"--extra {e}" for e in extras.split(","))
@@ -204,7 +130,6 @@ class InstallationScenario:
 
     @property
     def uv_pip_command(self) -> str:
-        """Alternative pip-compatible uv command."""
         extras = self._extras_spec()
         if extras:
             return f'uv pip install "benchbox[{extras}]"'
@@ -223,9 +148,6 @@ class InstallationScenario:
         if extras:
             return f'pipx install "benchbox[{extras}]"'
         return "pipx install benchbox"
-
-
-# Dependency catalog data is package metadata; Python keeps behavior and typed value objects.
 
 
 def _load_dependency_payload() -> dict[str, Any]:
@@ -273,15 +195,6 @@ PACKAGE_IMPORT_NAMES: dict[str, str] = dict(_DEPENDENCY_PAYLOAD["package_import_
 
 
 def check_platform_dependencies(platform: str, packages: Optional[Sequence[str]] = None) -> tuple[bool, list[str]]:
-    """Check if required packages are available for a platform.
-
-    Args:
-        platform: Platform name (e.g., 'databricks', 'clickhouse')
-        packages: Optional explicit list of required package names
-
-    Returns:
-        Tuple of (all_available, missing_packages)
-    """
     if packages is None:
         dep_info = DEPENDENCY_GROUPS.get(platform.lower())
         platforms_packages: Sequence[str] = dep_info.packages if dep_info else ()
@@ -290,10 +203,8 @@ def check_platform_dependencies(platform: str, packages: Optional[Sequence[str]]
 
     missing: list[str] = []
     for package in platforms_packages:
-        # Optional native modules can change cwd before failing to load.
         original_cwd = os.getcwd()
         try:
-            # Use mapping if available, otherwise fall back to simple hyphen-to-underscore replacement
             import_name = PACKAGE_IMPORT_NAMES.get(package, package.replace("-", "_"))
             __import__(import_name)
         except ImportError:
@@ -305,20 +216,10 @@ def check_platform_dependencies(platform: str, packages: Optional[Sequence[str]]
 
 
 def get_dependency_error_message(platform: str, missing_packages: list[str]) -> str:
-    """Generate a helpful error message for missing platform dependencies.
-
-    Args:
-        platform: Platform name
-        missing_packages: List of missing package names
-
-    Returns:
-        Formatted error message with installation instructions
-    """
     platform_lower = platform.lower()
     dep_info = DEPENDENCY_GROUPS.get(platform_lower)
 
     if not dep_info:
-        # Fallback for unknown platforms
         packages_str = ", ".join(missing_packages)
         return (
             f"Missing required dependencies for {platform}: {packages_str}\n"
@@ -350,7 +251,6 @@ def get_dependency_error_message(platform: str, missing_packages: list[str]) -> 
             ]
         )
 
-    # Add alternative installation suggestions
     message_parts.extend(
         [
             "",
@@ -370,14 +270,6 @@ def get_dependency_error_message(platform: str, missing_packages: list[str]) -> 
 
 
 def get_installation_recommendations(use_case: Optional[str] = None) -> list[str]:
-    """Get installation recommendations based on use case.
-
-    Args:
-        use_case: Optional use case description
-
-    Returns:
-        List of recommended installation commands
-    """
     recommendations = []
 
     if use_case:
@@ -399,7 +291,6 @@ def get_installation_recommendations(use_case: Optional[str] = None) -> list[str
         elif "trino" in use_case_lower:
             recommendations.append("uv add benchbox --extra trino  # Trino/Starburst distributed SQL")
 
-    # Always include general recommendations
     if not recommendations:
         recommendations.extend(
             [
@@ -418,28 +309,20 @@ def get_installation_recommendations(use_case: Optional[str] = None) -> list[str
 
 
 def list_available_dependency_groups() -> dict[str, DependencyInfo]:
-    """Get all available dependency groups with their information."""
     return DEPENDENCY_GROUPS.copy()
 
 
 def get_dependency_group_packages(platform: str) -> list[str]:
-    """Return package names associated with a dependency group."""
 
     dep_info = DEPENDENCY_GROUPS.get(platform.lower())
     return list(dep_info.packages) if dep_info else []
 
 
 def get_installation_scenarios() -> tuple[InstallationScenario, ...]:
-    """Return curated installation scenarios."""
     return INSTALLATION_SCENARIOS
 
 
 def get_installation_matrix_rows() -> list[tuple[str, str, str, str, str, str]]:
-    """Build rows for installation matrix presentation.
-
-    Returns:
-        List of tuples: (scenario, platforms, extras, uv, pip, pipx)
-    """
 
     rows: list[tuple[str, str, str, str, str, str]] = []
     for scenario in INSTALLATION_SCENARIOS:
@@ -458,12 +341,10 @@ def get_installation_matrix_rows() -> list[tuple[str, str, str, str, str, str]]:
 
 
 def validate_dependency_group(group_name: str) -> bool:
-    """Check if a dependency group name is valid."""
     return group_name.lower() in DEPENDENCY_GROUPS
 
 
 def get_dependency_decision_tree() -> str:
-    """Generate a decision tree for choosing dependency groups."""
     return """
 BenchBox Dependency Installation Guide
 =====================================

@@ -22,15 +22,14 @@ The implementation follows a minimal abstraction approach:
 Cloud storage support requires the optional `cloudstorage` dependency:
 
 ```bash
-# Install cloud storage support (recommended)
 uv add benchbox --extra cloudstorage
 
-# Or install all dependencies
 uv add benchbox --extra cloud
 
-# Prefer pip? Quotes still required in most shells
 python -m pip install "benchbox[cloudstorage]"
 ```
+
+The first command installs cloud storage support (recommended). The second installs all cloud dependencies. The third uses pip. Keep the quotes, which most shells require.
 
 ## Authentication Setup
 
@@ -41,8 +40,10 @@ Set AWS credentials using environment variables:
 ```bash
 export AWS_ACCESS_KEY_ID=your_access_key
 export AWS_SECRET_ACCESS_KEY=your_secret_key
-export AWS_DEFAULT_REGION=us-west-2  # optional
+export AWS_DEFAULT_REGION=us-west-2
 ```
+
+`AWS_DEFAULT_REGION` is optional.
 
 Alternative authentication methods:
 - AWS credentials file (`~/.aws/credentials`)
@@ -93,7 +94,6 @@ UC Volumes use the same Databricks authentication as SQL Warehouses (access toke
 BenchBox automatically uploads locally-generated data to UC Volumes:
 
 ```bash
-# Generate locally, upload to UC Volume, then load
 benchbox run --platform databricks --benchmark tpch --scale 0.01 \
              --output dbfs:/Volumes/workspace/benchbox/data
 ```
@@ -116,26 +116,27 @@ Note: Both the schema and UC Volume are automatically created by BenchBox. Manua
 Databricks supports these platform options for UC Volume configuration:
 
 ```bash
-# Using platform options (alternative to --output)
 benchbox run --platform databricks --benchmark tpch --scale 1 \
              --platform-option uc_catalog=workspace \
              --platform-option uc_schema=benchbox \
              --platform-option uc_volume=data
 
-# Or use --output with full UC Volume path
 benchbox run --platform databricks --benchmark tpch --scale 1 \
              --output dbfs:/Volumes/workspace/benchbox/data
 ```
+
+The first command uses platform options, an alternative to `--output`. The second uses `--output` with the full UC Volume path.
 
 **Databricks Free Edition Workflow:**
 Free Edition workspaces are limited to UC Volumes (no external S3/Azure/GCS). BenchBox fully supports this:
 
 ```bash
-# Run benchmark with UC Volume output - volume is automatically created
 benchbox run --platform databricks --benchmark tpch --scale 0.01 \
              --output dbfs:/Volumes/workspace/benchbox/data \
              --phases generate,load,power
 ```
+
+The volume is created automatically.
 
 Both the schema and UC Volume are automatically created if they don't exist - no manual setup required!
 
@@ -154,18 +155,17 @@ Or create it manually: CREATE SCHEMA IF NOT EXISTS workspace.benchbox
 Use the `--output` parameter with cloud storage paths:
 
 ```bash
-# AWS S3
 benchbox run --platform duckdb --benchmark tpch --scale 0.01 \
              --output s3://my-bucket/benchbox/tpch-data
 
-# Google Cloud Storage
 benchbox run --platform duckdb --benchmark tpch --scale 0.01 \
              --output gs://my-bucket/benchbox/tpch-data
 
-# Azure Blob Storage
 benchbox run --platform duckdb --benchmark tpch --scale 0.01 \
              --output abfss://container@account.dfs.core.windows.net/benchbox/data
 ```
+
+The three commands write to AWS S3, Google Cloud Storage, and Azure Blob Storage, in that order.
 
 ### Output Path Normalization (Remote Paths)
 
@@ -175,16 +175,14 @@ This matches local defaults and prevents dataset collisions.
 Examples:
 
 ```bash
-# UC Volume root auto-extends with dataset suffix
 benchbox run --platform databricks --benchmark tpch --scale 0.01 \
              --output dbfs:/Volumes/workspace/raw/source/
-# Effective path: dbfs:/Volumes/workspace/raw/source/tpch_sf01
 
-# S3 root behaves the same
 benchbox run --platform duckdb --benchmark tpcds --scale 1.0 \
              --output s3://my-bucket/benchbox
-# Effective path: s3://my-bucket/benchbox/tpcds_sf1
 ```
+
+A UC Volume root auto-extends with the dataset suffix, so the first command's effective path is `dbfs:/Volumes/workspace/raw/source/tpch_sf01`. An S3 root behaves the same: the second command's effective path is `s3://my-bucket/benchbox/tpcds_sf1`.
 
 ### Python API
 
@@ -194,16 +192,16 @@ Cloud storage paths work seamlessly with the Python API:
 from benchbox import TPCH
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Create benchmark with cloud storage output
 benchmark = TPCH(
     scale_factor=0.01,
     output_dir="s3://my-bucket/benchbox/tpch-data"
 )
 
-# Execute benchmark - data will be uploaded to S3
 adapter = DuckDBAdapter()
 results = adapter.run_benchmark(benchmark)
 ```
+
+The benchmark is created with cloud storage output, and its data is uploaded to S3 when the benchmark runs.
 
 ## Credential Validation
 
@@ -254,9 +252,10 @@ Local TPC Tools → Temp Directory → Cloud Upload → Database Loading → Que
 DuckDB can read directly from cloud storage:
 
 ```sql
--- DuckDB automatically handles cloud paths
 SELECT * FROM read_csv('s3://bucket/data/lineitem.tbl', delim='|', header=false)
 ```
+
+DuckDB handles cloud paths automatically.
 
 Configuration is handled automatically by the DuckDB adapter.
 
@@ -265,22 +264,24 @@ Configuration is handled automatically by the DuckDB adapter.
 BigQuery benchmarks use Google Cloud Storage integration:
 
 ```python
-# BigQuery automatically uses GCS for data staging
 benchmark = TPCH(output_dir="gs://my-bucket/bq-data")
 adapter = BigQueryAdapter()
 results = adapter.run_benchmark(benchmark)
 ```
+
+BigQuery uses GCS for data staging automatically.
 
 ### Snowflake Integration
 
 Snowflake benchmarks use cloud storage stages:
 
 ```python
-# Snowflake uses S3/GCS stages for data loading
 benchmark = TPCH(output_dir="s3://my-bucket/snowflake-data")
 adapter = SnowflakeAdapter()
 results = adapter.run_benchmark(benchmark)
 ```
+
+Snowflake uses S3 or GCS stages for data loading.
 
 ## Best Practices
 
@@ -321,7 +322,6 @@ s3://my-benchbox-bucket/
 ### Connection Issues
 
 ```bash
-# Test cloud storage access
 python -c "
 from benchbox.utils.cloud_storage import validate_cloud_credentials
 result = validate_cloud_credentials('s3://my-bucket/test')

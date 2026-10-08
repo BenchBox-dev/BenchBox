@@ -1,17 +1,6 @@
-"""Shared catalog loading functions for primitives benchmarks.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides generic YAML catalog loaders that handle the two catalog patterns:
-- Operations catalogs (write_primitives, transaction_primitives): entries with write_sql,
-  validation_queries, cleanup_sql, file_dependencies, platform_overrides, requires_setup
-- Query catalogs (read_primitives, metadata_primitives): entries with sql, variants, skip_on
-
-Each primitives module defines its own dataclasses and error types, then delegates
-the actual YAML parsing and validation to these shared functions.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -25,8 +14,6 @@ import yaml
 
 @dataclass(frozen=True)
 class ResultColumnContract:
-    """Contract for one projected query-result column."""
-
     name: str
     type_class: str = "scalar"
     order_sensitive: bool = False
@@ -34,8 +21,6 @@ class ResultColumnContract:
 
 @dataclass(frozen=True)
 class ResultContract:
-    """Machine-readable result shape and capability contract for query variants."""
-
     columns: tuple[ResultColumnContract, ...]
     row_identity: tuple[str, ...] = ()
     capability: str | None = None
@@ -56,26 +41,6 @@ def load_operations_catalog(
     build_operation: Any,
     build_catalog: Any,
 ) -> Any:
-    """Load and validate an operations-style catalog from package resources.
-
-    This handles the common loading pattern shared by write_primitives and
-    transaction_primitives catalogs.
-
-    Args:
-        package: The ``__package__`` of the calling module (for resource lookup)
-        catalog_filename: YAML filename to load (e.g., "operations.yaml")
-        error_class: Exception class to raise on validation failures
-        label: Human-readable label for error messages (e.g., "Write Primitives")
-        build_validation_query: Callable that builds a ValidationQuery from parsed fields
-        build_operation: Callable that builds a WriteOperation from parsed fields
-        build_catalog: Callable(version, operations) that builds the catalog container
-
-    Returns:
-        The catalog container built by ``build_catalog``
-
-    Raises:
-        error_class: If catalog cannot be loaded or is invalid
-    """
     payload = _load_yaml(package, catalog_filename, error_class, label, "operation")
 
     version = _parse_version(payload, error_class, label, "operation")
@@ -110,7 +75,6 @@ def _parse_operation_entry(
     build_validation_query: Any,
     build_operation: Any,
 ) -> Any:
-    """Parse and validate a single operation entry from the catalog YAML."""
     category = entry.get("category")
     if not isinstance(category, str) or not category.strip():
         category = operation_id.split("_")[0]
@@ -173,25 +137,6 @@ def load_query_catalog(
     build_query: Any,
     build_catalog: Any,
 ) -> Any:
-    """Load and validate a query-style catalog from package resources.
-
-    This handles the common loading pattern shared by read_primitives and
-    metadata_primitives catalogs.
-
-    Args:
-        package: The ``__package__`` of the calling module (for resource lookup)
-        catalog_filename: YAML filename to load (e.g., "queries.yaml")
-        error_class: Exception class to raise on validation failures
-        label: Human-readable label for error messages (e.g., "Metadata Primitives")
-        build_query: Callable that builds a query dataclass from parsed fields
-        build_catalog: Callable(version, queries) that builds the catalog container
-
-    Returns:
-        The catalog container built by ``build_catalog``
-
-    Raises:
-        error_class: If catalog cannot be loaded or is invalid
-    """
     payload = _load_yaml(package, catalog_filename, error_class, label, "query")
 
     version = _parse_version(payload, error_class, label, "query")
@@ -258,7 +203,6 @@ def load_query_catalog(
 
 
 def _callable_accepts_keyword(callable_obj: Any, keyword: str) -> bool:
-    """Return whether *callable_obj* can be called with *keyword*."""
     try:
         parameters = signature(callable_obj).parameters.values()
     except (TypeError, ValueError):
@@ -271,7 +215,6 @@ def _parse_result_contract(
     query_id: str,
     error_class: type[RuntimeError],
 ) -> ResultContract | None:
-    """Parse optional result-shape contract metadata from a query entry."""
     raw_contract = entry.get("result_contract")
     if raw_contract is None:
         return None
@@ -308,7 +251,6 @@ def _parse_result_column_contract(
     index: int,
     error_class: type[RuntimeError],
 ) -> ResultColumnContract:
-    """Parse one result_contract column entry."""
     if isinstance(raw_column, str):
         name = raw_column.strip()
         if not name:
@@ -351,7 +293,6 @@ def _parse_result_contract_row_identity(
     column_names: set[str],
     error_class: type[RuntimeError],
 ) -> tuple[str, ...]:
-    """Parse and validate result_contract.row_identity."""
     raw_row_identity = raw_contract.get("row_identity", [])
     if raw_row_identity is None:
         return ()
@@ -400,11 +341,6 @@ def _parse_optional_contract_string(
     return value.strip()
 
 
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
-
-
 def _load_yaml(
     package: str,
     filename: str,
@@ -412,7 +348,6 @@ def _load_yaml(
     label: str,
     kind: str,
 ) -> dict[str, Any]:
-    """Load and parse a YAML catalog file from package resources."""
     try:
         catalog_file = resources.files(package).joinpath(filename)
     except (AttributeError, FileNotFoundError) as exc:
@@ -438,7 +373,6 @@ def _parse_version(
     label: str,
     kind: str,
 ) -> int:
-    """Parse and validate the catalog version field."""
     raw_version = payload.get("version", 1)
     try:
         return int(raw_version)
@@ -453,7 +387,6 @@ def _parse_required_string(
     entry_id: str | None,
     error_class: type[RuntimeError],
 ) -> str:
-    """Parse a required non-empty string field from a catalog entry."""
     value = entry.get(field)
     if not isinstance(value, str) or not value.strip():
         context = f"'{entry_id}'" if entry_id else f"at index {index}"
@@ -467,18 +400,6 @@ def _parse_validation_queries(
     error_class: type[RuntimeError],
     build_validation_query: Any,
 ) -> list[Any]:
-    """Parse validation queries from an operation entry.
-
-    Loader contract: the kwargs forwarded to ``build_validation_query`` must
-    stay in lockstep with the write_primitives-local equivalent at
-    ``benchbox/core/write_primitives/catalog/loader.py``. New callers receive
-    `expected_value_min`, `expected_value_max`, and validation-level
-    `platform_overrides`; existing dataclasses without those fields ignore
-    the extras via ``_filter_supported_kwargs``. The cross-loader parity
-    test at ``tests/unit/core/primitives/test_loader_parity.py`` enforces
-    field-set equality; see TODO
-    `shared-primitives-loader-validation-parity` for rationale.
-    """
     raw_validations = entry.get("validation_queries", [])
     if not isinstance(raw_validations, list):
         raise error_class(f"Catalog entry '{operation_id}' validation_queries must be a list")
@@ -526,12 +447,6 @@ def _parse_validation_platform_overrides(
     val_entry: dict[str, Any],
     error_class: type[RuntimeError],
 ) -> dict[str, str | None]:
-    """Parse and validate per-platform validation SQL overrides.
-
-    Each value must be either a non-empty string (replacement SQL) or
-    ``None`` (explicit skip). Empty strings and other types are rejected at
-    load time so a typo cannot silently disable validation.
-    """
     raw = val_entry.get("platform_overrides")
     if raw is None:
         return {}
@@ -564,7 +479,6 @@ def _parse_expected_value_bounds(
     val_entry: dict[str, Any],
     error_class: type[RuntimeError],
 ) -> tuple[float | None, float | None]:
-    """Parse and validate ``expected_value_min``/``max`` for tolerance-based scalar checks."""
     raw_min = val_entry.get("expected_value_min")
     raw_max = val_entry.get("expected_value_max")
     if raw_min is None and raw_max is None:
@@ -601,7 +515,6 @@ def _parse_expected_value_bounds(
 
 
 def _filter_supported_kwargs(callable_: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
-    """Drop kwargs the target callable does not accept; preserves backwards compat."""
     try:
         params = signature(callable_).parameters
     except (TypeError, ValueError):
@@ -616,7 +529,6 @@ def _parse_variants(
     query_id: str,
     error_class: type[RuntimeError],
 ) -> dict[str, str] | None:
-    """Parse dialect-specific variants from a query entry."""
     raw_variants = entry.get("variants")
     if raw_variants is None:
         return None
@@ -640,7 +552,6 @@ def _parse_skip_on(
     query_id: str,
     error_class: type[RuntimeError],
 ) -> list[str] | None:
-    """Parse skip_on dialect list from a query entry."""
     raw_skip_on = entry.get("skip_on")
     if raw_skip_on is None:
         return None

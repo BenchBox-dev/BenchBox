@@ -1,10 +1,3 @@
-"""Unit tests for publication reconciliation, independence matrix, and operational receipts.
-
-These tools fail closed. The tests assert that missing, malformed, fabricated, or
-collapsed inputs produce a nonzero result and never a reconciled/valid one, and
-that real matching evidence reconciles.
-"""
-
 from __future__ import annotations
 
 import base64
@@ -144,11 +137,6 @@ def _distinct_states(generation: int = 5):
     return desired, built, deployed, observed
 
 
-# ======================================================================
-# RECONCILIATION (w1)
-# ======================================================================
-
-
 def test_reconcile_rejects_collapsed_states() -> None:
     desired = {"generation": 1}
     with pytest.raises(recon_mod.ReconciliationInputError):
@@ -270,7 +258,7 @@ def test_reconcile_missing_required_artifact_is_drift() -> None:
         "site": {"path": "/", "digest": "s" * 64},
         "explorer": {"path": "/results/", "digest": "e" * 64},
     }
-    built["artifacts"] = {"site": {"path": "/", "digest": "s" * 64}}  # explorer never built
+    built["artifacts"] = {"site": {"path": "/", "digest": "s" * 64}}
     report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)
     assert report.reconciled is False
     assert any(d.drift_type == "ARTIFACT_DRIFT" and "/results/" in d.description for d in report.drifts)
@@ -326,7 +314,7 @@ def test_reconcile_incomplete_receipt_fields() -> None:
 
 def test_reconcile_partial_route_success_fails_closed() -> None:
     desired, built, deployed, observed = _distinct_states()
-    observed["routes"] = [{"path": "/", "status_code": 200, "ok": True}]  # missing 2 required routes
+    observed["routes"] = [{"path": "/", "status_code": 200, "ok": True}]
     report = recon_mod.reconcile_states(desired=desired, built=built, deployed=deployed, observed=observed, now_dt=NOW)
     assert report.reconciled is False
     assert any("Required public route" in d.description for d in report.drifts)
@@ -411,17 +399,14 @@ def test_reconciliation_cli_requires_inputs(tmp_path: Path) -> None:
         recon_mod.main(["--help"])
     assert exc.value.code == 0
 
-    # No arguments at all -> config error, never 0.
     assert recon_mod.main([]) == 2
     assert recon_mod.main(["--json"]) == 2
 
     manifest = tmp_path / "desired-manifest.json"
     manifest.write_text(json.dumps(_distinct_states()[0]), encoding="utf-8")
 
-    # Manifest but no receipts dir -> 2.
     assert recon_mod.main(["--manifest", str(manifest)]) == 2
 
-    # Receipts dir missing files -> 2.
     rdir = tmp_path / "reconciliation"
     rdir.mkdir()
     assert recon_mod.main(["--manifest", str(manifest), "--receipts-dir", str(rdir)]) == 2
@@ -503,10 +488,6 @@ def test_receipt_targets_benchbox_dev_accepts_legacy_and_transaction_schemas(tar
     receipt = {"target": target} if target is not None else {}
     assert recon_mod.receipt_targets_benchbox_dev(receipt) is expected
 
-
-# ======================================================================
-# INDEPENDENCE MATRIX (w2)
-# ======================================================================
 
 _BASE = {"package": "p1", "site": "s1", "explorer": "e1", "corpus": "c1"}
 
@@ -602,17 +583,12 @@ def test_matrix_cli(tmp_path: Path) -> None:
 
     empty = tmp_path / "independence"
     empty.mkdir()
-    assert matrix_mod.main(["--receipts-dir", str(empty)]) == 2  # no transition record
+    assert matrix_mod.main(["--receipts-dir", str(empty)]) == 2
 
     (empty / matrix_mod.MATRIX_FILE_NAME).write_text(
         json.dumps({"transitions": _single_lane_transitions()}), encoding="utf-8"
     )
     assert matrix_mod.main(["--receipts-dir", str(empty), "--json"]) == 0
-
-
-# ======================================================================
-# OPERATIONAL RECEIPTS (w2)
-# ======================================================================
 
 
 def _valid_operational_dir(tmp_path: Path) -> Path:
@@ -787,20 +763,17 @@ def test_operational_cli(tmp_path: Path) -> None:
 def test_validate_live_receipt_contract_with_none_max_age_preserves_syntax_and_skew(
     attestor_keypair: Path,
 ) -> None:
-    """Disabling receipt expiry via max_age_hours=None still rejects invalid timestamps and future skew."""
     from datetime import datetime, timezone
 
     now = datetime(2026, 9, 10, 12, 0, 0, tzinfo=timezone.utc)
     _, _, _, valid_receipt = _distinct_states()
     _sign_receipt(valid_receipt, attestor_keypair)
 
-    # 1. Very old receipt passes when max_age_hours=None
     old_receipt = dict(valid_receipt)
     old_receipt["timestamp"] = "2025-01-01T00:00:00Z"
     findings = recon_mod.validate_live_receipt_contract(old_receipt, now=now, max_age_hours=None)
     assert not any(f.drift_type == "STALE_RECEIPT" for f in findings)
 
-    # 2. Unparseable timestamp fails even when max_age_hours=None
     bad_ts_receipt = dict(valid_receipt)
     bad_ts_receipt["timestamp"] = "not-a-date"
     findings = recon_mod.validate_live_receipt_contract(bad_ts_receipt, now=now, max_age_hours=None)
@@ -808,7 +781,6 @@ def test_validate_live_receipt_contract_with_none_max_age_preserves_syntax_and_s
     assert len(stale_findings) == 1
     assert "unparseable" in stale_findings[0].description
 
-    # 3. Future-skew timestamp fails even when max_age_hours=None
     future_receipt = dict(valid_receipt)
     future_receipt["timestamp"] = "2026-09-11T12:00:00Z"
     findings = recon_mod.validate_live_receipt_contract(future_receipt, now=now, max_age_hours=None)

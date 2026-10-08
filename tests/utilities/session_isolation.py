@@ -1,10 +1,3 @@
-"""Own a disposable pytest HOME after acquiring the real shared test lock.
-
-Started by the early pytest plugin, before conftest imports and collection.
-Child pytest processes may share a verified ancestor's live lock, never an
-unverified environment opt-out. Each process gets its own disposable HOME.
-"""
-
 from __future__ import annotations
 
 import errno
@@ -25,7 +18,6 @@ _state: dict[str, Any] | None = None
 
 
 def _ancestor_holds_lock(lock_path: Path) -> bool:
-    """Verify both lineage and kernel lock liveness before sharing ownership."""
     try:
         import psutil
     except ImportError:
@@ -65,11 +57,6 @@ def _ancestor_holds_lock(lock_path: Path) -> bool:
 
 
 def start(acquire_lock: bool = True) -> bool:
-    """Acquire or verify the shared lock before changing any HOME setting.
-
-    ``acquire_lock=False`` isolates HOME without the lock, for a run that does not compete for
-    one: a serial run, or one that sets ``BENCHBOX_SKIP_TEST_LOCK``.
-    """
     global _state
     if _state is not None:
         return False
@@ -104,7 +91,6 @@ def start(acquire_lock: bool = True) -> bool:
 
 
 def own_environment(monkeypatch: pytest.MonkeyPatch, keys: Iterable[str]) -> None:
-    """Register restoration of named runtime outputs, including absent keys."""
     for key in keys:
         value = os.environ.get(key)
         monkeypatch.setenv(key, value if value is not None else "")
@@ -113,19 +99,16 @@ def own_environment(monkeypatch: pytest.MonkeyPatch, keys: Iterable[str]) -> Non
 
 
 def session_home() -> Path:
-    """Return the owned collection-time HOME, independent of test patches."""
     if _state is None:
         raise RuntimeError("test-session isolation is not active")
     return Path(_state["home"].name)
 
 
 def active() -> bool:
-    """Whether this process established owned or verified test-session state."""
     return _state is not None
 
 
 def finish() -> None:
-    """Restore the caller's environment and release only our own lock."""
     global _state
     if _state is None:
         return

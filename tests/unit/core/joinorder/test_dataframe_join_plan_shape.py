@@ -1,14 +1,3 @@
-"""Structural guard: JoinOrder DataFrame mode measures multi-join EXECUTION.
-
-The SQL JoinOrder Benchmark stresses the optimizer's freedom to reorder joins.
-The DataFrame translation deliberately fixes the join order from the query's
-syntactic topology (see benchbox/core/joinorder/dataframe_queries.py module
-docstring) -- it measures multi-join execution with a fixed plan, NOT optimizer
-ordering. Row-equality oracle tests cannot detect a drift from "fixed plan" to
-"cost-reordered" because both can return identical rows. These tests pin the
-plan shape so that semantic cannot silently change.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -63,28 +52,25 @@ def _plan_for(query_id: str):
 @pytest.mark.parametrize("query_id", QUERY_IDS)
 def test_join_plan_is_left_deep_chain_over_all_tables(query_id: str) -> None:
     tables, _join_predicates, steps = _plan_for(query_id)
-    # A left-deep chain joins every non-anchor table exactly once, always
-    # extending the single growing result -- never a bushy / reordered plan.
+
     assert len(steps) == len(tables) - 1
     anchor = tables[0][0]
-    assert not steps or steps[0].existing_alias == anchor  # anchored on the first FROM table, not a cost pick
+    assert not steps or steps[0].existing_alias == anchor
     joined = {anchor}
     for step in steps:
-        assert step.existing_alias in joined  # builds on what is already joined
-        assert step.new_alias not in joined  # each table joined exactly once
+        assert step.existing_alias in joined
+        assert step.new_alias not in joined
         joined.add(step.new_alias)
     assert joined == {alias for alias, _table in tables}
 
 
 @pytest.mark.parametrize("query_id", QUERY_IDS)
 def test_join_plan_is_pure_function_of_sql_not_data(query_id: str) -> None:
-    # The plan is computed from SQL topology alone (no data / cardinality input),
-    # so recomputation is identical: there is no cost-based reordering.
+
     _t1, _j1, steps_a = _plan_for(query_id)
     _t2, _j2, steps_b = _plan_for(query_id)
     assert steps_a == steps_b
-    # Canonical JOB join graphs are connected: every join is predicate-driven,
-    # never a cross-product fallback.
+
     assert all(step.predicate_index >= 0 for step in steps_a)
 
 
@@ -92,9 +78,7 @@ def test_pandas_executor_uses_exact_planned_join_sequence(
     monkeypatch: pytest.MonkeyPatch,
     pandas_ctx: PandasContext,
 ) -> None:
-    # Query 1a has a real branch point in its join graph. This test exercises the
-    # executor path, not just the planner helper, and pins the exact textual-order
-    # plan consumed by pandas execution.
+
     tables, _join_predicates, expected_steps = _plan_for("1a")
     calls: list[tuple[list[tuple[str, str]], list[_JoinStep]]] = []
 

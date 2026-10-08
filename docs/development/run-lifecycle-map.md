@@ -5,10 +5,9 @@
 ```{tags} contributor, architecture
 ```
 
-This document records the current `benchbox run` lifecycle and export branches before the
-single-path refactor.
+This document maps the `benchbox run` lifecycle and its export path.
 
-## Canonical Runtime Today
+## Canonical runtime
 
 For real benchmark execution, `benchbox/cli/commands/run.py` delegates to:
 
@@ -21,41 +20,20 @@ The CLI path is therefore `run.py` -> `BenchmarkOrchestrator` -> `execute_run`
 the same core primitive through `_execute_mcp_run_via_core(...)` in
 `benchbox/mcp/tools/benchmark.py` and its durable caller in `benchbox/mcp/jobs.py`.
 
-
-## Branch Matrix (`benchbox/cli/commands/run.py`)
+## Run branches (`benchbox/cli/commands/run.py`)
 
 | Branch | Entry condition | Runtime path | Export path |
 | --- | --- | --- | --- |
-| Dry run | `if dry_run:` | `DryRunExecutor.execute_dry_run(...)` | `DryRunExecutor.save_dry_run_results(...)` |
-| Direct non-interactive SQL/DataFrame | `test_execution_type` not data/load-only and platform+benchmark provided | `BenchmarkOrchestrator` -> `execute_run` -> `run_benchmark_lifecycle` | Inline `ResultExporter` block with directory-manager filename override |
-| Data-only / load-only | `if test_execution_type in [\"data_only\", \"load_only\"]` | `BenchmarkOrchestrator` -> `execute_run` -> `run_benchmark_lifecycle` (phase-limited) | Separate inline `ResultExporter` block with mode-specific status rendering |
-| Interactive | fallback TTY-guided path | `BenchmarkOrchestrator` -> `execute_run` -> `run_benchmark_lifecycle` | Third inline export block (`config.get(\"output.formats\", [\"json\"])`) |
+| Dry run | `--dry-run` given (`_run_dry_run`) | `DryRunExecutor.execute_dry_run(...)` | `DryRunExecutor.save_dry_run_results(...)` |
+| Direct non-interactive SQL/DataFrame | platform and benchmark provided, not data-only or load-only | `_execute_orchestrated_run(...)` | `_export_orchestrated_result(...)` |
+| Data-only / load-only | `test_execution_type` is `data_only` or `load_only` | `_execute_orchestrated_run(...)` (phase-limited) | `_export_orchestrated_result(...)` |
+| Interactive | fallback TTY-guided path | `_execute_orchestrated_run(...)` | `_export_orchestrated_result(...)` |
 
-## Duplicate Export Logic Identified
+Driver and runtime metadata are applied on the canonical path by
+`benchbox/core/run_service.py::execute_run` through `apply_driver_metadata(...)`
+(`benchbox/core/results/driver_metadata.py`), so every run mode inherits them.
 
-`run.py` currently contains three non-dry-run export blocks with drift in:
-
-- format selection (`[\"json\"]` vs config-driven),
-- output filename/output_dir handling,
-- status output formatting.
-
-These blocks are the target for unification in the refactor.
-
-## Metadata Wiring Gap — Resolved
-
-Driver/runtime metadata enrichment previously existed in `ExecutionEngine._enrich_driver_metadata(...)`
-and was wired only in `benchbox/cli/execution_pipeline.py`. With the pipeline module deleted
-(`benchbox/cli/execution_pipeline.py` removed, `ExecutionPipeline`/`ExecutionEngine` no longer retained),
-enrichment now runs on the canonical path via `benchbox/core/run_service.py::execute_run` → `apply_driver_metadata(...)` (see `benchbox/core/results/driver_metadata.py`), so all run modes inherit it.
-
-## Refactor Baseline Decisions
-
-- Canonical runtime path: `run.py` -> `BenchmarkOrchestrator` -> `execute_run` -> `run_benchmark_lifecycle`.
-- `ExecutionPipeline` must not remain a parallel behavior-bearing runtime path.
-- Export policy must be centralized and called by all non-dry-run branches.
-- Metadata enrichment must run on the canonical path before result export.
-
-## Single-Path Architecture (Post-Refactor)
+## Single-path architecture
 
 ### Runtime path
 
@@ -70,12 +48,3 @@ enrichment now runs on the canonical path via `benchbox/core/run_service.py::exe
 - Add lifecycle behavior in `benchbox/core/runner/runner.py`, not in CLI branch-specific code.
 - Add result metadata wiring in `benchbox/core/results/driver_metadata.py` so all run modes inherit it.
 - Add export behavior in `benchbox/cli/commands/run.py` helper `_export_orchestrated_result(...)`.
-
-## Alpha Release Notes (Execution Refactor)
-
-- Removed legacy `quick` branch logic from `benchbox run`.
-- Removed legacy `no_regenerate` option wiring from run-command benchmark options.
-- Unified non-dry-run execution through shared run-command helpers:
-  - `_execute_orchestrated_run(...)`
-  - `_export_orchestrated_result(...)`
-- Deleted `benchbox/cli/execution_pipeline.py` (`ExecutionPipeline`/`ExecutionEngine`) — it was superseded by `benchbox/core/run_service.py::execute_run` + `run_benchmark_lifecycle(...)`; enrichment and export are now on the canonical path (see *Single-Path Architecture* above).

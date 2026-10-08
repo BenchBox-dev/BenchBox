@@ -52,11 +52,11 @@ After `compute_metrics()` the throughput phase `start_time`, `end_time` and
 both. The existing names become aliases in their respective modules for
 backward compatibility:
 ```python
-# tpch/throughput_test.py
 TPCHThroughputStreamResult = ThroughputStreamResult
-# tpcds/throughput_test.py
 TPCDSThroughputStreamResult = ThroughputStreamResult
 ```
+
+The first alias lives in `tpch/throughput_test.py` and the second in `tpcds/throughput_test.py`.
 
 ---
 

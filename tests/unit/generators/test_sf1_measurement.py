@@ -1,5 +1,3 @@
-"""SF=1 measurement script and calibrated size table tests."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -18,7 +16,7 @@ def _load_script():
     assert spec is not None and spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
     sys.modules["measure_sf1_sizes"] = mod
-    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    spec.loader.exec_module(mod)
     return mod
 
 
@@ -31,8 +29,6 @@ def test_all_registry_benchmarks_have_measurement_entry():
     mod = _load_script()
     registry_ids = set(get_all_benchmarks())
     measured = set(mod.all_benchmark_ids())
-    # ai_primitives reuses TPC-H data; metadata_primitives has no data files.
-    # Both are documented in the calibrated table rather than generated.
     documented_without_generation = {"ai_primitives", "metadata_primitives"}
     missing = registry_ids - measured - documented_without_generation
     assert not missing, f"benchmarks without measurement entry: {sorted(missing)}"
@@ -82,7 +78,6 @@ def test_sum_paths_skips_transport_archives(tmp_path):
 
 
 def test_sum_paths_skips_parquet_footprints(tmp_path):
-    """Parquet is encoded bytes, not uncompressed source: never counted."""
     mod = _load_script()
     (tmp_path / "cast_info.parquet").write_bytes(b"y" * 50)
     total, count = mod._sum_paths(tmp_path)
@@ -91,7 +86,6 @@ def test_sum_paths_skips_parquet_footprints(tmp_path):
 
 
 def test_sum_paths_counts_parquet_for_parquet_native_benchmarks(tmp_path):
-    """joinorder ships only Parquet: its documented size is the on-disk footprint."""
     mod = _load_script()
     (tmp_path / "cast_info.parquet").write_bytes(b"y" * 50)
     total, count = mod._sum_paths(tmp_path, count_parquet=True)
@@ -106,7 +100,6 @@ def test_only_joinorder_counts_parquet():
 
 
 def test_measure_many_parallel_resolves_alias_without_regenerating(monkeypatch):
-    """Aliases reuse the parent-process record instead of re-running the source generator."""
     mod = _load_script()
     calls: list[str] = []
 
@@ -155,8 +148,6 @@ def test_calibrated_table_covers_all_measured_benchmarks():
     table = Path(__file__).resolve().parents[3] / "docs" / "benchmarks" / "sf1-calibrated-sizes.md"
     assert table.is_file()
     expected = set(mod.all_benchmark_ids()) | {"ai_primitives", "metadata_primitives"}
-    # Compare against parsed table rows, not a substring search: a benchmark
-    # mentioned only in prose must not satisfy the coverage check.
     assert expected <= set(_parse_calibrated_table()), "benchmark missing from calibrated size table rows"
 
 
@@ -186,13 +177,6 @@ def test_calibrated_table_values_are_positive():
 
 
 def test_calibrated_table_matches_baseline_fixture():
-    """The doc table must reproduce the persisted measurement baseline.
-
-    The baseline fixture holds the byte counts emitted by
-    scripts/measure_sf1_sizes.py; the table is its human-readable mirror.
-    A generator change that shifts SF=1 sizes must update both together,
-    so a drift in either file fails here rather than passing silently.
-    """
     baseline = _load_baseline()
     parsed = _parse_calibrated_table()
     tolerance = baseline["tolerance"]
@@ -207,7 +191,6 @@ def test_calibrated_table_matches_baseline_fixture():
         )
     for benchmark in set(parsed) - set(baseline["sizes"]) - documented_without_generation:
         raise AssertionError(f"{benchmark}: table entry without baseline entry")
-    # ai_primitives reuses TPC-H data, so its row must track the tpch row.
     assert parsed["ai_primitives"] == parsed["tpch"]
 
 
@@ -220,7 +203,6 @@ def test_jobs_option_runs_subset():
 
 @pytest.mark.slow
 def test_measure_one_runs_a_lightweight_generator_end_to_end():
-    """measure_one executes a real generator and counts only its outputs."""
     mod = _load_script()
     record = mod.measure_one("coffeeshop")
     assert record.error is None, record.error

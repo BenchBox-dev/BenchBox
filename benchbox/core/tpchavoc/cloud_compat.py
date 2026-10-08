@@ -1,5 +1,3 @@
-"""Targeted SQL rewrites for TPC-Havoc cloud query variants."""
-
 from __future__ import annotations
 
 import sqlglot
@@ -34,7 +32,6 @@ BIGQUERY_FILTER_IDS = frozenset(
 
 
 def rewrite_cloud_variant(query_id: str, query: str, target_dialect: str) -> str:
-    """Preserve variant semantics where the target rejects translated syntax."""
     if query_id == _ARRAY_AGGREGATION_ID:
         return _rewrite_array_aggregation(query, target_dialect)
     if target_dialect == "databricks":
@@ -71,14 +68,6 @@ def rewrite_cloud_variant(query_id: str, query: str, target_dialect: str) -> str
 
 
 def _rewrite_array_aggregation(query: str, target_dialect: str) -> str:
-    """Render q1_v7's collected arrays with functions native to each cloud engine.
-
-    The Snowflake leg is intentionally unimplemented: Snowflake SQL has no
-    lambda-based array REDUCE, so emitting REDUCE would fail live compilation
-    (a sqlglot parse check cannot catch that engine-side limit). Snowflake
-    input falls through unchanged and stays skipped until a native reduction
-    is proven.
-    """
     if target_dialect not in {"bigquery", "databricks"}:
         return query
 
@@ -96,7 +85,6 @@ def _rewrite_array_aggregation(query: str, target_dialect: str) -> str:
 
 
 def _ordered_array(value: exp.Expression, target_dialect: str) -> exp.Expression:
-    """Collect values in lineitem key order so separately reduced arrays stay aligned."""
     rendered = value.sql(dialect=target_dialect)
     if target_dialect == "databricks":
         expression = (

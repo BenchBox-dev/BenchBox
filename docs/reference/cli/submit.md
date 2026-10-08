@@ -66,15 +66,15 @@ submission/
 | `submission_path` | `"PR-based"` or `"hosted-service"` |
 | `submitted_by` | Explicit flag, `git config user.name`, or empty with warning |
 
-## Phase 2 vs Phase 3
+## PR Submission and Hosted Upload
 
-`benchbox submit --output` is the Phase 2 community PR path.
-`benchbox submit --service` is the Phase 3 hosted API path.
+`benchbox submit --output` packages a result for a community pull request.
+`benchbox submit --service` uploads a result to the hosted API.
 
-| Phase | Workflow | Auth required |
-|-------|----------|---------------|
-| 2 (current) | Package locally → open PR manually | No |
-| 3 (hosted) | `--service` uploads to the hosted API | Yes (`benchbox auth login` or env token) |
+| Mode | Workflow | Auth required |
+|------|----------|---------------|
+| PR submission | Package locally → open PR manually | No |
+| Hosted upload | `--service` uploads to the hosted API | Yes (`benchbox auth login` or env token) |
 
 Both modes use the same canonical schema-v2 result JSON and companion files.
 There is no second hosted-only wire format.
@@ -134,41 +134,43 @@ These commands serve different purposes:
 ## Examples
 
 ```bash
-# Package a specific result file
 uv run -- benchbox submit results/tpch_sf1_duckdb.json
 
-# Package the most recent result
 uv run -- benchbox submit --last
 
-# Print exact result paths (one per line, pipeable), then package one result by path
 uv run -- benchbox results --paths
 uv run -- benchbox submit benchmark_runs/results/tpch_sf001_duckdb_20260401_120000.json --output ./submission
 
-# Or loop over every recent result
 uv run -- benchbox results --paths --limit 100 \
   | xargs -n1 -I{} uv run -- benchbox submit {} --output ./submissions
 
-# Package the most recent TPC-H result
 uv run -- benchbox submit --last --benchmark tpch
 
-# Preview what would be packaged (no files written)
 uv run -- benchbox submit --last --dry-run
 
-# Use a custom output directory
 uv run -- benchbox submit --last --output ./my-submission
 
-# Log in for hosted submission
 uv run -- benchbox auth login
 
-# Upload to hosted API and wait for publication
 uv run -- benchbox submit --last --service
 
-# Upload to staging without waiting for publication
 uv run -- benchbox submit --last --service https://staging.benchbox.dev/v1 --no-wait
 
-# Show hosted submission history
 uv run -- benchbox results --submitted
 ```
+
+In order, the commands:
+
+- Package a specific result file.
+- Package the most recent result.
+- Print exact result paths (one per line, pipeable) with `benchbox results --paths`, then package one result by path. The next command instead loops over every recent result.
+- Package the most recent TPC-H result.
+- Preview what would be packaged (no files written).
+- Use a custom output directory.
+- Log in for hosted submission.
+- Upload to the hosted API and wait for publication.
+- Upload to staging without waiting for publication.
+- Show hosted submission history.
 
 ## Related
 

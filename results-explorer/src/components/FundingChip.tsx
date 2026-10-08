@@ -1,33 +1,5 @@
-// ---------------------------------------------------------------------------
-// FundingChip - renders the `funding` disclosure as a StatusBadge with
-// role="funding".
-//
-// Funding is ORTHOGONAL to the trust label: a vendor-supplied result can be
-// employer-funded, and a community submission can be vendor-sponsored. The chip
-// is therefore ADDITIVE to TrustBadge, never a replacement for it.
-//
-// Every value renders with the SAME `neutral` tone. This is deliberate: a tone
-// gradient (e.g. vendor-sponsored → warning) would re-encode funding as a trust
-// signal and invite readers to rank results by who paid for them. Funding is a
-// disclosure, not a verdict. The chip text carries the meaning; the color does
-// not.
-//
-// `unspecified` (the producer default, and the value for every bundle that
-// predates the funding axis) renders NOTHING. An "Unspecified" chip on the
-// overwhelming majority of results would be pure noise, and unlike trust_label
-// there is no misreading to guard against: absent disclosure is the baseline
-// expectation, not a silent claim of neutrality.
-//
-// Vocabulary source of truth: benchbox/core/results/provenance.py::FUNDING_SOURCES.
-// ---------------------------------------------------------------------------
-
 import { StatusBadge } from "./StatusBadge";
 
-// `compact` is an explicit label, NOT a truncation of `label`. TrustBadge's
-// compact form takes the first word, which would render funding
-// "vendor-sponsored" as "Vendor" - exactly the word its compact TrustBadge uses
-// for trust "vendor-supplied". Two orthogonal axes must never collapse to the
-// same chip text on a dense row, so funding spells out "Sponsored" instead.
 const FUNDING_CONFIG: Record<string, { label: string; compact: string; title: string }> = {
   employer: {
     label: "Employer funded",
@@ -57,14 +29,8 @@ const FUNDING_CONFIG: Record<string, { label: string; compact: string; title: st
   },
 };
 
-/** The producer default; carries no information, so the chip is omitted. */
 export const UNSPECIFIED_FUNDING = "unspecified";
 
-/**
- * An unrecognised token is still a disclosure the producer chose to make - show
- * it verbatim rather than dropping it, so vocabulary drift between
- * provenance.py and this map surfaces in the UI instead of hiding a claim.
- */
 function configFor(funding: string): { label: string; compact: string; title: string } {
   return (
     FUNDING_CONFIG[funding] ?? {
@@ -75,7 +41,6 @@ function configFor(funding: string): { label: string; compact: string; title: st
   );
 }
 
-/** Tooltip/legend prose for a funding value. Single source for both surfaces. */
 export function fundingDescription(funding: string): string {
   return configFor(funding).title;
 }

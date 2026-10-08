@@ -1,7 +1,3 @@
-# Shared soundness review surface.
-# Format: kind<TAB>pattern. Kinds are prefix, file, glob, or regex.
-# Prefixes end in / and exact paths use file. The glob and regex entries are
-# matching rules, not CODEOWNERS spellings.
 regex	^benchbox/core/(?:.+/)?validation\.py$
 glob	results-data/bundles/**/*.override.json
 
@@ -107,6 +103,9 @@ file	quality/comment-policy-requirements.txt
 file	quality/comment-policy-package.json
 file	quality/comment-policy-package-lock.json
 file	scripts/check_comment_policy.py
+file	scripts/check_comment_cleanup_scope.py
+file	quality/comment-cleanup-scope.json
+file	tests/unit/scripts/test_comment_cleanup_scope.py
 file	scripts/comment_syntax.py
 file	scripts/comment_syntax_js.cjs
 file	scripts/run_comment_policy.py

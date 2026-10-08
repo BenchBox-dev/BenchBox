@@ -1,5 +1,3 @@
-"""Platform-specific query plan parsers."""
-
 from benchbox.core.query_plans.parsers.base import QueryPlanParser
 from benchbox.core.query_plans.parsers.datafusion import DataFusionQueryPlanParser
 from benchbox.core.query_plans.parsers.duckdb import DuckDBQueryPlanParser
@@ -20,7 +18,6 @@ __all__ = [
     "PostgreSQLQueryPlanParser",
     "RedshiftQueryPlanParser",
     "SQLiteQueryPlanParser",
-    # Registry
     "ParserRegistry",
     "get_parser_registry",
     "get_parser_for_platform",

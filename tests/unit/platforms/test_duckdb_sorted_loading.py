@@ -1,10 +1,3 @@
-"""Tests for DuckDB-specific CTAS sorted data loading behavior.
-
-Covers:
-- DuckDBAdapter._build_ctas_sort_sql() unit tests
-- Integration tests verifying sortedness and row-count preservation
-"""
-
 from __future__ import annotations
 
 from unittest.mock import Mock, patch
@@ -19,26 +12,15 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def _make_tuning_config(table_tunings: dict):
-    """Build a minimal mock unified tuning config."""
+
     config = Mock()
     config.table_tunings = table_tunings
     return config
 
 
 def _make_table_tuning_with_sort(sort_columns: list[str]):
-    """Build a mock TableTuning with SORTING columns.
 
-    Sort columns are real TuningColumn instances (not Mocks): apply_ctas_sort
-    forwards them to DuckDBDDLGenerator via a TableTuning, whose constructor
-    validates that sorting columns are genuine TuningColumn instances -- see
-    the renderer-consolidation TODO's w2 duckdb migration.
-    """
     from benchbox.core.tuning.interface import TuningColumn, TuningType
 
     table_tuning = Mock()
@@ -72,25 +54,17 @@ class TestDuckdbBuildCtasSortSql:
         assert sql == ("CREATE OR REPLACE TABLE lineitem AS SELECT * FROM lineitem ORDER BY l_shipdate, l_orderkey;")
 
 
-# ---------------------------------------------------------------------------
-# Integration test: verify data sortedness after CTAS load
-# ---------------------------------------------------------------------------
-
-
 class TestCtasSortIntegration:
-    """Integration tests that run against a real in-memory DuckDB database."""
-
     @pytest.fixture(autouse=True)
     def _require_duckdb(self):
         pytest.importorskip("duckdb")
 
     def test_apply_ctas_sort_produces_sorted_data(self):
-        """After apply_ctas_sort, table rows are ordered by the sort columns."""
+
         import duckdb
 
         conn = duckdb.connect(":memory:")
 
-        # Create and populate an unsorted table
         conn.execute("CREATE TABLE lineitem (l_orderkey INTEGER, l_shipdate DATE)")
         conn.execute("""
             INSERT INTO lineitem VALUES
@@ -110,13 +84,12 @@ class TestCtasSortIntegration:
 
         assert result is True
 
-        # Verify sorted order: l_shipdate ASC, l_orderkey ASC
         rows = conn.execute("SELECT l_shipdate, l_orderkey FROM lineitem").fetchall()
         dates = [r[0] for r in rows]
         assert dates == sorted(dates), f"Expected sorted dates, got: {dates}"
 
     def test_row_count_preserved_after_ctas_sort(self):
-        """CTAS sort preserves all rows - no data loss."""
+
         import duckdb
 
         conn = duckdb.connect(":memory:")
@@ -142,7 +115,7 @@ class TestCtasSortIntegration:
         assert count == 5
 
     def test_unsorted_table_unchanged_when_not_in_tuning_config(self):
-        """Tables not in tuning config are not modified by apply_ctas_sort."""
+
         import duckdb
 
         conn = duckdb.connect(":memory:")
@@ -152,25 +125,23 @@ class TestCtasSortIntegration:
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
 
-        # lineitem has sorting, but parts does not
         table_tuning = _make_table_tuning_with_sort(["l_shipdate"])
         tuning_config = _make_tuning_config({"lineitem": table_tuning})
 
         result = adapter.apply_ctas_sort("parts", tuning_config, conn)
 
         assert result is False
-        # Row count unchanged
+
         count = conn.execute("SELECT COUNT(*) FROM parts").fetchone()[0]
         assert count == 3
 
     def test_duckdb_adapter_load_data_with_sorting(self, tmp_path):
-        """End-to-end: DataLoader applies CTAS sort when tuning_config is enabled."""
+
         import duckdb
 
         from benchbox.platforms.base.data_loading import DataLoader, DuckDBNativeHandler
         from benchbox.utils.file_format import is_tpc_format
 
-        # Create a TBL file (pipe-delimited, TPC-H style)
         tbl_file = tmp_path / "lineitem.tbl"
         tbl_file.write_text("3|2024-03-01|\n1|2024-01-15|\n2|2024-02-10|\n1|2024-01-01|\n")
 
@@ -182,12 +153,10 @@ class TestCtasSortIntegration:
 
         adapter.tuning_enabled = True
 
-        # Build a real tuning config pointing to lineitem
         table_tuning = _make_table_tuning_with_sort(["l_shipdate", "l_orderkey"])
         tuning_config = _make_tuning_config({"lineitem": table_tuning})
         adapter.unified_tuning_configuration = tuning_config
 
-        # Benchmark with proper tables dict so DataSourceResolver can find data
         benchmark = Mock(spec=["tables", "get_schema"])
         benchmark.tables = {"lineitem": tbl_file}
         benchmark.get_schema.return_value = {}
@@ -211,7 +180,6 @@ class TestCtasSortIntegration:
         assert "lineitem" in table_stats
         assert table_stats["lineitem"] == 4
 
-        # Verify data is sorted by l_shipdate
         rows = conn.execute("SELECT l_shipdate FROM lineitem").fetchall()
         dates = [r[0] for r in rows]
         assert dates == sorted(dates), f"Expected sorted dates, got: {dates}"

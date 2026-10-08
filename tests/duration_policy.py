@@ -1,5 +1,3 @@
-"""Collection-time policy for measured test tiers and quarantine markers."""
-
 from __future__ import annotations
 
 import json
@@ -16,7 +14,6 @@ DURATION_FILE = Path(__file__).with_name("fixtures") / "test_durations.json"
 
 
 def current_test_tier() -> str:
-    """Return the active test tier, defaulting to the fast T1 contract."""
     tier = os.environ.get("BENCHBOX_TEST_TIER", "t1").strip().lower()
     if tier not in _VALID_TIERS:
         raise ValueError(f"BENCHBOX_TEST_TIER must be one of {sorted(_VALID_TIERS)}, got {tier!r}")
@@ -24,7 +21,6 @@ def current_test_tier() -> str:
 
 
 def load_durations(path: Path = DURATION_FILE) -> dict[str, float]:
-    """Load committed per-test p95 durations in seconds."""
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("duration file root must be an object")
@@ -49,7 +45,6 @@ def load_durations(path: Path = DURATION_FILE) -> dict[str, float]:
 
 
 def _percentile(values: list[float], percentile: float) -> float:
-    """Return a linearly interpolated percentile for a non-empty sample."""
     ordered = sorted(values)
     position = (len(ordered) - 1) * percentile / 100
     lower = math.floor(position)
@@ -130,7 +125,6 @@ def _junit_nodeid(testcase: ET.Element) -> str | None:
 
 
 def collect_junit_durations(paths: list[Path]) -> dict[str, float]:
-    """Read pytest JUnit reports and return one p95 duration per node ID."""
     samples: dict[str, list[float]] = {}
     for path in paths:
         root = ET.parse(path).getroot()
@@ -153,7 +147,6 @@ def collect_junit_durations(paths: list[Path]) -> dict[str, float]:
 
 
 def is_bootstrap_artifact(path: Path = DURATION_FILE) -> bool:
-    """Return whether the artifact explicitly declares an empty initial baseline."""
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -171,7 +164,6 @@ def write_duration_file(
     source: str = "T3 nightly JUnit reports",
     bootstrap: bool = False,
 ) -> None:
-    """Write the committed duration artifact in stable, reviewable JSON."""
     if bootstrap and durations:
         raise ValueError("bootstrap duration artifacts must contain an empty tests map")
     for nodeid, value in durations.items():
@@ -210,7 +202,6 @@ def _validate_expiry(value: Any, *, marker_name: str, nodeid: str, today: date) 
 
 
 def validate_markers(item: Any, *, today: date | None = None) -> list[str]:
-    """Return marker contract violations for one collected pytest item."""
     today = today or date.today()
     nodeid = item.nodeid
     errors: list[str] = []
@@ -243,7 +234,6 @@ def t1_budget_violations(
     *,
     allow_missing: bool | None = None,
 ) -> list[str]:
-    """Return unexempted fast tests whose measured p95 exceeds the T1 budget or lack timing records."""
     if item.get_closest_marker("fast") is None:
         return []
     if item.get_closest_marker("duration_exempt") is not None:

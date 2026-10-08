@@ -1,9 +1,6 @@
-"""Tests for enhanced benchmark results functionality.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from datetime import datetime
 from typing import Any
@@ -33,15 +30,12 @@ pytestmark = [
 
 
 class MockPlatformAdapter(PlatformAdapter):
-    """Mock platform adapter for testing."""
-
     @staticmethod
     def add_cli_arguments(parser) -> None:
-        """Mock CLI argument registration."""
+        pass
 
     @classmethod
     def from_config(cls, config):
-        """Simplified factory returning an instance with provided config."""
         return cls(**config)
 
     @property
@@ -68,10 +62,10 @@ class MockPlatformAdapter(PlatformAdapter):
         pass
 
     def create_schema(self, benchmark, connection):
-        return 0.5  # 500ms
+        return 0.5
 
     def load_data(self, benchmark, connection, data_dir):
-        return {"test_table": 1000}, 1.0, None  # 1000 rows, 1 second, no per-table timings
+        return {"test_table": 1000}, 1.0, None
 
     def configure_for_benchmark(self, connection, benchmark_type):
         pass
@@ -84,7 +78,6 @@ class MockPlatformAdapter(PlatformAdapter):
             "rows_returned": 10,
         }
 
-    # Abstract methods that need implementation
     def apply_table_tunings(self, table_tuning, connection):
         pass
 
@@ -101,8 +94,6 @@ class MockPlatformAdapter(PlatformAdapter):
         pass
 
     def get_table_info(self, connection, table_name):
-        """Mock table info method for validation."""
-        # Return mock table info that indicates the table exists
         return {
             "columns": [("id", "INTEGER"), ("name", "VARCHAR")],
             "row_count": 1000,
@@ -110,25 +101,17 @@ class MockPlatformAdapter(PlatformAdapter):
         }
 
     def check_table_exists(self, connection, table_name):
-        """Mock table existence check."""
-        # All tables exist in the mock
         return True
 
     def list_tables(self, connection):
-        """Mock table listing."""
         return ["test_table"]
 
     def _get_existing_tables(self, connection):
-        """Mock existing tables method for validation."""
-        # Return the tables that exist in our mock setup
         return ["test_table"]
 
 
 class TestEnhancedBenchmarkResultsDataStructures:
-    """Test the enhanced benchmark results data structures."""
-
     def test_table_generation_stats_success(self):
-        """Test TableGenerationStats for successful generation."""
         stats = TableGenerationStats(
             generation_time_ms=1500,
             status="SUCCESS",
@@ -146,7 +129,6 @@ class TestEnhancedBenchmarkResultsDataStructures:
         assert stats.error_message is None
 
     def test_table_generation_stats_failure(self):
-        """Test TableGenerationStats for failed generation."""
         stats = TableGenerationStats(
             generation_time_ms=500,
             status="FAILED",
@@ -167,7 +149,6 @@ class TestEnhancedBenchmarkResultsDataStructures:
         assert stats.bytes_attempted == 1024000
 
     def test_data_generation_phase(self):
-        """Test DataGenerationPhase construction."""
         table_stats = {
             "customers": TableGenerationStats(
                 generation_time_ms=800,
@@ -204,7 +185,6 @@ class TestEnhancedBenchmarkResultsDataStructures:
         assert "orders" in phase.per_table_stats
 
     def test_query_execution(self):
-        """Test QueryExecution construction."""
         execution = QueryExecution(
             query_id="Q1",
             stream_id="power_test",
@@ -224,8 +204,6 @@ class TestEnhancedBenchmarkResultsDataStructures:
         assert execution.resource_usage == {"peak_memory_mb": 256}
 
     def test_enhanced_benchmark_results_construction(self):
-        """Test EnhancedBenchmarkResults construction with all components."""
-        # minimal setup phase
         setup_phase = SetupPhase(
             data_generation=DataGenerationPhase(
                 duration_ms=2000,
@@ -280,15 +258,11 @@ class TestEnhancedBenchmarkResultsDataStructures:
 
 
 class TestPlatformAdapterEnhancedMethods:
-    """Test the enhanced methods added to PlatformAdapter."""
-
     def setup_method(self):
-        """Set up test fixtures."""
         self.adapter = MockPlatformAdapter()
         self.mock_benchmark = Mock()
         self.mock_benchmark._name = "TestBenchmark"
         self.mock_benchmark.scale_factor = 0.1
-        # Use a real dict instead of Mock to avoid len() and keys() issues
         self.mock_benchmark.tables = {
             "test_table": [
                 {"id": 1, "name": "row1"},
@@ -298,7 +272,6 @@ class TestPlatformAdapterEnhancedMethods:
         }
 
     def test_create_enhanced_data_generation_phase(self):
-        """Test _create_enhanced_data_generation_phase method."""
         phase = self.adapter._create_enhanced_data_generation_phase(self.mock_benchmark)
 
         assert phase is not None
@@ -313,9 +286,7 @@ class TestPlatformAdapterEnhancedMethods:
         assert table_stats.file_path == "test_table.tbl"
 
     def test_create_enhanced_data_generation_phase_no_tables(self):
-        """Test _create_enhanced_data_generation_phase with no tables."""
         benchmark_without_tables = Mock()
-        # Strip both tables attribute and _impl to simulate no tables scenario
         if hasattr(benchmark_without_tables, "tables"):
             del benchmark_without_tables.tables
         benchmark_without_tables._impl = None
@@ -324,18 +295,16 @@ class TestPlatformAdapterEnhancedMethods:
         assert phase is None
 
     def test_create_enhanced_schema_creation_phase(self):
-        """Test _create_enhanced_schema_creation_phase method."""
         connection = Mock()
-        schema_time = 0.5  # 500ms
+        schema_time = 0.5
 
-        # Use a real dict instead of Mock to avoid len() and keys() issues
         self.mock_benchmark.tables = {"test_table": []}
 
         phase = self.adapter._create_enhanced_schema_creation_phase(self.mock_benchmark, connection, schema_time)
 
         assert phase.duration_ms == 500
         assert phase.status == "SUCCESS"
-        assert phase.tables_created == 1  # Based on mock benchmark tables
+        assert phase.tables_created == 1
         assert "test_table" in phase.per_table_creation
 
         table_creation = phase.per_table_creation["test_table"]
@@ -344,9 +313,8 @@ class TestPlatformAdapterEnhancedMethods:
         assert table_creation.indexes_created == 1
 
     def test_create_enhanced_data_loading_phase(self):
-        """Test _create_enhanced_data_loading_phase method."""
         table_stats = {"test_table": 1000, "another_table": 500}
-        loading_time = 2.5  # 2.5 seconds
+        loading_time = 2.5
 
         phase = self.adapter._create_enhanced_data_loading_phase(table_stats, loading_time)
 
@@ -362,7 +330,6 @@ class TestPlatformAdapterEnhancedMethods:
         assert test_table_stats.status == "SUCCESS"
 
     def test_create_throughput_phase(self):
-        """Throughput results should convert into structured throughput phases."""
         from benchbox.core.tpch.throughput_test import (
             TPCHThroughputStreamResult,
             TPCHThroughputTestConfig,
@@ -425,10 +392,9 @@ class TestPlatformAdapterEnhancedMethods:
         assert first_execution.status == "SUCCESS"
 
     def test_create_enhanced_validation_phase(self):
-        """Test _create_enhanced_validation_phase method."""
         phase = self.adapter._create_enhanced_validation_phase()
 
-        assert phase.duration_ms >= 50  # Minimum 50ms
+        assert phase.duration_ms >= 50
         assert phase.row_count_validation == "PASSED"
         assert phase.schema_validation == "PASSED"
         assert phase.data_integrity_checks == "PASSED"
@@ -436,7 +402,6 @@ class TestPlatformAdapterEnhancedMethods:
         assert phase.validation_details["row_count_matches"] is True
 
     def test_extract_query_definitions(self):
-        """Test _extract_query_definitions method."""
         queries = {
             "Q1": "SELECT COUNT(*) FROM test_table",
             "Q2": "SELECT * FROM test_table LIMIT 10",
@@ -454,7 +419,6 @@ class TestPlatformAdapterEnhancedMethods:
         assert q1_def.parameters == {}
 
     def test_create_standard_execution_phase(self):
-        """Test _create_standard_execution_phase method."""
         query_results = [
             {
                 "query_id": "Q1",
@@ -480,7 +444,7 @@ class TestPlatformAdapterEnhancedMethods:
         assert exec1.query_id == "Q1"
         assert exec1.stream_id == "standard"
         assert exec1.execution_order == 1
-        assert exec1.execution_time_ms == 1500  # Converted to ms
+        assert exec1.execution_time_ms == 1500
         assert exec1.status == "SUCCESS"
         assert exec1.rows_returned == 100
 
@@ -491,25 +455,19 @@ class TestPlatformAdapterEnhancedMethods:
 
 
 class TestEnhancedBenchmarkIntegration:
-    """Test the enhanced benchmark execution integration."""
-
     def setup_method(self):
-        """Set up test fixtures."""
         self.adapter = MockPlatformAdapter()
         self.mock_benchmark = Mock()
         self.mock_benchmark._name = "TestBenchmark"
         self.mock_benchmark.scale_factor = 0.1
         self.mock_benchmark.output_dir = "/tmp/test"
-        # Use a real dict instead of Mock to avoid len() and keys() issues
         self.mock_benchmark.tables = {"test_table": [{"id": 1, "name": "test1"}, {"id": 2, "name": "test2"}]}
 
-        # Mock benchmark methods
         self.mock_benchmark.get_queries.return_value = {
             "Q1": "SELECT COUNT(*) FROM test_table",
             "Q2": "SELECT * FROM test_table",
         }
 
-        # Mock the centralized result creation method
         def mock_create_enhanced_benchmark_result(platform, query_results, **kwargs):
             from datetime import datetime
 
@@ -537,7 +495,6 @@ class TestEnhancedBenchmarkIntegration:
 
         self.mock_benchmark.create_enhanced_benchmark_result = mock_create_enhanced_benchmark_result
 
-        # Mock platform adapter methods that require implementation
         self.adapter._execute_all_queries = Mock(
             return_value=[
                 {
@@ -562,13 +519,10 @@ class TestEnhancedBenchmarkIntegration:
 
     @patch("uuid.uuid4")
     def test_run_enhanced_benchmark_success(self, mock_uuid):
-        """Test successful run_enhanced_benchmark execution."""
-        # Mock uuid
         mock_uuid_obj = Mock()
         mock_uuid_obj.__getitem__ = Mock(return_value="test123")
         mock_uuid.return_value = mock_uuid_obj
 
-        # Mock anonymization manager
         with patch("benchbox.core.results.anonymization.AnonymizationManager") as mock_anon:
             mock_anon_instance = Mock()
             mock_anon_instance.get_system_profile.return_value = {"os": "TestOS"}
@@ -577,7 +531,6 @@ class TestEnhancedBenchmarkIntegration:
 
             results = self.adapter.run_enhanced_benchmark(self.mock_benchmark)
 
-        # Verify enhanced results structure
         assert isinstance(results, BenchmarkResults)
         assert results.benchmark_name == "TestBenchmark"
         assert results.platform == "TestDB"
@@ -586,12 +539,10 @@ class TestEnhancedBenchmarkIntegration:
         assert results.successful_queries == 2
         assert results.failed_queries == 0
 
-        # Verify query definitions
         assert "standard" in results.query_definitions
         assert "Q1" in results.query_definitions["standard"]
         assert "Q2" in results.query_definitions["standard"]
 
-        # Verify execution phases
         assert results.execution_phases.setup is not None
         assert results.execution_phases.setup.data_generation is not None
         assert results.execution_phases.setup.schema_creation is not None
@@ -600,10 +551,7 @@ class TestEnhancedBenchmarkIntegration:
 
 
 class TestEnhancedResultsErrorHandling:
-    """Test error handling in enhanced benchmark results."""
-
     def test_data_generation_phase_with_errors(self):
-        """Test DataGenerationPhase with table generation errors."""
         table_stats = {
             "success_table": TableGenerationStats(
                 generation_time_ms=1000,
@@ -636,14 +584,12 @@ class TestEnhancedResultsErrorHandling:
         )
 
         assert phase.status == "PARTIAL_FAILURE"
-        assert phase.tables_generated == 1  # Only successful table
+        assert phase.tables_generated == 1
 
-        # Verify success case
         success_stats = phase.per_table_stats["success_table"]
         assert success_stats.status == "SUCCESS"
         assert success_stats.error_type is None
 
-        # Verify failure case
         failed_stats = phase.per_table_stats["failed_table"]
         assert failed_stats.status == "FAILED"
         assert failed_stats.error_type == "DISK_FULL"
@@ -652,7 +598,6 @@ class TestEnhancedResultsErrorHandling:
         assert failed_stats.bytes_attempted == 300000
 
     def test_schema_creation_phase_with_errors(self):
-        """Test SchemaCreationPhase with table creation errors."""
         per_table_creation = {
             "success_table": TableCreationStats(
                 creation_time_ms=200,
@@ -683,14 +628,12 @@ class TestEnhancedResultsErrorHandling:
         assert phase.status == "PARTIAL_FAILURE"
         assert phase.tables_created == 1
 
-        # Verify error details are preserved
         failed_creation = phase.per_table_creation["failed_table"]
         assert failed_creation.status == "FAILED"
         assert failed_creation.error_type == "TABLE_EXISTS"
         assert failed_creation.error_message == "Table 'failed_table' already exists"
 
     def test_data_loading_phase_with_errors(self):
-        """Test DataLoadingPhase with table loading errors."""
         per_table_stats = {
             "success_table": TableLoadingStats(rows=1000, load_time_ms=1500, status="SUCCESS"),
             "failed_table": TableLoadingStats(
@@ -714,10 +657,9 @@ class TestEnhancedResultsErrorHandling:
         )
 
         assert phase.status == "PARTIAL_FAILURE"
-        assert phase.total_rows_loaded == 1000  # Only successful rows
-        assert phase.tables_loaded == 1  # Only successfully loaded tables
+        assert phase.total_rows_loaded == 1000
+        assert phase.tables_loaded == 1
 
-        # Verify error details
         failed_loading = phase.per_table_stats["failed_table"]
         assert failed_loading.status == "FAILED"
         assert failed_loading.error_type == "CONSTRAINT_VIOLATION"

@@ -1,5 +1,3 @@
-"""Fast-test coverage for the Apple `container` cleanup mode."""
-
 from __future__ import annotations
 
 import json
@@ -100,7 +98,6 @@ def _runner(calls: list[tuple[str, ...]], *, df_fails: bool = False):
             if df_fails:
                 return docker_assets.DockerCommandResult(argv_tuple, 1, "", "boom", error="unavailable")
             return docker_assets.DockerCommandResult(argv_tuple, 0, _SYSTEM_DF, "")
-        # Mutating commands succeed.
         return docker_assets.DockerCommandResult(argv_tuple, 0, "", "")
 
     return fake
@@ -129,8 +126,6 @@ def test_owned_mode_targets_only_benchbox_owned():
         "volume": {"benchbox-uat-smoke-postgresql_pgdata"},
         "network": {"benchbox-uat-smoke-postgresql_default"},
     }
-    # Shared + system are retained; builder is never a target; the builtin
-    # default network is never a target either.
     retained = {r.display_name for r in report.retained}
     assert {"postgres:18", "ubuntu:24.04", "ghcr.io/apple/container-builder-shim/builder:0.12.0"} <= retained
     assert "buildkit" in retained
@@ -145,11 +140,9 @@ def test_images_mode_adds_shared_images_but_not_builder():
         "postgres:18",
         "ubuntu:24.04",
     }
-    # The builder image + builder container stay retained (system category).
     retained = {r.display_name for r in report.retained}
     assert "ghcr.io/apple/container-builder-shim/builder:0.12.0" in retained
     assert "buildkit" in retained
-    # The external non-owned container is only reclaimed at max.
     assert "external-ctr" not in {r.display_name for r in report.targets}
 
 
@@ -157,7 +150,6 @@ def test_apply_runs_grouped_removals_in_dependency_order():
     calls: list[tuple[str, ...]] = []
     report = container_cleanup.reclaim_container_usage(mode="owned", apply=True, runner=_runner(calls))
     mutations = [c for c in calls if c[:3] not in _LIST_CALL_PREFIXES and c != ("container", "system", "df")]
-    # Containers removed before images so image removal is not blocked.
     assert mutations == [
         ("container", "rm", "-f", "uat-leftover"),
         ("container", "volume", "rm", "benchbox-uat-smoke-postgresql_pgdata"),
@@ -209,10 +201,6 @@ def test_report_renders_mode_and_store_path():
 
 
 def test_custom_project_prefix_reaches_classification():
-    """#1065 review: --prefix must actually classify resources, not just be
-    echoed in the report. _inventory_resources/_list_images/_list_containers/
-    _list_volumes previously ignored the caller's project_prefix and always
-    classified against the hard-coded DEFAULT_UAT_PROJECT_PREFIX."""
     custom_images = [
         {"id": "img-custom", "configuration": {"name": "foo-tpc-h:latest", "creationDate": "2026-07-08T00:00:00Z"}},
     ]
@@ -248,9 +236,6 @@ def test_custom_project_prefix_reaches_classification():
 
 
 def test_image_reference_read_from_display_reference_field():
-    """#1065 review: current `container image ls --format json` renders
-    ImageResource rows with the reference at the top-level `displayReference`
-    field, not `configuration.name` (which is empty on those rows)."""
     images = [
         {
             "id": "sha256:abc123",
@@ -280,16 +265,7 @@ def test_image_reference_read_from_display_reference_field():
     assert _targets_by_kind(report) == {"image": {"benchbox/tpc-h-linux-arm64:latest"}}
 
 
-# --------------------------------------------------------------------------
-# uat-container-engine-routing w4/w5/w6 regression coverage
-# --------------------------------------------------------------------------
-
-
 def test_custom_prefix_changes_classification():
-    """PREFIX passthrough (w4): a non-default project_prefix must actually be
-    used by classification, not silently ignored in favor of
-    DEFAULT_UAT_PROJECT_PREFIX (container_cleanup.py:344, :379-380, :407 --
-    the bug this TODO fixes)."""
     default_report = container_cleanup.reclaim_container_usage(mode="owned", apply=False, runner=_runner([]))
     default_targets = _targets_by_kind(default_report)
     assert "uat-leftover" in default_targets["container"]
@@ -299,10 +275,6 @@ def test_custom_prefix_changes_classification():
         mode="owned", apply=False, project_prefix="benchbox-custom", runner=_runner([])
     )
     custom_targets = _targets_by_kind(custom_report)
-    # The fixture's compose-project label is "benchbox-uat-smoke-postgresql",
-    # which does not match the "benchbox-custom" prefix -- these resources
-    # must now be retained, not targeted, proving the passed-in prefix (not
-    # the hardcoded default) drove classification.
     assert "uat-leftover" not in custom_targets.get("container", set())
     assert "benchbox-uat-smoke-postgresql_pgdata" not in custom_targets.get("volume", set())
     assert "benchbox-uat-smoke-postgresql_default" not in custom_targets.get("network", set())
@@ -310,10 +282,6 @@ def test_custom_prefix_changes_classification():
 
 
 def test_benchbox_experiment_dev_container_survives_owned_mode():
-    """Owned-mode ownership tightening (w6): a bare `benchbox-`-prefixed dev
-    image/container with no compose project label must NOT be reclaimed by
-    `owned` (or `images`) mode -- only the widest `max` mode, which reclaims
-    every non-system resource regardless of name, may reach it."""
     images = [*_IMAGES, {"id": "img-dev", "configuration": {"name": "benchbox-experiment:latest"}}]
     containers = [
         *_CONTAINERS,
@@ -347,9 +315,6 @@ def test_benchbox_experiment_dev_container_survives_owned_mode():
     assert "dev-ctr" in retained_names
 
     images_mode = container_cleanup.reclaim_container_usage(mode="images", apply=False, runner=fake)
-    # `images` mode reclaims every non-system IMAGE regardless of name (the
-    # existing widening rule) -- the container stays retained, only the
-    # image widens in.
     assert "dev-ctr" not in {r.display_name for r in images_mode.targets}
 
     max_mode = container_cleanup.reclaim_container_usage(mode="max", apply=False, runner=fake)
@@ -359,10 +324,6 @@ def test_benchbox_experiment_dev_container_survives_owned_mode():
 
 
 def test_network_inventory_owned_vs_shared_vs_system():
-    """Network inventory (w5): the builtin default network is system
-    (never a target); a compose-project-labeled network is owned (target in
-    every mode); an unlabeled non-default network is shared (retained until
-    `max`)."""
     networks = [*_NETWORKS, {"id": "other-net", "configuration": {"name": "developer-bridge", "labels": {}}}]
 
     def fake(argv, **kwargs):
@@ -388,16 +349,10 @@ def test_network_inventory_owned_vs_shared_vs_system():
     max_mode = container_cleanup.reclaim_container_usage(mode="max", apply=False, runner=fake)
     max_networks = {r.display_name for r in max_mode.targets if r.kind == "network"}
     assert "developer-bridge" in max_networks
-    assert "default" not in max_networks  # system network is never a target, even at max
+    assert "default" not in max_networks
 
 
 def test_network_name_extending_prefix_without_separator_is_not_owned():
-    """#1158 review: a network without a compose project label whose name
-    merely extends project_prefix (no `-`/`_` boundary) must be classified
-    `shared`, not `owned` -- otherwise `MODE=owned APPLY=1` deletes an
-    unrelated network. The name fallback must use the same separator-aware
-    matching as the project-label check (_is_owned), not a bare startswith.
-    """
     networks = [
         *_NETWORKS,
         {"id": "lookalike-net", "configuration": {"name": "benchbox-uatfoo_default", "labels": {}}},
@@ -425,11 +380,6 @@ def test_network_name_extending_prefix_without_separator_is_not_owned():
 
 
 def test_mocker_compose_project_label_is_recognized(monkeypatch):
-    """uat-container-engine-routing w4/w0 live-validation finding: a
-    `mocker compose up` container/network carries `com.mocker.compose.project`,
-    NOT the Docker key `com.docker.compose.project` -- checking only the
-    Docker key silently misclassified every mocker-managed resource as
-    `shared` (never reclaimed even in `owned` mode)."""
     containers = [
         {
             "id": "pg-1",
@@ -475,13 +425,6 @@ def test_mocker_compose_project_label_is_recognized(monkeypatch):
 
 
 def test_max_mode_apply_passes_the_real_forbidden_prune_guard(monkeypatch):
-    """REQUIRED-1 regression: `make uat-docker-cleanup ENGINE=container
-    MODE=max APPLY=1` executes `container prune` / `container volume prune`
-    / `container network prune` through the REAL run_docker_command, whose
-    forbidden-prune guard must exempt the Apple-native `container` CLI --
-    an engine-agnostic verb-pair guard blocked these and made max-mode
-    cleanup raise ContainerCleanupError. Only the subprocess layer is
-    mocked here; the guard itself runs for every command."""
     import subprocess
 
     executed: list[tuple[str, ...]] = []
@@ -505,7 +448,6 @@ def test_max_mode_apply_passes_the_real_forbidden_prune_guard(monkeypatch):
 
     monkeypatch.setattr(docker_assets.subprocess, "run", fake_subprocess_run)
 
-    # runner=None -> the real docker_assets.run_docker_command, guard included.
     report = container_cleanup.reclaim_container_usage(mode="max", apply=True, runner=None)
 
     assert ("container", "prune") in executed
@@ -516,10 +458,6 @@ def test_max_mode_apply_passes_the_real_forbidden_prune_guard(monkeypatch):
 
 
 def test_non_uat_mocker_project_stays_shared_below_max():
-    """NIT-5 regression: a container labeled com.mocker.compose.project with
-    a NON-UAT project (`myapp`) is recognized as compose-managed but stays
-    `shared` -- untouched by `owned`, image-only widening in `images`, and
-    reclaimed only by `max`'s catch-all."""
     containers = [
         {
             "id": "myapp-web-1",

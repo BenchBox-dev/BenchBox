@@ -1,5 +1,3 @@
-"""Tests for scripts/ci_unit_result.py, the per-unit result aggregator."""
-
 from __future__ import annotations
 
 import json
@@ -29,7 +27,6 @@ def test_required_job_must_succeed() -> None:
 
 
 def test_required_job_skipped_is_a_failure() -> None:
-    """A skipped required job must never green the unit."""
     problems, _ = evaluate(needs(lint="skipped"), {"lint": True}, [])
     assert problems == ["lint=skipped (required for this change; expected success)"]
 
@@ -44,8 +41,6 @@ def test_failure_always_fails() -> None:
 
 
 def test_cancelled_upstream_is_never_a_failure() -> None:
-    """A cancelled upstream means a newer run superseded this one, so the
-    aggregate must conclude cancelled (reported separately) instead of failed."""
     assert evaluate(needs(lint="cancelled", other="success"), {"other": True}, []) == (
         [],
         ["lint=cancelled"],
@@ -61,7 +56,6 @@ def test_cancelled_always_job_is_superseded_not_failed() -> None:
 
 
 def test_failure_beats_cancellation() -> None:
-    """A real failure alongside a cancellation still fails the unit."""
     problems, cancelled = evaluate(needs(lint="failure", test="cancelled"), {"lint": True, "test": True}, [])
     assert problems != []
     assert cancelled == ["test=cancelled"]
@@ -119,8 +113,6 @@ def test_cli_exit_codes() -> None:
 
 
 def test_cli_superseded_exit_code_for_cancelled_upstreams() -> None:
-    """A cancelled-only outcome exits SUPERSEDED (not 0, not 1) so the
-    workflow can cancel its own run instead of failing the aggregate."""
     assert SUPERSEDED_EXIT_CODE not in (0, 1)
     superseded = run(
         needs(classify="success", lint="cancelled"),

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Validate checked-in TPC tuned templates against the logical tuning profile."""
 
 from __future__ import annotations
 
@@ -14,8 +13,11 @@ from benchbox.core.tuning.workload_profiles import load_tpc_tuning_profile
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
+CLI_DESCRIPTION = "Validate checked-in TPC tuned templates against the logical tuning profile."
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--benchmarks", default="tpch,tpcds", help="Comma-separated benchmark ids")
     parser.add_argument("--platforms", default="databricks,duckdb", help="Comma-separated platform ids")
     parser.add_argument("--strict", action="store_true", help="Exit non-zero when any template validation fails")

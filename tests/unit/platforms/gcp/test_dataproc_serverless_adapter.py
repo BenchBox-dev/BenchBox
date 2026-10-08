@@ -1,9 +1,6 @@
-"""Tests for GCP Dataproc Serverless platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -19,10 +16,8 @@ pytestmark = [
 
 
 class TestDataprocServerlessAdapterInitialization:
-    """Test DataprocServerlessAdapter initialization."""
-
     def test_missing_project_id_raises_error(self):
-        """Test error when project_id is not provided."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.GOOGLE_CLOUD_AVAILABLE", True),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1", MagicMock()),
@@ -36,7 +31,7 @@ class TestDataprocServerlessAdapterInitialization:
                 )
 
     def test_missing_gcs_staging_dir_raises_error(self):
-        """Test error when gcs_staging_dir is not provided."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.GOOGLE_CLOUD_AVAILABLE", True),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1", MagicMock()),
@@ -50,7 +45,7 @@ class TestDataprocServerlessAdapterInitialization:
                 )
 
     def test_invalid_gcs_path_raises_error(self):
-        """Test error when gcs_staging_dir has invalid format."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.GOOGLE_CLOUD_AVAILABLE", True),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1", MagicMock()),
@@ -65,7 +60,7 @@ class TestDataprocServerlessAdapterInitialization:
                 )
 
     def test_valid_configuration(self):
-        """Test valid configuration initializes correctly."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.GOOGLE_CLOUD_AVAILABLE", True),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1", MagicMock()),
@@ -90,7 +85,7 @@ class TestDataprocServerlessAdapterInitialization:
             assert adapter.database == "my_benchmark_db"
 
     def test_default_values(self):
-        """Test default configuration values."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.GOOGLE_CLOUD_AVAILABLE", True),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1", MagicMock()),
@@ -115,7 +110,7 @@ class TestDataprocServerlessAdapterInitialization:
             assert adapter.subnetwork_uri is None
 
     def test_optional_network_configuration(self):
-        """Test optional network configuration."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.GOOGLE_CLOUD_AVAILABLE", True),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1", MagicMock()),
@@ -140,10 +135,8 @@ class TestDataprocServerlessAdapterInitialization:
 
 
 class TestDataprocServerlessTableFormat:
-    """Test table_format parameter configuration."""
-
     def test_table_format_default_parquet(self):
-        """Test table_format defaults to parquet."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.GOOGLE_CLOUD_AVAILABLE", True),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1", MagicMock()),
@@ -160,7 +153,7 @@ class TestDataprocServerlessTableFormat:
             assert adapter.table_format == "parquet"
 
     def test_table_format_delta(self):
-        """Test table_format can be set to delta."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.GOOGLE_CLOUD_AVAILABLE", True),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1", MagicMock()),
@@ -178,7 +171,7 @@ class TestDataprocServerlessTableFormat:
             assert adapter.table_format == "delta"
 
     def test_table_format_from_config(self):
-        """Test table_format is passed through from_config."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.GOOGLE_CLOUD_AVAILABLE", True),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1", MagicMock()),
@@ -199,10 +192,8 @@ class TestDataprocServerlessTableFormat:
 
 
 class TestDataprocServerlessAdapterPlatformInfo:
-    """Test platform info methods."""
-
     def test_get_platform_info(self):
-        """Test get_platform_info returns correct metadata."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.GOOGLE_CLOUD_AVAILABLE", True),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1", MagicMock()),
@@ -232,7 +223,7 @@ class TestDataprocServerlessAdapterPlatformInfo:
             assert info["cluster_management"] is False
 
     def test_get_dialect(self):
-        """Test get_target_dialect returns spark."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.GOOGLE_CLOUD_AVAILABLE", True),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1", MagicMock()),
@@ -252,10 +243,8 @@ class TestDataprocServerlessAdapterPlatformInfo:
 
 
 class TestDataprocServerlessAdapterConnection:
-    """Test connection functionality."""
-
     def test_create_connection_success(self):
-        """Test successful connection verification."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.GOOGLE_CLOUD_AVAILABLE", True),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1") as mock_dataproc,
@@ -264,7 +253,6 @@ class TestDataprocServerlessAdapterConnection:
         ):
             mock_staging.from_uri.return_value = MagicMock()
 
-            # Setup mock batch client
             mock_batch_client = MagicMock()
             mock_batch_client.list_batches.return_value = []
             mock_dataproc.BatchControllerClient.return_value = mock_batch_client
@@ -285,7 +273,7 @@ class TestDataprocServerlessAdapterConnection:
             assert result["region"] == "us-central1"
 
     def test_create_connection_failure(self):
-        """Test connection failure handling."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.GOOGLE_CLOUD_AVAILABLE", True),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1") as mock_dataproc,
@@ -294,7 +282,6 @@ class TestDataprocServerlessAdapterConnection:
         ):
             mock_staging.from_uri.return_value = MagicMock()
 
-            # Setup mock batch client to raise an error
             mock_batch_client = MagicMock()
             mock_batch_client.list_batches.side_effect = Exception("Permission denied")
             mock_dataproc.BatchControllerClient.return_value = mock_batch_client
@@ -312,11 +299,8 @@ class TestDataprocServerlessAdapterConnection:
 
 
 class TestDataprocServerlessAdapterDataLoading:
-    """Test data loading functionality."""
-
     def test_load_data_existing_tables(self, tmp_path):
-        """Test load_data skips upload when tables exist."""
-        # Create actual source directory to pass validation
+
         source_dir = tmp_path / "test_data"
         source_dir.mkdir()
 
@@ -347,10 +331,8 @@ class TestDataprocServerlessAdapterDataLoading:
 
 
 class TestDataprocBatchState:
-    """Test batch state constants."""
-
     def test_batch_state_values(self):
-        """Test DataprocBatchState constants are correct."""
+
         from benchbox.platforms.gcp.dataproc_serverless_adapter import DataprocBatchState
 
         assert DataprocBatchState.PENDING == "PENDING"
@@ -360,7 +342,7 @@ class TestDataprocBatchState:
         assert DataprocBatchState.CANCELLED == "CANCELLED"
 
     def test_terminal_states(self):
-        """Test terminal states are correctly defined."""
+
         from benchbox.platforms.gcp.dataproc_serverless_adapter import DataprocBatchState
 
         assert DataprocBatchState.SUCCEEDED in DataprocBatchState.TERMINAL_STATES
@@ -370,17 +352,15 @@ class TestDataprocBatchState:
 
 
 class TestDataprocServerlessAdapterRegistry:
-    """Test platform registry integration."""
-
     def test_platform_metadata_exists(self):
-        """Test Dataproc Serverless metadata exists in platform registry."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         all_metadata = PlatformRegistry.get_all_platform_metadata()
         assert "dataproc-serverless" in all_metadata
 
     def test_platform_metadata_content(self):
-        """Test Dataproc Serverless metadata content is correct."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         all_metadata = PlatformRegistry.get_all_platform_metadata()
@@ -395,10 +375,8 @@ class TestDataprocServerlessAdapterRegistry:
 
 
 class TestDataprocServerlessAdapterTuning:
-    """Test tuning interface implementation."""
-
     def test_apply_platform_optimizations(self):
-        """Test apply_platform_optimizations returns empty list."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.GOOGLE_CLOUD_AVAILABLE", True),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1", MagicMock()),
@@ -418,7 +396,7 @@ class TestDataprocServerlessAdapterTuning:
             assert result == []
 
     def test_apply_primary_keys(self):
-        """Test apply_primary_keys returns empty list."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.GOOGLE_CLOUD_AVAILABLE", True),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1", MagicMock()),
@@ -440,13 +418,12 @@ class TestDataprocServerlessAdapterTuning:
             assert result == []
 
     def test_configure_for_benchmark(self):
-        """Test configure_for_benchmark sets benchmark type."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.GOOGLE_CLOUD_AVAILABLE", True),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1", MagicMock()),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.storage", MagicMock()),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.CloudSparkStaging") as mock_staging,
-            # SparkConfigOptimizer is now used from the mixin module
             patch("benchbox.platforms.base.cloud_spark.mixins.SparkConfigOptimizer") as mock_optimizer,
         ):
             mock_staging.from_uri.return_value = MagicMock()
@@ -468,10 +445,8 @@ class TestDataprocServerlessAdapterTuning:
 
 
 class TestDataprocServerlessAdapterCLI:
-    """Test CLI argument handling."""
-
     def test_add_cli_arguments(self):
-        """Test add_cli_arguments adds expected arguments."""
+
         from benchbox.platforms.gcp import DataprocServerlessAdapter
 
         parser = MagicMock()
@@ -483,10 +458,8 @@ class TestDataprocServerlessAdapterCLI:
 
 
 class TestDataprocServerlessAdapterFromConfig:
-    """Test from_config factory method."""
-
     def test_from_config_basic(self):
-        """Test from_config creates adapter with basic config."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.GOOGLE_CLOUD_AVAILABLE", True),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1", MagicMock()),
@@ -514,10 +487,8 @@ class TestDataprocServerlessAdapterFromConfig:
 
 
 class TestDataprocServerlessAdapterClose:
-    """Test cleanup functionality."""
-
     def test_close_logs_metrics(self):
-        """Test close logs execution metrics."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.GOOGLE_CLOUD_AVAILABLE", True),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1", MagicMock()),
@@ -538,15 +509,11 @@ class TestDataprocServerlessAdapterClose:
 
             adapter.close()
 
-            # Verify logging was called
             mock_logger.info.assert_called()
 
 
 class TestDataprocServerlessUserConfigPrecedence:
-    """User spark_config entries must win over optimizer output (adapter level)."""
-
     def test_user_entries_win_and_survive_reconfigure(self):
-        """Pre-seeded user entries persist in job properties across benchmarks."""
         with patch("benchbox.platforms.gcp.dataproc_serverless_adapter.CloudSparkStaging") as mock_staging:
             mock_staging.from_uri.return_value = MagicMock()
 
@@ -569,8 +536,6 @@ class TestDataprocServerlessUserConfigPrecedence:
 
 
 class TestLoadDataRequestedFormat:
-    """Registration must follow the resolved upload format, not table_format alone."""
-
     def test_requested_delta_registers_delta(self, tmp_path):
         source_dir = tmp_path / "test_data"
         source_dir.mkdir()

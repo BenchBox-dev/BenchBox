@@ -127,13 +127,11 @@ describe("dashboard store", () => {
 
   it("keeps deletes deleted when storage writes fail", () => {
     const dashboard = createDashboard("Board")!;
-    // Fail every write from here on; the stored copy still holds the board.
     const storage = window.localStorage;
     vi.spyOn(storage, "setItem").mockImplementation(() => {
       throw new DOMException("quota", "QuotaExceededError");
     });
     expect(deleteDashboard(dashboard.id)).toEqual([]);
-    // The stale stored copy must not resurrect through the memory merge.
     expect(loadDashboards()).toEqual([]);
     expect(deleteDashboard("missing")).toEqual([]);
   });

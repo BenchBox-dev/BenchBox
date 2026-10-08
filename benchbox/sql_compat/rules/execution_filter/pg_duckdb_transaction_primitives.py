@@ -1,5 +1,3 @@
-"""pg_duckdb execution-filter rules for transaction_primitives operation gaps."""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.actions import CompatAction

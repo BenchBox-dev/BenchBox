@@ -1,11 +1,3 @@
-"""TPC-Havoc DataFrame variants for Q16.
-
-Q16 filters parts, joins partsupp, excludes complaint suppliers via an
-anti-join, then groups by brand/type/size with a distinct-supplier count.
-The variants keep the canonical output while varying the anti-join shape,
-filter pushdown, prefiltering, column pruning, and aggregation structure.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -82,9 +74,6 @@ def _make_q16_expression_impl(variant: int) -> VariantImpl:
             )
 
         if variant == 3:
-            # Semi-join pruning: partsupp is first reduced to the rows whose
-            # part key survives the part filter, via a distinct-key semi-join,
-            # before the main part/partsupp join runs.
             filtered = part.filter(_q16_expr_parts(col, lit, params))
             part_keys = filtered.select("p_partkey").distinct()
             pruned = partsupp.join(part_keys, left_on="ps_partkey", right_on="p_partkey", how="semi")
@@ -132,9 +121,6 @@ def _make_q16_expression_impl(variant: int) -> VariantImpl:
             )
 
         if variant == 7:
-            # Late filtering: part and partsupp join unfiltered, and the
-            # brand/type/size predicates run on the joined rows instead of on
-            # part before the join, swapping the canonical filter order.
             joined = part.join(partsupp, left_on="p_partkey", right_on="ps_partkey").filter(
                 _q16_expr_parts(col, lit, params)
             )
@@ -218,7 +204,6 @@ def _make_q16_pandas_impl(variant: int) -> VariantImpl:
             return _q16_pandas_aggregate(joined[~joined["ps_suppkey"].isin(_to_list(complaint_keys))])
 
         if variant == 3:
-            # Semi-join pruning mirror: partsupp reduced to surviving part keys first.
             filtered = part[_q16_pandas_parts_mask(part, params)]
             part_keys = _to_list(filtered[["p_partkey"]].drop_duplicates()["p_partkey"])
             pruned = partsupp[partsupp["ps_partkey"].isin(part_keys)]
@@ -258,7 +243,6 @@ def _make_q16_pandas_impl(variant: int) -> VariantImpl:
             return _q16_pandas_aggregate(joined[~joined["ps_suppkey"].isin(_to_list(complaint_keys))])
 
         if variant == 7:
-            # Late filtering mirror: join first, filter the joined rows after.
             joined = part.merge(partsupp, left_on="p_partkey", right_on="ps_partkey")
             filtered = joined[_q16_pandas_parts_mask(joined, params)]
             complaint_keys = _q16_pandas_complaint_keys(supplier)

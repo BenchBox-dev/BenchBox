@@ -1,9 +1,6 @@
-"""Tests for TPC-H Skew benchmark implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -18,22 +15,20 @@ pytestmark = [
 
 
 class TestTPCHSkewBenchmark:
-    """Tests for TPCHSkewBenchmark class."""
-
     def test_initialization_default(self):
-        """Test default initialization uses moderate preset."""
+
         benchmark = TPCHSkewBenchmark(scale_factor=0.01)
         assert benchmark.skew_preset == "moderate"
         assert benchmark.skew_config.skew_factor == 0.5
 
     def test_initialization_with_preset(self):
-        """Test initialization with specific preset."""
+
         benchmark = TPCHSkewBenchmark(scale_factor=0.01, skew_preset="heavy")
         assert benchmark.skew_preset == "heavy"
         assert benchmark.skew_config.skew_factor == 0.8
 
     def test_initialization_with_custom_config(self):
-        """Test initialization with custom configuration."""
+
         config = SkewConfiguration(skew_factor=0.75, distribution_type="normal")
         benchmark = TPCHSkewBenchmark(scale_factor=0.01, skew_config=config)
         assert benchmark.skew_preset == "custom"
@@ -41,19 +36,18 @@ class TestTPCHSkewBenchmark:
         assert benchmark.skew_config.distribution_type == "normal"
 
     def test_invalid_preset(self):
-        """Test invalid preset raises error."""
+
         with pytest.raises(ValueError, match="Invalid skew preset"):
             TPCHSkewBenchmark(scale_factor=0.01, skew_preset="invalid")
 
     def test_scale_factor_validation(self):
-        """Test scale factor must be positive."""
         with pytest.raises(ValueError):
             TPCHSkewBenchmark(scale_factor=0)
         with pytest.raises(ValueError):
             TPCHSkewBenchmark(scale_factor=-1)
 
     def test_get_skew_info(self):
-        """Test get_skew_info returns correct structure."""
+
         benchmark = TPCHSkewBenchmark(scale_factor=0.01, skew_preset="light")
         info = benchmark.get_skew_info()
 
@@ -67,7 +61,7 @@ class TestTPCHSkewBenchmark:
         assert info["skew_factor"] == 0.2
 
     def test_get_benchmark_info(self):
-        """Test get_benchmark_info returns complete metadata."""
+
         benchmark = TPCHSkewBenchmark(scale_factor=1.0, skew_preset="moderate")
         info = benchmark.get_benchmark_info()
 
@@ -77,39 +71,38 @@ class TestTPCHSkewBenchmark:
         assert info["skew_info"]["preset"] == "moderate"
 
     def test_get_available_presets(self):
-        """Test get_available_presets returns all presets."""
+
         presets = TPCHSkewBenchmark.get_available_presets()
         expected = ["none", "light", "moderate", "heavy", "extreme", "realistic"]
         assert presets == expected
 
     def test_get_preset_description(self):
-        """Test get_preset_description returns valid descriptions."""
+
         desc = TPCHSkewBenchmark.get_preset_description("moderate")
         assert "Moderate skew" in desc
         assert "0.5" in desc
 
     def test_get_preset_description_invalid(self):
-        """Test get_preset_description raises for invalid preset."""
+
         with pytest.raises(ValueError, match="Unknown preset"):
             TPCHSkewBenchmark.get_preset_description("invalid")
 
     def test_inherits_tpch_queries(self):
-        """Test benchmark provides TPC-H queries."""
+
         benchmark = TPCHSkewBenchmark(scale_factor=0.01)
         queries = benchmark.get_queries()
         assert len(queries) == 22
-        # Check query 1 exists
         assert "1" in queries
 
     def test_get_single_query(self):
-        """Test getting a single query."""
+
         benchmark = TPCHSkewBenchmark(scale_factor=0.01)
         query = benchmark.get_query(1)
         assert isinstance(query, str)
         assert "SELECT" in query.upper()
 
     def test_get_schema(self):
-        """Test get_schema returns TPC-H schema."""
+
         benchmark = TPCHSkewBenchmark(scale_factor=0.01)
         schema = benchmark.get_schema()
         assert "lineitem" in schema
@@ -118,56 +111,51 @@ class TestTPCHSkewBenchmark:
 
 
 class TestTPCHSkewTopLevel:
-    """Tests for TPCHSkew top-level class."""
-
     def test_initialization(self):
-        """Test basic initialization."""
+
         benchmark = TPCHSkew(scale_factor=0.01)
         assert benchmark.scale_factor == 0.01
 
     def test_preset_access(self):
-        """Test skew_preset property."""
+
         benchmark = TPCHSkew(scale_factor=0.01, skew_preset="light")
         assert benchmark.skew_preset == "light"
 
     def test_skew_config_access(self):
-        """Test skew_config property."""
+
         benchmark = TPCHSkew(scale_factor=0.01, skew_preset="heavy")
         assert benchmark.skew_config.skew_factor == 0.8
 
     def test_get_queries(self):
-        """Test get_queries method."""
+
         benchmark = TPCHSkew(scale_factor=0.01)
         queries = benchmark.get_queries()
         assert len(queries) == 22
 
     def test_get_query_validation(self):
-        """Test get_query validates inputs."""
+
         benchmark = TPCHSkew(scale_factor=0.01)
 
-        # Valid query
         query = benchmark.get_query(1)
         assert isinstance(query, str)
 
-        # Invalid query ID
         with pytest.raises(ValueError, match="1-22"):
             benchmark.get_query(0)
         with pytest.raises(ValueError, match="1-22"):
             benchmark.get_query(23)
 
-        # Invalid type
         with pytest.raises(TypeError, match="integer"):
-            benchmark.get_query("1")  # type: ignore
+            benchmark.get_query("1")
 
     def test_get_skew_info(self):
-        """Test get_skew_info method."""
+
         benchmark = TPCHSkew(scale_factor=0.01, skew_preset="realistic")
         info = benchmark.get_skew_info()
         assert info["preset"] == "realistic"
         assert info["skew_factor"] == 0.6
 
     def test_static_methods(self):
-        """Test static utility methods."""
+
         presets = TPCHSkew.get_available_presets()
         assert "moderate" in presets
 
@@ -176,19 +164,16 @@ class TestTPCHSkewTopLevel:
 
 
 class TestTPCHSkewPresetConfigurations:
-    """Tests for preset configuration correctness."""
-
     @pytest.mark.parametrize("preset", ["none", "light", "moderate", "heavy", "extreme", "realistic"])
     def test_preset_creates_valid_benchmark(self, preset):
-        """Test each preset creates a working benchmark."""
+
         benchmark = TPCHSkew(scale_factor=0.01, skew_preset=preset)
         assert benchmark.skew_preset == preset
-        # Should be able to get queries
         queries = benchmark.get_queries()
         assert len(queries) == 22
 
     def test_none_preset_is_uniform(self):
-        """Test 'none' preset has no skew."""
+
         benchmark = TPCHSkew(scale_factor=0.01, skew_preset="none")
         config = benchmark.skew_config
         assert config.skew_factor == 0.0
@@ -197,7 +182,7 @@ class TestTPCHSkewPresetConfigurations:
         assert config.enable_temporal_skew is False
 
     def test_extreme_has_max_skew(self):
-        """Test 'extreme' preset has maximum skew settings."""
+
         benchmark = TPCHSkew(scale_factor=0.01, skew_preset="extreme")
         config = benchmark.skew_config
         assert config.skew_factor == 1.0
@@ -205,7 +190,7 @@ class TestTPCHSkewPresetConfigurations:
         assert config.join_skew.part_popularity_skew == 1.0
 
     def test_realistic_has_temporal_skew(self):
-        """Test 'realistic' preset enables temporal skew."""
+
         benchmark = TPCHSkew(scale_factor=0.01, skew_preset="realistic")
         config = benchmark.skew_config
         assert config.enable_temporal_skew is True
@@ -213,83 +198,70 @@ class TestTPCHSkewPresetConfigurations:
 
 
 class TestTPCHSkewDialectSupport:
-    """Tests for SQL dialect support."""
-
     def test_query_dialect_translation(self):
-        """Test queries can be translated to different dialects."""
+
         benchmark = TPCHSkew(scale_factor=0.01)
 
-        # Get query in default dialect
         query_default = benchmark.get_query(1)
         assert isinstance(query_default, str)
 
-        # Get query in specific dialect
         query_duckdb = benchmark.get_query(1, dialect="duckdb")
         assert isinstance(query_duckdb, str)
 
     def test_get_all_queries_with_dialect(self):
-        """Test get_queries with dialect parameter."""
+
         benchmark = TPCHSkew(scale_factor=0.01)
         queries = benchmark.get_queries(dialect="duckdb")
         assert len(queries) == 22
-        # All queries should be strings
         for _query_id, query in queries.items():
             assert isinstance(query, str)
 
 
 class TestTPCHSkewScaleFactor:
-    """Tests for scale factor handling."""
-
     def test_fractional_scale_factor(self):
-        """Test fractional scale factors work."""
+
         benchmark = TPCHSkew(scale_factor=0.01)
         assert benchmark.scale_factor == 0.01
 
     def test_integer_scale_factor(self):
-        """Test integer scale factors work."""
+
         benchmark = TPCHSkew(scale_factor=1)
         assert benchmark.scale_factor == 1
 
     def test_scale_factor_in_benchmark_info(self):
-        """Test scale factor appears in benchmark info."""
+
         benchmark = TPCHSkew(scale_factor=10)
         info = benchmark.get_benchmark_info()
         assert info["scale_factor"] == 10
 
 
 class TestCompareWithUniform:
-    """Tests for compare_with_uniform() method on TPCHSkewBenchmark."""
-
     def test_compare_with_uniform_validation_none_adapter(self):
-        """Test compare_with_uniform raises on None adapter."""
+
         benchmark = TPCHSkewBenchmark(scale_factor=0.01)
         with pytest.raises(ValueError, match="adapter cannot be None"):
             benchmark.compare_with_uniform(None)
 
     def test_compare_with_uniform_validation_invalid_queries(self):
-        """Test compare_with_uniform validates query IDs."""
+
         benchmark = TPCHSkewBenchmark(scale_factor=0.01)
 
-        # Create a mock adapter (won't be used due to validation failure)
         class MockAdapter:
             pass
 
         mock_adapter = MockAdapter()
 
-        # Invalid query ID (0)
         with pytest.raises(ValueError, match="Invalid query IDs"):
             benchmark.compare_with_uniform(mock_adapter, queries=[0, 1, 2])
 
-        # Invalid query ID (23)
         with pytest.raises(ValueError, match="Invalid query IDs"):
             benchmark.compare_with_uniform(mock_adapter, queries=[1, 23])
 
-        # Invalid query ID (string)
         with pytest.raises(ValueError, match="Invalid query IDs"):
-            benchmark.compare_with_uniform(mock_adapter, queries=["1", 2])  # type: ignore
+            benchmark.compare_with_uniform(mock_adapter, queries=["1", 2])
 
     def test_compare_with_uniform_validation_invalid_iterations(self):
-        """Test compare_with_uniform validates iterations parameter."""
+
         benchmark = TPCHSkewBenchmark(scale_factor=0.01)
 
         class MockAdapter:
@@ -304,56 +276,43 @@ class TestCompareWithUniform:
             benchmark.compare_with_uniform(mock_adapter, queries=[1], iterations=-1)
 
     def test_geometric_mean_helper(self):
-        """Test _geometric_mean helper function."""
-        # Simple case
+
         result = TPCHSkewBenchmark._geometric_mean([1.0, 1.0, 1.0])
         assert result == pytest.approx(1.0)
 
-        # Known geometric mean: sqrt(2*8) = 4
         result = TPCHSkewBenchmark._geometric_mean([2.0, 8.0])
         assert result == pytest.approx(4.0)
 
-        # Cube root of 8 = 2
         result = TPCHSkewBenchmark._geometric_mean([8.0])
         assert result == pytest.approx(8.0)
 
-        # Empty list
         result = TPCHSkewBenchmark._geometric_mean([])
         assert result == 0.0
 
     def test_compare_default_queries(self):
-        """Test default queries list is all 22."""
         benchmark = TPCHSkewBenchmark(scale_factor=0.01)
 
-        # We can't run the full comparison without a real adapter,
-        # but we can verify the default would be all 22 queries
-        # by checking the docstring or creating a minimal mock
-
-        # Verify the benchmark is properly configured
         assert benchmark.scale_factor == 0.01
         queries = benchmark.get_queries()
         assert len(queries) == 22
 
 
 class TestTPCHSkewCompareWithUniformWrapper:
-    """Tests for compare_with_uniform() method on public TPCHSkew class."""
-
     def test_compare_with_uniform_exists_on_tpch_skew(self):
-        """Test that compare_with_uniform method exists on TPCHSkew."""
+
         benchmark = TPCHSkew(scale_factor=0.01)
         assert hasattr(benchmark, "compare_with_uniform")
         assert callable(benchmark.compare_with_uniform)
 
     def test_compare_with_uniform_delegates_to_impl(self):
-        """Test that TPCHSkew.compare_with_uniform delegates to implementation."""
+
         benchmark = TPCHSkew(scale_factor=0.01)
 
-        # Should raise same validation error as implementation
         with pytest.raises(ValueError, match="adapter cannot be None"):
             benchmark.compare_with_uniform(None)
 
     def test_compare_with_uniform_validates_queries(self):
-        """Test query validation through wrapper."""
+
         benchmark = TPCHSkew(scale_factor=0.01, skew_preset="moderate")
 
         class MockAdapter:
@@ -361,16 +320,14 @@ class TestTPCHSkewCompareWithUniformWrapper:
 
         mock_adapter = MockAdapter()
 
-        # Invalid query ID (0)
         with pytest.raises(ValueError, match="Invalid query IDs"):
             benchmark.compare_with_uniform(mock_adapter, queries=[0, 1, 2])
 
-        # Invalid query ID (23)
         with pytest.raises(ValueError, match="Invalid query IDs"):
             benchmark.compare_with_uniform(mock_adapter, queries=[1, 23])
 
     def test_compare_with_uniform_validates_iterations(self):
-        """Test iterations validation through wrapper."""
+
         benchmark = TPCHSkew(scale_factor=0.01)
 
         class MockAdapter:
@@ -382,14 +339,12 @@ class TestTPCHSkewCompareWithUniformWrapper:
             benchmark.compare_with_uniform(mock_adapter, queries=[1], iterations=0)
 
     def test_compare_signature_matches_implementation(self):
-        """Test that wrapper signature matches implementation."""
+
         import inspect
 
-        # Get signatures
         wrapper_sig = inspect.signature(TPCHSkew.compare_with_uniform)
         impl_sig = inspect.signature(TPCHSkewBenchmark.compare_with_uniform)
 
-        # Check parameter names match (excluding 'self')
         wrapper_params = [p for p in wrapper_sig.parameters if p != "self"]
         impl_params = [p for p in impl_sig.parameters if p != "self"]
         assert wrapper_params == impl_params

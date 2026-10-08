@@ -1,13 +1,3 @@
-"""Cross-loader parity test: shared and write_primitives loaders must
-forward the same set of validation_query fields.
-
-Closes blind-spot 2026-05-04-004045 — three rounds of write_primitives-
-local extensions (expected_value_min/max, platform_overrides) silently
-bypassed transaction_primitives because the shared loader did not
-forward them. This test fails when one loader gains a field the other
-does not.
-"""
-
 from __future__ import annotations
 
 import inspect
@@ -39,12 +29,6 @@ def test_validation_query_dataclasses_share_field_set() -> None:
 
 
 def test_shared_parser_forwards_all_validation_query_fields() -> None:
-    """Verify the shared parser builds a ValidationQuery with every field both dataclasses expose.
-
-    The parser uses _filter_supported_kwargs to drop fields a target dataclass
-    doesn't accept; this test asserts the dataclass DOES accept every field
-    we expect to forward, by parsing a synthetic entry that exercises all of them.
-    """
 
     class _CatalogError(RuntimeError):
         pass
@@ -128,7 +112,6 @@ def test_shared_parser_rejects_empty_string_override() -> None:
 
 
 def test_write_primitives_loader_delegates_to_shared_parser() -> None:
-    """The write_primitives _parse_validation_queries should not have its own helpers anymore."""
     from benchbox.core.write_primitives.catalog import loader as write_loader
 
     source = inspect.getsource(write_loader._parse_validation_queries)
@@ -139,7 +122,6 @@ def test_write_primitives_loader_delegates_to_shared_parser() -> None:
 
 
 def test_write_primitives_backcompat_helper_shims_stay_callable() -> None:
-    """Backcompat helper exports should fail loudly if deleted or rebound incorrectly."""
     from benchbox.core.write_primitives.catalog import loader as write_loader
 
     assert write_loader._parse_expected_value_bounds(

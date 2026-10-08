@@ -44,43 +44,45 @@ Top-level object containing complete benchmark execution information.
 **Key Fields**:
 ```python
 {
-    # Identification
-    "benchmark_name": str,           # e.g., "TPC-H", "TPC-DS", "ClickBench"
-    "platform": str,                 # e.g., "DuckDB", "Snowflake"
-    "execution_id": str,             # Unique run identifier
-    "timestamp": datetime,           # ISO 8601 timestamp
+    "benchmark_name": str,
+    "platform": str,
+    "execution_id": str,
+    "timestamp": datetime,
 
-    # Configuration
-    "scale_factor": float,           # Data size multiplier
-    "test_execution_type": str,      # "standard", "power", "throughput"
+    "scale_factor": float,
+    "test_execution_type": str,
 
-    # Timing Summary
-    "duration_seconds": float,       # Total execution time
-    "total_execution_time": float,   # Query execution time only
-    "average_query_time": float,     # Mean query time
-    "data_loading_time": float,      # Time to load data
-    "schema_creation_time": float,   # Time to create schema
+    "duration_seconds": float,
+    "total_execution_time": float,
+    "average_query_time": float,
+    "data_loading_time": float,
+    "schema_creation_time": float,
 
-    # Query Statistics
-    "total_queries": int,            # Number of queries attempted
-    "successful_queries": int,       # Queries that succeeded
-    "failed_queries": int,           # Queries that failed
+    "total_queries": int,
+    "successful_queries": int,
+    "failed_queries": int,
 
-    # Detailed Results
     "query_results": List[QueryResult],
     "query_definitions": Dict[str, QueryDefinition],
     "execution_phases": ExecutionPhases,
 
-    # Validation
-    "validation_status": str,        # "PASSED", "FAILED", "SKIPPED"
-    "validation_details": dict,      # Validation check results
+    "validation_status": str,
+    "validation_details": dict,
 
-    # System Context
-    "system_profile": dict,          # Hardware/software info
-    "platform_info": dict,           # Platform-specific metadata
-    "tunings_applied": dict,         # Performance tuning configuration
+    "system_profile": dict,
+    "platform_info": dict,
+    "tunings_applied": dict,
 }
 ```
+
+The fields fall into these groups:
+
+- **Identification**: `benchmark_name` (for example `"TPC-H"`, `"TPC-DS"` or `"ClickBench"`), `platform` (for example `"DuckDB"` or `"Snowflake"`), `execution_id` (a unique run identifier) and `timestamp` (an ISO 8601 timestamp).
+- **Configuration**: `scale_factor` (the data size multiplier) and `test_execution_type` (`"standard"`, `"power"` or `"throughput"`).
+- **Timing summary**: `duration_seconds` is the total execution time. `total_execution_time` covers query execution only. `average_query_time` is the mean query time. `data_loading_time` and `schema_creation_time` are the times to load data and create the schema.
+- **Query statistics**: `total_queries` counts queries attempted, `successful_queries` those that succeeded, and `failed_queries` those that failed.
+- **Validation**: `validation_status` is `"PASSED"`, `"FAILED"` or `"SKIPPED"`. `validation_details` holds the validation check results.
+- **System context**: `system_profile` holds hardware and software information, `platform_info` holds platform-specific metadata, and `tunings_applied` holds the performance tuning configuration.
 
 **Example**:
 ```json
@@ -109,17 +111,17 @@ Individual query execution details.
 **Structure**:
 ```python
 {
-    "query_id": str,                 # e.g., "q1", "query15"
-    "stream_id": str,                # "stream_1" (default), "stream_2" (throughput)
-    "execution_time": float,         # Seconds
-    "status": str,                   # "SUCCESS", "FAILED", "SKIPPED"
-    "row_count": int,                # Number of rows returned
-    "data_scanned_bytes": int,       # Bytes scanned (if available)
-    "error_message": str | None,     # Error details if failed
-    "query_text": str,               # Executed SQL
-    "parameters": dict | None,       # Query parameters used
-    "start_time": datetime,          # Query start timestamp
-    "end_time": datetime,            # Query completion timestamp
+    "query_id": str,
+    "stream_id": str,
+    "execution_time": float,
+    "status": str,
+    "row_count": int,
+    "data_scanned_bytes": int,
+    "error_message": str | None,
+    "query_text": str,
+    "parameters": dict | None,
+    "start_time": datetime,
+    "end_time": datetime,
 }
 ```
 
@@ -145,9 +147,9 @@ Detailed timing breakdown for benchmark phases.
 **Structure**:
 ```python
 {
-    "setup": SetupPhase,             # Data gen, schema, loading
-    "power_test": PowerTestPhase,    # Single-stream execution
-    "throughput_test": ThroughputTestPhase,  # Multi-stream execution
+    "setup": SetupPhase,
+    "power_test": PowerTestPhase,
+    "throughput_test": ThroughputTestPhase,
 }
 ```
 
@@ -190,10 +192,10 @@ Detailed timing breakdown for benchmark phases.
 
 ```python
 {
-    "query_stream": List[QueryResult],  # Single stream execution
+    "query_stream": List[QueryResult],
     "start_time": datetime,
     "end_time": datetime,
-    "geometric_mean": float,             # Geomean of query times
+    "geometric_mean": float,
 }
 ```
 
@@ -201,12 +203,12 @@ Detailed timing breakdown for benchmark phases.
 
 ```python
 {
-    "streams": List[QueryStream],        # Multiple concurrent streams
-    "refresh_functions": List[RefreshFunction],  # Maintenance operations
+    "streams": List[QueryStream],
+    "refresh_functions": List[RefreshFunction],
     "start_time": datetime,
     "end_time": datetime,
     "measurement_interval_seconds": float,
-    "throughput_qph": float,             # Queries per hour
+    "throughput_qph": float,
 }
 ```
 
@@ -217,9 +219,9 @@ SQL query template and parameters.
 **Structure**:
 ```python
 {
-    "sql": str,                      # Query text (may have placeholders)
-    "parameters": dict | None,       # Parameter values for substitution
-    "description": str | None,       # Query purpose/description
+    "sql": str,
+    "parameters": dict | None,
+    "description": str | None,
 }
 ```
 
@@ -240,14 +242,14 @@ Hardware and software context for reproducibility.
 
 ```python
 {
-    "os": str,                       # "Linux", "macOS", "Windows"
-    "os_version": str,               # "Ubuntu 22.04", "macOS 14.1"
-    "python_version": str,           # "3.11.5"
-    "benchbox_version": str,         # "0.1.0"
-    "cpu_model": str,                # "Intel Xeon E5-2686 v4"
-    "cpu_cores": int,                # 8
-    "ram_gb": float,                 # 32.0
-    "anonymous_machine_id": str,     # Hashed machine identifier
+    "os": str,
+    "os_version": str,
+    "python_version": str,
+    "benchbox_version": str,
+    "cpu_model": str,
+    "cpu_cores": int,
+    "ram_gb": float,
+    "anonymous_machine_id": str,
 }
 ```
 
@@ -257,12 +259,12 @@ Platform-specific metadata.
 
 ```python
 {
-    "platform_name": str,            # "DuckDB", "Snowflake", etc.
-    "driver_name": str,              # "duckdb", "snowflake-connector-python"
-    "driver_version": str,           # "0.9.2", "3.0.4"
-    "configuration": dict,           # Platform-specific settings
-    "warehouse_size": str | None,    # Cloud warehouse size
-    "cluster_id": str | None,        # Cloud cluster identifier
+    "platform_name": str,
+    "driver_name": str,
+    "driver_version": str,
+    "configuration": dict,
+    "warehouse_size": str | None,
+    "cluster_id": str | None,
 }
 ```
 
@@ -288,19 +290,19 @@ Correctness verification details.
 
 ```python
 {
-    "validation_status": str,        # "PASSED", "FAILED", "SKIPPED"
-    "validation_mode": str,          # "none", "basic", "strict"
+    "validation_status": str,
+    "validation_mode": str,
     "checks": {
         "row_count": {
-            "status": str,           # "PASSED", "FAILED"
-            "expected": dict,        # Expected row counts per query
-            "actual": dict,          # Actual row counts
-            "mismatches": list,      # Queries with wrong row counts
+            "status": str,
+            "expected": dict,
+            "actual": dict,
+            "mismatches": list,
         },
         "result_checksum": {
             "status": str,
-            "expected": dict,        # Expected checksums
-            "actual": dict,          # Actual checksums
+            "expected": dict,
+            "actual": dict,
             "mismatches": list,
         },
         "data_integrity": {
@@ -325,22 +327,25 @@ Correctness verification details.
 
 **Example**:
 ```bash
-# Pretty-print results
 cat results.json | jq '.query_results[] | {query_id, execution_time}'
+```
 
-# Load into pandas
+```python
 import pandas as pd
 df = pd.read_json("results.json")
 ```
+
+The first command pretty-prints the query results with jq. The Python snippet loads the results into pandas.
 
 ### CSV (Export Format)
 
 **Use case**: Simplified analysis in spreadsheets
 
 ```bash
-# Export query results to CSV
 benchbox export results.json --format csv --output-dir ./
 ```
+
+This exports the query results to CSV.
 
 **CSV Columns**:
 ```
@@ -355,15 +360,12 @@ q2,3.421,SUCCESS,100
 **Use case**: Long-term storage, data lakes
 
 ```python
-# Convert results to Parquet using pandas
 import pandas as pd
 import json
 
-# Load JSON results
 with open("results.json") as f:
     data = json.load(f)
 
-# Extract query results
 query_data = []
 for q in data["results"]["queries"]["details"]:
     query_data.append({
@@ -372,10 +374,11 @@ for q in data["results"]["queries"]["details"]:
         "status": q["status"],
     })
 
-# Convert to DataFrame and save as Parquet
 df = pd.DataFrame(query_data)
 df.to_parquet("results.parquet", compression="snappy")
 ```
+
+This converts results to Parquet using pandas. It loads the JSON results, extracts the query results, and saves them as a DataFrame in Parquet format.
 
 **Benefits**:
 - Compressed (smaller file size)
@@ -389,35 +392,32 @@ df.to_parquet("results.parquet", compression="snappy")
 ```python
 from benchbox.core.results.models import BenchmarkResults
 
-# Load results from JSON
 results = BenchmarkResults.from_json_file("results.json")
 
-# Access fields
 print(f"Benchmark: {results.benchmark_name}")
 print(f"Duration: {results.duration_seconds:.2f}s")
 print(f"Success rate: {results.successful_queries}/{results.total_queries}")
 
-# Iterate through query results
 for qr in results.query_results:
     if qr.status == "SUCCESS":
         print(f"{qr.query_id}: {qr.execution_time:.3f}s")
 
-# Save to file
 results.to_json_file("results_copy.json")
 ```
+
+The example loads results from JSON, accesses their fields, iterates through the query results, and saves the results to a file.
 
 ### Command-Line Tools
 
 ```bash
-# Query results with jq
 jq '.query_results[] | select(.execution_time > 5)' results.json
 
-# Extract timing summary
 jq '{benchmark: .benchmark_name, total_time: .total_execution_time, avg_time: .average_query_time}' results.json
 
-# Compare two results
 benchbox compare baseline.json current.json
 ```
+
+The first command selects query results slower than 5 seconds with jq. The second extracts a timing summary. The last compares two result files.
 
 ### Analysis Examples
 
@@ -436,7 +436,6 @@ print(f"Geometric mean: {geomean:.3f}s")
 
 ```python
 def compare_results(baseline, current, threshold=1.1):
-    """Flag queries with >10% regression"""
     baseline_times = {qr.query_id: qr.execution_time
                       for qr in baseline.query_results}
     current_times = {qr.query_id: qr.execution_time
@@ -457,7 +456,6 @@ def compare_results(baseline, current, threshold=1.1):
 ```python
 import pandas as pd
 
-# Convert to DataFrame
 df = pd.DataFrame([
     {
         "query_id": qr.query_id,
@@ -468,10 +466,11 @@ df = pd.DataFrame([
     for qr in results.query_results
 ])
 
-# Analyze
 print(df.describe())
 print(df.groupby("status").count())
 ```
+
+The code converts the results to a DataFrame, then analyzes them.
 
 ## Schema Evolution
 

@@ -1,5 +1,3 @@
-"""Integration tests for TPC-H verbosity propagation and logging."""
-
 from __future__ import annotations
 
 import logging
@@ -18,7 +16,7 @@ pytestmark = [
 
 
 class _NoopConsole:
-    def print(self, *args, **kwargs):  # pragma: no cover - helper for tests
+    def print(self, *args, **kwargs):
         return None
 
 
@@ -50,7 +48,7 @@ class _StubBenchmark(VerbosityMixin):
         if hasattr(self, "data_generator"):
             self.data_generator.apply_verbosity(settings)
 
-    def create_enhanced_benchmark_result(self, **_: Any):  # pragma: no cover - unused path
+    def create_enhanced_benchmark_result(self, **_: Any):
         return SimpleNamespace()
 
 
@@ -61,22 +59,20 @@ class _StubAdapter(VerbosityMixin):
         self.logger = logging.getLogger("benchbox.test.stub.adapter")
         self.apply_verbosity(VerbositySettings.default())
 
-    def run_benchmark(self, *args: Any, **kwargs: Any):  # pragma: no cover - unused path
+    def run_benchmark(self, *args: Any, **kwargs: Any):
         return SimpleNamespace()
 
 
 def test_verbosity_settings_flow_through_orchestrator(monkeypatch, tmp_path):
-    """Simulate CLI-provided verbosity and ensure it reaches benchmark, adapter, and generator."""
 
     captured: dict[str, VerbositySettings] = {}
 
     def fake_run_benchmark_lifecycle(**kwargs):
-        # Extract key arguments
+
         benchmark_instance = kwargs.get("benchmark_instance")
         platform_adapter = kwargs.get("platform_adapter")
         verbosity = kwargs.get("verbosity")
 
-        # Mark that function was called
         captured["_called"] = True
 
         if benchmark_instance and isinstance(benchmark_instance, VerbosityMixin):
@@ -94,19 +90,15 @@ def test_verbosity_settings_flow_through_orchestrator(monkeypatch, tmp_path):
 
         return SimpleNamespace(validation_status="PASSED", total_queries=0, successful_queries=0, failed_queries=0)
 
-    # Mock the benchmark class to return our stub
     monkeypatch.setattr(BenchmarkOrchestrator, "_get_benchmark_class", lambda self, name: _StubBenchmark)
 
-    # Mock platform config and adapter
     monkeypatch.setattr(
         BenchmarkOrchestrator, "_get_platform_config", lambda self, db_config, system_profile, **kwargs: {}
     )
     monkeypatch.setattr("benchbox.cli.orchestrator.get_platform_adapter", lambda *a, **k: _StubAdapter())
 
-    # Mock the lifecycle function
     monkeypatch.setattr("benchbox.core.run_service.run_benchmark_lifecycle", fake_run_benchmark_lifecycle)
 
-    # Also need to patch _get_benchmark_instance to actually instantiate the stub
     def mock_get_benchmark_instance(self, config, system_profile):
         return _StubBenchmark(scale_factor=config.scale_factor, output_dir=tmp_path)
 
@@ -140,7 +132,6 @@ def test_verbosity_settings_flow_through_orchestrator(monkeypatch, tmp_path):
     except Exception as e:
         pytest.fail(f"execute_benchmark raised exception: {type(e).__name__}: {e}")
 
-    # Debug: Check if the function was called at all
     assert "_called" in captured, (
         f"Mock function was never called. Captured keys: {list(captured.keys())}, result={result}"
     )
@@ -155,7 +146,7 @@ def _patch_dbgen_path(monkeypatch):
 
     original_exists = Path.exists
 
-    def patched_exists(self: Path) -> bool:  # pragma: no cover - helper for tests
+    def patched_exists(self: Path) -> bool:
         if "_sources/tpc-h/dbgen" in str(self):
             return True
         return original_exists(self)
@@ -164,7 +155,6 @@ def _patch_dbgen_path(monkeypatch):
 
 
 def test_tpch_generator_emits_debug_when_very_verbose(monkeypatch, tmp_path, caplog):
-    """-vv (very verbose) should emit DEBUG logs from the generator."""
 
     _patch_dbgen_path(monkeypatch)
 
@@ -180,7 +170,6 @@ def test_tpch_generator_emits_debug_when_very_verbose(monkeypatch, tmp_path, cap
 
 
 def test_tpch_generator_quiet_supresses_logs(monkeypatch, tmp_path, caplog, capsys):
-    """--quiet must silence generator logging output entirely."""
 
     _patch_dbgen_path(monkeypatch)
 

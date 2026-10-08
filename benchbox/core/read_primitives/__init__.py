@@ -1,16 +1,8 @@
-"""Read Primitives benchmark module.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides functionality to run primitive database read operations tests
-based on the TPC-H schema. The Read Primitives benchmark includes queries that test
-fundamental database read operations like aggregations, joins, filters, and more
-advanced analytical operations.
+# This implementation is derived from TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-This implementation is derived from TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from .benchmark import ReadPrimitivesBenchmark
 from .generator import ReadPrimitivesDataGenerator

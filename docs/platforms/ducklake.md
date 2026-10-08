@@ -8,7 +8,7 @@
 DuckLake is an open lakehouse table format shipped as a DuckDB extension: table **data** is stored as Parquet files, while table **metadata** (the catalog) lives in a SQL database. BenchBox runs DuckLake through the same DuckDB engine used by the `duckdb` platform, inheriting DuckDB's SQL dialect and benchmark compatibility unchanged.
 
 ```{warning}
-The DuckLake platform is **beta** (promoted from experimental on 2026-07-30). The four registry deployment modes (catalog/storage pairings) have each been validated with a TPC-H SF=1 run through the correctness gate; this is not a claim that every one of the six possible backend-by-storage cross-product combinations was separately exercised - see [Catalog Backends](#catalog-backends) below and the [maturity ADR](../development/adr/adr-ducklake-maturity-and-publishability.md) for what promotion required.
+The DuckLake platform is **beta**. BenchBox has tested four catalog/storage deployment modes with TPC-H; other backend-by-storage combinations have not been tested separately. See [Catalog Backends](#catalog-backends) below and [ADR: DuckLake Maturity, Publishability, and Compaction Bias](../development/adr/adr-ducklake-maturity-and-publishability.md).
 ```
 
 ## Features
@@ -23,16 +23,16 @@ The DuckLake platform is **beta** (promoted from experimental on 2026-07-30). Th
 ## Quick Start
 
 ```bash
-# Install DuckDB >= 1.3 (required for the ducklake extension)
 uv add "duckdb>=1.3,<2.0"
 
-# Run benchmark (metadata/data paths default under benchmark_runs/databases/)
 benchbox run --platform ducklake --benchmark tpch --scale 0.01
 ```
 
+The first command installs DuckDB 1.3 or later, which the `ducklake` extension requires. The second runs the benchmark. Metadata and data paths default under `benchmark_runs/databases/`.
+
 ## Requirements
 
-DuckLake requires a live **DuckDB >= 1.3** runtime — the `ducklake` extension is not available on earlier releases. This floor is enforced at connection time by the adapter itself, independent of the `duckdb` package version pinned by the global BenchBox `pyproject.toml` (which stays `<2.0` for `duckdb-wasm` on-disk-format compatibility). If the detected DuckDB version is too old, the adapter raises immediately with the detected version and a remediation hint (e.g. `uv add 'duckdb>=1.3,<2.0'` or `--driver-version 1.3.2`).
+DuckLake requires **DuckDB >= 1.3** — the `ducklake` extension is not available on earlier releases. The adapter checks the version when it connects. If the detected DuckDB version is too old, the adapter raises immediately with the detected version and a remediation hint (e.g. `uv add 'duckdb>=1.3,<2.0'` or `--driver-version 1.3.2`).
 
 The first run also needs network access once, to `INSTALL` the `ducklake` extension.
 
@@ -74,12 +74,9 @@ The catalog metadata backend is selected with `--platform-option catalog=<duckdb
 | `postgres` | `ducklake`, `postgres` | Self-hosted PostgreSQL database | The target database **must already exist** - DuckLake's `ATTACH` does not run `CREATE DATABASE` |
 
 ```bash
-# SQLite catalog, local Parquet data
 benchbox run --platform ducklake --benchmark tpch --scale 0.1 \
     --platform-option catalog=sqlite
 
-# Self-hosted PostgreSQL catalog (the "ducklake_catalog" database must
-# already exist on the target server)
 benchbox run --platform ducklake --benchmark tpch --scale 0.1 \
     --platform-option catalog=postgres \
     --platform-option pg_host=localhost \
@@ -87,6 +84,8 @@ benchbox run --platform ducklake --benchmark tpch --scale 0.1 \
     --platform-option pg_user=postgres \
     --platform-option pg_password=postgres
 ```
+
+The first command uses a SQLite catalog with local Parquet data. The second uses a self-hosted PostgreSQL catalog; the `ducklake_catalog` database must already exist on the target server.
 
 MySQL is deliberately not supported as a catalog backend - DuckLake's own documentation flags it as not recommended (compatibility issues).
 
@@ -116,12 +115,12 @@ benchbox run --platform ducklake --benchmark tpch --scale 0.1 \
 ### Basic Benchmark
 
 ```bash
-# TPC-H at scale factor 0.01 with default (generated) paths
 benchbox run --platform ducklake --benchmark tpch --scale 0.01
 
-# TPC-DS at scale factor 1
 benchbox run --platform ducklake --benchmark tpcds --scale 1.0
 ```
+
+The first command runs TPC-H at scale factor 0.01 with the default (generated) paths. The second runs TPC-DS at scale factor 1.
 
 ### Explicit Catalog and Data Paths
 
@@ -136,9 +135,10 @@ benchbox run --platform ducklake --benchmark tpch --scale 0.1 \
 Without `--force`, an existing catalog is reused: schema creation and data loading are skipped and queries run directly against the already-populated catalog. For `catalog=duckdb`/`sqlite` this is detected from the `metadata_path` file; for `catalog=postgres` the catalog lives server-side, so it is detected after the `ATTACH` by inspecting the attached catalog itself.
 
 ```bash
-# Wipe the existing catalog metadata file and Parquet data, then rebuild
 benchbox run --platform ducklake --benchmark tpch --scale 0.1 --force
 ```
+
+This wipes the existing catalog metadata file and Parquet data, then rebuilds them.
 
 What `--force` clears depends on where the catalog and the data live:
 
@@ -165,13 +165,11 @@ adapter logs a warning naming the prefix; clear it yourself, e.g.
 from benchbox import TPCH
 from benchbox.platforms.ducklake import DuckLakeAdapter
 
-# Initialize adapter
 adapter = DuckLakeAdapter(
     metadata_path="benchmark_runs/databases/tpch_sf1.ducklake",
     data_path="benchmark_runs/databases/tpch_sf1_data",
 )
 
-# Load and run benchmark
 benchmark = TPCH(scale_factor=1.0)
 benchmark.generate_data()
 adapter.load_benchmark(benchmark)
@@ -190,14 +188,12 @@ DuckLake extends `DuckDBAdapter`, which means:
 ```python
 from benchbox.core.platform_registry import PlatformRegistry
 
-# Check platform family
 family = PlatformRegistry.get_platform_family("ducklake")
-# Returns: "duckdb"
 
-# Check inheritance
 parent = PlatformRegistry.get_inherited_platform("ducklake")
-# Returns: "duckdb"
 ```
+
+`get_platform_family` returns `"duckdb"`, and `get_inherited_platform` also returns `"duckdb"`.
 
 ## Comparison: DuckLake vs DuckDB
 
@@ -237,26 +233,14 @@ while row-wise loading produces many small ones.
 
 Treat a DuckLake-vs-other-engine gap accordingly, and do not read it as the
 best DuckLake can do. See
-[ADR: DuckLake Maturity, Publishability, Review Path, and Compaction Bias](../development/adr/adr-ducklake-maturity-and-publishability.md)
+[ADR: DuckLake Maturity, Publishability, and Compaction Bias](../development/adr/adr-ducklake-maturity-and-publishability.md)
 for why this is documented rather than instrumented.
 
 ## Lakehouse-Feature Benchmarks (Time Travel, Schema Evolution, Snapshots)
 
-DuckLake parity today means TPC-H/TPC-DS parity with DuckDB plus the
-run-phase `maintenance` operations inherited from the shared SQL
-maintenance harnesses (`benchbox/platforms/base/execution.py` dispatches
-to the TPC-H/TPC-DS SQL maintenance tests, as for the other engines).
-`benchbox/platforms/dataframe/ducklake_maintenance.py` is a separate,
-standalone surface: it exposes insert/delete/update/merge through the
-DataFrame maintenance factory (with time-travel support flagged in the
-maintenance capabilities) but the runner never invokes it, so measured
-run-phase coverage must not be attributed to that module. There is
-no dedicated time-travel, schema-evolution, or snapshot/maintenance
-benchmark workload yet: those need versioned-query fixtures and
-compaction/snapshot lifecycle harnesses that do not exist in the runner,
-so they remain a separate research item. When adding one, build it on the
-existing maintenance-operations interface and the documented no-compaction
-bias above rather than inventing a parallel harness.
+DuckLake runs the same TPC-H and TPC-DS workloads as DuckDB, including the
+standard maintenance operations; BenchBox has no dedicated time-travel,
+schema-evolution, or snapshot benchmark yet.
 
 ## Troubleshooting
 

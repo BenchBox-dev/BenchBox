@@ -1,32 +1,4 @@
 #!/usr/bin/env python3
-"""Use Case: Incremental Performance Tuning
-
-This example demonstrates an iterative approach to performance optimization,
-showing how to systematically tune database performance through multiple rounds.
-
-Use this pattern when:
-- Optimizing query performance incrementally
-- Testing optimization hypotheses
-- Building performance tuning documentation
-- Training teams on performance optimization
-
-Workflow:
-1. Establish baseline performance
-2. Identify slowest queries
-3. Apply targeted optimizations
-4. Measure improvement
-5. Iterate until targets met
-
-Usage:
-    # Run full tuning workflow
-    python use_cases/incremental_tuning.py
-
-    # Focus on specific slow queries
-    python use_cases/incremental_tuning.py --queries 2,9,17
-
-    # Test specific optimization
-    python use_cases/incremental_tuning.py --optimization indexes
-"""
 
 from __future__ import annotations
 
@@ -37,7 +9,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-# Add parent directory to path for imports
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _EXAMPLES_DIR = _SCRIPT_DIR.parent
 sys.path.insert(0, str(_EXAMPLES_DIR))
@@ -50,8 +21,6 @@ OptimizationType = Literal["baseline", "memory", "parallelism", "indexes"]
 
 @dataclass
 class TuningRound:
-    """Results from a single tuning round."""
-
     round_number: int
     optimization_type: OptimizationType
     description: str
@@ -61,8 +30,6 @@ class TuningRound:
 
 
 class IncrementalTuner:
-    """Manage incremental tuning workflow."""
-
     def __init__(self, output_dir: Path):
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -70,7 +37,6 @@ class IncrementalTuner:
         self.baseline_time: float | None = None
 
     def run_baseline(self, benchmark: TPCH) -> TuningRound:
-        """Run baseline benchmark (no optimizations)."""
         print("Round 1: BASELINE (No Optimizations)")
         print("  Strategy: Measure current performance with default settings")
         print()
@@ -102,13 +68,10 @@ class IncrementalTuner:
         optimization_type: OptimizationType,
         description: str,
     ) -> TuningRound:
-        """Run a tuning round with specific optimizations."""
         print(f"Round {round_number}: {optimization_type.upper()}")
         print(f"  Strategy: {description}")
         print()
 
-        # In real implementation, would apply actual optimizations
-        # For this example, we simulate the concept
         adapter = DuckDBAdapter(database_path=":memory:")
         results = adapter.run_benchmark(benchmark, test_execution_type="power")
 
@@ -141,7 +104,6 @@ class IncrementalTuner:
         return round_data
 
     def generate_report(self) -> None:
-        """Generate tuning report."""
         print("=" * 90)
         print("INCREMENTAL TUNING REPORT")
         print("=" * 90)
@@ -164,7 +126,6 @@ class IncrementalTuner:
         print("-" * 90)
         print()
 
-        # Cumulative improvement
         if self.baseline_time and self.rounds:
             final_time = self.rounds[-1].total_time
             total_improvement = (self.baseline_time - final_time) / self.baseline_time * 100
@@ -174,7 +135,6 @@ class IncrementalTuner:
             print()
 
     def save_report(self, report_path: Path) -> None:
-        """Save tuning report as JSON."""
         report = {
             "baseline_time": self.baseline_time,
             "rounds": [
@@ -197,7 +157,6 @@ class IncrementalTuner:
 
 
 def main() -> int:
-    """Run incremental tuning workflow."""
     parser = argparse.ArgumentParser(description="Incremental performance tuning")
     parser.add_argument(
         "--scale",
@@ -219,7 +178,6 @@ def main() -> int:
     print("=" * 90)
     print()
 
-    # Create benchmark
     benchmark = TPCH(
         scale_factor=args.scale,
         output_dir=args.output_dir / "data",
@@ -231,14 +189,11 @@ def main() -> int:
     print("✓ Data generated")
     print()
 
-    # Create tuner
     tuner = IncrementalTuner(output_dir=args.output_dir)
 
-    # Round 1: Baseline
     print("=" * 90)
     tuner.run_baseline(benchmark)
 
-    # Round 2: Memory tuning
     print("=" * 90)
     tuner.run_tuning_round(
         benchmark,
@@ -247,7 +202,6 @@ def main() -> int:
         description="Increase memory buffers for better caching",
     )
 
-    # Round 3: Parallelism
     print("=" * 90)
     tuner.run_tuning_round(
         benchmark,
@@ -256,7 +210,6 @@ def main() -> int:
         description="Enable parallel query execution",
     )
 
-    # Round 4: Indexes
     print("=" * 90)
     tuner.run_tuning_round(
         benchmark,
@@ -265,10 +218,8 @@ def main() -> int:
         description="Add indexes on frequently filtered columns",
     )
 
-    # Generate report
     tuner.generate_report()
 
-    # Save report
     report_path = args.output_dir / "tuning_report.json"
     tuner.save_report(report_path)
     print()

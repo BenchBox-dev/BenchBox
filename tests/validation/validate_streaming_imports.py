@@ -1,21 +1,7 @@
 #!/usr/bin/env python3
-"""DEPRECATED: This file has been moved.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This validation script has been relocated to:
-/Users/joe/Developer/BenchBox/tests/utilities/tpcdi_import_validator.py
-
-Please use the new location for TPC-DI streaming capabilities validation.
-
-Usage:
-    python tests/utilities/tpcdi_import_validator.py
-
-Or from the project root:
-    cd tests/utilities && python tpcdi_import_validator.py
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import sys
 

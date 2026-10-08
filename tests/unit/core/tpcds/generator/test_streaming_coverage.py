@@ -130,11 +130,6 @@ def test_generate_parent_table_chunk_with_children_tracks_manifest(monkeypatch, 
     assert harness._manifest_entries["catalog_returns"][0]["row_count"] == 1
 
 
-# ---------------------------------------------------------------------------
-# _generate_table_with_streaming dispatch
-# ---------------------------------------------------------------------------
-
-
 def test_generate_table_with_streaming_dispatches_to_parent_for_catalog_sales(monkeypatch, tmp_path):
     harness = _StreamingHarness(tmp_path)
     called_with = {}
@@ -177,11 +172,6 @@ def test_generate_table_with_streaming_dispatches_to_single_for_regular_table(mo
     assert called["name"] == "customer"
 
 
-# ---------------------------------------------------------------------------
-# _generate_parent_table_with_children parent-child routing
-# ---------------------------------------------------------------------------
-
-
 def test_generate_parent_table_with_children_routes_web_sales(monkeypatch, tmp_path):
     harness = _StreamingHarness(tmp_path)
     monkeypatch.setattr("benchbox.core.tpcds.generator.streaming.subprocess.run", lambda *a, **k: None)
@@ -198,7 +188,6 @@ def test_generate_parent_table_with_children_routes_web_sales(monkeypatch, tmp_p
 
 
 def test_generate_parent_table_with_children_cleanup_on_success(monkeypatch, tmp_path):
-    """Source .dat files are removed after successful compression."""
     harness = _StreamingHarness(tmp_path)
     monkeypatch.setattr("benchbox.core.tpcds.generator.streaming.subprocess.run", lambda *a, **k: None)
 
@@ -207,7 +196,6 @@ def test_generate_parent_table_with_children_cleanup_on_success(monkeypatch, tmp
 
     harness._generate_parent_table_with_children(tmp_path, "store_sales", ["store_returns"])
 
-    # The original .dat file should be cleaned up
     assert not parent.exists()
 
 
@@ -225,13 +213,7 @@ def test_generate_parent_table_with_children_subprocess_error(monkeypatch, tmp_p
         harness._generate_parent_table_with_children(tmp_path, "catalog_sales", ["catalog_returns"])
 
 
-# ---------------------------------------------------------------------------
-# _generate_single_table_streaming compression path
-# ---------------------------------------------------------------------------
-
-
 def test_generate_single_table_streaming_compression_removes_dat(monkeypatch, tmp_path):
-    """After compression, .dat file is cleaned up."""
     harness = _StreamingHarness(tmp_path)
     monkeypatch.setattr("benchbox.core.tpcds.generator.streaming.subprocess.run", lambda *a, **k: None)
 
@@ -245,7 +227,6 @@ def test_generate_single_table_streaming_compression_removes_dat(monkeypatch, tm
 
 
 def test_generate_single_table_streaming_skips_empty_dat(monkeypatch, tmp_path):
-    """A zero-byte .dat file is skipped without manifest entry."""
     harness = _StreamingHarness(tmp_path)
     monkeypatch.setattr("benchbox.core.tpcds.generator.streaming.subprocess.run", lambda *a, **k: None)
 
@@ -258,21 +239,17 @@ def test_generate_single_table_streaming_skips_empty_dat(monkeypatch, tmp_path):
 
 
 class _NoCompressionHarness(_StreamingHarness):
-    """Harness variant with compression disabled."""
-
     def should_use_compression(self) -> bool:
         return False
 
     def get_compressed_filename(self, expected_filename: str) -> str:
-        return expected_filename  # same name → no-op path in single-table
+        return expected_filename
 
 
 def test_generate_parent_chunk_no_compression_tracks_manifest(monkeypatch, tmp_path):
-    """No-compression path in _generate_parent_table_chunk_with_children adds to manifest."""
     harness = _NoCompressionHarness(tmp_path)
     monkeypatch.setattr("benchbox.core.tpcds.generator.streaming.subprocess.run", lambda *a, **k: None)
 
-    # Create .dat files that will be found
     (tmp_path / "store_sales_1_3.dat").write_text("row1\nrow2\n")
     (tmp_path / "store_returns_1_3.dat").write_text("row_a\n")
 
@@ -285,7 +262,6 @@ def test_generate_parent_chunk_no_compression_tracks_manifest(monkeypatch, tmp_p
 
 
 def test_generate_parent_chunk_no_compression_verbose(monkeypatch, tmp_path):
-    """No-compression verbose path emits expected message."""
     harness = _NoCompressionHarness(tmp_path)
     harness.verbose = True
     monkeypatch.setattr("benchbox.core.tpcds.generator.streaming.subprocess.run", lambda *a, **k: None)
@@ -297,7 +273,6 @@ def test_generate_parent_chunk_no_compression_verbose(monkeypatch, tmp_path):
 
 
 def test_generate_parent_chunk_called_process_error_with_stderr(monkeypatch, tmp_path):
-    """CalledProcessError with stderr is included in the RuntimeError message."""
     harness = _StreamingHarness(tmp_path)
 
     def _raise(*a, **k):
@@ -312,7 +287,6 @@ def test_generate_parent_chunk_called_process_error_with_stderr(monkeypatch, tmp
 
 
 def test_generate_parent_chunk_generic_exception(monkeypatch, tmp_path):
-    """Generic exceptions in chunk generation are wrapped as RuntimeError."""
     harness = _StreamingHarness(tmp_path)
 
     monkeypatch.setattr(

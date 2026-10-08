@@ -1,20 +1,3 @@
-/**
- * G-3 driver - cross-surface metric parity.
- *
- * Every surface that reads a given (result, benchmark, scale_factor, phase)
- * must expose the same `power_score`, `display_geomean_ms`, `rank`,
- * `speedup_vs_best`, and `speedup_vs_slowest_in_cohort` values. In the
- * pipeline's canonical-browser contract those values originate from exactly
- * one DuckDB column per metric; no surface is allowed to recompute them.
- *
- * This test gates regressions by:
- *   1. Pinning the per-surface SQL to the canonical table/column it must
- *      read from - if a helper is rewritten to recompute via a derived
- *      expression the SELECT shape check fails.
- *   2. Running each helper against the SAME stubbed row and asserting the
- *      projected TS shape carries byte-identical values on every surface.
- */
-
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/db", () => ({
@@ -32,8 +15,6 @@ import {
 
 const mockedQueryRows = vi.mocked(queryRows);
 
-// Canonical fixture values - each metric appears in the mocked response
-// for every surface so any drift in the projected field name is caught.
 const FIXTURE = {
   result_id: "r1",
   short_id: "r1short01",
@@ -64,8 +45,6 @@ describe("G-3 cross-surface metric parity", () => {
 
     for (const [sql] of mockedQueryRows.mock.calls) {
       expect(sql as string).toMatch(/\bbench\.\w+/);
-      // Every surface's SQL must either SELECT * (inherits canonical column)
-      // or explicitly name the canonical column - never a re-derived alias.
       const sqlLower = (sql as string).toLowerCase();
       const mentionsStar = /select\s+(?:\*|\w+\.\*)/.test(sqlLower);
       const namesPowerScore = /\bpower_score\b/.test(sqlLower);
@@ -93,7 +72,6 @@ describe("G-3 cross-surface metric parity", () => {
     expect(ranking.length).toBeGreaterThan(0);
     expect(platformIdx.length).toBeGreaterThan(0);
 
-    // Every surface projects the canonical metric values verbatim.
     expect(detail!.power_score).toBe(FIXTURE.power_score);
     expect(ranking[0]!.power_score).toBe(FIXTURE.power_score);
     expect(platformIdx[0]!.power_score).toBe(FIXTURE.power_score);
@@ -104,7 +82,6 @@ describe("G-3 cross-surface metric parity", () => {
   });
 
   it("benchmark_rankings exposes speedup_vs_best and speedup_vs_slowest_in_cohort", async () => {
-    // Guards C1: these are new columns - catch accidental removal or rename.
     mockedQueryRows.mockResolvedValue([FIXTURE]);
     const ranking = await getBenchmarkRanking(
       FIXTURE.benchmark,
@@ -138,8 +115,6 @@ describe("G-3 cross-surface metric parity", () => {
   });
 
   it("every reading surface targets the canonical bench.<table> path", async () => {
-    // No surface may read metrics from a non-canonical view or synthesise a
-    // column from a subquery. Every SELECT must come from `bench.<table>`.
     mockedQueryRows.mockResolvedValue([FIXTURE]);
 
     await listResults();

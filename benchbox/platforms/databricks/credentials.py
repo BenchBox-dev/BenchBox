@@ -1,9 +1,6 @@
-"""Databricks credentials setup and validation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from typing import Optional, Union
 
@@ -16,12 +13,6 @@ from benchbox.utils.printing import QuietConsoleProxy
 
 
 def setup_databricks_credentials(cred_manager: CredentialManager, console: Union[Console, QuietConsoleProxy]) -> None:
-    """Interactive setup for Databricks credentials.
-
-    Args:
-        cred_manager: Credential manager instance
-        console: Rich console for output
-    """
     console.print("\n📋 [bold]You'll need:[/bold]")
     console.print("  • Databricks workspace URL (server hostname)")
     console.print("  • SQL Warehouse HTTP path")
@@ -29,15 +20,12 @@ def setup_databricks_credentials(cred_manager: CredentialManager, console: Union
 
     console.print("[dim]Need help? Visit: https://docs.databricks.com/dev-tools/auth.html[/dim]\n")
 
-    # Load existing credentials to use as defaults
     existing_creds = cred_manager.get_platform_credentials("databricks")
 
-    # Only offer auto-detection if no existing credentials
     if existing_creds:
         console.print("ℹ️  [cyan]Existing credentials found - updating configuration[/cyan]\n")
         auto_config = None
     else:
-        # Try auto-detection first
         auto_config = None
         try_auto = Confirm.ask("🔍 Attempt auto-detection using Databricks SDK?", default=True)
 
@@ -45,7 +33,6 @@ def setup_databricks_credentials(cred_manager: CredentialManager, console: Union
             console.print("\n[dim]Attempting auto-detection...[/dim]")
             auto_config = _auto_detect_databricks(console)
 
-    # Get credentials (use auto-detected or prompt)
     if auto_config:
         server_hostname = auto_config.get("server_hostname")
         http_path = auto_config.get("http_path")
@@ -55,7 +42,6 @@ def setup_databricks_credentials(cred_manager: CredentialManager, console: Union
     else:
         console.print("\n[bold]Workspace Configuration:[/bold]")
 
-        # Use existing credentials as defaults if available
         current_hostname = existing_creds.get("server_hostname") if existing_creds else None
         current_http_path = existing_creds.get("http_path") if existing_creds else None
 
@@ -77,7 +63,6 @@ def setup_databricks_credentials(cred_manager: CredentialManager, console: Union
             console.print("[red]❌ HTTP path is required[/red]")
             return
 
-    # Get access token (always prompt, never auto-detect for security)
     console.print("\n[bold]🔑 Access Token:[/bold]")
     console.print("You can create a token at:")
     console.print(f"  https://{server_hostname}/#settings/account\n")
@@ -89,14 +74,12 @@ def setup_databricks_credentials(cred_manager: CredentialManager, console: Union
         console.print("[red]❌ Access token is required[/red]")
         return
 
-    # Build credentials
     credentials = {
         "server_hostname": server_hostname,
         "http_path": http_path,
         "access_token": access_token,
     }
 
-    # Optional: catalog and schema
     console.print("\n[bold]Optional Settings:[/bold]")
     current_catalog = existing_creds.get("catalog") if existing_creds else None
     current_schema = existing_creds.get("schema") if existing_creds else None
@@ -109,10 +92,8 @@ def setup_databricks_credentials(cred_manager: CredentialManager, console: Union
     if schema:
         credentials["schema"] = schema
 
-    # Validate credentials
     console.print("\n🧪 [bold]Validating credentials...[/bold]")
 
-    # Save temporarily for validation
     cred_manager.set_platform_credentials("databricks", credentials, CredentialStatus.NOT_VALIDATED)
 
     success, error = validate_databricks_credentials(cred_manager)
@@ -125,7 +106,6 @@ def setup_databricks_credentials(cred_manager: CredentialManager, console: Union
         console.print(f"   Location: [cyan]{cred_manager.credentials_path}[/cyan]")
         console.print("   Status: [green]Ready to use[/green]\n")
 
-        # Prompt for default output location (optional)
         _prompt_default_output_location(cred_manager, console, credentials)
 
         console.print("[bold]Try it:[/bold]")
@@ -144,13 +124,6 @@ def setup_databricks_credentials(cred_manager: CredentialManager, console: Union
 def _prompt_default_output_location(
     cred_manager: CredentialManager, console: Union[Console, QuietConsoleProxy], credentials: dict
 ) -> None:
-    """Prompt for default cloud output location for Databricks.
-
-    Args:
-        cred_manager: Credential manager instance
-        console: Rich console for output
-        credentials: Current credentials dictionary
-    """
     from benchbox.utils.cloud_storage import is_cloud_path
 
     console.print("\n[bold]Default Output Location (Optional):[/bold]")
@@ -163,7 +136,6 @@ def _prompt_default_output_location(
         console.print("[dim]You can add --output <cloud-path> when running benchmarks[/dim]\n")
         return
 
-    # Show examples
     console.print("\n[bold cyan]Example paths for Databricks:[/bold cyan]")
     console.print("  • [dim]dbfs:/Volumes/main/benchbox/data[/dim]")
     console.print("  • [dim]s3://my-bucket/benchbox-data[/dim]")
@@ -176,7 +148,6 @@ def _prompt_default_output_location(
     console.print(f"  dbfs:/Volumes/{catalog}/{schema}/<volume>/<path>")
     console.print("\n[dim]Note: Ensure the volume/bucket exists and has proper permissions[/dim]\n")
 
-    # Prompt for path with validation
     while True:
         cloud_path = Prompt.ask("[bold]Enter default cloud storage path[/bold]", default="")
 
@@ -184,7 +155,6 @@ def _prompt_default_output_location(
             console.print("[yellow]Skipping default output location[/yellow]\n")
             return
 
-        # Validate cloud path format
         if not is_cloud_path(cloud_path):
             console.print(f"[yellow]⚠️  Warning: '{cloud_path}' doesn't look like a cloud path[/yellow]")
             console.print("[dim]Expected formats: s3://, gs://, abfss://, dbfs:/Volumes/...[/dim]")
@@ -192,11 +162,9 @@ def _prompt_default_output_location(
             if not proceed:
                 continue
 
-        # Confirm the path
         console.print(f"\n[green]✓[/green] Will use: [cyan]{cloud_path}[/cyan]")
         confirmed = Confirm.ask("Is this correct?", default=True)
         if confirmed:
-            # Set credentials with default_output_location
             credentials["default_output_location"] = cloud_path
             cred_manager.set_platform_credentials("databricks", credentials, CredentialStatus.VALID)
             cred_manager.save_credentials()
@@ -205,14 +173,6 @@ def _prompt_default_output_location(
 
 
 def validate_databricks_credentials(cred_manager: CredentialManager) -> tuple[bool, Optional[str]]:
-    """Validate Databricks credentials by testing connection.
-
-    Args:
-        cred_manager: Credential manager instance
-
-    Returns:
-        Tuple of (success, error_message)
-    """
     creds = cred_manager.get_platform_credentials("databricks")
 
     if not creds:
@@ -224,13 +184,11 @@ def validate_databricks_credentials(cred_manager: CredentialManager) -> tuple[bo
     if missing:
         return False, f"Missing required fields: {', '.join(missing)}"
 
-    # Try to import Databricks SQL connector
     try:
         from databricks import sql as databricks_sql
     except ImportError:
         return False, "Databricks SQL connector not installed. Run: pip install databricks-sql-connector"
 
-    # Test connection
     try:
         connection = databricks_sql.connect(
             server_hostname=creds["server_hostname"],
@@ -241,11 +199,9 @@ def validate_databricks_credentials(cred_manager: CredentialManager) -> tuple[bo
 
         cursor = connection.cursor()
 
-        # Test basic query
         cursor.execute("SELECT 1")
         cursor.fetchall()
 
-        # Test catalog access if specified
         if creds.get("catalog"):
             cursor.execute(f"USE CATALOG {creds['catalog']}")
 
@@ -256,7 +212,6 @@ def validate_databricks_credentials(cred_manager: CredentialManager) -> tuple[bo
 
     except Exception as e:
         error_msg = str(e)
-        # Make error more user-friendly
         if "authentication" in error_msg.lower() or "token" in error_msg.lower():
             return False, "Authentication failed. Check your access token."
         elif "warehouse" in error_msg.lower() or "http_path" in error_msg.lower():
@@ -268,14 +223,6 @@ def validate_databricks_credentials(cred_manager: CredentialManager) -> tuple[bo
 
 
 def _auto_detect_databricks(console: Union[Console, QuietConsoleProxy]) -> Optional[dict]:
-    """Attempt to auto-detect Databricks configuration using SDK.
-
-    Args:
-        console: Rich console for output
-
-    Returns:
-        Dictionary with detected config or None
-    """
     try:
         from databricks.sdk import WorkspaceClient
         from databricks.sdk.service.sql import WarehousesAPI
@@ -286,7 +233,6 @@ def _auto_detect_databricks(console: Union[Console, QuietConsoleProxy]) -> Optio
 
         console.print(f"  ✓ Found workspace: {server_hostname}")
 
-        # List warehouses
         warehouses = list(WarehousesAPI(workspace.api_client).list())
 
         if not warehouses:
@@ -299,7 +245,6 @@ def _auto_detect_databricks(console: Union[Console, QuietConsoleProxy]) -> Optio
 
         console.print(f"  ✓ Found {len(warehouses)} SQL Warehouse(s)\n")
 
-        # Show warehouse options
         running_warehouses = [wh for wh in warehouses if str(wh.state) == "RUNNING"]
         available_warehouses = [wh for wh in warehouses if str(wh.state) not in ["DELETING", "DELETED"]]
 
@@ -312,7 +257,6 @@ def _auto_detect_databricks(console: Union[Console, QuietConsoleProxy]) -> Optio
             for i, wh in enumerate(available_warehouses, 1):
                 console.print(f"  {i}. {wh.name} (State: {wh.state}, Size: {wh.cluster_size})")
 
-        # Let user select warehouse
         if running_warehouses or available_warehouses:
             warehouses_to_choose = running_warehouses if running_warehouses else available_warehouses
             max_choice = len(warehouses_to_choose)

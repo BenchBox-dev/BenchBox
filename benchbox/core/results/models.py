@@ -1,10 +1,3 @@
-"""
-Core result models for benchmark execution.
-
-These dataclasses capture detailed execution phases and summary metrics for
-benchmarks and are intentionally free of CLI/platform imports to avoid cycles.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -23,9 +16,6 @@ if TYPE_CHECKING:
     from benchbox.core.results.query_plan_models import QueryPlanDAG
 
 
-# Canonical run_type vocabulary for query-result rows.
-# `test_execution_type` captures run mode (power/throughput/etc.);
-# `run_type` captures per-row execution role.
 QUERY_RUN_TYPE_WARMUP = "warmup"
 QUERY_RUN_TYPE_MEASUREMENT = "measurement"
 QUERY_RUN_TYPE_METADATA = "metadata"
@@ -40,8 +30,6 @@ QUERY_RUN_TYPES = {
 
 @dataclass
 class TableGenerationStats:
-    """Per-table data generation metrics captured during the generate phase."""
-
     generation_time_ms: int
     status: str
     rows_generated: int
@@ -56,8 +44,6 @@ class TableGenerationStats:
 
 @dataclass
 class DataGenerationPhase:
-    """Aggregate data generation metrics for a benchmark run."""
-
     duration_ms: int
     status: str
     tables_generated: int
@@ -68,8 +54,6 @@ class DataGenerationPhase:
 
 @dataclass
 class TableCreationStats:
-    """Per-table schema creation metrics captured during setup."""
-
     creation_time_ms: int
     status: str
     constraints_applied: int
@@ -81,8 +65,6 @@ class TableCreationStats:
 
 @dataclass
 class SchemaCreationPhase:
-    """Aggregate schema creation metrics for a benchmark run."""
-
     duration_ms: int
     status: str
     tables_created: int
@@ -93,8 +75,6 @@ class SchemaCreationPhase:
 
 @dataclass
 class TableLoadingStats:
-    """Per-table load metrics captured during the load phase."""
-
     rows: int
     load_time_ms: int
     status: str
@@ -107,8 +87,6 @@ class TableLoadingStats:
 
 @dataclass
 class DataLoadingPhase:
-    """Aggregate table loading metrics for a benchmark run."""
-
     duration_ms: int
     status: str
     total_rows_loaded: int
@@ -118,8 +96,6 @@ class DataLoadingPhase:
 
 @dataclass
 class ValidationPhase:
-    """Validation outcomes captured for generated or loaded data."""
-
     duration_ms: int
     row_count_validation: str
     schema_validation: str
@@ -136,35 +112,6 @@ class PostLoadMaintenancePhase:
 
 @dataclass
 class StatisticsGatheringPhase:
-    """Optimizer-statistics build between load and query (opt-in).
-
-    stats_mode attributes where the statistics time landed:
-    - "explicit": the phase ran the platform's ANALYZE and duration_ms is the
-      measured wall-clock of that build.
-    - "auto-on-load": the engine already gathered statistics during load
-      (e.g. Redshift auto_analyze); nothing is re-built and duration_ms is 0
-      so load timing keeps the cost exactly once.
-    - "unsupported": the platform exposes no statistics-build hook;
-      duration_ms is 0.
-
-    stats_lifecycle records the cold-stats vs warm-stats reset/persist
-    control (opt-in; None when the control was not used, keeping bundles
-    byte-identical to the PR #980 shipped behavior):
-    - "reset": statistics were dropped/invalidated before this build (cold-stats).
-    - "unsupported": a reset was requested but this adapter has no generic
-      drop-stats primitive; the build below still ran a full rebuild.
-    - "persist": the caller explicitly requested warm-stats (no reset),
-      recorded even though it matches the default so a bundle can say the
-      control was deliberately exercised.
-
-    per_table_ms is an OPTIONAL per-table wall-clock breakdown (milliseconds)
-    for the statistics build, populated only when the caller opted in AND
-    this adapter's build fell back to a per-table ANALYZE loop (whole-database
-    analyze hooks and "auto-on-load"/"unsupported" modes cannot provide a
-    breakdown and leave this None). Omitted from the serialized payload when
-    None/empty so schema-v2's additive/omit-empty rule holds.
-    """
-
     duration_ms: int
     status: str
     stats_mode: str
@@ -176,8 +123,6 @@ class StatisticsGatheringPhase:
 
 @dataclass
 class SetupPhase:
-    """Setup phase metrics grouped by lifecycle stage."""
-
     data_generation: DataGenerationPhase | None = None
     schema_creation: SchemaCreationPhase | None = None
     data_loading: DataLoadingPhase | None = None
@@ -188,23 +133,6 @@ class SetupPhase:
 
 @dataclass(init=False)
 class QueryExecution:
-    """Canonical in-memory result for one query execution.
-
-    Milliseconds are the stored duration unit because they are also the schema-v2
-    artifact unit.  ``execution_time_seconds`` remains an accepted constructor
-    argument and a computed property for the producer APIs that historically
-    reported seconds.  Passing both representations is allowed only when they
-    agree within one millisecond; matching seconds retain their additional
-    precision and conflicting aliases fail closed.
-
-    Compatibility dictionaries and compact schema-v2 rows are converted by the
-    explicit adapters in :mod:`benchbox.core.results.query_execution`.  Keeping
-    those boundary rules out of this model prevents a third result
-    representation from accumulating its own precedence and defaulting rules.
-    Missing and explicit-null optional values both remain ``None`` internally;
-    adapters never turn them into numeric zero, false, or an empty collection.
-    """
-
     query_id: str
     stream_id: str | int | None
     execution_order: int | None
@@ -215,15 +143,12 @@ class QueryExecution:
     error_message: str | None = None
     iteration: int | None = None
     run_type: str | None = None
-    # Row count validation - nested object structure
-    row_count_validation: dict[str, Any] | None = None  # Contains: expected, actual, status, error/warning
-    # Cost estimation
-    cost: float | None = None  # Compute cost in USD for this query
-    # Query plan capture (structured DAG representation)
-    query_plan: QueryPlanDAG | dict[str, Any] | str | None = None  # Typed or compatibility plan payload
-    plan_fingerprint: str | None = None  # SHA256 hash for fast plan comparison
-    plan_fingerprint_normalized: str | None = None  # Literal-normalized fingerprint (opt-in)
-    plan_capture_time_ms: float | None = None  # Time spent capturing plan (EXPLAIN + parse)
+    row_count_validation: dict[str, Any] | None = None
+    cost: float | None = None
+    query_plan: QueryPlanDAG | dict[str, Any] | str | None = None
+    plan_fingerprint: str | None = None
+    plan_fingerprint_normalized: str | None = None
+    plan_capture_time_ms: float | None = None
     plan_capture_error: str | None = None
     dataframe_skip_summary: dict[str, Any] | None = None
     result_digest: str | None = None
@@ -296,7 +221,6 @@ class QueryExecution:
 
     @property
     def execution_time_seconds(self) -> float | None:
-        """Return the canonical duration converted to producer-facing seconds."""
         if self.execution_time_ms is None:
             return None
         return self.execution_time_ms / 1000.0
@@ -304,8 +228,6 @@ class QueryExecution:
 
 @dataclass
 class PowerTestPhase:
-    """Power-test execution metrics and per-query results."""
-
     start_time: str
     end_time: str
     duration_ms: int
@@ -326,8 +248,6 @@ class ThroughputStream:
 
 
 class ThroughputOutstandingWork(TypedDict):
-    """Phase-level evidence about throughput workers after phase completion."""
-
     stream_ids: list[int]
     cleanup_state: str
 
@@ -379,13 +299,6 @@ class MigrationTableStats:
 
 @dataclass
 class MigrationPhase:
-    """Phase result for heap-to-columnstore migration (pg_mooncake-specific).
-
-    Captures the overhead of converting existing PostgreSQL heap tables to
-    pg_mooncake's columnstore format via ALTER TABLE ... SET ACCESS METHOD columnar.
-    Set on ExecutionPhases.migration when run_migration_phase() completes.
-    """
-
     duration_ms: int
     status: str
     tables_migrated: int
@@ -402,29 +315,20 @@ class ExecutionPhases:
     power_test: PowerTestPhase | None = None
     throughput_test: ThroughputTestPhase | None = None
     maintenance_test: MaintenanceTestPhase | None = None
-    migration: MigrationPhase | None = None  # pg_mooncake heap-to-columnstore
+    migration: MigrationPhase | None = None
 
 
 @dataclass
 class NativeComparisonEntry:
-    """Per-query timing delta between pg_duckdb and native DuckDB execution."""
-
     query_id: str
     pg_duckdb_ms: float
     duckdb_ms: float
-    delta_ms: float  # pg_duckdb_ms - duckdb_ms; positive = pg_duckdb slower
+    delta_ms: float
 
 
 @dataclass
 class NativeComparison:
-    """Comparison of pg_duckdb vs native DuckDB query timings.
-
-    Produced by PgDuckDBAdapter.run_native_comparison() when triggered via
-    --platform-option compare_native=true. Serialized under the top-level
-    'comparisons' key in the result JSON (omitted when None).
-    """
-
-    generated_at: str  # ISO-8601 timestamp
+    generated_at: str
     scale_factor: float
     total_queries: int
     mean_delta_ms: float
@@ -449,43 +353,25 @@ class BenchmarkResults:
     total_queries: int
     successful_queries: int
     failed_queries: int
-    # Summary of queries (flattened list for basic consumers)
-    # Runtime compatibility dictionaries remain the public container shape;
-    # schema/comparison boundaries accept QueryExecution directly as an
-    # incremental migration aid without widening every downstream consumer at
-    # once.
     query_results: list[dict[str, Any]] = field(default_factory=list)
-    # Summary metrics
     total_execution_time: float = 0.0
     average_query_time: float = 0.0
-    # Setup metrics
     data_loading_time: float = 0.0
     schema_creation_time: float = 0.0
     total_rows_loaded: int = 0
     data_size_mb: float = 0.0
     table_statistics: dict[str, int] = field(default_factory=dict)
-    # Data-generation version (benchbox.utils.datagen_version.DATA_GENERATION_VERSION)
-    # that produced the data this result ran against. Results stamped with
-    # different versions must not be silently compared. None for results
-    # predating the stamp.
     data_generation_version: int | None = None
-    # Fingerprint of the base-constant inputs (benchbox.utils.datagen_version.compute_base_constants_hash)
-    # behind the data this result ran against. Distinguishes datasets whose specs changed without a
-    # version bump. None for results predating the stamp.
     data_generation_hash: str | None = None
     flightdata_source_provenance: dict[str, Any] | None = None
-    # Optional detailed per-query timing info (for CSV export and analysis)
     per_query_timings: list[dict[str, Any]] | None = field(default_factory=list)
-    # Optional detailed structures
     execution_phases: ExecutionPhases | None = None
     query_definitions: dict[str, dict[str, QueryDefinition]] | None = None
-    # TPC metrics and execution type
     test_execution_type: str = "standard"
     power_at_size: float | None = None
     throughput_at_size: float | None = None
-    qph_at_size: float | None = None  # TPC composite metric (QphH for TPC-H, QphDS for TPC-DS)
+    qph_at_size: float | None = None
     geometric_mean_execution_time: float | None = None
-    # Validation and metadata
     validation_status: str = "PASSED"
     validation_details: dict[str, Any] | None = None
     execution_environment: NormalizedExecutionEnvironment | dict[str, Any] | None = None
@@ -498,27 +384,10 @@ class BenchmarkResults:
     platform_info: dict[str, Any] | None = None
     platform_metadata: dict[str, Any] | None = None
     tunings_applied: dict[str, Any] | None = None
-    # requested_config_hash (ADR-1): full SHA-256 over the requested
-    # UnifiedTuningConfiguration.to_dict(), canonical JSON (sort_keys, compact
-    # separators). Platform-independent template identity - not a certification
-    # of what was physically applied (see the separate applied-ledger hash).
     tuning_config_hash: str | None = None
-    # applied_tuning_ledger: the AppliedTuningLedger.to_payload() dict produced
-    # BY the execution path (status, applied_ledger_hash, statements, dropped) -
-    # what the adapter actually executed, never reconstructed from the requested
-    # config. None when no tuning ran. See benchbox.core.tuning.applied_ledger.
     applied_tuning_ledger: dict[str, Any] | None = None
-    # applied_ledger_hash (ADR-1 physical-identity): SHA-256 over the ordered
-    # executed-statement list (canonical JSON). DISTINCT from tuning_config_hash
-    # above, which is the requested-config hash - this one certifies what was
-    # physically applied. None when nothing executed.
     applied_ledger_hash: str | None = None
-    # Template reference: repo-relative path, or "<basename>:<content-hash>"
-    # for templates outside the repo. Never a raw local filesystem path.
     tuning_source_file: str | None = None
-    # Raw TuningSource enum value (e.g. "auto_discovered", "explicit_file",
-    # "wizard", "fallback", "smart_defaults", "baseline"); see
-    # benchbox.cli.tuning_resolver.TuningSource.
     tuning_source: str | None = None
     # Pre-ADR-1 ``platform.tuning.source`` bridge value ("yaml"/"auto") preserved
     # across a load -> re-export cycle when the bundle carries no richer tuning
@@ -533,8 +402,7 @@ class BenchmarkResults:
     execution_metadata: dict[str, Any] | None = None
     performance_characteristics: dict[str, Any] = field(default_factory=dict)
     performance_summary: dict[str, Any] = field(default_factory=dict)
-    # Cost estimation
-    cost_summary: dict[str, Any] | None = None  # Contains: total_cost, phase_costs, platform_details
+    cost_summary: dict[str, Any] | None = None
     driver_package: str | None = None
     driver_version_requested: str | None = None
     driver_version_resolved: str | None = None
@@ -543,13 +411,8 @@ class BenchmarkResults:
     driver_runtime_path: str | None = None
     driver_runtime_python_executable: str | None = None
     driver_auto_install: bool = False
-    # Engine/service version metadata (independent from Python driver version).
-    # For coupled platforms (DuckDB, DataFusion): engine version == driver version.
-    # For decoupled platforms (Snowflake, Redshift, etc.): engine version is the
-    # remote service/runtime version, probed from connection or API metadata.
-    engine_version: str | None = None  # Observed engine/service version
-    engine_version_source: str | None = None  # Provenance: "sql_query", "api", "connection_metadata", "driver_coupled"
-    # Additional optional attributes set dynamically
+    engine_version: str | None = None
+    engine_version_source: str | None = None
     output_filename: str | None = None
     resource_utilization: dict[str, Any] | None = None
     _benchmark_id_override: str | None = None
@@ -557,36 +420,24 @@ class BenchmarkResults:
     query_subset: list[str] | None = None
     concurrency_level: int | None = None
     benchmark_version: str | None = None
-    # Query plan capture statistics
-    query_plans_captured: int = 0  # Count of queries with captured plans
-    plan_capture_failures: int = 0  # Count of plan capture failures
+    query_plans_captured: int = 0
+    plan_capture_failures: int = 0
     plan_capture_errors: list[dict[str, str]] = field(default_factory=list)
-    plan_comparison_summary: dict[str, Any] | None = None  # Cross-run/platform plan comparison results
-    # Query plan capture timing (set during result aggregation)
-    total_plan_capture_time_ms: float = 0.0  # Total time spent on plan capture
-    avg_plan_capture_overhead_pct: float = 0.0  # Average overhead as % of query time
-    max_plan_capture_time_ms: float = 0.0  # Maximum single capture time
-    # Execution context for reproducibility (captures CLI/MCP/API params)
+    plan_comparison_summary: dict[str, Any] | None = None
+    total_plan_capture_time_ms: float = 0.0
+    avg_plan_capture_overhead_pct: float = 0.0
+    max_plan_capture_time_ms: float = 0.0
     execution_context: dict[str, Any] | None = None
-    # pg_duckdb vs native DuckDB comparison (omitted when not run)
     native_comparison: NativeComparison | None = None
-    # Methodology/comparability classification (TPC-DS: "official", "unofficial_nonstandard", "unofficial_subscale")
     compliance_class: str | None = None
-    # Dataset identity captured at run/export time for manifest-backed benchmarks.
     dataset_version: str | None = None
     manifest_hash: str | None = None
     data_archive_hash: str | None = None
-    # Result provenance (see benchbox.core.results.provenance). funding = how the
-    # run was paid for; result_source = an advisory producer hint (internal/
-    # community/vendor). Both optional; absent -> no provenance block in the bundle.
-    # The authoritative vendor trust label is assigned downstream under maintainer
-    # control, never from result_source here.
     funding: str | None = None
     result_source: str | None = None
 
     @property
     def benchmark_id(self) -> str:
-        """Return benchmark identifier derived from benchmark name."""
         override = getattr(self, "_benchmark_id_override", None)
         if override:
             return override

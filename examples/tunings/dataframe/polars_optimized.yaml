@@ -1,6 +1,3 @@
-# Polars DataFrame Tuning - Performance Optimized
-# Maximum performance for in-memory workloads
-
 execution:
   streaming_mode: false
   engine_affinity: in-memory

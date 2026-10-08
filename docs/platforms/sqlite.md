@@ -26,11 +26,11 @@ SQLite is useful in BenchBox for:
 
 ## Installation
 
+SQLite is included with Python, so no separate install is needed. Install BenchBox with uv or with pip:
+
 ```bash
-# SQLite is included with Python
 uv add benchbox
 
-# Or with pip
 pip install benchbox
 ```
 
@@ -73,14 +73,14 @@ benchbox run --platform sqlite --benchmark tpch --scale 0.1 \
 ### Quick Start
 
 ```bash
-# Small benchmark
 benchbox run --platform sqlite --benchmark tpch --scale 0.01
 ```
 
 ### With Optimizations
 
+This configuration is optimized for read performance (`cache_size=-64000` is a 64 MB cache):
+
 ```bash
-# Optimized for read performance
 benchbox run --platform sqlite --benchmark tpch --scale 0.1 \
   --platform-option journal_mode=WAL \
   --platform-option cache_size=-64000 \
@@ -130,21 +130,20 @@ benchbox run --platform sqlite --benchmark tpch \
 
 ### Cache Size
 
-Increase cache to reduce disk I/O:
+Increase cache to reduce disk I/O. A negative `cache_size` is in KiB, so `-64000` is a 64 MB cache:
 
 ```bash
-# 64 MB cache
 benchbox run --platform sqlite --benchmark tpch \
   --platform-option cache_size=-64000
 ```
 
 ### Memory-Mapped I/O
 
-For large databases:
+For large databases. `268435456` bytes is 256 MB:
 
 ```bash
 benchbox run --platform sqlite --benchmark tpch \
-  --platform-option mmap_size=268435456  # 256 MB
+  --platform-option mmap_size=268435456
 ```
 
 ## Limitations
@@ -178,7 +177,6 @@ SQLite and DuckDB are optimized for different workload types:
 **Note:** Performance differences vary based on query characteristics, data size, and hardware. Run benchmarks with your specific workloads to compare.
 
 ```bash
-# Compare performance
 benchbox run --platform sqlite --benchmark tpch --scale 0.1
 benchbox run --platform duckdb --benchmark tpch --scale 0.1
 ```
@@ -187,24 +185,27 @@ benchbox run --platform duckdb --benchmark tpch --scale 0.1
 
 ### Database Locked
 
+Wait for the lock by setting a busy timeout (`30000` ms is 30 seconds):
+
 ```bash
-# Wait for lock
 benchbox run --platform sqlite --benchmark tpch \
-  --platform-option busy_timeout=30000  # 30 seconds
+  --platform-option busy_timeout=30000
 ```
 
 ### Out of Memory
 
+Use file-based temp storage:
+
 ```bash
-# Use file-based temp storage
 benchbox run --platform sqlite --benchmark tpch \
   --platform-option temp_store=FILE
 ```
 
 ### Slow Queries
 
+Increase the cache and use WAL:
+
 ```bash
-# Increase cache and use WAL
 benchbox run --platform sqlite --benchmark tpch \
   --platform-option cache_size=-128000 \
   --platform-option journal_mode=WAL \

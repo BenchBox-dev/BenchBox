@@ -1,62 +1,3 @@
-"""Run TPC-H on Databend (cloud-native or self-hosted).
-
-Databend is a cloud-native, Rust-based data warehouse with Snowflake-compatible
-SQL and compute/storage separation on object storage (S3, GCS, Azure Blob, MinIO).
-BenchBox connects via the databend-driver Python package and uses the Snowflake
-dialect as a SQLGlot translation proxy for SQL compatibility.
-
-Databend supports two deployment modes:
-
-- **Databend Cloud**: Managed service at https://www.databend.com
-  - Authentication via host, username, and password
-  - Warehouse-scoped compute (similar to Snowflake)
-  - SSL enabled by default (port 443)
-
-- **Self-hosted**: User-managed cluster with object storage backend
-  - Typically runs on port 8000 (HTTP, no SSL)
-  - Requires MinIO or S3-compatible storage for data persistence
-  - DSN-based connection: databend+http://user:pass@host:port/database?sslmode=disable
-
-Prerequisites:
-    1. Databend Cloud account or self-hosted Databend instance
-    2. databend-driver Python package installed (>=0.28.0)
-    3. Database user with CREATE/DROP/INSERT/SELECT privileges
-
-Required environment variables (choose one approach):
-
-    Option A - Individual parameters:
-        DATABEND_HOST            Databend hostname or IP address
-        DATABEND_USER            Database username (default: benchbox)
-        DATABEND_PASSWORD        Database password
-
-    Option B - DSN string:
-        DATABEND_DSN             Full DSN (e.g., databend+http://user:pass@host:port/db?sslmode=disable)
-
-Optional environment variables:
-    DATABEND_DATABASE        Target database name (default: benchbox)
-    DATABEND_PORT            Connection port (default: 443 for cloud, 8000 for self-hosted)
-    DATABEND_WAREHOUSE       Databend Cloud warehouse name
-
-Installation:
-    uv add databend-driver
-
-Usage:
-    # Databend Cloud
-    export DATABEND_HOST=tenant--warehouse.gw.databend.com
-    export DATABEND_USER=benchbox
-    export DATABEND_PASSWORD=your_password
-
-    python examples/getting_started/cloud/databend_tpch.py
-
-    # Self-hosted via DSN
-    export DATABEND_DSN=databend+http://benchbox:benchbox@localhost:8000/benchbox?sslmode=disable
-
-    python examples/getting_started/cloud/databend_tpch.py
-
-    # Preview without execution
-    python examples/getting_started/cloud/databend_tpch.py --dry-run ./preview
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -73,30 +14,6 @@ _OUTPUT_DIR = _PROJECT_ROOT / "benchmark_runs" / "getting_started" / "databend"
 
 
 def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig]:
-    """Build benchmark and database configurations for Databend.
-
-    Databend Concepts:
-
-    1. COMPUTE/STORAGE SEPARATION
-       - Compute nodes run queries; storage is on object storage (S3, MinIO, etc.)
-       - Cloud: Warehouses provide isolated compute resources
-       - Self-hosted: Single or multi-node clusters backed by object storage
-
-    2. SNOWFLAKE-COMPATIBLE SQL
-       - Databend claims ~100% Snowflake SQL compatibility
-       - BenchBox uses Snowflake dialect via SQLGlot as translation proxy
-       - CHAR(n) types are converted to VARCHAR(n) for Databend compatibility
-
-    3. CLUSTERING KEYS
-       - Similar to Snowflake clustering keys
-       - CLUSTER BY clause optimizes data layout for frequent query patterns
-       - Applied via tuning configuration at table creation or post-creation
-
-    4. AUTHENTICATION
-       - Cloud: Host + username + password (SSL on port 443)
-       - Self-hosted: DSN-based or individual params (HTTP on port 8000)
-       - Credentials should always be provided via environment variables
-    """
     benchmark_config = BenchmarkConfig(
         name="tpch",
         display_name="TPC-H",
@@ -105,16 +22,13 @@ def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig
         options={"enable_preflight_validation": False},
     )
 
-    # Build connection options from environment variables
     dsn = os.getenv("DATABEND_DSN")
 
     options: dict[str, object] = {}
 
     if dsn:
-        # DSN takes precedence over individual parameters
         options["dsn"] = dsn
     else:
-        # Individual parameters with env var fallbacks
         host = os.getenv("DATABEND_HOST")
         if not host:
             raise RuntimeError(
@@ -133,7 +47,6 @@ def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig
         if port:
             options["port"] = int(port)
 
-    # Optional configuration
     options["database"] = os.getenv("DATABEND_DATABASE", "benchbox")
 
     warehouse = os.getenv("DATABEND_WAREHOUSE")
@@ -150,14 +63,6 @@ def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig
 
 
 def run_example(scale_factor: float = 0.01, *, dry_run_output: Path | None = None) -> None:
-    """Execute TPC-H benchmark on Databend.
-
-    Databend provides:
-    - Cloud-native compute/storage separation on object storage
-    - Snowflake-compatible SQL for broad query compatibility
-    - Vectorized Rust query engine for analytical performance
-    - Automatic micro-partitioning and statistics collection
-    """
     _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     benchmark_config, database_config = _build_configs(scale_factor)
 

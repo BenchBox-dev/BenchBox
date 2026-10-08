@@ -44,6 +44,10 @@ considered binding.
   `results-explorer/src/lib/__tests__/`, and
   `results-explorer/src/pages/__tests__/`. Vitest runs in jsdom - no real
   browser, no real WASM worker, no real `Worker`/`Blob` URL creation.
+- Files named `*.types.test.ts` hold type-level tests. `npm run typecheck`
+  (`tsc --noEmit`) checks them, not Vitest. Each `// @ts-expect-error` line
+  asserts that the next line must not compile, so a change that weakens a type
+  invariant leaves the directive unused and fails the build.
 - The only prior real-browser verification work is
   `verify-trust-badge-rendering-in-explorer` (done 2026-04-12). It used an
   ad-hoc local Playwright-driven check plus a throwaway fixture branch and

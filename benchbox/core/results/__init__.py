@@ -1,9 +1,6 @@
-"""Enhanced results system with execution metadata and anonymization.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from .anonymization import AnonymizationConfig, AnonymizationManager
 from .builder import (
@@ -72,15 +69,12 @@ from .query_normalizer import (
 from .timing import QueryTiming, TimingAnalyzer, TimingCollector
 
 __all__ = [
-    # Anonymization
     "AnonymizationConfig",
     "AnonymizationManager",
-    # Builder
     "BenchmarkInfoInput",
     "ResultBuilder",
     "build_benchmark_results",
     "normalize_benchmark_id",
-    # Database
     "PerformanceTrend",
     "PlatformRanking",
     "QueryTiming",
@@ -88,7 +82,6 @@ __all__ = [
     "ResultDatabase",
     "StoredQuery",
     "StoredResult",
-    # Display
     "display_benchmark_list",
     "display_configuration_summary",
     "display_platform_list",
@@ -97,7 +90,6 @@ __all__ = [
     "print_completion_message",
     "print_dry_run_summary",
     "print_phase_header",
-    # Environment
     "ClientHostEnvironment",
     "ContainerEnvironment",
     "NormalizedExecutionEnvironment",
@@ -106,7 +98,6 @@ __all__ = [
     "PlatformDeploymentMetadata",
     "PlatformRuntimeEnvironment",
     "PlatformStorageMetadata",
-    # Metrics
     "TPCMetricsCalculator",
     "calculate_named_metric",
     "geometric_mean_ms",
@@ -114,11 +105,9 @@ __all__ = [
     "sample_stdev_ms",
     "NAMED_METRICS",
     "TimingStatsCalculator",
-    # Platform Info
     "PlatformInfoInput",
     "build_platform_info",
     "format_platform_display_name",
-    # Query Normalizer
     "QueryExecution",
     "QueryExecutionContractError",
     "QueryResultInput",
@@ -130,7 +119,6 @@ __all__ = [
     "query_execution_from_legacy_dict",
     "query_execution_to_compact_v2",
     "query_execution_to_legacy_dict",
-    # Timing
     "TimingAnalyzer",
     "TimingCollector",
 ]

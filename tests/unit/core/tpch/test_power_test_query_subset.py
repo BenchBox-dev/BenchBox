@@ -1,10 +1,3 @@
-"""Regression tests for CLI-style Q-prefixed query ids in the TPC-H power test.
-
-The CLI passes --queries values through verbatim (e.g. "Q1,Q6,Q14"), so the
-power test must accept both bare and Q-prefixed ids (release PR #1043 canary
-found `int("Q1")` crashing every subset run).
-"""
-
 from __future__ import annotations
 
 import pytest

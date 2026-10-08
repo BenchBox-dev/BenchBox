@@ -1,26 +1,4 @@
 #!/usr/bin/env python3
-"""Generate the benchmark correctness-oracle coverage map.
-
-The map is the authoritative, *generated* answer to "which correctness oracle, if
-any, guards each shipped benchmark?" It is derived from live sources so it cannot
-drift from reality:
-
-  - the benchmark registry (``benchbox.core.benchmark_registry``) for the set of
-    shipped benchmarks and their surfaces (SQL / DataFrame);
-  - the expected-results provider registry
-    (``benchbox.core.expected_results.registry``) for stored answer keys;
-  - the cross-surface gate registry
-    (``benchbox.core.equivalence.cross_surface.GATES``) for SQL<->DataFrame gates;
-  - module presence for the bespoke TPC-Havoc variant / variant-DataFrame gates.
-
-Run ``python _project/scripts/generate_oracle_coverage_map.py`` to (re)write the
-checked-in artifacts under ``_project/analysis/``. Run with ``--check`` to fail if
-those artifacts are stale (used by ``tests/unit/test_oracle_coverage_map.py``).
-
-This script owns w0 (the matrix) and feeds w3 (drift/UNGUARDED visibility) of the
-``benchmark-correctness-oracle-coverage-map`` TODO. It deliberately does NOT build
-per-benchmark oracles (w1/w2); it makes the gap legible and dispatchable.
-"""
 
 from __future__ import annotations
 
@@ -31,8 +9,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# Oracle kinds, strongest/most-specific first. "primary" oracle = the first of
-# these a benchmark has; UNGUARDED benchmarks have none.
 ORACLE_EXPECTED_RESULTS = "expected-results"
 ORACLE_VARIANT_EQUIVALENCE = "variant-equivalence"
 ORACLE_CROSS_SURFACE_VARIANT = "cross-surface-variant"
@@ -46,62 +22,23 @@ _ORACLE_PRIORITY = [
     ORACLE_CROSS_SURFACE,
 ]
 
-# Oracle STRENGTH-TYPE: what a guarded cell actually proves. Distinct from the
-# oracle KIND above, and derived from live sources (provider capability / comparator
-# identity), never hand-labelled per benchmark.
-STRENGTH_VALUE = "value-level"  # full result values compared (cross-surface, variant gates)
-STRENGTH_CARDINALITY = "cardinality-only"  # row counts only (expected-results without value digests)
-STRENGTH_VALUE_AND_CARDINALITY = "value+cardinality"  # row counts AND stored value digests
+STRENGTH_VALUE = "value-level"
+STRENGTH_CARDINALITY = "cardinality-only"
+STRENGTH_VALUE_AND_CARDINALITY = "value+cardinality"
 STRENGTH_NONE = "—"
 
-# Oracle REFERENCE-INDEPENDENCE: how independent the guarded reference is from the
-# implementation under test -- i.e. is the reference an authority OUTSIDE benchbox, or
-# benchbox comparing against itself? This is ORTHOGONAL to Strength (a value-level
-# oracle can still be weak), so it is a SEPARATE column, never folded into Strength.
-# It is also ORTHOGONAL to Surface-provenance below: provenance grades how far apart
-# two benchbox surfaces are, which never makes either surface an external authority.
-# Derived from the oracle KIND plus the live strength signal, never hand-labelled:
-#   * cross-surface gates: BOTH sides are benchbox's own SQL and DataFrame surfaces,
-#     so the reference is always self-referential regardless of how the two surfaces
-#     were authored (that is the Surface-provenance axis).
-#   * variant gates: canonical/variant surfaces from the same BenchBox family, so
-#     they are likewise self-referential.
-#   * expected-results VALUE digests (tpch): a frozen benchbox-on-DuckDB snapshot, so
-#     the value axis is self-referential (a regression snapshot, not an authority).
-#   * expected-results ROW COUNTS (tpch/tpcds cardinality): the cardinalities come
-#     from the published TPC answer sets, an authority outside benchbox -- but only
-#     the row COUNT is checked, not the values, so this is SEMI-independent, not full.
-INDEPENDENCE_INDEPENDENT = "independent"  # reference is an external authority (full values)
-INDEPENDENCE_SEMI = "semi-independent"  # external authority on cardinality only (TPC answer-set row counts)
-INDEPENDENCE_SELF = "self-referential"  # compared against itself (shared spec / frozen self-snapshot)
+INDEPENDENCE_INDEPENDENT = "independent"
+INDEPENDENCE_SEMI = "semi-independent"
+INDEPENDENCE_SELF = "self-referential"
 INDEPENDENCE_NONE = "—"
 
-# Oracle SURFACE-PROVENANCE: for a cross-surface gate, how far apart the two compared
-# benchbox surfaces were AUTHORED. A deliberately DISTINCT vocabulary from
-# INDEPENDENCE_* above: folding these labels into the Independence column made a
-# `separate-handwritten` cell read as an external reference, when the reference is
-# still benchbox's own DataFrame code. Provenance grades the STRENGTH OF THE INTERNAL
-# SIGNAL (separately handwritten surfaces catch more than two generated-from-one-spec
-# surfaces); it never buys independence.
-#
-# These strings mirror ``cross_surface.SURFACE_INDEPENDENCE_*`` -- the live per-gate
-# metadata this column is read from -- rather than importing them, so the module stays
-# import-light; ``tests/unit/test_oracle_coverage_map.py`` pins them to the live
-# constants so they cannot drift apart.
-PROVENANCE_SHARED_SPEC = "shared-spec"  # both DataFrame backends generated from one shared spec
-PROVENANCE_MIXED = "mixed-provenance"  # mixes generated/shared and bespoke implementations
-PROVENANCE_SEPARATE = "separate-handwritten"  # DataFrame families separately handwritten
-PROVENANCE_NONE = "—"  # not a cross-surface gate: the axis does not apply
+PROVENANCE_SHARED_SPEC = "shared-spec"
+PROVENANCE_MIXED = "mixed-provenance"
+PROVENANCE_SEPARATE = "separate-handwritten"
+PROVENANCE_NONE = "—"
 
-# The closed vocabulary this column may render. Pinning the three constants above to
-# the live ``cross_surface`` constants catches a RENAME, but not an ADDITION: a new
-# ``SURFACE_INDEPENDENCE_*`` label on a newly registered gate would pass through
-# unvalidated and render a label the map's own prose does not define, leaving the
-# legend quietly contradicting the table. Validating membership keeps the value read
-# live from the gate while making an unknown label a loud failure.
 _KNOWN_PROVENANCE_LABELS = frozenset({PROVENANCE_SHARED_SPEC, PROVENANCE_MIXED, PROVENANCE_SEPARATE})
 
-# Sentinel for "no scale guarantee" (UNGUARDED rows).
 SCALE_NONE = "—"
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -110,8 +47,32 @@ JSON_ARTIFACT = ARTIFACT_DIR / "oracle-coverage-map.json"
 MARKDOWN_ARTIFACT = ARTIFACT_DIR / "oracle-coverage-map.md"
 
 
+CLI_DESCRIPTION = (
+    "Generate the benchmark correctness-oracle coverage map.\n"
+    "\n"
+    'The map is the authoritative, *generated* answer to "which correctness oracle, if\n'
+    'any, guards each shipped benchmark?" It is derived from live sources so it cannot\n'
+    "drift from reality:\n"
+    "\n"
+    "  - the benchmark registry (``benchbox.core.benchmark_registry``) for the set of\n"
+    "    shipped benchmarks and their surfaces (SQL / DataFrame);\n"
+    "  - the expected-results provider registry\n"
+    "    (``benchbox.core.expected_results.registry``) for stored answer keys;\n"
+    "  - the cross-surface gate registry\n"
+    "    (``benchbox.core.equivalence.cross_surface.GATES``) for SQL<->DataFrame gates;\n"
+    "  - module presence for the bespoke TPC-Havoc variant / variant-DataFrame gates.\n"
+    "\n"
+    "Run ``python _project/scripts/generate_oracle_coverage_map.py`` to (re)write the\n"
+    "checked-in artifacts under ``_project/analysis/``. Run with ``--check`` to fail if\n"
+    "those artifacts are stale (used by ``tests/unit/test_oracle_coverage_map.py``).\n"
+    "\n"
+    "This script owns w0 (the matrix) and feeds w3 (drift/UNGUARDED visibility) of the\n"
+    "``benchmark-correctness-oracle-coverage-map`` TODO. It deliberately does NOT build\n"
+    "per-benchmark oracles (w1/w2); it makes the gap legible and dispatchable.\n"
+)
+
+
 def _module_exists(dotted: str) -> bool:
-    """True if an importable module exists, without importing it."""
     try:
         return importlib.util.find_spec(dotted) is not None
     except ModuleNotFoundError:
@@ -125,22 +86,9 @@ def classify_oracles(
     cross_surface_gates: set[str],
     staged_cross_surface_gates: set[str],
 ) -> list[str]:
-    """Return every correctness oracle that currently guards ``benchmark_id``.
-
-    Detection is from live sources only; adding a real oracle (a provider, a
-    ``GATES`` entry, or a TPC-Havoc gate module) automatically reclassifies the
-    benchmark on the next regeneration.
-
-    A cross-surface oracle is detected from membership in either the enforced
-    ``GATES`` registry or the (currently empty) ``STAGED_GATES`` registry; the
-    caller records *which* of the two via ``cross_surface_enforced`` so a
-    registered-but-not-CI-enforced gate is never reported as enforced coverage.
-    """
     oracles: list[str] = []
     if benchmark_id in expected_results_providers:
         oracles.append(ORACLE_EXPECTED_RESULTS)
-    # TPC-Havoc ships its own bespoke gates (variant-vs-canonical SQL, and
-    # SQL-variant-vs-DataFrame-variant); detect them by module presence.
     if benchmark_id == "tpchavoc":
         if _module_exists("benchbox.core.tpchavoc.equivalence"):
             oracles.append(ORACLE_VARIANT_EQUIVALENCE)
@@ -159,40 +107,17 @@ def primary_oracle(oracles: list[str]) -> str:
 
 
 def _expected_results_has_value_digests(benchmark_id: str) -> bool:
-    """True if the expected-results provider stores VALUE digests for this benchmark.
-
-    Probed from the committed digest reference (no answer files / DuckDB needed, so
-    the result is deterministic across environments and the drift check stays
-    stable). This is what flips the expected-results strength from cardinality-only
-    to value+cardinality once stored digests land -- derived from the provider's
-    actual capability, not a hand-edited label.
-    """
     try:
         if benchmark_id == "tpch":
             from benchbox.core.expected_results.loader import load_tpch_value_digests
 
             return bool(load_tpch_value_digests(1.0))
-    except Exception:  # pragma: no cover - absence simply means cardinality-only
+    except Exception:  # pragma: no cover
         return False
     return False
 
 
 def _bounded_value_gate_scale(benchmark_id: str) -> str:
-    """The bounded scale this benchmark's value-level gate runs at, read live.
-
-    A cross-surface gate may override the shared ``EQUIVALENCE_SCALE`` per gate
-    (e.g. ``h2odb`` runs a smaller cell because its generator base is the 10M-row
-    small tier), so read the per-gate ``scale_factor`` where one is registered;
-    fall back to the shared default for the TPC-Havoc variant gates, which are not
-    in the cross-surface ``GATES`` registry. Reading it live keeps the artifact
-    honest rather than hand-labelled.
-
-    Both gate registries are consulted. ``classify_oracles`` already treats a
-    STAGED gate as a cross-surface oracle, so looking in ``GATES`` alone would
-    silently render the shared default for a staged gate that declares its own
-    ``scale_factor`` -- overstating the scale at which the gate actually holds,
-    on exactly the path every gate takes before promotion.
-    """
     from benchbox.core.equivalence.cross_surface import EQUIVALENCE_SCALE, GATES, STAGED_GATES
 
     gate = GATES.get(benchmark_id) or STAGED_GATES.get(benchmark_id)
@@ -201,23 +126,12 @@ def _bounded_value_gate_scale(benchmark_id: str) -> str:
 
 
 def oracle_strength_and_scale(primary: str, benchmark_id: str) -> tuple[str, str]:
-    """Return ``(strength_type, scale_coverage)`` for a benchmark's primary oracle.
-
-    Derived from live sources so it cannot rot:
-      * expected-results -> cardinality-only OR value+cardinality (probe the
-        provider's stored value digests); scale SF=1 (the loader raises for any
-        other scale, so no expected-results oracle exists above SF=1).
-      * variant-equivalence / cross-surface(-variant) -> value-level (they compare
-        full result sets via ResultValidator/validate_results_exact); scale = the
-        bounded gate scale read live from the equivalence module.
-    """
     if primary == ORACLE_EXPECTED_RESULTS:
         strength = (
             STRENGTH_VALUE_AND_CARDINALITY
             if _expected_results_has_value_digests(benchmark_id)
             else STRENGTH_CARDINALITY
         )
-        # SF=1 only: benchbox/core/expected_results/loader.py raises for other scales.
         return strength, "SF=1"
     if primary in (ORACLE_VARIANT_EQUIVALENCE, ORACLE_CROSS_SURFACE_VARIANT, ORACLE_CROSS_SURFACE):
         return STRENGTH_VALUE, _bounded_value_gate_scale(benchmark_id)
@@ -225,32 +139,9 @@ def oracle_strength_and_scale(primary: str, benchmark_id: str) -> tuple[str, str
 
 
 def oracle_reference_independence(primary: str, strength: str) -> str:
-    """Return the reference-independence axis for a benchmark's primary oracle.
-
-    Answers one question only: is the reference an authority OUTSIDE benchbox?
-    Orthogonal to Strength and to Surface-provenance, and derived from the oracle KIND
-    plus the strength signal (which already encodes whether stored VALUE digests
-    exist), so it tracks the classifier without a hand-maintained field:
-
-      * cross-surface gates -> self-referential. Both compared surfaces are benchbox's
-        own SQL and DataFrame implementations, so no authoring distance between them
-        (see ``oracle_surface_provenance``) turns either into an external authority.
-      * variant gates -> self-referential (canonical SQL variant is the reference
-        for generated/variant surfaces).
-      * expected-results with value+cardinality (tpch) -> self-referential: the value
-        digest is a frozen benchbox-on-DuckDB snapshot (a regression snapshot, not an
-        authority). The strength signal flips this label (drop the stored digests and
-        it falls back to the semi-independent row-count case), so it is derived.
-      * expected-results cardinality-only (tpcds) -> semi-independent: row counts come
-        from the published TPC answer sets (an authority outside benchbox), but only
-        the cardinality is checked, never the values.
-    """
     if primary in (ORACLE_CROSS_SURFACE, ORACLE_VARIANT_EQUIVALENCE, ORACLE_CROSS_SURFACE_VARIANT):
         return INDEPENDENCE_SELF
     if primary == ORACLE_EXPECTED_RESULTS:
-        # A stored value digest is a frozen self-snapshot, so the (stronger) value
-        # claim is self-referential; without it only the answer-set cardinality is
-        # checked, which is semi-independent.
         if strength == STRENGTH_VALUE_AND_CARDINALITY:
             return INDEPENDENCE_SELF
         return INDEPENDENCE_SEMI
@@ -258,11 +149,8 @@ def oracle_reference_independence(primary: str, strength: str) -> str:
 
 
 def oracle_independence_and_rationale(primary: str, strength: str) -> tuple[str, str]:
-    """Return the independence label plus one-line rationale rendered in the map."""
     independence = oracle_reference_independence(primary, strength)
     if independence == INDEPENDENCE_SELF:
-        # Only a cross-surface gate has a Surface-provenance cell to point at; a variant
-        # gate's provenance axis is `—`, so it must not send the reader to an empty cell.
         if primary == ORACLE_CROSS_SURFACE:
             return (
                 independence,
@@ -286,20 +174,6 @@ def oracle_independence_and_rationale(primary: str, strength: str) -> tuple[str,
 
 
 def oracle_surface_provenance(primary: str, benchmark_id: str) -> tuple[str, str]:
-    """Return ``(surface_provenance, rationale)`` for a benchmark's primary oracle.
-
-    A SEPARATE axis from reference-independence: it grades how far apart the two
-    compared benchbox surfaces were AUTHORED, which sets how much internal signal the
-    gate carries (separately handwritten surfaces catch more than two surfaces
-    generated from one spec) without ever making the reference external.
-
-    Read live from the per-gate ``CrossSurfaceGate.surface_independence`` metadata, so
-    re-registering a gate with different provenance reclassifies the row on the next
-    regeneration. The axis applies to any benchmark with a registered cross-surface
-    gate (enforced or staged), even when a higher-priority oracle is primary: the
-    gate exists and its authorship distance is disclosable. Benchmarks with no
-    registered gate report ``—``.
-    """
     from benchbox.core.equivalence.cross_surface import GATES, STAGED_GATES
 
     gate = GATES.get(benchmark_id) or STAGED_GATES.get(benchmark_id)
@@ -316,18 +190,12 @@ def oracle_surface_provenance(primary: str, benchmark_id: str) -> tuple[str, str
 
 
 def _surfaces(metadata: dict[str, Any]) -> tuple[bool, bool]:
-    """Return ``(has_sql, has_dataframe)`` for a benchmark's metadata.
-
-    Every shipped benchmark exposes SQL queries (``num_queries`` > 0); DataFrame
-    is gated by the registry's ``supports_dataframe`` flag.
-    """
     has_sql = bool(metadata.get("num_queries") or 0)
     has_dataframe = bool(metadata.get("supports_dataframe", False))
     return has_sql, has_dataframe
 
 
 def build_coverage_map() -> list[dict[str, Any]]:
-    """Build the coverage matrix: one classified row per shipped benchmark."""
     from benchbox.core.benchmark_registry import get_benchmark_metadata, list_benchmark_ids
     from benchbox.core.equivalence.cross_surface import GATES, STAGED_GATES
     from benchbox.core.expected_results.registry import get_registry
@@ -351,14 +219,7 @@ def build_coverage_map() -> list[dict[str, Any]]:
         strength, scale = oracle_strength_and_scale(primary, benchmark_id)
         independence, independence_rationale = oracle_independence_and_rationale(primary, strength)
         surface_provenance, surface_provenance_rationale = oracle_surface_provenance(primary, benchmark_id)
-        # A dual-surface benchmark with no oracle is reachable by the cross-surface
-        # SQL<->DataFrame gate (the w1 dispatch target). A single-surface benchmark
-        # is not and needs a fallback oracle (w2).
         dual_surface = has_sql and has_dataframe
-        # Honesty signal (M1): a cross-surface oracle's mere REGISTRATION does not
-        # prove it is green. Distinguish a CI-enforced (blocking) gate -- which is
-        # green-or-CI-fails -- from a STAGED gate that is registered but not run in
-        # CI. ``None`` for benchmarks with no cross-surface gate at all.
         if ORACLE_CROSS_SURFACE in oracles:
             cross_surface_enforced: bool | None = benchmark_id in cross_surface_gates
         else:
@@ -385,13 +246,6 @@ def build_coverage_map() -> list[dict[str, Any]]:
 
 
 def _enforcement_label(row: dict[str, Any]) -> str:
-    """Honesty signal for a cross-surface gate: CI-enforced vs merely registered.
-
-    ``cross_surface_enforced`` is ``True`` for an enforced (CI-blocking) gate,
-    ``False`` for a STAGED (registered-but-not-run-in-CI) gate, and ``None`` when
-    the benchmark has no cross-surface gate. Only an enforced gate is green-or-
-    CI-fails; a staged gate's registration proves nothing about correctness.
-    """
     enforced = row.get("cross_surface_enforced")
     if enforced is True:
         return "enforced (CI-blocking)"
@@ -400,20 +254,10 @@ def _enforcement_label(row: dict[str, Any]) -> str:
     return "—"
 
 
-# SF>1 value-blindness disclosure (w2): an expected-results VALUE oracle holds only at
-# SF=1 (the loader raises above it). Render it INTO the Strength cell so the tpch row
-# alone -- without reading the Scale column or the prose -- shows the gap. Derived from
-# the live strength signal, not a hand-typed caveat.
 _SF1_VALUE_DISCLOSURE = " (SF=1 only; values UNGUARDED above SF=1)"
 
 
 def _strength_cell(row: dict[str, Any]) -> str:
-    """Strength text for the markdown table, self-contained for the SF>1 value gap.
-
-    For an expected-results oracle that guards VALUES (``value+cardinality``), append
-    the SF>1 value-blindness disclosure so a skimmer reading only the Strength column
-    cannot conclude the values are guarded generally. Other cells are unchanged.
-    """
     if row["primary_oracle"] == ORACLE_EXPECTED_RESULTS and row["strength"] == STRENGTH_VALUE_AND_CARDINALITY:
         return row["strength"] + _SF1_VALUE_DISCLOSURE
     return row["strength"]
@@ -513,9 +357,6 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
         oracle = r["primary_oracle"]
         if r["guarded"]:
             note = ", ".join(r["oracles"])
-            # M1 honesty: a STAGED cross-surface gate is registered but not run in
-            # CI, so spell that out in the row note too -- never let the Oracle
-            # column alone imply a verified gate.
             if r.get("cross_surface_enforced") is False:
                 note += " (registered, NOT CI-enforced)"
         elif r["cross_surface_applicable"]:
@@ -562,31 +403,11 @@ def render_json(rows: list[dict[str, Any]]) -> str:
     return json.dumps({"benchmarks": rows}, indent=2, sort_keys=True) + "\n"
 
 
-# Provenance is stamped into a leading HTML-comment region of the markdown that the
-# drift check IGNORES (see _strip_provenance / check_artifacts). It carries the
-# generation date + a CONTENT HASH of the generated body so a reader can verify the
-# artifact by regenerating, WITHOUT putting a volatile value into the drift-compared
-# body (which would make `--check` churn on every commit).
-#
-# Why a content hash and not a git SHA: a PR-branch HEAD SHA is ORPHANED by
-# squash-merge (the squashed commit discards the branch HEAD, so `git cat-file`
-# reports "bad object" for the stamped revision -- reproduced on the prior
-# `revision: ddd96c47…` stamp). A content hash of the body is reproducible from the
-# live sources on develop and survives a squash, so a reader can confirm the committed
-# map matches its inputs by rerunning the generator. See
-# `_project/analysis/REVIEW-PROTOCOL.md` (squash-merge orphans PR-branch SHAs).
 _PROVENANCE_START = "<!-- PROVENANCE"
 _PROVENANCE_END = "-->"
 
 
 def _content_revision(rows: list[dict[str, Any]]) -> str:
-    """A reproducible content hash of the generated body (squash-survivable provenance).
-
-    Hashes the drift-compared bodies (markdown + json) so the stamp is derivable from
-    the live sources on develop and resolvable by regeneration, unlike a PR-branch SHA
-    that a squash-merge orphans. Excludes the provenance header itself (which carries
-    this value) so it is well-defined.
-    """
     import hashlib
 
     body = render_markdown(rows) + render_json(rows)
@@ -611,7 +432,6 @@ def _provenance_header(rows: list[dict[str, Any]]) -> str:
 
 
 def _strip_provenance(text: str) -> str:
-    """Remove a leading provenance HTML-comment region so drift compares only the body."""
     if not text.startswith(_PROVENANCE_START):
         return text
     end = text.find(_PROVENANCE_END)
@@ -628,11 +448,6 @@ def write_artifacts(rows: list[dict[str, Any]]) -> None:
 
 
 def check_artifacts(rows: list[dict[str, Any]]) -> list[str]:
-    """Return a list of human-readable drift problems (empty == in sync).
-
-    The markdown's provenance header is stripped before comparison so a refreshed
-    date/SHA never makes the drift check churn; only the generated body must match.
-    """
     problems: list[str] = []
     checks = (
         (JSON_ARTIFACT, render_json(rows), False),
@@ -652,7 +467,7 @@ def check_artifacts(rows: list[dict[str, Any]]) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument(
         "--check",
         action="store_true",

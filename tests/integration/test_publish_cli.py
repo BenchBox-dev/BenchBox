@@ -1,12 +1,6 @@
-"""End-to-end integration tests for the benchbox publish CLI command.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the full publish workflow using the Click test runner and the
-actual store/publisher implementations against real temporary directories.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -25,11 +19,6 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
 @pytest.fixture
 def runner():
     return CliRunner()
@@ -37,7 +26,7 @@ def runner():
 
 @pytest.fixture
 def schema_v2_bundle(tmp_path) -> Path:
-    """Create a minimal but valid schema-v2 result bundle on disk."""
+
     bundle = tmp_path / "tpch_sf0.01_duckdb_20260401_120000.json"
     payload = {
         "version": "2.0",
@@ -53,7 +42,7 @@ def schema_v2_bundle(tmp_path) -> Path:
 
 @pytest.fixture
 def schema_v2_bundle_with_companions(tmp_path) -> Path:
-    """Create a result bundle with companion files."""
+
     bundle = tmp_path / "tpch_sf0.01_duckdb_20260401_120000.json"
     payload = {
         "version": "2.0",
@@ -65,7 +54,6 @@ def schema_v2_bundle_with_companions(tmp_path) -> Path:
     }
     bundle.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
-    # Companion files
     plans_path = tmp_path / "tpch_sf0.01_duckdb_20260401_120000.plans.json"
     plans_path.write_text(json.dumps({"plans": []}), encoding="utf-8")
 
@@ -85,11 +73,6 @@ def publish_target(tmp_path) -> Path:
 @pytest.fixture
 def store(tmp_path) -> PublicationStore:
     return PublicationStore(store_path=tmp_path / "published.json")
-
-
-# ---------------------------------------------------------------------------
-# publish run (the default sub-action)
-# ---------------------------------------------------------------------------
 
 
 class TestPublishRun:
@@ -181,11 +164,6 @@ class TestPublishRun:
         assert result.exit_code == 0
 
 
-# ---------------------------------------------------------------------------
-# publish list
-# ---------------------------------------------------------------------------
-
-
 class TestPublishList:
     def test_list_empty_store(self, runner, tmp_path):
         result = runner.invoke(
@@ -198,14 +176,14 @@ class TestPublishList:
         assert "No publications" in result.output or "publications found" in result.output
 
     def test_list_shows_published_artifacts(self, runner, schema_v2_bundle, publish_target, tmp_path):
-        # Publish first
+
         runner.invoke(
             publish,
             ["run", str(schema_v2_bundle), "--target", str(publish_target)],
             env={"HOME": str(tmp_path), "USERPROFILE": str(tmp_path)},
             catch_exceptions=False,
         )
-        # Then list
+
         result = runner.invoke(
             publish,
             ["list"],
@@ -216,21 +194,16 @@ class TestPublishList:
         assert "tpch" in result.output or "duckdb" in result.output
 
 
-# ---------------------------------------------------------------------------
-# publish show
-# ---------------------------------------------------------------------------
-
-
 class TestPublishShow:
     def test_show_existing_record(self, runner, schema_v2_bundle, publish_target, tmp_path):
-        # Publish and grab the ID from output
+
         runner.invoke(
             publish,
             ["run", str(schema_v2_bundle), "--target", str(publish_target)],
             env={"HOME": str(tmp_path), "USERPROFILE": str(tmp_path)},
             catch_exceptions=False,
         )
-        # Get ID from the store directly (env HOME patched)
+
         store2 = PublicationStore(store_path=tmp_path / ".benchbox" / "published.json")
         records = store2.list_all()
         if not records:
@@ -253,11 +226,6 @@ class TestPublishShow:
             env={"HOME": str(tmp_path), "USERPROFILE": str(tmp_path)},
         )
         assert result.exit_code != 0
-
-
-# ---------------------------------------------------------------------------
-# publish remove
-# ---------------------------------------------------------------------------
 
 
 class TestPublishRemove:
@@ -290,11 +258,6 @@ class TestPublishRemove:
             env={"HOME": str(tmp_path), "USERPROFILE": str(tmp_path)},
         )
         assert result.exit_code != 0
-
-
-# ---------------------------------------------------------------------------
-# Idempotency (w8)
-# ---------------------------------------------------------------------------
 
 
 class TestPublishIdempotency:

@@ -2,8 +2,8 @@
 
 This matrix binds each concurrency claim to the lowest repository layer that can
 falsify it. It does not certify live adapter behavior or an external MCP
-deployment. Those claims require the operator-controlled UAT and production
-evidence named below.
+deployment. Local durable-job tests do not certify TLS termination,
+deployment, rollback, operator response, or a production database adapter.
 
 ## Repository evidence
 
@@ -61,16 +61,6 @@ service equivalence for every platform.
 Live container and cloud evidence belongs to `docs/operations/uat-framework.md`.
 An unsupported classification is a safe product limit, not proof that the
 platform can never support throughput.
-
-## Hosted CI and external acceptance
-
-Hosted CI for this remediation is recorded on its PR and is not pre-certified
-by this document. A local pass and a required-CI pass remain separate evidence.
-
-External MCP production acceptance remains operator-owned under
-`docs/operations/mcp-production-readiness.md` and its evidence record. Local
-durable-job tests do not certify TLS termination, deployment, rollback,
-operator response, or a production database adapter.
 
 ## Known fail-closed boundary
 

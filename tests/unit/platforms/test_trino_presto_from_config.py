@@ -1,15 +1,6 @@
-"""Unit tests for Trino/Presto from_config field mapping.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Pins that from_config carries host/port/catalog/credentials plus the
-engine-specific optional fields (Trino timezone, Presto source) through to
-the constructed adapter, and that unknown keys never leak into __init__.
-from_config always generates a schema from benchmark/scale_factor, so every
-input includes those keys.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 

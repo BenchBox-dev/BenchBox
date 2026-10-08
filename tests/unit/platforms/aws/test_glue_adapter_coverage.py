@@ -1,9 +1,6 @@
-"""Additional coverage tests for AWS Glue adapter - orchestration branches.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -22,13 +19,7 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def _make_client_error(code: str) -> Exception:
-    """Build a minimal mock ClientError with the given error code."""
 
     class _MockClientError(Exception):
         def __init__(self) -> None:
@@ -39,7 +30,6 @@ def _make_client_error(code: str) -> Exception:
 
 
 def _adapter(**extra):
-    """Return a minimally-configured AWSGlueAdapter with all AWS calls mocked."""
     from benchbox.platforms.aws import AWSGlueAdapter
 
     with (
@@ -59,16 +49,8 @@ def _benchmark(*tables: str) -> SimpleNamespace:
     return SimpleNamespace(get_table_names=lambda: list(tables))
 
 
-# ---------------------------------------------------------------------------
-# _get_boto_session branches
-# ---------------------------------------------------------------------------
-
-
 class TestGetBotoSession:
-    """Test the three credential branches in _get_boto_session."""
-
     def test_profile_branch(self) -> None:
-        """When aws_profile is set, Session is created with profile_name."""
         adapter = _adapter(aws_profile="my-profile")
 
         mock_boto3 = MagicMock()
@@ -78,7 +60,6 @@ class TestGetBotoSession:
         mock_boto3.Session.assert_called_once_with(profile_name="my-profile", region_name="us-east-1")
 
     def test_explicit_keys_branch(self) -> None:
-        """When access key + secret key are set, Session uses them."""
         adapter = _adapter(
             aws_access_key_id="AKID123",
             aws_secret_access_key="secret456",
@@ -95,7 +76,6 @@ class TestGetBotoSession:
         )
 
     def test_default_credential_chain(self) -> None:
-        """When no credentials are set, Session uses the default chain."""
         adapter = _adapter()
 
         mock_boto3 = MagicMock()
@@ -105,14 +85,7 @@ class TestGetBotoSession:
         mock_boto3.Session.assert_called_once_with(region_name="us-east-1")
 
 
-# ---------------------------------------------------------------------------
-# _get_glue_client / _get_s3_client lazy caching
-# ---------------------------------------------------------------------------
-
-
 class TestClientCaching:
-    """Clients must be created lazily and cached (single instance)."""
-
     def test_glue_client_is_cached(self) -> None:
         adapter = _adapter()
         mock_client = MagicMock()
@@ -125,7 +98,6 @@ class TestClientCaching:
             c2 = adapter._get_glue_client()
 
         assert c1 is c2
-        # Session.client should only be called once
         assert mock_session.client.call_count == 1
 
     def test_s3_client_is_cached(self) -> None:
@@ -143,14 +115,7 @@ class TestClientCaching:
         assert mock_session.client.call_count == 1
 
 
-# ---------------------------------------------------------------------------
-# create_connection error paths
-# ---------------------------------------------------------------------------
-
-
 class TestCreateConnectionErrors:
-    """Test error handling in create_connection."""
-
     def test_access_denied_raises_configuration_error(self) -> None:
         adapter = _adapter()
 
@@ -176,11 +141,6 @@ class TestCreateConnectionErrors:
                     adapter.create_connection()
 
 
-# ---------------------------------------------------------------------------
-# create_schema - re-raise non-EntityNotFoundException errors
-# ---------------------------------------------------------------------------
-
-
 class TestCreateSchemaNonEntityError:
     def test_non_entity_error_is_reraised(self) -> None:
         adapter = _adapter()
@@ -194,14 +154,7 @@ class TestCreateSchemaNonEntityError:
                     adapter.create_schema(_benchmark(), None)
 
 
-# ---------------------------------------------------------------------------
-# _create_catalog_table format branches
-# ---------------------------------------------------------------------------
-
-
 class TestCreateCatalogTable:
-    """Test file-format dispatch in _create_catalog_table."""
-
     def test_parquet_format_uses_parquet_serde(self) -> None:
         adapter = _adapter()
         mock_glue = MagicMock()
@@ -237,19 +190,13 @@ class TestCreateCatalogTable:
         with patch("benchbox.platforms.aws.glue_adapter.ClientError", type(already_exists)):
             mock_glue.create_table.side_effect = already_exists
             with patch.object(adapter, "_get_glue_client", return_value=mock_glue):
-                # Should not raise
                 adapter._create_catalog_table("orders", "parquet", "s3://b/orders/")
-
-
-# ---------------------------------------------------------------------------
-# load_data - _staging is None branch
-# ---------------------------------------------------------------------------
 
 
 class TestLoadDataStagingNone:
     def test_load_data_with_no_staging_returns_empty_upload(self) -> None:
         adapter = _adapter()
-        adapter._staging = None  # Force the None branch
+        adapter._staging = None
 
         mock_glue = MagicMock()
         with (
@@ -267,16 +214,8 @@ class TestLoadDataStagingNone:
             adapter.load_data(_benchmark("lineitem"), None, "/nonexistent/path")
 
 
-# ---------------------------------------------------------------------------
-# execute_query orchestration
-# ---------------------------------------------------------------------------
-
-
 class TestExecuteQuery:
-    """Test the full execute_query workflow."""
-
     def _setup_execute_mock(self, adapter, status="SUCCEEDED", results=None):
-        """Wire up all the mocks needed for execute_query to run."""
         if results is None:
             results = [{"col": "val"}]
 
@@ -344,11 +283,6 @@ class TestExecuteQuery:
         assert adapter._query_count == 2
 
 
-# ---------------------------------------------------------------------------
-# _ensure_job_exists
-# ---------------------------------------------------------------------------
-
-
 class TestEnsureJobExists:
     def test_returns_cached_job_name_if_set(self) -> None:
         adapter = _adapter()
@@ -391,11 +325,6 @@ class TestEnsureJobExists:
         assert adapter._job_name == job_name
 
 
-# ---------------------------------------------------------------------------
-# _upload_job_script
-# ---------------------------------------------------------------------------
-
-
 class TestUploadJobScript:
     def test_uploads_script_and_returns_s3_path(self) -> None:
         adapter = _adapter()
@@ -410,11 +339,6 @@ class TestUploadJobScript:
         call_kwargs = mock_s3.put_object.call_args[1]
         assert call_kwargs["Bucket"] == "my-bucket"
         assert call_kwargs["ContentType"] == "text/x-python"
-
-
-# ---------------------------------------------------------------------------
-# _submit_job_run
-# ---------------------------------------------------------------------------
 
 
 class TestSubmitJobRun:
@@ -433,11 +357,6 @@ class TestSubmitJobRun:
             JobName="benchbox-test-job",
             Arguments={"--query": "SELECT 1"},
         )
-
-
-# ---------------------------------------------------------------------------
-# _wait_for_job - polling and terminal states
-# ---------------------------------------------------------------------------
 
 
 class TestWaitForJob:
@@ -526,13 +445,7 @@ class TestWaitForJob:
         with patch.object(adapter, "_get_glue_client", return_value=mock_glue):
             adapter._wait_for_job("jr-abc", poll_interval=0)
 
-        # 1 hour * 4 workers = 4.0 DPU-hours
         assert adapter._total_dpu_hours == pytest.approx(4.0)
-
-
-# ---------------------------------------------------------------------------
-# _retrieve_results
-# ---------------------------------------------------------------------------
 
 
 class TestRetrieveResults:
@@ -557,23 +470,17 @@ class TestRetrieveResults:
             results = adapter._retrieve_results("jr-001")
 
         assert results == rows
-        # _SUCCESS file should be skipped
         assert mock_s3.get_object.call_count == 1
 
     def test_returns_empty_list_when_no_contents(self) -> None:
         adapter = _adapter()
         mock_s3 = MagicMock()
-        mock_s3.list_objects_v2.return_value = {}  # no "Contents" key
+        mock_s3.list_objects_v2.return_value = {}
 
         with patch.object(adapter, "_get_s3_client", return_value=mock_s3):
             results = adapter._retrieve_results("jr-empty")
 
         assert results == []
-
-
-# ---------------------------------------------------------------------------
-# apply_tuning with platform config
-# ---------------------------------------------------------------------------
 
 
 class TestApplyTuning:
@@ -594,20 +501,10 @@ class TestApplyTuning:
         assert result["platform_optimizations"] == []
 
 
-# ---------------------------------------------------------------------------
-# get_target_dialect
-# ---------------------------------------------------------------------------
-
-
 class TestGetTargetDialect:
     def test_returns_spark(self) -> None:
         adapter = _adapter()
         assert adapter.get_target_dialect() == "spark"
-
-
-# ---------------------------------------------------------------------------
-# from_config - database provided branch
-# ---------------------------------------------------------------------------
 
 
 class TestFromConfigDatabaseProvided:
@@ -629,11 +526,6 @@ class TestFromConfigDatabaseProvided:
         assert adapter.database == "explicit_db_name"
 
 
-# ---------------------------------------------------------------------------
-# GlueJobStatus extra constants
-# ---------------------------------------------------------------------------
-
-
 class TestGlueJobStatusExtra:
     def test_all_status_constants(self) -> None:
         from benchbox.platforms.aws.glue_adapter import GlueJobStatus
@@ -642,11 +534,6 @@ class TestGlueJobStatusExtra:
         assert GlueJobStatus.STOPPING == "STOPPING"
         assert GlueJobStatus.WAITING == "WAITING"
         assert GlueJobStatus.ERROR == "ERROR"
-
-
-# ---------------------------------------------------------------------------
-# s3_prefix fallback when no path component
-# ---------------------------------------------------------------------------
 
 
 class TestS3PrefixFallback:
@@ -662,11 +549,6 @@ class TestS3PrefixFallback:
 
         assert adapter.s3_bucket == "my-bucket"
         assert adapter.s3_prefix == "benchbox-data"
-
-
-# ---------------------------------------------------------------------------
-# region alias (aws_region)
-# ---------------------------------------------------------------------------
 
 
 class TestRegionAlias:

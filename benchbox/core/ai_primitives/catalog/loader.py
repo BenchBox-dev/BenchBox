@@ -1,9 +1,6 @@
-"""Utilities for loading the AI Primitives benchmark query catalog.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -16,26 +13,11 @@ CATALOG_FILENAME = "queries.yaml"
 
 
 class AICatalogError(RuntimeError):
-    """Raised when the AI Primitives query catalog cannot be loaded or is invalid."""
+    pass
 
 
 @dataclass(frozen=True)
 class AIQuery:
-    """Representation of a single AI query entry.
-
-    Attributes:
-        id: Unique query identifier
-        category: Query category (generative, nlp, transform, embedding)
-        sql: Base SQL query text
-        description: Human-readable description
-        variants: Platform-specific SQL variants {dialect: sql}
-        skip_on: List of platforms where query is not supported
-        model: Default model to use (can be overridden at runtime)
-        estimated_tokens: Estimated input tokens per row
-        batch_size: Recommended batch size for execution
-        cost_per_1k_tokens: Estimated cost per 1000 tokens (USD)
-    """
-
     id: str
     category: str
     sql: str
@@ -50,8 +32,6 @@ class AIQuery:
 
 @dataclass(frozen=True)
 class AICatalog:
-    """Container for the AI query catalog."""
-
     version: int
     queries: dict[str, AIQuery]
 
@@ -173,14 +153,6 @@ def _parse_catalog_entry(index: int, entry: object, existing_ids: set[str]) -> A
 
 
 def load_ai_catalog() -> AICatalog:
-    """Load and validate the AI Primitives query catalog from package resources.
-
-    Returns:
-        AICatalog containing all validated queries
-
-    Raises:
-        AICatalogError: If catalog cannot be loaded or is invalid
-    """
     payload = _load_catalog_payload()
 
     raw_version = payload.get("version", 1)

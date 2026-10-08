@@ -366,6 +366,11 @@ gh api -X POST repos/BenchBox-dev/BenchBox/rulesets \
   -f 'rules[][type]=creation'
 ```
 
+This is a starting point, not the final payload. Restricting the actor list
+further (for example, to a release-bot identity) needs a `bypass_actors` and
+`rules` payload tailored to who should retain the ability to tag. Draft that
+with the admin before applying.
+
 Why this can't be applied by the write-task's own PR: same as the
 soundness-path section above — the develop-PR `GITHUB_TOKEN` has no
 `administration` scope to read or write repository rulesets.
@@ -373,7 +378,9 @@ soundness-path section above — the develop-PR `GITHUB_TOKEN` has no
 Drift detection (landed 2026-07-05, tag-and-pypi-environment-admin-hardening
 w3): `_project/scripts/ruleset_review_enforcement.py` carries a
 `tag_protection_findings()` predicate and an enforced `TAG_RULESET_ENFORCED`
-flag. Feed it the live tag rulesets to check:
+flag. Feed it the live tag rulesets to check. Fetch each ruleset in full,
+because the list endpoint omits conditions and rules, which the predicate
+correctly treats as "not protected":
 
 ```bash
 ids=$(gh api repos/BenchBox-dev/BenchBox/rulesets --jq '.[].id')
@@ -478,7 +485,7 @@ publish paths). Observed on 2026-08-05:
 gh api repos/BenchBox-dev/BenchBox/environments/test-pypi --jq '{name, protection_rules}'
 ```
 
-That empty gate is accepted by design; do not copy the real-PyPI
+The command returns `{"name":"test-pypi","protection_rules":[]}`. That empty gate is accepted by design; do not copy the real-PyPI
 `required_reviewers` rule onto `test-pypi` unless a future policy change
 explicitly wants the same friction on the test path.
 

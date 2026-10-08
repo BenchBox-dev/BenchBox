@@ -1,25 +1,3 @@
-"""TPC-H benchmark reporting and validation module.
-
-This module provides comprehensive reporting capabilities for TPC-H benchmark results,
-including detailed analysis, validation against TPC-H specification requirements,
-and generation of certification-ready reports.
-
-The reporting system supports:
-- Detailed performance analysis and metrics
-- TPC-H specification compliance validation
-- Certification-ready report generation
-- Performance trend analysis
-- Result comparison and regression detection
-- Audit trail generation
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-H specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
-
 import csv
 import re
 import statistics
@@ -78,8 +56,6 @@ def _report_view(result: Any) -> Any:
 
 @dataclass
 class PerformanceMetrics:
-    """Comprehensive performance metrics for TPC-H benchmark."""
-
     power_at_size: float
     throughput_at_size: float
     total_execution_time: float
@@ -91,8 +67,6 @@ class PerformanceMetrics:
 
 @dataclass
 class ValidationResult:
-    """TPC-H specification validation result."""
-
     compliant: bool
     certification_ready: bool
     issues: list[str] = field(default_factory=list)
@@ -102,8 +76,6 @@ class ValidationResult:
 
 @dataclass
 class ComparisonResult:
-    """Result comparison between benchmark runs."""
-
     baseline_power_at_size: float
     current_power_at_size: float
     performance_change: float
@@ -113,18 +85,7 @@ class ComparisonResult:
 
 
 class TPCHReportGenerator:
-    """Comprehensive TPC-H benchmark report generator.
-
-    This class provides detailed reporting capabilities for TPC-H benchmark results,
-    including performance analysis, validation, and certification-ready reports.
-    """
-
     def __init__(self, output_dir: Optional[Union[str, Path]] = None) -> None:
-        """Initialize the report generator.
-
-        Args:
-            output_dir: Directory for generated reports
-        """
         self.output_dir = Path(output_dir) if output_dir else Path.cwd()
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -135,28 +96,14 @@ class TPCHReportGenerator:
         include_detailed_analysis: bool = True,
         include_certification_info: bool = True,
     ) -> Path:
-        """Generate a comprehensive TPC-H benchmark report.
-
-        Args:
-            result: TPC-H benchmark result
-            report_title: Title for the report
-            include_detailed_analysis: Include detailed performance analysis
-            include_certification_info: Include certification information
-
-        Returns:
-            Path to generated report file
-        """
         result = _report_view(result)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         report_file = self.output_dir / f"tpch_comprehensive_report_{timestamp}.html"
 
-        # Calculate performance metrics
         metrics = self._calculate_performance_metrics(result)
 
-        # Perform validation
         validation = self._validate_result(result)
 
-        # Generate HTML report
         html_content = self._generate_html_report(
             result,
             metrics,
@@ -172,14 +119,6 @@ class TPCHReportGenerator:
         return report_file
 
     def generate_certification_report(self, result: TPCHOfficialBenchmarkResult) -> Path:
-        """Generate a certification-ready TPC-H report.
-
-        Args:
-            result: TPC-H benchmark result
-
-        Returns:
-            Path to generated certification report
-        """
         result = _report_view(result)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         report_file = self.output_dir / f"tpch_certification_report_{timestamp}.txt"
@@ -191,14 +130,12 @@ class TPCHReportGenerator:
             f.write("TPC-H BENCHMARK CERTIFICATION REPORT\n")
             f.write("=" * 60 + "\n\n")
 
-            # Executive Summary
             f.write("EXECUTIVE SUMMARY\n")
             f.write("-" * 20 + "\n")
             f.write(f"Scale Factor: {result.scale_factor}\n")
             f.write(f"Certification Ready: {'YES' if validation.certification_ready else 'NO'}\n")
             f.write(f"Specification Compliant: {'YES' if validation.compliant else 'NO'}\n\n")
 
-            # Test Results
             f.write("TEST RESULTS\n")
             f.write("-" * 15 + "\n")
             f.write("Power Test:\n")
@@ -212,7 +149,6 @@ class TPCHReportGenerator:
             f.write(f"  Number of Streams: {result.throughput_test.num_streams}\n")
             f.write(f"  Success: {'YES' if result.throughput_test.success else 'NO'}\n\n")
 
-            # Detailed Metrics
             f.write("DETAILED METRICS\n")
             f.write("-" * 18 + "\n")
             f.write(f"Average Query Time: {metrics.average_query_time:.3f} seconds\n")
@@ -220,7 +156,6 @@ class TPCHReportGenerator:
             f.write(f"Query Time Std Dev: {metrics.query_time_std_dev:.3f} seconds\n")
             f.write(f"Total Execution Time: {metrics.total_execution_time:.2f} seconds\n\n")
 
-            # Validation Results
             f.write("VALIDATION RESULTS\n")
             f.write("-" * 20 + "\n")
             if validation.issues:
@@ -241,7 +176,6 @@ class TPCHReportGenerator:
                     f.write(f"  - {rec}\n")
                 f.write("\n")
 
-            # Query-Level Details
             f.write("QUERY-LEVEL PERFORMANCE\n")
             f.write("-" * 25 + "\n")
             f.write("Query ID | Execution Time (s) | Relative Performance\n")
@@ -251,7 +185,6 @@ class TPCHReportGenerator:
                 relative_perf = query_time / metrics.average_query_time
                 f.write(f"{query_id:8} | {query_time:16.3f} | {relative_perf:16.2f}\n")
 
-            # Certification Statement
             f.write("\nCERTIFICATION STATEMENT\n")
             f.write("-" * 25 + "\n")
             if validation.certification_ready:
@@ -265,14 +198,6 @@ class TPCHReportGenerator:
         return report_file
 
     def generate_performance_csv(self, result: TPCHOfficialBenchmarkResult) -> Path:
-        """Generate CSV file with detailed performance data.
-
-        Args:
-            result: TPC-H benchmark result
-
-        Returns:
-            Path to generated CSV file
-        """
         result = _report_view(result)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         csv_file = self.output_dir / f"tpch_performance_data_{timestamp}.csv"
@@ -280,7 +205,6 @@ class TPCHReportGenerator:
         with open(csv_file, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
 
-            # Write header
             writer.writerow(
                 [
                     "Query_ID",
@@ -291,10 +215,8 @@ class TPCHReportGenerator:
                 ]
             )
 
-            # Calculate average for relative performance
             avg_time = statistics.mean(result.power_test.query_times.values())
 
-            # Write query data
             for query_id, query_time in sorted(result.power_test.query_times.items()):
                 relative_perf = query_time / avg_time
                 query_type = self._classify_query_type(query_id)
@@ -302,7 +224,6 @@ class TPCHReportGenerator:
 
                 writer.writerow([query_id, query_time, relative_perf, query_type, complexity])
 
-            # Write summary data
             writer.writerow([])
             writer.writerow(["SUMMARY"])
             writer.writerow(["Metric", "Value"])
@@ -319,19 +240,8 @@ class TPCHReportGenerator:
         current_result: TPCHOfficialBenchmarkResult,
         significance_threshold: float = 0.05,
     ) -> ComparisonResult:
-        """Compare two benchmark results for performance changes.
-
-        Args:
-            baseline_result: Baseline benchmark result
-            current_result: Current benchmark result
-            significance_threshold: Threshold for significant change detection
-
-        Returns:
-            ComparisonResult with detailed comparison analysis
-        """
         baseline_result = _report_view(baseline_result)
         current_result = _report_view(current_result)
-        # Calculate overall performance change
         baseline_power = baseline_result.power_test.power_at_size
         current_power = current_result.power_test.power_at_size
 
@@ -344,7 +254,6 @@ class TPCHReportGenerator:
             relative_change = 0.0
             significant_change = False
 
-        # Calculate query-level changes
         query_changes = {}
         for query_id in range(1, 23):
             baseline_time = baseline_result.power_test.query_times.get(query_id, 0)
@@ -369,16 +278,6 @@ class TPCHReportGenerator:
         current_result: TPCHOfficialBenchmarkResult,
         report_title: str = "TPC-H Performance Comparison",
     ) -> Path:
-        """Generate a comparison report between two benchmark results.
-
-        Args:
-            baseline_result: Baseline benchmark result
-            current_result: Current benchmark result
-            report_title: Title for the comparison report
-
-        Returns:
-            Path to generated comparison report
-        """
         baseline_result = _report_view(baseline_result)
         current_result = _report_view(current_result)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -386,7 +285,6 @@ class TPCHReportGenerator:
 
         comparison = self.compare_results(baseline_result, current_result)
 
-        # Generate HTML comparison report
         html_content = self._generate_comparison_html(baseline_result, current_result, comparison, report_title)
 
         with open(report_file, "w", encoding="utf-8") as f:
@@ -395,11 +293,9 @@ class TPCHReportGenerator:
         return report_file
 
     def _calculate_performance_metrics(self, result: TPCHOfficialBenchmarkResult) -> PerformanceMetrics:
-        """Calculate comprehensive performance metrics."""
         query_times = list(result.power_test.query_times.values())
 
         if not query_times:
-            # Return default metrics if no query times available
             return PerformanceMetrics(
                 power_at_size=result.power_test.power_at_size,
                 throughput_at_size=result.throughput_test.throughput_at_size,
@@ -425,7 +321,6 @@ class TPCHReportGenerator:
         )
 
     def _validate_result(self, result: TPCHOfficialBenchmarkResult) -> ValidationResult:
-        """Validate benchmark result against TPC-H specification."""
         issues = self._check_basic_requirements(result)
         warnings = self._check_execution_warnings(result)
         recommendations = self._generate_recommendations(result)
@@ -442,7 +337,6 @@ class TPCHReportGenerator:
         )
 
     def _check_basic_requirements(self, result: TPCHOfficialBenchmarkResult) -> list[str]:
-        """Check basic TPC-H compliance requirements."""
         issues = []
         if not result.success:
             issues.append("Benchmark did not complete successfully")
@@ -457,14 +351,12 @@ class TPCHReportGenerator:
         return issues
 
     def _check_execution_warnings(self, result: TPCHOfficialBenchmarkResult) -> list[str]:
-        """Check for execution time warnings and query outliers."""
         warnings = []
         if result.power_test.total_time < 10:
             warnings.append("Power Test execution time seems unusually fast")
         if result.throughput_test.total_time < 10:
             warnings.append("Throughput Test execution time seems unusually fast")
 
-        # Check for query time outliers
         if result.power_test.query_times:
             query_times = list(result.power_test.query_times.values())
             avg_time = statistics.mean(query_times)
@@ -476,7 +368,6 @@ class TPCHReportGenerator:
         return warnings
 
     def _generate_recommendations(self, result: TPCHOfficialBenchmarkResult) -> list[str]:
-        """Generate improvement recommendations."""
         recommendations = []
         if result.throughput_test.num_streams < 2:
             recommendations.append("Consider using more streams in Throughput Test for better performance measurement")
@@ -485,8 +376,6 @@ class TPCHReportGenerator:
         return recommendations
 
     def _classify_query_type(self, query_id: int) -> str:
-        """Classify query type based on TPC-H query characteristics."""
-        # Simplified classification based on TPC-H query patterns
         if query_id in [1, 6, 10, 14, 15, 19]:
             return "Pricing_Summary"
         elif query_id in [2, 4, 17, 20]:
@@ -501,8 +390,6 @@ class TPCHReportGenerator:
             return "Mixed"
 
     def _calculate_query_complexity(self, query_id: int) -> int:
-        """Calculate query complexity score (1-10) based on TPC-H query characteristics."""
-        # Simplified complexity scoring based on typical TPC-H query patterns
         complexity_map = {
             1: 3,
             2: 7,
@@ -538,7 +425,6 @@ class TPCHReportGenerator:
         include_detailed_analysis: bool,
         include_certification_info: bool,
     ) -> str:
-        """Generate HTML report content."""
         safe_title = html_escape(str(title), quote=True)
         html = f"""
 <!DOCTYPE html>
@@ -657,7 +543,6 @@ class TPCHReportGenerator:
         comparison: ComparisonResult,
         title: str,
     ) -> str:
-        """Generate HTML comparison report."""
         safe_title = html_escape(str(title), quote=True)
         change_class = "success" if comparison.relative_change > 0 else "error"
 

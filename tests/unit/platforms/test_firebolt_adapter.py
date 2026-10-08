@@ -1,14 +1,6 @@
-"""Tests for Firebolt platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the FireboltAdapter for both Firebolt Core (local Docker) and Firebolt Cloud modes.
-
-Firebolt Core is a free, self-hosted version that runs locally via Docker with the
-same distributed, vectorized query engine as the cloud version.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import tempfile
 from pathlib import Path
@@ -26,10 +18,7 @@ pytestmark = [
 
 
 class TestFireboltAdapterInitialization:
-    """Test Firebolt adapter initialization and configuration."""
-
     def test_initialization_core_mode_with_url(self):
-        """Test initialization in Core mode with explicit URL."""
         try:
             adapter = FireboltAdapter(
                 url="http://localhost:3473",
@@ -45,7 +34,6 @@ class TestFireboltAdapterInitialization:
         assert adapter.get_target_dialect() == "postgres"
 
     def test_initialization_core_mode_default(self):
-        """Test initialization defaults to Core mode."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -56,7 +44,6 @@ class TestFireboltAdapterInitialization:
         assert adapter.database == "benchbox"
 
     def test_initialization_cloud_mode(self):
-        """Test initialization in Cloud mode with credentials."""
         try:
             adapter = FireboltAdapter(
                 client_id="test_client_id",
@@ -77,7 +64,6 @@ class TestFireboltAdapterInitialization:
         assert adapter.platform_name == "Firebolt (Cloud)"
 
     def test_initialization_cloud_mode_with_api_endpoint(self):
-        """Test Cloud mode with custom API endpoint."""
         try:
             adapter = FireboltAdapter(
                 client_id="test_client_id",
@@ -93,7 +79,6 @@ class TestFireboltAdapterInitialization:
         assert adapter.api_endpoint == "custom.api.firebolt.io"
 
     def test_initialization_default_api_endpoint(self):
-        """Test default API endpoint for Cloud mode."""
         try:
             adapter = FireboltAdapter(
                 client_id="test_client_id",
@@ -107,7 +92,6 @@ class TestFireboltAdapterInitialization:
         assert adapter.api_endpoint == "api.app.firebolt.io"
 
     def test_initialization_invalid_mode(self):
-        """Invalid explicit mode should raise a clear error."""
         try:
             with pytest.raises(ValueError):
                 FireboltAdapter(deployment_mode="invalid")
@@ -115,7 +99,6 @@ class TestFireboltAdapterInitialization:
             pytest.skip("Firebolt SDK not installed")
 
     def test_initialization_ambiguous_configuration(self):
-        """Providing both core URL and cloud credentials without a mode is ambiguous."""
         try:
             with pytest.raises(ValueError):
                 FireboltAdapter(
@@ -127,7 +110,6 @@ class TestFireboltAdapterInitialization:
             pytest.skip("Firebolt SDK not installed")
 
     def test_initialization_missing_cloud_fields(self):
-        """Cloud mode should require all mandatory fields."""
         from benchbox.core.exceptions import ConfigurationError
 
         try:
@@ -137,17 +119,13 @@ class TestFireboltAdapterInitialization:
                     client_id="id",
                     client_secret="secret",
                     account_name="acct",
-                    # engine_name missing
                 )
         except ImportError:
             pytest.skip("Firebolt SDK not installed")
 
 
 class TestFireboltConnectionParameters:
-    """Test connection parameter handling."""
-
     def test_get_connection_params_core_mode(self):
-        """Test connection parameters for Core mode."""
         try:
             adapter = FireboltAdapter(
                 url="http://localhost:3473",
@@ -162,11 +140,10 @@ class TestFireboltConnectionParameters:
 
         assert params["url"] == "http://localhost:3473"
         assert params["database"] == "test_db"
-        assert "auth" in params  # Core mode requires FireboltCore auth
+        assert "auth" in params
         assert "account_name" not in params
 
     def test_get_connection_params_cloud_mode(self):
-        """Test connection parameters for Cloud mode."""
         try:
             adapter = FireboltAdapter(
                 client_id="test_client_id",
@@ -189,10 +166,7 @@ class TestFireboltConnectionParameters:
 
 
 class TestFireboltConnection:
-    """Test connection creation and management."""
-
     def test_create_connection_core_mode(self):
-        """Test connection creation for Core mode."""
         try:
             adapter = FireboltAdapter(
                 url="http://localhost:3473",
@@ -212,7 +186,6 @@ class TestFireboltConnection:
         ):
             connection = adapter.create_connection()
 
-        # Core mode uses 'url' (not 'engine_url') and requires FireboltCore auth
         call_kwargs = mock_connect.call_args.kwargs
         assert call_kwargs["url"] == "http://localhost:3473"
         assert call_kwargs["database"] == "test_db"
@@ -224,7 +197,6 @@ class TestFireboltConnection:
         mock_cursor.close.assert_called_once()
 
     def test_create_connection_cloud_mode(self):
-        """Test connection creation for Cloud mode."""
         try:
             adapter = FireboltAdapter(
                 client_id="test_client_id",
@@ -251,7 +223,6 @@ class TestFireboltConnection:
         mock_connect.assert_called_once()
 
     def test_close_connection(self):
-        """Test connection closing."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -264,17 +235,14 @@ class TestFireboltConnection:
         mock_connection.close.assert_called_once()
 
     def test_close_connection_none(self):
-        """Test closing None connection doesn't raise."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
             pytest.skip("Firebolt SDK not installed")
 
-        # Should not raise
         adapter.close_connection(None)
 
     def test_test_connection_success(self):
-        """Test successful connection test."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -294,7 +262,6 @@ class TestFireboltConnection:
         mock_connection.close.assert_called_once()
 
     def test_test_connection_failure(self):
-        """Test failed connection test."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -307,10 +274,7 @@ class TestFireboltConnection:
 
 
 class TestFireboltSchemaOperations:
-    """Test schema creation and management."""
-
     def test_create_schema(self):
-        """Test schema creation with Firebolt table definitions."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -339,7 +303,6 @@ class TestFireboltSchemaOperations:
         mock_cursor.close.assert_called_once()
 
     def test_optimize_table_definition_varchar_to_text(self):
-        """Test VARCHAR to TEXT conversion for Firebolt."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -352,7 +315,6 @@ class TestFireboltSchemaOperations:
         assert "TEXT" in optimized
 
     def test_optimize_table_definition_decimal_to_numeric(self):
-        """Test DECIMAL to NUMERIC conversion for Firebolt."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -363,10 +325,9 @@ class TestFireboltSchemaOperations:
 
         assert "DECIMAL" not in optimized
         assert "NUMERIC" in optimized
-        assert "(10,2)" in optimized  # Preserve precision/scale
+        assert "(10,2)" in optimized
 
     def test_optimize_table_definition_removes_primary_key(self):
-        """Test PRIMARY KEY constraint removal."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -378,7 +339,6 @@ class TestFireboltSchemaOperations:
         assert "PRIMARY KEY" not in optimized
 
     def test_optimize_table_definition_removes_foreign_key(self):
-        """Test FOREIGN KEY constraint removal."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -391,7 +351,6 @@ class TestFireboltSchemaOperations:
         assert "REFERENCES" not in optimized
 
     def test_normalize_table_name_in_sql(self):
-        """Test table name normalization to lowercase."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -403,7 +362,6 @@ class TestFireboltSchemaOperations:
         assert "CREATE TABLE customer" in normalized
 
     def test_extract_table_name(self):
-        """Test table name extraction from CREATE statement."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -415,7 +373,6 @@ class TestFireboltSchemaOperations:
         assert table_name == "customer"
 
     def test_extract_table_name_if_not_exists(self):
-        """Test table name extraction with IF NOT EXISTS."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -428,10 +385,7 @@ class TestFireboltSchemaOperations:
 
 
 class TestFireboltDataLoading:
-    """Test data loading functionality."""
-
     def test_load_data_csv(self):
-        """Test loading CSV data."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -443,7 +397,6 @@ class TestFireboltDataLoading:
 
         mock_benchmark = Mock()
 
-        # Create temporary test file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
             f.write("1,test1\n2,test2\n")
             temp_path = Path(f.name)
@@ -459,7 +412,6 @@ class TestFireboltDataLoading:
             assert "test_table" in table_stats
             assert table_stats["test_table"] == 2
 
-            # Should execute parameterized INSERT commands
             assert mock_cursor.executemany.called
             insert_sql, rows = mock_cursor.executemany.call_args[0]
             assert insert_sql.startswith('INSERT INTO "test_table" VALUES')
@@ -469,7 +421,6 @@ class TestFireboltDataLoading:
             temp_path.unlink()
 
     def test_load_data_tbl_files(self):
-        """Test loading pipe-delimited .tbl files (TPC format)."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -481,7 +432,6 @@ class TestFireboltDataLoading:
 
         mock_benchmark = Mock()
 
-        # Create temporary test file with pipe delimiter
         with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False, encoding="utf-8") as f:
             f.write("1|test1|\n2|test2|\n")
             temp_path = Path(f.name)
@@ -502,7 +452,6 @@ class TestFireboltDataLoading:
             temp_path.unlink()
 
     def test_load_data_escapes_quotes(self):
-        """Test proper escaping of single quotes in data."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -514,7 +463,6 @@ class TestFireboltDataLoading:
 
         mock_benchmark = Mock()
 
-        # Create file with single quotes in data
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
             f.write("1,test's data\n")
             temp_path = Path(f.name)
@@ -524,7 +472,6 @@ class TestFireboltDataLoading:
 
             adapter.load_data(mock_benchmark, mock_connection, Path("/tmp"))
 
-            # Verify quotes are handled via parameterization (value should be intact)
             _, rows = mock_cursor.executemany.call_args[0]
             assert rows == [("1", "test's data")]
 
@@ -533,10 +480,7 @@ class TestFireboltDataLoading:
 
 
 class TestFireboltQueryExecution:
-    """Test query execution functionality."""
-
     def test_execute_query_success(self):
-        """Test successful query execution."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -559,7 +503,6 @@ class TestFireboltQueryExecution:
         mock_cursor.close.assert_called_once()
 
     def test_execute_query_failure(self):
-        """Test query execution failure."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -581,7 +524,6 @@ class TestFireboltQueryExecution:
         mock_cursor.close.assert_called_once()
 
     def test_execute_query_empty_result(self):
-        """Test query execution with empty result."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -600,7 +542,6 @@ class TestFireboltQueryExecution:
         assert result["first_row"] is None
 
     def test_get_query_plan(self):
-        """Test query plan retrieval."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -622,10 +563,7 @@ class TestFireboltQueryExecution:
 
 
 class TestFireboltPlatformInfo:
-    """Test platform information retrieval."""
-
     def test_get_platform_info_core_mode(self):
-        """Test platform info for Core mode."""
         try:
             adapter = FireboltAdapter(
                 url="http://localhost:3473",
@@ -648,7 +586,6 @@ class TestFireboltPlatformInfo:
         assert platform_info["configuration"]["database"] == "test_db"
 
     def test_get_platform_info_cloud_mode(self):
-        """Test platform info for Cloud mode."""
         try:
             adapter = FireboltAdapter(
                 client_id="test_client_id",
@@ -674,7 +611,6 @@ class TestFireboltPlatformInfo:
         assert platform_info["engine_name"] == "test_engine"
 
     def test_get_platform_info_no_connection(self):
-        """Test platform info without connection."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -687,10 +623,7 @@ class TestFireboltPlatformInfo:
 
 
 class TestFireboltTuning:
-    """Test tuning and optimization functionality."""
-
     def test_configure_for_benchmark_olap(self):
-        """Test OLAP benchmark configuration."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -698,11 +631,9 @@ class TestFireboltTuning:
 
         mock_connection = Mock()
 
-        # Should not raise
         adapter.configure_for_benchmark(mock_connection, "olap")
 
     def test_supports_tuning_type(self):
-        """Test tuning type support checking."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -714,13 +645,10 @@ class TestFireboltTuning:
             mock_tuning_type.DISTRIBUTION = "distribution"
 
             assert adapter.supports_tuning_type(mock_tuning_type.PARTITIONING) is True
-            # Firebolt supports distribution via PRIMARY INDEX
             assert adapter.supports_tuning_type(mock_tuning_type.DISTRIBUTION) is True
-            # Firebolt doesn't support sorting as a tuning type
             assert adapter.supports_tuning_type(mock_tuning_type.SORTING) is False
 
     def test_generate_tuning_clause_with_partitioning(self):
-        """Test tuning clause generation with partitioning."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -749,7 +677,6 @@ class TestFireboltTuning:
             assert "event_date" in clause
 
     def test_generate_tuning_clause_none(self):
-        """Test tuning clause generation with None input."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -759,7 +686,6 @@ class TestFireboltTuning:
         assert clause == ""
 
     def test_apply_constraint_configuration(self):
-        """Test constraint configuration (informational only in Firebolt)."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -771,15 +697,11 @@ class TestFireboltTuning:
         mock_foreign_key_config = Mock()
         mock_foreign_key_config.enabled = True
 
-        # Should not raise - constraints are informational only
         adapter.apply_constraint_configuration(mock_primary_key_config, mock_foreign_key_config, mock_connection)
 
 
 class TestFireboltFromConfig:
-    """Test from_config() factory method."""
-
     def test_from_config_core_mode(self):
-        """Test from_config() for Core mode."""
         config = {
             "url": "http://localhost:3473",
             "database": "test_db",
@@ -796,7 +718,6 @@ class TestFireboltFromConfig:
         assert adapter.url == "http://localhost:3473"
 
     def test_from_config_cloud_mode(self):
-        """Test from_config() for Cloud mode."""
         config = {
             "client_id": "test_client_id",
             "client_secret": "test_client_secret",
@@ -819,7 +740,6 @@ class TestFireboltFromConfig:
         assert adapter.database == "cloud_db"
 
     def test_from_config_generates_database_name(self):
-        """Test from_config() generates database name from benchmark config."""
         config = {
             "url": "http://localhost:3473",
             "benchmark": "tpch",
@@ -831,37 +751,29 @@ class TestFireboltFromConfig:
         except ImportError:
             pytest.skip("Firebolt SDK not installed")
 
-        # Database name should be generated from benchmark config
         assert adapter.database is not None
         assert "tpch" in adapter.database.lower() or "sf10" in adapter.database.lower()
 
 
 class TestFireboltDatabaseOperations:
-    """Test database existence checking and dropping."""
-
     def test_check_server_database_exists_core_mode(self):
-        """Test database existence check in Core mode returns False (implicit creation)."""
         try:
             adapter = FireboltAdapter(url="http://localhost:3473")
         except ImportError:
             pytest.skip("Firebolt SDK not installed")
 
-        # Core mode always returns False (databases created implicitly)
         result = adapter.check_server_database_exists()
         assert result is False
 
     def test_drop_database_core_mode(self):
-        """Test drop database in Core mode is a no-op."""
         try:
             adapter = FireboltAdapter(url="http://localhost:3473")
         except ImportError:
             pytest.skip("Firebolt SDK not installed")
 
-        # Should not raise
         adapter.drop_database(database="test_db")
 
     def test_check_server_database_exists_closes_on_error(self):
-        """Ensure connections are closed even when errors occur."""
         try:
             adapter = FireboltAdapter(
                 client_id="id",
@@ -885,7 +797,6 @@ class TestFireboltDatabaseOperations:
         mock_conn.close.assert_called_once()
 
     def test_get_existing_tables(self):
-        """Test getting list of existing tables."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -898,15 +809,12 @@ class TestFireboltDatabaseOperations:
 
         tables = adapter._get_existing_tables(mock_connection)
 
-        assert tables == ["table1", "table2", "table3"]  # All lowercase
+        assert tables == ["table1", "table2", "table3"]
         mock_cursor.execute.assert_called_with("SHOW TABLES")
 
 
 class TestFireboltDialect:
-    """Test SQL dialect handling."""
-
     def test_target_dialect_is_postgres(self):
-        """Test that Firebolt uses PostgreSQL-compatible dialect."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -917,10 +825,7 @@ class TestFireboltDialect:
 
 
 class TestFireboltAnalyze:
-    """Test table analysis functionality."""
-
     def test_analyze_table_skipped(self):
-        """Test that ANALYZE is skipped (Firebolt collects stats automatically)."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -930,18 +835,13 @@ class TestFireboltAnalyze:
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        # ANALYZE should not be called - Firebolt collects stats automatically
         adapter.analyze_table(mock_connection, "test_table")
 
-        # No execute call should be made
         mock_cursor.execute.assert_not_called()
 
 
 class TestFireboltResultCacheControl:
-    """Test result cache control functionality."""
-
     def test_disable_result_cache_cloud_mode(self):
-        """Test result cache is disabled in Cloud mode."""
         try:
             adapter = FireboltAdapter(
                 client_id="test_client_id",
@@ -963,7 +863,6 @@ class TestFireboltResultCacheControl:
         mock_cursor.close.assert_called_once()
 
     def test_disable_result_cache_core_mode_skipped(self):
-        """Test result cache control is skipped in Core mode."""
         try:
             adapter = FireboltAdapter(
                 url="http://localhost:3473",
@@ -978,11 +877,9 @@ class TestFireboltResultCacheControl:
 
         adapter._disable_result_cache(mock_connection)
 
-        # Should not attempt to disable cache in Core mode
         mock_cursor.execute.assert_not_called()
 
     def test_validate_session_cache_control_disabled(self):
-        """Test cache validation when cache is disabled."""
         try:
             adapter = FireboltAdapter(
                 client_id="test_client_id",
@@ -1004,7 +901,6 @@ class TestFireboltResultCacheControl:
         mock_cursor.execute.assert_called_with("SHOW enable_result_cache")
 
     def test_validate_session_cache_control_enabled_warning(self):
-        """Test cache validation warns when cache is still enabled."""
         try:
             adapter = FireboltAdapter(
                 client_id="test_client_id",
@@ -1026,7 +922,6 @@ class TestFireboltResultCacheControl:
         assert result is False
 
     def test_validate_session_cache_control_core_mode(self):
-        """Test cache validation always passes in Core mode."""
         try:
             adapter = FireboltAdapter(
                 url="http://localhost:3473",
@@ -1041,7 +936,6 @@ class TestFireboltResultCacheControl:
         assert result is True
 
     def test_initialization_with_benchmark_options(self):
-        """Test initialization with disable_result_cache and strict_validation."""
         try:
             adapter = FireboltAdapter(
                 url="http://localhost:3473",
@@ -1056,11 +950,8 @@ class TestFireboltResultCacheControl:
 
 
 class TestFireboltAdminConnection:
-    """Test admin connection functionality."""
-
     @patch("benchbox.platforms.firebolt.firebolt_connect")
     def test_create_admin_connection_core_mode(self, mock_connect):
-        """Test admin connection in Core mode."""
         try:
             adapter = FireboltAdapter(
                 url="http://localhost:3473",
@@ -1076,13 +967,11 @@ class TestFireboltAdminConnection:
 
         assert conn == mock_conn
         mock_connect.assert_called_once()
-        # Core mode uses the same database
         call_kwargs = mock_connect.call_args[1]
         assert call_kwargs["database"] == "test_db"
 
     @patch("benchbox.platforms.firebolt.firebolt_connect")
     def test_create_admin_connection_cloud_mode(self, mock_connect):
-        """Test admin connection in Cloud mode uses information_schema."""
         try:
             adapter = FireboltAdapter(
                 client_id="test_client_id",
@@ -1101,16 +990,12 @@ class TestFireboltAdminConnection:
 
         assert conn == mock_conn
         mock_connect.assert_called_once()
-        # Cloud mode connects to information_schema for admin ops
         call_kwargs = mock_connect.call_args[1]
         assert call_kwargs["database"] == "information_schema"
 
 
 class TestFireboltPlatformMetadata:
-    """Test platform metadata collection."""
-
     def test_get_platform_metadata_core_mode(self):
-        """Test metadata collection in Core mode."""
         try:
             adapter = FireboltAdapter(
                 url="http://localhost:3473",
@@ -1132,7 +1017,6 @@ class TestFireboltPlatformMetadata:
         assert metadata["version"] == "3.0.0"
 
     def test_get_platform_metadata_cloud_mode(self):
-        """Test metadata collection in Cloud mode."""
         try:
             adapter = FireboltAdapter(
                 client_id="test_client_id",
@@ -1147,8 +1031,8 @@ class TestFireboltPlatformMetadata:
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
         mock_cursor.fetchone.side_effect = [
-            ("3.0.0",),  # version query
-            ("test_engine", "GENERAL_PURPOSE", "RUNNING"),  # engine info
+            ("3.0.0",),
+            ("test_engine", "GENERAL_PURPOSE", "RUNNING"),
         ]
 
         metadata = adapter._get_platform_metadata(mock_connection)
@@ -1160,10 +1044,7 @@ class TestFireboltPlatformMetadata:
 
 
 class TestFireboltTuningDistribution:
-    """Test DISTRIBUTION -> PRIMARY INDEX tuning support."""
-
     def test_supports_distribution_tuning_type(self):
-        """Test that DISTRIBUTION tuning type is supported (maps to PRIMARY INDEX)."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -1175,7 +1056,6 @@ class TestFireboltTuningDistribution:
         assert adapter.supports_tuning_type(TuningType.PARTITIONING) is True
 
     def test_generate_tuning_clause_with_distribution(self):
-        """Test tuning clause generation with DISTRIBUTION -> PRIMARY INDEX."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -1196,7 +1076,6 @@ class TestFireboltTuningDistribution:
         assert "PRIMARY INDEX (order_id, customer_id)" in clause
 
     def test_generate_tuning_clause_with_distribution_and_partitioning(self):
-        """Test tuning clause with both DISTRIBUTION (PRIMARY INDEX) and PARTITION BY."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -1221,10 +1100,7 @@ class TestFireboltTuningDistribution:
 
 
 class TestFireboltFromConfigOptions:
-    """Test from_config with new options."""
-
     def test_from_config_with_benchmark_options(self):
-        """Test from_config passes disable_result_cache and strict_validation."""
         config = {
             "benchmark": "tpch",
             "scale_factor": 1.0,
@@ -1242,16 +1118,8 @@ class TestFireboltFromConfigOptions:
         assert adapter.strict_validation is True
 
 
-# ---------------------------------------------------------------------------
-# Data loading - _resolve_data_files DataSourceResolver delegation
-# ---------------------------------------------------------------------------
-
-
 class TestFireboltDataLoading:
-    """Tests for _resolve_data_files DataSourceResolver delegation."""
-
     def test_resolve_data_files_returns_path_mapping(self, tmp_path):
-        """_resolve_data_files delegates to DataSourceResolver and normalizes DataSource paths."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -1273,15 +1141,11 @@ class TestFireboltDataLoading:
 
         assert "orders" in result.tables
         assert all(isinstance(p, Path) for p in result.tables["orders"])
-        # Manifest metadata must survive Path normalization so resolve_csv_dialect
-        # still sees it on the downstream INSERT/COPY paths.
         assert result.table_metadata == {"orders": {"csv_delimiter": ","}}
-        # Resolver-owned DataSource must not be mutated.
         assert all(isinstance(p, str) for p in resolver_data_source.tables["orders"])
         assert mock_cls.call_args.kwargs.get("platform_name") == adapter.platform_name
 
     def test_resolve_data_files_raises_when_resolver_returns_none(self, tmp_path):
-        """_resolve_data_files raises ValueError when DataSourceResolver returns None."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -1296,7 +1160,6 @@ class TestFireboltDataLoading:
                 adapter._resolve_data_files(Mock(), tmp_path)
 
     def test_resolve_data_files_raises_when_tables_empty(self, tmp_path):
-        """_resolve_data_files raises ValueError when resolver returns empty tables."""
         try:
             adapter = FireboltAdapter()
         except ImportError:
@@ -1311,7 +1174,6 @@ class TestFireboltDataLoading:
                 adapter._resolve_data_files(Mock(), tmp_path)
 
     def test_resolve_data_files_uses_adapter_platform_name(self, tmp_path):
-        """DataSourceResolver receives self.platform_name from the Firebolt adapter."""
         try:
             adapter = FireboltAdapter()
         except ImportError:

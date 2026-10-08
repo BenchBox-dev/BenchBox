@@ -1,12 +1,6 @@
-"""ClickBench DataFrame query implementations.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-All 43 ClickBench queries implemented for both Expression and Pandas families.
-All queries operate on a single flat 'hits' table (no joins).
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -28,10 +22,6 @@ def _hits(ctx: DataFrameContext) -> Any:
 
 def _expr_july_mask(ctx: DataFrameContext, start: str = _DATE_FROM, end: str = _DATE_TO) -> Any:
     col, lit = ctx.col, ctx.lit
-    # EventDate is a Date column; compare against native date literals. Comparing a
-    # date column to a string literal raises in Polars ("cannot compare
-    # date/datetime to a string value"), unlike the SQL reference where the string
-    # is parsed as a date.
     start_date, end_date = date.fromisoformat(start), date.fromisoformat(end)
     return (col("CounterID") == lit(62)) & (col("EventDate") >= lit(start_date)) & (col("EventDate") <= lit(end_date))
 
@@ -53,9 +43,6 @@ def _expr_filter(ctx: DataFrameContext, hits: Any, code: str) -> Any:
     if code == "google_title":
         return hits.filter(
             (col("Title").str.contains(lit("Google")))
-            # Regex-escaped: UnifiedStrExpr.contains is regex on every
-            # expression backend while the pandas twin matches regex=False,
-            # so the dots in ".google." must not act as wildcards.
             & (~col("URL").str.contains(lit("\\.google\\.")))
             & (col("SearchPhrase") != lit(""))
         )
@@ -329,7 +316,6 @@ def _make_select_pandas(filter_code: str, sort_spec: str, limit_spec: str, selec
 
 
 def q28_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q28: AVG URL length by CounterID with HAVING > 100000."""
     col, lit = ctx.col, ctx.lit
     return (
         _hits(ctx)
@@ -344,7 +330,6 @@ def q28_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q28_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q28: AVG URL length by CounterID with HAVING > 100000."""
     filtered = _hits(ctx)[_hits(ctx)["URL"] != ""].copy()
     filtered["url_len"] = filtered["URL"].str.len()
     grouped = filtered.groupby(["CounterID"], as_index=False).agg(l=("url_len", "mean"), c=("url_len", "count"))
@@ -352,7 +337,6 @@ def q28_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q29_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q29: Domain extraction from Referer via regex, with HAVING > 100000."""
     col, lit = ctx.col, ctx.lit
     return (
         _hits(ctx)
@@ -370,7 +354,6 @@ def q29_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q29_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q29: Domain extraction from Referer via regex, with HAVING > 100000."""
     filtered = _hits(ctx)[_hits(ctx)["Referer"] != ""].copy()
     filtered["k"] = filtered["Referer"].str.replace(r"^https?://(?:www\.)?([^/]+)/.*$", r"\1", regex=True)
     filtered["ref_len"] = filtered["Referer"].str.len()
@@ -381,13 +364,11 @@ def q29_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q30_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q30: Wide aggregation - SUM(ResolutionWidth + N) for N=0..89."""
     col, lit = ctx.col, ctx.lit
     return _hits(ctx).select(*[(col("ResolutionWidth") + lit(i)).sum().alias(f"sum_{i}") for i in range(90)])
 
 
 def q30_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q30: Wide aggregation - SUM(ResolutionWidth + N) for N=0..89."""
     import pandas as pd
 
     base = _hits(ctx)["ResolutionWidth"]

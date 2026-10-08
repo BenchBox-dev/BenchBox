@@ -1,12 +1,3 @@
-/**
- * The corpus overview at /results/.
- *
- * The ranking table and its filters moved to the compare route, so this page's
- * claim is narrower: what the corpus holds, what arrived last, and where to go
- * to rank runs against each other. These tests pin that it answers those
- * without reintroducing a filter.
- */
-
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -143,7 +134,6 @@ describe("Overview", () => {
   it("shows power score in recent results only when a power score is present", async () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Recent results")).toBeTruthy());
-    // RESULT_ROWS carries one non-null power_score (r3), so the column shows.
     expect(screen.getByText("Power score")).toBeTruthy();
 
     const withoutPower = RESULT_ROWS.map((row) => ({ ...row, power_score: null }));

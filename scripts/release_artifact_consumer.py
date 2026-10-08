@@ -31,14 +31,10 @@ MAX_PAYLOAD_BYTES = 256 * 1024 * 1024
 DOWNLOAD_TIMEOUT_SECONDS = 60.0
 Api = Callable[[str], dict[str, Any]]
 
-# The only variables a Git or verifier child inherits. Every credential, Git configuration
-# injection variable, and Python setting is dropped; only the transport receives credentials.
 _CHILD_ENVIRONMENT_KEYS = frozenset({"PATH", "LANG", "LC_ALL", "LC_CTYPE", "TMPDIR", "TEMP", "TMP", "SYSTEMROOT"})
 _GIT_ENVIRONMENT = {"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_TERMINAL_PROMPT": "0"}
 TAG_PATTERN = r"v[0-9][A-Za-z0-9.+-]*"
 _DENIED_TRANSPORTS = ("ext", "file", "git", "http", "ssh")
-# What `gh` needs beyond that allowlist: its own authentication, its configuration location, and
-# the proxy and CA settings a runner may require. `GH_HOST` is left out because the host is pinned.
 _GH_ENVIRONMENT_KEYS = frozenset(
     {
         "GH_TOKEN",
@@ -69,18 +65,12 @@ def _child_environment(**extra: str) -> dict[str, str]:
 
 
 def _gh_environment() -> dict[str, str]:
-    """The transport's environment: the allowlist plus its authentication and network settings."""
     environment = _child_environment(GH_PROMPT_DISABLED="1", GH_NO_UPDATE_NOTIFIER="1")
     environment.update({key: value for key, value in os.environ.items() if key in _GH_ENVIRONMENT_KEYS})
     return environment
 
 
 def _run_git(root: Path, *args: str, **options: Any) -> subprocess.CompletedProcess[Any]:
-    """Run Git with replacement objects, hooks, and the filesystem monitor disabled.
-
-    The checkout's own configuration is still read, but system and global configuration,
-    ``GIT_CONFIG_*`` injection, and every credential variable are not inherited.
-    """
     command = [
         "git",
         "--no-replace-objects",
@@ -88,10 +78,6 @@ def _run_git(root: Path, *args: str, **options: Any) -> subprocess.CompletedProc
         "core.fsmonitor=false",
         "-c",
         f"core.hooksPath={os.devnull}",
-        # Only HTTPS may be used, so repository-local `core.sshCommand`, `core.gitProxy` and
-        # other transport helpers never run. Local credential and askpass helpers are cleared.
-        # A repository-local `protocol.<name>.allow` outranks the general `protocol.allow`, so
-        # each non-HTTPS transport is denied by name; `-c` outranks repository configuration.
         "-c",
         "protocol.allow=never",
         *[item for name in _DENIED_TRANSPORTS for item in ("-c", f"protocol.{name}.allow=never")],
@@ -109,12 +95,10 @@ def _run_git(root: Path, *args: str, **options: Any) -> subprocess.CompletedProc
 
 
 def _require_private_parent(parent: Path) -> None:
-    """Refuse an output parent that another user could use to swap the staging directory."""
     if not hasattr(os, "getuid"):
         return
     info = parent.stat()
     writable_by_others = bool(info.st_mode & (stat.S_IWGRP | stat.S_IWOTH))
-    # A sticky directory stops other users renaming entries they do not own, so it is acceptable.
     _require(
         info.st_uid in {os.getuid(), 0} and (not writable_by_others or bool(info.st_mode & stat.S_ISVTX)),
         "output parent directory is writable by other users",
@@ -146,7 +130,6 @@ def _object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 
 def github_json(path: str) -> dict[str, Any]:
-    """Read a constructed repository API path using gh's credential handling."""
     endpoint = f"repos/{REPOSITORY}" + (f"/{path}" if path else "")
     result = subprocess.run(
         ["gh", "api", "--hostname", "github.com", endpoint],
@@ -199,7 +182,6 @@ def _run_identity(run: dict[str, Any], sha: str, repository_id: int) -> None:
 
 
 def select_producer(sha: str, api: Api = github_json) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    """Select the latest exact-SHA run, never falling back to an older success."""
     repository = api("")
     _require(repository.get("full_name") == REPOSITORY, "wrong repository")
     runs = _pages(
@@ -216,7 +198,6 @@ def select_producer(sha: str, api: Api = github_json) -> tuple[dict[str, Any], d
     for other in runs:
         if other["id"] == latest["id"]:
             continue
-        # A re-run keeps its original creation time, so an older run can hold the newest attempt.
         _require(other.get("status") == "completed", "another producer run for this SHA is still pending")
         _require(
             _timestamp(other.get("run_started_at") or other["created_at"])
@@ -280,7 +261,6 @@ def _files(directory: Path) -> dict[str, dict[str, Any]]:
 
 
 def producer_receipt(directory: Path, run: dict[str, Any], job: dict[str, Any]) -> dict[str, Any]:
-    """Record immutable bytes and the actual job ID before artifact upload."""
     _run_identity(run, run["head_sha"], run["repository"]["id"])
     _require(job.get("name") == JOB_NAME and _positive(job.get("id")), "invalid producer job")
     _require(
@@ -307,7 +287,6 @@ def producer_receipt(directory: Path, run: dict[str, Any], job: dict[str, Any]) 
 
 
 def verify_archive(archive: Path, artifact: dict[str, Any]) -> dict[str, bytes]:
-    """Read four bounded, flat, regular members after verifying the ZIP digest."""
     _require(archive.stat().st_size <= MAX_PAYLOAD_BYTES, "archive exceeds size limit")
     with archive.open("rb") as stream:
         digest = hashlib.file_digest(stream, "sha256").hexdigest()
@@ -361,7 +340,6 @@ def verify_archive(archive: Path, artifact: dict[str, Any]) -> dict[str, bytes]:
 
 
 def verify_producer_receipt(directory: Path, run: dict[str, Any], job: dict[str, Any]) -> dict[str, Any]:
-    """Require exact JSON types as well as exact attempt and byte identities."""
     receipt = json.loads((directory / PRODUCER_RECEIPT).read_bytes(), object_pairs_hook=_object)
     expected = producer_receipt(directory, run, job)
     _require(
@@ -372,7 +350,6 @@ def verify_producer_receipt(directory: Path, run: dict[str, Any], job: dict[str,
 
 
 def resolve_tag(root: Path, tag: str, develop_ref: str = "refs/remotes/origin/develop") -> dict[str, str]:
-    """Require an annotated version tag and an exact checked-out develop ancestor."""
     _require(bool(re.fullmatch(TAG_PATTERN, tag)), "invalid version tag")
 
     def git(*args: str) -> str:
@@ -394,11 +371,6 @@ def resolve_tag(root: Path, tag: str, develop_ref: str = "refs/remotes/origin/de
 
 
 def _committed_snapshot(root: Path, commit: str, destination: Path) -> None:
-    """Materialize regular Git blobs, not worktree bytes or attribute-filtered archives.
-
-    The duplicate-check archive helper uses extractall and permits links. This
-    execution boundary instead reads exact object IDs and rejects all links.
-    """
     _require(bool(re.fullmatch(r"[0-9a-f]{40}", commit)), "invalid snapshot commit")
     entries = _run_git(
         root,
@@ -431,7 +403,6 @@ def _committed_snapshot(root: Path, commit: str, destination: Path) -> None:
             "unsafe committed snapshot member",
         )
         declared_size = int(raw_size)
-        # Enforce the byte budget from tree metadata before any blob is written to disk.
         declared_total += declared_size
         _require(declared_total <= MAX_PAYLOAD_BYTES, "committed snapshot exceeds size limit")
         files.append((name, mode, oid, declared_size))
@@ -465,11 +436,6 @@ def _committed_snapshot(root: Path, commit: str, destination: Path) -> None:
             target.chmod(0o755 if mode == b"100755" else 0o644)
 
 
-# Runs under `-I -S -B`: no site packages, `.pth` files, `sitecustomize`, or Python environment.
-# `-I` also drops the script directory from `sys.path`, so without this the verifier's
-# `benchbox` import would resolve to the installed package instead of the committed bytes.
-# The two namespace stubs point at the snapshot and keep the package `__init__` files, which
-# import third-party modules, from running.
 _VERIFIER_BOOTSTRAP = r"""
 import runpy
 import sys
@@ -487,7 +453,6 @@ runpy.run_path(verifier, run_name="__main__")
 
 
 def _verify_committed_binaries(root: Path, commit: str, distributions: list[Path]) -> None:
-    """Run only committed verifier bytes in a private, isolated source snapshot."""
     with tempfile.TemporaryDirectory(prefix="release-source-") as temporary:
         snapshot = Path(temporary)
         _committed_snapshot(root, commit, snapshot)
@@ -515,9 +480,7 @@ def _verify_committed_binaries(root: Path, commit: str, distributions: list[Path
 
 
 def _publish_output(stage: Path, output: Path) -> None:
-    """Atomically rename a directory without replacing even an empty destination."""
     if os.name == "nt":
-        # Windows os.rename fails if the destination already exists.
         os.rename(stage, output)
         return
     library = ctypes.CDLL(None, use_errno=True)
@@ -526,13 +489,13 @@ def _publish_output(stage: Path, output: Path) -> None:
         _require(operation is not None, "atomic no-replace publication is unsupported")
         operation.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
         operation.restype = ctypes.c_int
-        result = operation(os.fsencode(stage), os.fsencode(output), 0x4)  # RENAME_EXCL
+        result = operation(os.fsencode(stage), os.fsencode(output), 0x4)
     elif sys.platform.startswith("linux"):
         operation = getattr(library, "renameat2", None)
         _require(operation is not None, "atomic no-replace publication is unsupported")
         operation.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
         operation.restype = ctypes.c_int
-        result = operation(-100, os.fsencode(stage), -100, os.fsencode(output), 1)  # RENAME_NOREPLACE
+        result = operation(-100, os.fsencode(stage), -100, os.fsencode(output), 1)
     else:
         raise ValueError("atomic no-replace publication is unsupported")
     if result != 0:
@@ -541,16 +504,11 @@ def _publish_output(stage: Path, output: Path) -> None:
 
 
 def _reap_download(process: subprocess.Popen[bytes], reader: threading.Thread | None, stop: threading.Event) -> None:
-    """Terminate only the download's owned tree and close its unbuffered pipe."""
     stop.set()
     try:
-        # Popen created this private session. The captured group ID remains
-        # valid even if gh exited while a descendant retained stdout.
         try:
             os.killpg(process.pid, signal.SIGKILL)
         except (ProcessLookupError, PermissionError):
-            # Nothing killable is left. macOS reports EPERM, not ESRCH, for a group whose only
-            # member is an exited, unreaped leader. A live descendant would have been signalled.
             pass
     finally:
         if process.poll() is None:
@@ -559,18 +517,13 @@ def _reap_download(process: subprocess.Popen[bytes], reader: threading.Thread | 
             process.wait(timeout=5)
         finally:
             assert process.stdout is not None
-            # Raw FileIO.close does not wait for a buffered reader lock.
             process.stdout.close()
             if reader is not None and reader.ident is not None:
                 reader.join(timeout=0.2)
 
 
 def _download(artifact_id: int, archive: Path) -> None:
-    """Bound the entire stream, including blocked reads, and always reap our child."""
-    # Descendant cleanup relies on a private POSIX session. Windows has no equivalent here: tree
-    # termination after the direct child exits needs a Job Object, which has no native test yet.
     _require(os.name != "nt", "artifact download needs POSIX process-group ownership; Windows is unsupported")
-    # Load the canonical clock without importing the optional SDK/package graph.
     spec = importlib.util.spec_from_file_location(
         "_release_clock", Path(__file__).resolve().parents[1] / "benchbox/utils/clock.py"
     )
@@ -648,17 +601,11 @@ def _download(artifact_id: int, archive: Path) -> None:
 
 
 def hosted_refspecs(tag: str) -> list[str]:
-    """Refspecs that refresh develop and force the local tag to the hosted tag object."""
     _require(bool(re.fullmatch(TAG_PATTERN, tag)), "invalid version tag")
     return ["develop:refs/remotes/origin/develop", f"+refs/tags/{tag}:refs/tags/{tag}"]
 
 
 def fetch_hosted_refs(source: Path, tag: str) -> None:
-    """Fetch develop and the tag from the fixed repository URL, not the checkout's `origin`.
-
-    Local remote configuration cannot redirect it. Forcing the tag means a hosted tag that was
-    moved after checkout changes the local tag, so `resolve_tag` then refuses the stale checkout.
-    """
     _run_git(
         source,
         "fetch",
@@ -671,12 +618,10 @@ def fetch_hosted_refs(source: Path, tag: str) -> None:
 
 
 def admit(root: Path, tag: str, output: Path, api: Api = github_json) -> dict[str, Any]:
-    """Admit exact bytes only after provenance, archive and binary verification."""
     source = resolve_tag(root, tag)
     run, job, artifact = select_producer(source["head_sha"], api)
     _require(not output.exists(), "output already exists")
     output.parent.mkdir(parents=True, exist_ok=True)
-    # Bind to the real parent directory and require that no other user can rename entries in it.
     output = output.parent.resolve(strict=True) / output.name
     _require_private_parent(output.parent)
     with tempfile.TemporaryDirectory(prefix="release-admission-", dir=output.parent) as temporary:
@@ -720,7 +665,7 @@ def admit(root: Path, tag: str, output: Path, api: Api = github_json) -> dict[st
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
     produce = commands.add_parser("producer")
     produce.add_argument("--dist", type=Path, required=True)

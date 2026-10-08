@@ -1,29 +1,15 @@
-# Example GitHub Actions workflow for CI/CD regression testing
-#
-# This workflow demonstrates how to integrate the ci_regression_test.py
-# example into a GitHub Actions pipeline for automated performance testing.
-#
-# To use this workflow:
-# 1. Copy this file to .github/workflows/performance-regression.yml
-# 2. Generate baseline on main branch (run once):
-#    python examples/use_cases/ci_regression_test.py --save-baseline baseline.json
-# 3. Commit baseline.json to repository
-# 4. Pull requests will automatically run regression tests
-
 name: Performance Regression Test
 
 on:
-  # Run on pull requests to main
   pull_request:
     branches: [main, master]
 
-  # Allow manual trigger
   workflow_dispatch:
 
 jobs:
   performance-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10  # Fail if test takes too long
+    timeout-minutes: 10
 
     steps:
       - name: Checkout code
@@ -33,13 +19,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'  # Cache pip dependencies
+          cache: 'pip'
 
       - name: Install BenchBox
         run: |
           pip install benchbox
-          # Or install from source:
-          # pip install -e .
 
       - name: Run regression test
         run: |
@@ -66,136 +50,3 @@ jobs:
               repo: context.repo.repo,
               body: '⚠️ Performance regression detected! See job logs for details.'
             })
-
-# ============================================================================
-# ALTERNATIVE: More comprehensive workflow with multiple benchmarks
-# ============================================================================
-
-# name: Comprehensive Performance Testing
-#
-# on:
-#   pull_request:
-#     branches: [main]
-#
-# jobs:
-#   smoke-test:
-#     name: Quick Smoke Test
-#     runs-on: ubuntu-latest
-#     timeout-minutes: 5
-#     steps:
-#       - uses: actions/checkout@v4
-#       - uses: actions/setup-python@v5
-#         with:
-#           python-version: '3.11'
-#       - run: pip install benchbox
-#       - run: |
-#           python examples/use_cases/ci_regression_test.py \
-#             --baseline baselines/smoke.json \
-#             --threshold 20
-#
-#   tpch-test:
-#     name: TPC-H Regression Test
-#     runs-on: ubuntu-latest
-#     timeout-minutes: 10
-#     needs: smoke-test  # Run after smoke test passes
-#     steps:
-#       - uses: actions/checkout@v4
-#       - uses: actions/setup-python@v5
-#         with:
-#           python-version: '3.11'
-#       - run: pip install benchbox
-#       - run: |
-#           python unified_runner.py \
-#             --platform duckdb \
-#             --benchmark tpch \
-#             --scale 0.1 \
-#             --phases power \
-#             --queries 1,3,6,12,14 \
-#             --formats json \
-#             --output-dir results/current
-#       - run: |
-#           python features/result_analysis.py \
-#             baselines/tpch.json \
-#             results/current/results.json
-#
-#   tpcds-test:
-#     name: TPC-DS Regression Test
-#     runs-on: ubuntu-latest
-#     timeout-minutes: 15
-#     needs: smoke-test
-#     steps:
-#       - uses: actions/checkout@v4
-#       - uses: actions/setup-python@v5
-#         with:
-#           python-version: '3.11'
-#       - run: pip install benchbox
-#       - run: |
-#           python unified_runner.py \
-#             --platform duckdb \
-#             --benchmark tpcds \
-#             --scale 0.01 \
-#             --phases power \
-#             --queries 1,2,3 \
-#             --formats json \
-#             --output-dir results/current
-#       - run: |
-#           python features/result_analysis.py \
-#             baselines/tpcds.json \
-#             results/current/results.json
-
-# ============================================================================
-# BASELINE GENERATION WORKFLOW (Run once on main branch)
-# ============================================================================
-
-# name: Generate Performance Baseline
-#
-# on:
-#   workflow_dispatch:  # Manual trigger only
-#   push:
-#     branches: [main]
-#     paths:
-#       - 'benchbox/**'  # Only when core code changes
-#
-# jobs:
-#   generate-baseline:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: actions/checkout@v4
-#       - uses: actions/setup-python@v5
-#         with:
-#           python-version: '3.11'
-#       - run: pip install benchbox
-#
-#       - name: Generate baselines
-#         run: |
-#           # Smoke test baseline
-#           python examples/use_cases/ci_regression_test.py \
-#             --save-baseline baselines/smoke.json
-#
-#           # TPC-H baseline
-#           python unified_runner.py \
-#             --platform duckdb \
-#             --benchmark tpch \
-#             --scale 0.1 \
-#             --phases power \
-#             --queries 1,3,6,12,14 \
-#             --formats json \
-#             --output-dir baselines/tpch
-#
-#           # TPC-DS baseline
-#           python unified_runner.py \
-#             --platform duckdb \
-#             --benchmark tpcds \
-#             --scale 0.01 \
-#             --phases power \
-#             --queries 1,2,3 \
-#             --formats json \
-#             --output-dir baselines/tpcds
-#
-#       - name: Commit baselines
-#         run: |
-#           git config --local user.email "github-actions[bot]@users.noreply.github.com"
-#           git config --local user.name "github-actions[bot]"
-#           git add baselines/
-#           git commit -m "chore: update performance baselines"
-#           git push

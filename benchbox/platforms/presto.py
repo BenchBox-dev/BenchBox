@@ -1,28 +1,6 @@
-"""PrestoDB platform adapter with distributed SQL query engine optimizations.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides PrestoDB-specific optimizations for analytical workloads,
-including connector catalog support, session properties, and query optimization.
-
-PrestoDB is Meta's (Facebook's) distributed SQL query engine, maintained as an
-open-source project separate from Trino (formerly PrestoSQL).
-
-IMPORTANT: This adapter supports PrestoDB only, NOT Trino.
-
-While PrestoDB and Trino share a common ancestry (Trino forked from Presto in 2019),
-they have diverged significantly:
-- Different Python drivers (presto-python-client vs trino)
-- Different HTTP headers (X-Presto-* vs X-Trino-*)
-- Diverging SQL syntax and function implementations
-- Different system metadata table schemas
-
-For Trino workloads, use the TrinoAdapter instead.
-For AWS Athena (managed Presto-compatible), use the AthenaAdapter.
-For Starburst Enterprise (commercial Trino), use the TrinoAdapter.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -46,25 +24,6 @@ PRESTO_DIALECT = "presto"
 
 
 class PrestoAdapter(PrestoTrinoAdapterBase):
-    """PrestoDB platform adapter for distributed SQL query execution.
-
-    PrestoDB is a distributed SQL query engine designed for interactive analytics
-    against data sources of all sizes. It supports querying data from multiple
-    sources including Hive, Iceberg, Delta Lake, and cloud storage.
-
-    Key Features:
-    - Distributed query execution across multiple workers
-    - Federated queries across multiple data sources
-    - Session properties for query optimization
-    - Support for Hive and other table formats
-
-    Compatibility:
-    - PrestoDB (Meta/Facebook): Fully supported
-    - Trino: NOT supported - use TrinoAdapter instead
-    - AWS Athena: Use AthenaAdapter instead (managed Presto-compatible service)
-    - Starburst Enterprise: Use TrinoAdapter (Trino-based)
-    """
-
     plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
@@ -75,8 +34,6 @@ class PrestoAdapter(PrestoTrinoAdapterBase):
     unavailable_catalog_marker = "does not exist on the Presto server"
     default_username = "presto"
     table_format_choices = ("memory", "hive")
-    # A Presto catalog literally named "memory" behaves like the memory table
-    # format for DDL purposes even when table_format names another connector.
     ddl_memory_catalog_names = ("memory",)
     target_dialect = PRESTO_DIALECT
     uses_client_source = True
@@ -124,7 +81,6 @@ class PrestoAdapter(PrestoTrinoAdapterBase):
         return params
 
     def _get_connection_params(self) -> dict[str, Any]:
-        """Get connection parameters for Presto."""
         params: dict[str, Any] = {
             "host": self.host,
             "port": self.port,
@@ -135,11 +91,9 @@ class PrestoAdapter(PrestoTrinoAdapterBase):
             "source": self.source,
         }
 
-        # Add authentication if password is provided
         if self.password and PrestoBasicAuthentication:
             params["auth"] = PrestoBasicAuthentication(self.username, self.password)
 
-        # SSL verification - presto-python-client uses 'requests_kwargs' for SSL config
         if self.http_scheme == "https":
             requests_kwargs = {}
             if self.ssl_cert_path:
@@ -149,38 +103,27 @@ class PrestoAdapter(PrestoTrinoAdapterBase):
             if requests_kwargs:
                 params["requests_kwargs"] = requests_kwargs
 
-        # Apply session configuration at connection time when provided
         if self.session_properties:
             params["session_properties"] = self.session_properties
 
-        # Enforce request timeout when configured (0 means client default)
         if self.query_timeout and self.query_timeout > 0:
             params["request_timeout"] = self.query_timeout
 
         return params
 
     def drop_database(self, **connection_config) -> None:
-        """Drop schema in Presto catalog.
-
-        Presto uses DROP SCHEMA for removing schemas.
-        DROP SCHEMA CASCADE is not supported by Presto connectors (including memory,
-        hive, iceberg), so we drop tables individually before dropping the schema.
-        """
         schema = connection_config.get("schema", self.schema)
         catalog = connection_config.get("catalog", self.catalog)
 
-        # Validate identifiers to prevent SQL injection
         if not self._validate_identifier(catalog) or not self._validate_identifier(schema):
             raise ValueError(f"Invalid catalog or schema identifier: {catalog}.{schema}")
 
-        # Check if schema exists first
         if not self.check_server_database_exists(schema=schema, catalog=catalog):
             self.log_verbose(f"Schema {catalog}.{schema} does not exist - nothing to drop")
             return
 
         try:
             params = self._get_connection_params()
-            # Connect to the target schema to list and drop tables
             params["catalog"] = catalog
             params["schema"] = schema
 
@@ -188,11 +131,9 @@ class PrestoAdapter(PrestoTrinoAdapterBase):
             cursor = conn.cursor()
 
             try:
-                # Get list of tables in the schema
                 cursor.execute("SHOW TABLES")
                 tables = [row[0] for row in cursor.fetchall()]
 
-                # Drop each table individually (Presto connectors don't support CASCADE)
                 for table in tables:
                     if self._validate_identifier(table):
                         try:
@@ -201,7 +142,6 @@ class PrestoAdapter(PrestoTrinoAdapterBase):
                         except Exception as table_error:
                             self.logger.warning(f"Failed to drop table {table}: {table_error}")
 
-                # Now drop the empty schema
                 cursor.execute(f"DROP SCHEMA IF EXISTS {catalog}.{schema}")
                 self.logger.info(f"Dropped schema {catalog}.{schema}")
             finally:
@@ -212,13 +152,6 @@ class PrestoAdapter(PrestoTrinoAdapterBase):
             raise RuntimeError(f"Failed to drop Presto schema {catalog}.{schema}: {e}") from e
 
     def generate_tuning_clause(self, table_tuning) -> str:
-        """Generate Presto-specific tuning clauses for CREATE TABLE statements.
-
-        Presto table properties depend on the connector:
-        - memory: Limited properties
-        - hive: PARTITIONED BY, BUCKETED BY
-
-        """
         if not table_tuning or not table_tuning.has_any_tuning():
             return ""
 
@@ -227,7 +160,6 @@ class PrestoAdapter(PrestoTrinoAdapterBase):
         try:
             from benchbox.core.tuning.interface import TuningType
 
-            # Handle partitioning
             partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
             if partition_columns and self.table_format == "hive":
                 sorted_cols = sorted(partition_columns, key=lambda col: col.order)
@@ -242,11 +174,6 @@ class PrestoAdapter(PrestoTrinoAdapterBase):
         return ""
 
     def apply_table_tunings(self, table_tuning, connection: Any) -> None:
-        """Apply tuning configurations to a Presto table.
-
-        Presto tuning is primarily handled at table creation time.
-        Post-creation optimization is limited.
-        """
         from benchbox.platforms.base.tuning_utils import log_partition_tunings
 
         log_partition_tunings(table_tuning, self.logger, "Presto")
@@ -257,7 +184,6 @@ try:
 
     PlatformHookRegistry.register_config_builder("presto", PrestoAdapter.build_platform_config)
 except ImportError:
-    # Platform hooks may not be available in all contexts
     pass
 
 _build_presto_config = PrestoAdapter.build_platform_config

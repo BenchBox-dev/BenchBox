@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Safely prune worktree-less local branches proven merged into develop."""
 
 from __future__ import annotations
 
@@ -12,18 +11,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TextIO
 
+CLI_DESCRIPTION = "Safely prune worktree-less local branches proven merged into develop."
+
 PROTECTED_BRANCHES = frozenset({"develop", "main", "release", "published-results"})
 TARGET_BRANCH = "develop"
 
 
 class PruneError(RuntimeError):
-    """Raised when required Git or GitHub evidence cannot be collected."""
+    pass
 
 
 @dataclass(frozen=True)
 class RepositoryIdentity:
-    """GitHub repository identity resolved from the current clone."""
-
     name_with_owner: str
     node_id: str
 
@@ -34,8 +33,6 @@ class RepositoryIdentity:
 
 @dataclass(frozen=True)
 class Candidate:
-    """A local branch with complete deletion evidence."""
-
     branch: str
     local_oid: str
     pr_number: int
@@ -44,8 +41,6 @@ class Candidate:
 
 @dataclass(frozen=True)
 class PruneResult:
-    """Summary returned by the pruning workflow."""
-
     deleted: int
     would_delete: int
     kept: int
@@ -81,7 +76,6 @@ def _run_json(args: list[str], repo_root: Path) -> Any:
 
 
 def resolve_repository_identity(repo_root: Path) -> RepositoryIdentity:
-    """Resolve the repository selected by gh from the current clone."""
     payload = _run_json(["gh", "repo", "view", "--json", "id,nameWithOwner"], repo_root)
     if not isinstance(payload, dict):
         raise PruneError("gh repo view returned an unexpected payload")
@@ -93,7 +87,6 @@ def resolve_repository_identity(repo_root: Path) -> RepositoryIdentity:
 
 
 def fetch_target_branch(repo_root: Path) -> None:
-    """Refresh the structural target before testing merge-commit reachability."""
     _run(
         ["git", "fetch", "--quiet", "origin", f"{TARGET_BRANCH}:refs/remotes/origin/{TARGET_BRANCH}"],
         repo_root,
@@ -102,7 +95,6 @@ def fetch_target_branch(repo_root: Path) -> None:
 
 
 def get_current_branch(repo_root: Path) -> str | None:
-    """Return the exact current local branch name without ambiguous shortening."""
     proc = _run(["git", "symbolic-ref", "--quiet", "HEAD"], repo_root)
     if proc.returncode != 0:
         return None
@@ -112,7 +104,6 @@ def get_current_branch(repo_root: Path) -> str | None:
 
 
 def get_local_branches(repo_root: Path) -> dict[str, str]:
-    """Return exact local branch names mapped to their commit OIDs."""
     proc = _run(
         ["git", "for-each-ref", "--format=%(refname:lstrip=2)\t%(objectname)", "refs/heads/"],
         repo_root,
@@ -127,7 +118,6 @@ def get_local_branches(repo_root: Path) -> dict[str, str]:
 
 
 def get_worktree_branches(repo_root: Path) -> set[str]:
-    """Return exact branch names currently attached to registered worktrees."""
     proc = _run(["git", "worktree", "list", "--porcelain"], repo_root, check=True)
     prefix = "branch refs/heads/"
     return {line[len(prefix) :] for line in proc.stdout.splitlines() if line.startswith(prefix)}
@@ -138,7 +128,6 @@ def list_pull_requests(
     branch: str,
     repo_root: Path,
 ) -> list[dict[str, Any]]:
-    """List every PR for one exact same-repository branch across all bases."""
     endpoint = f"repos/{identity.name_with_owner}/pulls"
     payload = _run_json(
         [
@@ -206,12 +195,6 @@ def get_historical_head_at_merge(
     expected_merge_commit: str,
     repo_root: Path,
 ) -> str | None:
-    """Return the PR head at merge time from immutable PR history.
-
-    The timeline establishes chronological head state before the merged event.
-    The PR commit list independently corroborates the final head. Any missing or
-    conflicting evidence fails closed.
-    """
     timeline_payload = _run_json(
         [
             "gh",
@@ -261,7 +244,6 @@ def get_historical_head_at_merge(
 
 
 def is_merge_commit_reachable(merge_commit: str, repo_root: Path) -> bool:
-    """Return whether the PR merge commit is in the freshly fetched target."""
     proc = _run(
         [
             "git",
@@ -396,7 +378,6 @@ def _delete_branch(candidate: Candidate, repo_root: Path) -> tuple[bool, str]:
 
 
 def prune_merged_branches(repo_root: Path, *, dry_run: bool, out: TextIO = sys.stdout) -> PruneResult:
-    """Plan from complete evidence, then delete candidates with race rechecks."""
     identity = resolve_repository_identity(repo_root)
     fetch_target_branch(repo_root)
 
@@ -447,7 +428,7 @@ def prune_merged_branches(repo_root: Path, *, dry_run: bool, out: TextIO = sys.s
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args(argv)

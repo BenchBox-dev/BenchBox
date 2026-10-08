@@ -1,5 +1,3 @@
-"""Read Primitives cross-surface gate builder."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,7 +6,6 @@ from benchbox.core.equivalence.builders.base import CrossSurfaceData, _load_duck
 
 
 def build_read_primitives_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
-    """Generate Read Primitives data, load it into DuckDB, and wire both surfaces."""
     from benchbox.core.read_primitives.benchmark import ReadPrimitivesBenchmark
     from benchbox.core.read_primitives.dataframe_queries import get_dataframe_queries
     from benchbox.core.read_primitives.schema import TABLES

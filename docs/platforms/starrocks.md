@@ -22,32 +22,29 @@ StarRocks is used in production by Airbnb, Alibaba, Coinbase, Pinterest, and Ten
 
 ## Quick Start
 
+Install the PyMySQL dependency directly or through the StarRocks extra. StarRocks must be running before you configure the connection and run TPC-H:
+
 ```bash
-# Install PyMySQL dependency
 uv add pymysql
 
-# Or install via the StarRocks extra
 uv add benchbox --extra starrocks
 
-# Configure connection (StarRocks must be running)
 export STARROCKS_HOST=localhost
 export STARROCKS_PORT=9030
 
-# Run TPC-H benchmark
 benchbox run --platform starrocks --benchmark tpch --scale 0.01
 ```
 
 ### Docker Quick Start
 
+The Docker image runs both the FE and BE. After it starts, verify connectivity with the `mysql` client, then run the benchmark:
+
 ```bash
-# Start StarRocks with Docker (FE + BE)
 docker run -p 9030:9030 -p 8030:8030 -p 8040:8040 \
     starrocks/allin1-ubuntu:latest
 
-# Verify connectivity
 mysql -h 127.0.0.1 -P 9030 -u root -e "SELECT 1"
 
-# Run benchmark
 benchbox run --platform starrocks --benchmark tpch --scale 1.0
 ```
 
@@ -103,13 +100,10 @@ StarRocks provides a high-throughput Stream Load API on the BE HTTP port (defaul
 ### Basic Benchmarks
 
 ```bash
-# TPC-H at scale factor 1
 benchbox run --platform starrocks --benchmark tpch --scale 1.0
 
-# TPC-DS at scale factor 10
 benchbox run --platform starrocks --benchmark tpcds --scale 10.0
 
-# Run specific queries only
 benchbox run --platform starrocks --benchmark tpch --queries Q1,Q6,Q17
 ```
 
@@ -136,7 +130,6 @@ benchbox run --platform starrocks --benchmark tpch --scale 1.0 \
 ### Dry Run (Preview)
 
 ```bash
-# Preview execution plan without running
 benchbox run --platform starrocks --benchmark tpch --scale 1.0 --dry-run ./preview
 ```
 

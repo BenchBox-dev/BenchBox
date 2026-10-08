@@ -1,12 +1,3 @@
-"""Retag legacy synthetic JoinOrder result bundles.
-
-Renames develop-tree bundle pairs:
-
-    joinorder_sf1_* -> joinorder_synthetic_sf1_*
-
-and updates the result bundle benchmark id plus submission sidecar metadata.
-"""
-
 from __future__ import annotations
 
 import argparse

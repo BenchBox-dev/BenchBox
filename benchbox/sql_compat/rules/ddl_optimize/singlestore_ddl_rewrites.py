@@ -1,27 +1,3 @@
-"""SingleStore DDL rewrite rules for Phase.DDL_OPTIMIZE.
-
-SingleStore requires several DDL transformations on CREATE TABLE statements generated
-by DuckDB, each registered here for governance / compat_lint audit. The runtime
-implementations live in ``benchbox/platforms/singlestore.py`` as methods named by
-``transformer_id``; ``BaseDdlOptimizer`` dispatches them in registration order.
-
-Four transforms (applied in this order — order is load-bearing):
-  1. strip_foreign_keys         – SingleStore raises error 2752 on FK clauses.
-  2. reference_table_for_dims   – small dimension tables use REFERENCE TABLE replication.
-                                  Must run before inject_shard_key so REFERENCE TABLE
-                                  is visible in the stmt when the shard/sort guards fire.
-  3. inject_shard_key           – columnstore tables need SHARD KEY for distribution.
-  4. inject_sort_key            – SORT KEY drives analytical ordering.
-
-IMPORTANT — multi-rule conflict:
-  All four rules are registered at the same (Phase.DDL_OPTIMIZE, "singlestore") key.
-  REGISTRY.resolve() will raise CompatibilityRegistryConflict for this platform+phase
-  because multiple candidates match. Use REGISTRY.resolve_all() for governance/audit
-  queries (see tests/unit/sql_compat/test_singlestore_rules.py).
-  Do NOT pass SingleStore through CompatibilityResolver.build_plan() — build_plan()
-  calls resolve() for every Phase.
-"""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.decision import FailureMode

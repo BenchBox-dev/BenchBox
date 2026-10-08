@@ -1,5 +1,3 @@
-"""Cross-principal artifact isolation over stateless HTTP."""
-
 from __future__ import annotations
 
 import json

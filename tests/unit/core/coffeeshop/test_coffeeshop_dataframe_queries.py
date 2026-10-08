@@ -1,7 +1,4 @@
-"""Unit tests for CoffeeShop DataFrame query implementations.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -19,8 +16,6 @@ ALL_QUERY_IDS = ["SA1", "SA2", "SA3", "SA4", "SA5", "PR1", "PR2", "TR1", "TM1", 
 
 
 class TestCoffeeShopQueryRegistry:
-    """Tests for CoffeeShop DataFrame query registry."""
-
     def test_registry_imports_successfully(self):
         from benchbox.core.coffeeshop.dataframe_queries import COFFEESHOP_DATAFRAME_QUERIES
 
@@ -89,8 +84,6 @@ class TestCoffeeShopQueryRegistry:
 
 
 class TestCoffeeShopQueryCategories:
-    """Tests for CoffeeShop query category assignments."""
-
     def test_sales_queries_have_join(self):
         from benchbox.core.coffeeshop.dataframe_queries import get_coffeeshop_query
 
@@ -113,8 +106,6 @@ class TestCoffeeShopQueryCategories:
 
 
 class TestCoffeeShopParameters:
-    """Tests for CoffeeShop query parameters."""
-
     def test_all_queries_have_parameters(self):
         from benchbox.core.coffeeshop.dataframe_queries.parameters import COFFEESHOP_DEFAULT_PARAMS
 
@@ -142,8 +133,6 @@ class TestCoffeeShopParameters:
 
 
 class TestCoffeeShopBenchmarkRegistry:
-    """Tests for CoffeeShop DataFrame support in benchmark registry."""
-
     def test_coffeeshop_supports_dataframe(self):
         from benchbox.core.benchmark_registry import get_benchmark_metadata
 

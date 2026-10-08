@@ -1,5 +1,3 @@
-"""Execution and replay checks for the independent schema challenge."""
-
 import pytest
 from oracle import cell, equivalent, execute, safe_query
 from schema_generator import generate

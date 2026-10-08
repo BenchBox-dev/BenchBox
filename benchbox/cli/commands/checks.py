@@ -1,5 +1,3 @@
-"""Dependency check command implementation."""
-
 from collections.abc import Callable
 from typing import Any
 
@@ -10,7 +8,22 @@ from rich.table import Table
 from benchbox.cli.shared import console
 
 
-@click.command("check-deps")
+@click.command(
+    "check-deps",
+    help=(
+        "Check dependency status and provide installation guidance.\n"
+        "\n"
+        "Verifies platform dependencies and provides installation commands for\n"
+        "missing packages. Shows comprehensive installation matrix for all platforms.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox check-deps                      # Overview of all platforms\n"
+        "    benchbox check-deps --platform databricks # Check specific platform\n"
+        "    benchbox check-deps --matrix             # Show installation matrix\n"
+        "    benchbox check-deps --verbose            # Detailed guidance"
+    ),
+)
 @click.option("--platform", type=str, help="Check dependencies for specific platform")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed dependency information")
 @click.option(
@@ -21,18 +34,6 @@ from benchbox.cli.shared import console
 )
 @click.pass_context
 def check_dependencies(ctx, platform, verbose, show_matrix):
-    """Check dependency status and provide installation guidance.
-
-    Verifies platform dependencies and provides installation commands for
-    missing packages. Shows comprehensive installation matrix for all platforms.
-
-    \b
-    Examples:
-        benchbox check-deps                      # Overview of all platforms
-        benchbox check-deps --platform databricks # Check specific platform
-        benchbox check-deps --matrix             # Show installation matrix
-        benchbox check-deps --verbose            # Detailed guidance
-    """
     from benchbox.utils.dependencies import (
         check_platform_dependencies,
         get_dependency_decision_tree,
@@ -62,7 +63,6 @@ def _show_matrix(
     get_installation_matrix_rows: Callable[[], list[tuple[str, str, str, str, str, str]]],
     get_installation_scenarios: Callable[[], list[Any]],
 ) -> None:
-    """Display the installation matrix table."""
     table = Table(
         title="BenchBox Installation Matrix",
         box=None,
@@ -98,7 +98,6 @@ def _show_platform(
     list_available_dependency_groups: Callable[[], dict[str, Any]],
     check_platform_dependencies: Callable[[str, list[str]], tuple[bool, list[str]]],
 ) -> None:
-    """Display dependency status for a specific platform."""
     platform_lower = platform.lower()
     dep_groups = list_available_dependency_groups()
 
@@ -133,7 +132,6 @@ def _show_overview(
     get_dependency_decision_tree: Callable[[], str],
     get_installation_recommendations: Callable[[], list[str]],
 ) -> None:
-    """Display an overview of all platform dependency statuses."""
     dep_groups = list_available_dependency_groups()
 
     for name, info in dep_groups.items():

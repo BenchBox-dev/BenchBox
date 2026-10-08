@@ -1,10 +1,3 @@
-"""Tests for TPC-DS dsqgen variant template resolution.
-
-Ensures dsqgen is invoked with the correct -DIRECTORY (main templates dir)
-and a relative -TEMPLATE path pointing into query_variants/ when a variant
-template exists only under that subdirectory.
-"""
-
 import sys
 from pathlib import Path
 
@@ -29,22 +22,17 @@ def _fake_completed(stdout: str = "SELECT 1\n"):
 
 
 def test_dsqgen_uses_main_directory_for_variants(tmp_path, monkeypatch):
-    # Arrange: create a fake templates structure
     templates_dir = tmp_path / "query_templates"
     variants_dir = tmp_path / "query_variants"
     templates_dir.mkdir(parents=True)
     variants_dir.mkdir(parents=True)
 
-    # Minimal required files
     (templates_dir / "templates.lst").write_text("\n")
     (templates_dir / "ansi.tpl").write_text("-- dialect stub\n")
 
-    # Base query exists in main; variant only in query_variants
-    # Use query 1 instead of 14 since 14 is multi-part and variants are skipped for multi-part queries
     (templates_dir / "query1.tpl").write_text("-- base query 1\nSELECT 1;\n")
     (variants_dir / "query1a.tpl").write_text("-- variant query 1a\nSELECT 1;\n")
 
-    # Instantiate dsqgen binary and point it to our fake templates
     dsq = DSQGenBinary()
     dsq.templates_dir = templates_dir
 
@@ -63,31 +51,24 @@ def test_dsqgen_uses_main_directory_for_variants(tmp_path, monkeypatch):
     ):
         nonlocal captured_cmd
         captured_cmd = list(cmd)
-        # Query 1 is a single-part query (not multi-part)
         return _fake_completed(stdout="SELECT 1;\n")
 
     monkeypatch.setattr("subprocess.run", fake_run)
 
-    # Act: generate a variant query by passing composite id '1a'
     sql = dsq.generate("1a", seed=22, scale_factor=1.0, dialect="ansi")
 
-    # dsqgen uses '/' option prefix on Windows, '-' on Unix (r_params.c OPTION_START)
     _opt = "/" if sys.platform == "win32" else "-"
 
-    # Assert: command uses a short path for -DIRECTORY (avoids dsqgen path buffer overflow)
     assert f"{_opt}DIRECTORY" in captured_cmd
     dir_idx = captured_cmd.index(f"{_opt}DIRECTORY") + 1
     tmpl_dir = Path(captured_cmd[dir_idx])
-    # The -DIRECTORY is a temp copy named 'q' of templates_dir
     assert tmpl_dir.name == "q"
 
     assert f"{_opt}TEMPLATE" in captured_cmd
     tpl_idx = captured_cmd.index(f"{_opt}TEMPLATE") + 1
     tpl_arg = captured_cmd[tpl_idx]
-    # For variants, the template path should use ../ to access sibling directory
     assert tpl_arg == "../query_variants/query1a.tpl"
 
-    # validate output path goes through and returns SQL
     assert "select" in sql.lower()
 
 

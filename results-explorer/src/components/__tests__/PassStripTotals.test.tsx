@@ -1,13 +1,3 @@
-/**
- * Run totals for the pass table.
- *
- * The table reports one row per query; a reader comparing two runs needs the
- * whole number without adding 22 rows up. Each total covers only the queries
- * that recorded the value it sums, and the warmup ratio is recomputed from the
- * totals rather than averaged, so a run where only some queries recorded a
- * warmup cannot report a penalty diluted by the queries that did not.
- */
-
 import { render, screen, within } from "@testing-library/preact";
 import { describe, it, expect } from "vitest";
 import type { QueryTiming } from "@/types";
@@ -42,17 +32,14 @@ describe("summarizeRunPasses", () => {
     const totals = summarizeRunPasses(summarizeQueryPasses(QUERIES));
     expect(totals.queryCount).toBe(2);
     expect(totals.passCount).toBe(6);
-    expect(totals.warmMedianMs).toBe(34); // 12 + 22
-    expect(totals.warmMinMs).toBe(30); // 10 + 20
-    expect(totals.spreadMs).toBe(8); // 4 + 4
-    expect(totals.warmupMs).toBe(70); // 30 + 40
+    expect(totals.warmMedianMs).toBe(34);
+    expect(totals.warmMinMs).toBe(30);
+    expect(totals.spreadMs).toBe(8);
+    expect(totals.warmupMs).toBe(70);
     expect(totals.warmupRatio).toBeCloseTo(70 / 34, 10);
   });
 
   it("measures the warmup ratio against the same queries the warmup total covers", () => {
-    // Q2 recorded no warmup. Dividing 30 ms of warmup by both queries' warm
-    // total (34 ms) would report a 0.88x penalty for a run whose only
-    // measured warmup was 2.5x its query's warm median.
     const totals = summarizeRunPasses(
       summarizeQueryPasses(QUERIES.filter((row) => !(row.query_id === "Q2" && row.run_type === "warmup"))),
     );
@@ -71,8 +58,6 @@ describe("summarizeRunPasses", () => {
   });
 
   it("drops a query with a warmup but no warm median from both sides of the ratio", () => {
-    // The warmup on Q2 has nothing to be measured against. Counting it in the
-    // numerator alone would report a penalty the run never demonstrated.
     const totals = summarizeRunPasses(
       summarizeQueryPasses([
         warmup("Q1", 30),

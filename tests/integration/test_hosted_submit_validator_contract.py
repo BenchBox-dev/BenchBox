@@ -1,12 +1,3 @@
-"""Check the hosted-submit bundle against the published-results validator.
-
-The CLI validates submissions before upload, then sends canonical bundle
-bytes and a manifest to the hosted service. These tests build that manifest
-with the same code and check the develop-side validator's acceptance, hash,
-and schema rules. The hosted service performs its own final validation;
-its deployment is outside this repository.
-"""
-
 from __future__ import annotations
 
 import importlib
@@ -54,16 +45,6 @@ def _minimal_schema_v2_bundle() -> dict:
 
 
 def _hosted_bundle_layout(tmp_path: Path) -> tuple[Path, Path, dict]:
-    """Reconstruct the bundle layout the hosted service mirrors to corpus.
-
-    The `--service` path uploads the source file as `bundle` plus a
-    multipart manifest. When the hosted service later mirrors a
-    submission into `published-results`, the layout is `<stem>.json`
-    plus `<stem>.manifest.json` in the same directory — same shape
-    `validate_submission.py` walks for PR-flow bundles. This helper
-    produces that layout from the same in-process manifest builder
-    that `_dispatch_service_mode` uses.
-    """
     sub = importlib.import_module("benchbox.cli.commands.submit")
 
     bundle_dir = tmp_path / "bundle"
@@ -72,8 +53,6 @@ def _hosted_bundle_layout(tmp_path: Path) -> tuple[Path, Path, dict]:
     source_path.write_text(json.dumps(_minimal_schema_v2_bundle()), encoding="utf-8")
     source_path.write_bytes(sub._canonical_submission_file_bytes(source_path))
 
-    # Build manifest with submission_path="hosted-service" — the exact
-    # call _dispatch_service_mode makes at submit.py:222.
     manifest = sub._build_submission_manifest(
         source_path=source_path,
         companions=[],
@@ -98,8 +77,6 @@ def _run_validator(bundle_path: Path, cwd: Path) -> tuple[int, str]:
 
 
 def test_hosted_bundle_passes_develop_validator(tmp_path: Path) -> None:
-    """Happy path: the bundle the hosted-submit code path generates must
-    pass `scripts/validate_submission.py` unchanged."""
     bundle_path, _manifest_path, _manifest = _hosted_bundle_layout(tmp_path)
 
     rc, output = _run_validator(bundle_path, cwd=tmp_path)
@@ -116,9 +93,6 @@ def test_hosted_bundle_passes_develop_validator(tmp_path: Path) -> None:
 
 
 def test_hosted_bundle_with_corrupted_hash_is_rejected(tmp_path: Path) -> None:
-    """Tamper detection: if the hosted manifest carries a hash that does
-    not match the bundle's bytes, the develop validator must reject the
-    bundle. Confirms both validators key off the same hash contract."""
     bundle_path, manifest_path, manifest = _hosted_bundle_layout(tmp_path)
 
     manifest["bundle_hash"] = "0" * 64
@@ -131,7 +105,6 @@ def test_hosted_bundle_with_corrupted_hash_is_rejected(tmp_path: Path) -> None:
 
 
 def test_hosted_partial_bundle_is_rejected_even_with_a_valid_manifest(tmp_path: Path) -> None:
-    """A valid hosted hash cannot make incomplete query evidence publishable."""
     sub = importlib.import_module("benchbox.cli.commands.submit")
     bundle_dir = tmp_path / "bundle"
     bundle_dir.mkdir()
@@ -159,10 +132,6 @@ def test_hosted_partial_bundle_is_rejected_even_with_a_valid_manifest(tmp_path: 
 
 
 def test_hosted_bundle_missing_required_schema_key_is_rejected(tmp_path: Path) -> None:
-    """Schema drift detection: if the source file is missing a top-level
-    schema-v2 key (`queries`, `summary`, etc.), the develop validator
-    must reject. Hosted-side schema-v2 expectations must stay in lockstep
-    with develop's REQUIRED_TOP_KEYS."""
     sub = importlib.import_module("benchbox.cli.commands.submit")
 
     bundle_dir = tmp_path / "bundle"
@@ -190,12 +159,6 @@ def test_hosted_bundle_missing_required_schema_key_is_rejected(tmp_path: Path) -
 
 
 def test_hosted_manifest_schema_matches_pr_flow_for_required_keys(tmp_path: Path) -> None:
-    """Cross-path manifest schema: the hosted-submit manifest must carry
-    every key that the PR-flow manifest carries (and which the develop
-    validator reads). Without this guard, a divergent change to one
-    `_build_submission_manifest` call site could silently drop a field
-    the validator depends on for the other path.
-    """
     sub = importlib.import_module("benchbox.cli.commands.submit")
 
     src = tmp_path / "tpch_duckdb.json"
@@ -216,31 +179,20 @@ def test_hosted_manifest_schema_matches_pr_flow_for_required_keys(tmp_path: Path
         submission_path="hosted-service",
     )
 
-    # Same key set in both paths — only `submission_path` differs in value.
     assert set(pr_manifest.keys()) == set(hosted_manifest.keys()), (
         f"hosted vs PR manifest key drift. PR={set(pr_manifest)}, hosted={set(hosted_manifest)}"
     )
     assert pr_manifest["submission_path"] == "PR-based"
     assert hosted_manifest["submission_path"] == "hosted-service"
-    # Hash, bundle_file, and benchmark/platform/scale_factor are identical
-    # for the same source file — the manifests differ only in metadata.
     for key in ("bundle_file", "bundle_hash", "benchmark", "platform", "scale_factor"):
         assert pr_manifest[key] == hosted_manifest[key], f"{key} drift"
 
 
 def test_hosted_and_pr_manifest_built_via_dispatch_call_sites(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """w21 regression: drive each manifest through its dispatching call site
-    (the hosted-service path and the PR-package path) rather than calling
-    ``_build_submission_manifest`` directly with hard-coded arguments. If a
-    future iteration of either dispatch mutates the manifest after
-    construction or starts passing different arguments, the parity check
-    below catches it; the previous direct-construction test could not."""
     from click.testing import CliRunner
 
     sub = importlib.import_module("benchbox.cli.commands.submit")
 
-    # `benchbox submit` is community-facing end-to-end (both dispatch call
-    # sites exercised below) and hard-refuses without a deployment salt.
     monkeypatch.setenv("BENCHBOX_MACHINE_ID_SALT", "integration-test-community-publish-salt")
 
     src = tmp_path / "tpch_duckdb.json"
@@ -248,7 +200,6 @@ def test_hosted_and_pr_manifest_built_via_dispatch_call_sites(tmp_path: Path, mo
 
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
 
-    # ----- Drive the PR-package path through the CLI to capture its manifest -----
     out_dir = tmp_path / "submission"
     pr_result = CliRunner().invoke(sub.submit, [str(src), "--output", str(out_dir)])
     assert pr_result.exit_code == 0, pr_result.output
@@ -256,7 +207,6 @@ def test_hosted_and_pr_manifest_built_via_dispatch_call_sites(tmp_path: Path, mo
     assert pr_manifest_path.exists(), pr_result.output
     pr_manifest = json.loads(pr_manifest_path.read_text(encoding="utf-8"))
 
-    # ----- Drive the hosted dispatch path with stubbed network calls --------
     captured_manifest: dict[str, dict] = {}
 
     def fake_submit_hosted_bundle(*, manifest: dict, bundle_hash: str, **_kwargs):
@@ -296,7 +246,6 @@ def test_hosted_and_pr_manifest_built_via_dispatch_call_sites(tmp_path: Path, mo
     assert "payload" in captured_manifest, "hosted dispatch never called submit_hosted_bundle"
     hosted_manifest = captured_manifest["payload"]
 
-    # Same key set; hosted vs PR diverges only in submission_path metadata.
     assert set(pr_manifest.keys()) == set(hosted_manifest.keys()), (
         f"hosted vs PR manifest key drift via dispatch call sites. PR={set(pr_manifest)}, hosted={set(hosted_manifest)}"
     )

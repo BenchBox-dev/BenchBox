@@ -1,5 +1,3 @@
-"""Replay the bounded fast-lane overlap inventory from GitHub Actions."""
-
 from __future__ import annotations
 
 import argparse

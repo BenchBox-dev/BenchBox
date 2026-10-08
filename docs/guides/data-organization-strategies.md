@@ -61,5 +61,3 @@ Unified tuning fields map to data organization as follows:
 - Delta output requires `deltalake`.
 - Iceberg output requires `pyiceberg`.
 - When dependencies are missing, BenchBox reports a clear installation hint.
-- CI validates Delta/Iceberg presorted paths in the required
-  `integration-table-formats` lane using the `requires_table_formats` marker.

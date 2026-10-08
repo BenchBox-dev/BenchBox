@@ -1,19 +1,5 @@
 name: Publication Canaries & Drift Reconciliation
 
-# These canaries fail closed. Availability probing runs independently of
-# evidence acquisition (Defect D3). Each audit tool requires real publication
-# evidence (a desired manifest plus attested built/deployed/observed receipts,
-# or recorded lane transitions, or real operational drill receipts). Until an
-# independent publication run produces and publishes that evidence for this
-# workflow to consume, the audit jobs are expected to exit nonzero: per
-# docs/operations/independent-publication-contract.md lines 22-25 a green
-# workflow does not prove live publication, and we would rather this canary be
-# red than fabricate a passing result.
-#
-# To wire real evidence: download the publication evidence bundle into
-# ${{ runner.temp }}/publication-evidence and pass --manifest / --receipts-dir /
-# --pages-dir to each step.
-
 on:
   workflow_dispatch:
 
@@ -37,15 +23,15 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Prepare report directory
         run: mkdir -p diagnostic-reports
@@ -59,7 +45,7 @@ jobs:
 
       - name: Upload availability probe report
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: availability-probe-report
           path: diagnostic-reports/availability-report.json
@@ -73,22 +59,19 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: uv sync --group dev
 
-      # The runner context is unavailable in job-level env, so the evidence
-      # directory is exported here for every later step. This runs even when
-      # dependency installation failed, matching the always() consumers below.
       - name: Prepare diagnostic report directory
         if: always()
         run: |
@@ -142,12 +125,10 @@ jobs:
 
       - name: Upload diagnostic canary reports
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: publication-canary-reports
           path: diagnostic-reports/
-          # Diagnostic canary output is a transient build/test artifact
-          # (<= 7 day retention per the operational receipts taxonomy).
           retention-days: 7
 
   certification:
@@ -160,28 +141,28 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Prepare report directory
         run: mkdir -p diagnostic-reports
 
       - name: Download availability probe report
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: availability-probe-report
           path: diagnostic-reports
         continue-on-error: true
 
       - name: Download diagnostic canary reports
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: publication-canary-reports
           path: diagnostic-reports

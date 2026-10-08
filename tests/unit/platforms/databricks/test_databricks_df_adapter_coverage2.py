@@ -1,18 +1,6 @@
-"""Extra coverage tests for Databricks DataFrame adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Targets branches not exercised by the first two test files:
-  - __init__ with _databricks_connect_error message
-  - _get_or_create_spark_session without hostname / token / cluster_id
-  - execute_dataframe_query validation path (benchmark_type + validate_row_count)
-  - execute_dataframe_query with empty result (first_row=None)
-  - execute_dataframe_query with tables dict
-  - get_platform_info in SQL execution_mode (no spark_version branch)
-  - close_connection when spark not initialised
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -32,11 +20,6 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def _fake_parent_init(self, **config):
     self.server_hostname = config.get("server_hostname")
     self.http_path = config.get("http_path")
@@ -49,13 +32,11 @@ def _fake_parent_init(self, **config):
 
 
 def _patch_parent_init(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Replace DatabricksAdapter.__init__ with a lightweight stub."""
 
     monkeypatch.setattr(mod.DatabricksAdapter, "__init__", _fake_parent_init)
 
 
 def _new_adapter(**overrides) -> mod.DatabricksDataFrameAdapter:
-    """Build a DatabricksDataFrameAdapter through its constructor with a fake parent init."""
     config = {
         "server_hostname": overrides.get("server_hostname", "host.cloud.databricks.com"),
         "http_path": overrides.get("http_path", "/sql/path"),
@@ -73,7 +54,6 @@ def _new_adapter(**overrides) -> mod.DatabricksDataFrameAdapter:
 
 
 def _make_fake_spark(registered: list | None = None):
-    """Return a minimal Spark stub whose .table() optionally records calls."""
 
     class _FakeCatalog:
         def setCurrentCatalog(self, _c):
@@ -94,7 +74,6 @@ def _make_fake_spark(registered: list | None = None):
 
 
 def _make_result_df(rows=()):
-    """Return a DataFrame stub whose .collect() returns the given rows."""
 
     class _FakeResultDF:
         def collect(self):
@@ -104,7 +83,6 @@ def _make_result_df(rows=()):
 
 
 def _mock_validator(*, warning=None, is_valid=True, error=None):
-    """Return a (mock_class, mock_result) pair for QueryValidator patching."""
     result = MagicMock()
     result.expected_row_count = 2
     result.validation_mode = ValidationMode.EXACT
@@ -116,14 +94,7 @@ def _mock_validator(*, warning=None, is_valid=True, error=None):
     return validator, result
 
 
-# ---------------------------------------------------------------------------
-# __init__ - connect-error fallback
-# ---------------------------------------------------------------------------
-
-
 class TestInitWithConnectError:
-    """Covers the branch that includes the import-error message in the warning."""
-
     def test_falls_back_when_connect_error_message_set(self, monkeypatch: pytest.MonkeyPatch):
         _patch_parent_init(monkeypatch)
         monkeypatch.setattr(mod, "DATABRICKS_CONNECT_AVAILABLE", False)
@@ -154,16 +125,8 @@ class TestInitWithConnectError:
         assert adapter.cluster_id == "cl-1"
 
 
-# ---------------------------------------------------------------------------
-# _get_or_create_spark_session - credential branches
-# ---------------------------------------------------------------------------
-
-
 class TestSparkSessionCredentialPaths:
-    """Exercise branches for missing hostname, token, or cluster_id."""
-
     def _make_builder(self):
-        """Return (builder, calls_list) where calls records each chained call."""
         calls: list[tuple[str, str]] = []
 
         class _Builder:
@@ -235,14 +198,7 @@ class TestSparkSessionCredentialPaths:
         assert adapter._get_or_create_spark_session() is existing
 
 
-# ---------------------------------------------------------------------------
-# execute_dataframe_query - validation paths
-# ---------------------------------------------------------------------------
-
-
 class TestExecuteDataFrameQueryValidation:
-    """Cover validate_row_count=True branches and result edge cases."""
-
     def _run(
         self,
         adapter,
@@ -256,7 +212,6 @@ class TestExecuteDataFrameQueryValidation:
         tables=None,
         validator_mock=None,
     ):
-        """Helper: patch spark session, optionally validator, run execute_dataframe_query."""
         registered: list[str] = []
         spark = _make_fake_spark(registered=registered if tables else None)
         result_df = _make_result_df(rows)
@@ -365,14 +320,7 @@ class TestExecuteDataFrameQueryValidation:
         assert "execution_time_seconds" in out["resource_usage"]
 
 
-# ---------------------------------------------------------------------------
-# get_platform_info - SQL execution_mode
-# ---------------------------------------------------------------------------
-
-
 class TestGetPlatformInfoSQLMode:
-    """Covers the SQL-mode branch where spark_version is not added."""
-
     def test_sql_mode_skips_spark_version(self, monkeypatch: pytest.MonkeyPatch):
         adapter = _new_adapter(execution_mode="sql")
         monkeypatch.setattr(
@@ -388,14 +336,7 @@ class TestGetPlatformInfoSQLMode:
         assert info["databricks_connect_available"] == mod.DATABRICKS_CONNECT_AVAILABLE
 
 
-# ---------------------------------------------------------------------------
-# close_connection - spark not initialised
-# ---------------------------------------------------------------------------
-
-
 class TestCloseConnectionNotInitialized:
-    """close_connection should delegate to parent even when spark was never started."""
-
     def test_close_without_spark(self, monkeypatch: pytest.MonkeyPatch):
         adapter = _new_adapter()
         close_calls: list = []
@@ -425,14 +366,7 @@ class TestCloseConnectionNotInitialized:
         assert adapter._spark_initialized is False
 
 
-# ---------------------------------------------------------------------------
-# platform_name - mode suffix
-# ---------------------------------------------------------------------------
-
-
 class TestPlatformNameModes:
-    """platform_name includes -df suffix only in dataframe mode."""
-
     def test_dataframe_mode_suffix(self, monkeypatch: pytest.MonkeyPatch):
         _patch_parent_init(monkeypatch)
         monkeypatch.setattr(mod, "DATABRICKS_CONNECT_AVAILABLE", True)
@@ -456,14 +390,7 @@ class TestPlatformNameModes:
         assert adapter.platform_name == "Databricks"
 
 
-# ---------------------------------------------------------------------------
-# execute_query - SQL dispatch
-# ---------------------------------------------------------------------------
-
-
 class TestExecuteQuerySQLDispatch:
-    """execute_query with a SQL string delegates to DatabricksAdapter.execute_query."""
-
     def test_kwargs_forwarded_to_parent(self, monkeypatch: pytest.MonkeyPatch):
         adapter = _new_adapter()
         received: dict = {}

@@ -1,24 +1,3 @@
-"""Dependency audit CI guard for BenchBox.
-
-Fails (exit 1) when:
-  (a) A declared package has zero import sites AND is not in either allowlist.
-  (b) [Future] An imported top-level module is undeclared and not in the
-      guarded-optional allowlist. (Not yet enabled - Phase 5.)
-
-Usage:
-    uv run -- python _project/scripts/dependency_audit/check_deps.py
-    uv run -- python _project/scripts/dependency_audit/check_deps.py --help
-
-Exit codes:
-    0  All checks pass.
-    1  One or more violations found.
-
-See also:
-    _project/scripts/dependency_audit/plugin_cli_allowlist.yaml
-    _project/scripts/dependency_audit/guarded_optional_allowlist.yaml
-    docs/development/dependency-inventory.md (Methodology section)
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -34,23 +13,14 @@ except ImportError:
     print("pyyaml is required. Run: uv run --project _project/scripts -- python check_deps.py", file=sys.stderr)
     sys.exit(1)
 
-# ---------------------------------------------------------------------------
-# Paths (all relative to the repo root, resolved at runtime)
-# ---------------------------------------------------------------------------
 _HERE = pathlib.Path(__file__).resolve().parent
-_ROOT = _HERE.parents[2]  # BenchBox repo root
+_ROOT = _HERE.parents[2]
 
 PLUGIN_CLI_ALLOWLIST = _HERE / "plugin_cli_allowlist.yaml"
 GUARDED_OPTIONAL_ALLOWLIST = _HERE / "guarded_optional_allowlist.yaml"
 
-# Scan targets: main source + test dirs (does NOT include _project/scripts/ -
-# tooling-only imports belong in the isolated env, not the main manifest).
 SCAN_PATHS = ["benchbox", "scripts", "tests", "docs/conf.py", "docs/_static"]
 
-# ---------------------------------------------------------------------------
-# Package → top-level import-name map.
-# Must stay in sync with scan_imports.py and dependency-inventory.md.
-# ---------------------------------------------------------------------------
 PKG_TO_IMPORTS: dict[str, set[str]] = {
     "pyyaml": {"yaml"},
     "markdown-it-py": {"markdown_it"},
@@ -132,9 +102,27 @@ PKG_TO_IMPORTS: dict[str, set[str]] = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+CLI_EPILOG = (
+    "Dependency audit CI guard for BenchBox.\n"
+    "\n"
+    "Fails (exit 1) when:\n"
+    "  (a) A declared package has zero import sites AND is not in either allowlist.\n"
+    "  (b) [Future] An imported top-level module is undeclared and not in the\n"
+    "      guarded-optional allowlist. (Not yet enabled - Phase 5.)\n"
+    "\n"
+    "Usage:\n"
+    "    uv run -- python _project/scripts/dependency_audit/check_deps.py\n"
+    "    uv run -- python _project/scripts/dependency_audit/check_deps.py --help\n"
+    "\n"
+    "Exit codes:\n"
+    "    0  All checks pass.\n"
+    "    1  One or more violations found.\n"
+    "\n"
+    "See also:\n"
+    "    _project/scripts/dependency_audit/plugin_cli_allowlist.yaml\n"
+    "    _project/scripts/dependency_audit/guarded_optional_allowlist.yaml\n"
+    "    docs/development/dependency-inventory.md (Methodology section)\n"
+)
 
 
 def _strip_extras(name: str) -> str:
@@ -214,11 +202,6 @@ def _load_allowlist(path: pathlib.Path) -> set[str]:
     return {_normalize(k) for k in data}
 
 
-# ---------------------------------------------------------------------------
-# Main check
-# ---------------------------------------------------------------------------
-
-
 def run_check(root: pathlib.Path, verbose: bool = False) -> int:
     plugin_allow = _load_allowlist(PLUGIN_CLI_ALLOWLIST)
     guarded_allow = _load_allowlist(GUARDED_OPTIONAL_ALLOWLIST)
@@ -271,7 +254,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Check declared deps against import sites. Fails if any unused dep is found.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__,
+        epilog=CLI_EPILOG,
     )
     parser.add_argument("--verbose", "-v", action="store_true", help="Show all packages, not just violations.")
     parser.add_argument("--root", type=pathlib.Path, default=_ROOT, help="Repo root (default: auto-detected).")

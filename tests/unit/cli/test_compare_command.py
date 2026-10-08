@@ -1,11 +1,6 @@
-"""Tests for the CLI compare command.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the benchmark result comparison command functionality.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import json
 import sys
@@ -20,12 +15,6 @@ from click.testing import CliRunner
 from benchbox.cli.app import cli
 from tests.fixtures.result_dict_fixtures import make_v2_result_dict
 
-# benchbox.cli.commands.__init__ re-exports `compare` (a Click Command) under
-# the same name as the compare submodule.  On Python 3.10 mock's string-based
-# patch() resolves the target via getattr(benchbox.cli.commands, "compare"),
-# which returns the Command object, not the submodule.  Seeding sys.modules
-# here via __import__ and using patch.object() avoids the ambiguity on all
-# Python versions.
 __import__("benchbox.cli.commands.compare")
 _compare_module = _sys.modules["benchbox.cli.commands.compare"]
 
@@ -36,8 +25,6 @@ pytestmark = [
 
 
 class TestCompareCommand:
-    """Test the compare CLI command."""
-
     @staticmethod
     def _set_loaded_result_pair(mock_load):
         mock_baseline = MagicMock(benchmark_name="TPC-H", platform="DuckDB", scale_factor=0.01)
@@ -53,7 +40,7 @@ class TestCompareCommand:
         return baseline_path, current_path
 
     def test_compare_command_exists(self):
-        """Test that the compare command is available."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
 
@@ -61,7 +48,7 @@ class TestCompareCommand:
         assert "compare" in result.output
 
     def test_compare_help(self):
-        """Test the compare help output."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["compare", "--help"])
 
@@ -73,7 +60,6 @@ class TestCompareCommand:
         assert "--show-all-queries" in result.output
 
     def test_compare_requires_two_files(self):
-        """Test that compare requires at least 2 files."""
         runner = CliRunner()
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as f:
             json.dump({"test": "data"}, f)
@@ -89,11 +75,10 @@ class TestCompareCommand:
     @patch.object(_compare_module, "load_result_file")
     @patch.object(_compare_module, "ResultExporter")
     def test_compare_two_files_success(self, mock_exporter_class, mock_load):
-        """Test successful comparison of two result files."""
+
         runner = CliRunner()
         self._set_loaded_result_pair(mock_load)
 
-        # Mock comparison result
         mock_exporter = MagicMock()
         mock_exporter.compare_results.return_value = {
             "baseline_file": "baseline.json",
@@ -120,11 +105,10 @@ class TestCompareCommand:
     @patch.object(_compare_module, "load_result_file")
     @patch.object(_compare_module, "ResultExporter")
     def test_compare_with_regression_detection(self, mock_exporter_class, mock_load):
-        """Test comparison with regression detection and exit code."""
+
         runner = CliRunner()
         self._set_loaded_result_pair(mock_load)
 
-        # Mock comparison with regression
         mock_exporter = MagicMock()
         mock_exporter.compare_results.return_value = {
             "baseline_file": "baseline.json",
@@ -160,14 +144,13 @@ class TestCompareCommand:
             assert "regression detected" in result.output.lower()
 
     def test_compare_json_output_format(self):
-        """Test comparison with JSON output format."""
+
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
             baseline_path = Path(tmpdir) / "baseline.json"
             current_path = Path(tmpdir) / "current.json"
 
-            # Create minimal valid v2 result files
             baseline_data = make_v2_result_dict(version="2.0", query_time_ms=100, total_ms=100)
             current_data = make_v2_result_dict(version="2.0", query_time_ms=100, total_ms=100)
 
@@ -176,8 +159,7 @@ class TestCompareCommand:
 
             result = runner.invoke(cli, ["compare", str(baseline_path), str(current_path), "--format", "json"])
 
-            assert result.exit_code in [0, 1]  # May fail on actual comparison
-            # Output should be valid JSON if it succeeded
+            assert result.exit_code in [0, 1]
             if result.exit_code == 0:
                 try:
                     json.loads(result.output)
@@ -185,7 +167,7 @@ class TestCompareCommand:
                     pytest.fail("Output is not valid JSON")
 
     def test_compare_invalid_threshold_format(self):
-        """Test that invalid regression threshold is rejected."""
+
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -198,7 +180,7 @@ class TestCompareCommand:
             assert "Invalid threshold format" in result.output
 
     def test_compare_help_includes_plan_options(self):
-        """Test that --include-plans and --plan-threshold options are in help."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["compare", "--help"])
 
@@ -210,11 +192,10 @@ class TestCompareCommand:
     @patch.object(_compare_module, "ResultExporter")
     @patch.object(_compare_module, "_compare_plans")
     def test_compare_with_include_plans_flag(self, mock_compare_plans, mock_exporter_class, mock_load):
-        """Test comparison with --include-plans flag."""
+
         runner = CliRunner()
         self._set_loaded_result_pair(mock_load)
 
-        # Mock comparison result
         mock_exporter = MagicMock()
         mock_exporter.compare_results.return_value = {
             "baseline_file": "baseline.json",
@@ -231,7 +212,6 @@ class TestCompareCommand:
         }
         mock_exporter_class.return_value = mock_exporter
 
-        # Mock plan comparison
         mock_compare_plans.return_value = {
             "plans_compared": 22,
             "plans_unchanged": 20,
@@ -248,14 +228,13 @@ class TestCompareCommand:
 
             assert result.exit_code == 0
             mock_compare_plans.assert_called_once()
-            # Plan analysis section should be in output
             assert "QUERY PLAN ANALYSIS" in result.output
 
     @patch.object(_compare_module, "load_result_file")
     @patch.object(_compare_module, "ResultExporter")
     @patch.object(_compare_module, "_compare_plans")
     def test_compare_include_plans_no_plans_available(self, mock_compare_plans, mock_exporter_class, mock_load):
-        """Test --include-plans when result files have no captured plans."""
+
         runner = CliRunner()
         self._set_loaded_result_pair(mock_load)
 
@@ -269,7 +248,6 @@ class TestCompareCommand:
         }
         mock_exporter_class.return_value = mock_exporter
 
-        # Mock plan comparison returning None (no plans found)
         mock_compare_plans.return_value = None
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -281,10 +259,8 @@ class TestCompareCommand:
 
 
 class TestResultFileDiscovery:
-    """Test the result file discovery and metadata extraction functions."""
-
     def test_result_file_metadata_class(self):
-        """Test ResultFileMetadata properties."""
+
         from benchbox.cli.commands.compare import ResultFileMetadata
 
         meta = ResultFileMetadata(
@@ -304,7 +280,7 @@ class TestResultFileDiscovery:
         assert "result.json" in meta.short_path
 
     def test_result_file_metadata_formatted_timestamp_handles_invalid(self):
-        """Test that formatted_timestamp handles invalid timestamps."""
+
         from benchbox.cli.commands.compare import ResultFileMetadata
 
         meta = ResultFileMetadata(
@@ -317,12 +293,11 @@ class TestResultFileDiscovery:
             execution_id="xyz",
         )
 
-        # Should not raise, should return truncated string
         ts = meta.formatted_timestamp
-        assert ts == "invalid-timestam"  # truncated to 16 chars
+        assert ts == "invalid-timestam"
 
     def test_result_file_metadata_empty_timestamp(self):
-        """Test that formatted_timestamp handles empty timestamps."""
+
         from benchbox.cli.commands.compare import ResultFileMetadata
 
         meta = ResultFileMetadata(
@@ -338,13 +313,12 @@ class TestResultFileDiscovery:
         assert meta.formatted_timestamp == "Unknown"
 
     def test_discover_result_files_with_valid_files(self):
-        """Test discovery of valid BenchBox result files."""
+
         from benchbox.cli.commands.compare import _discover_result_files_with_metadata
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmppath = Path(tmpdir)
 
-            # Create valid v2.0 result file
             valid_result = make_v2_result_dict(
                 version="2.0",
                 benchmark_id="tpc_h",
@@ -361,11 +335,9 @@ class TestResultFileDiscovery:
             )
             (tmppath / "valid_result.json").write_text(json.dumps(valid_result))
 
-            # Create invalid file (no version - could be v1.x or just invalid)
             invalid_result = {"benchmark": {"id": "test"}}
             (tmppath / "invalid_result.json").write_text(json.dumps(invalid_result))
 
-            # Create non-JSON file
             (tmppath / "not_json.txt").write_text("not json content")
 
             results = _discover_result_files_with_metadata(search_dirs=[tmppath])
@@ -376,13 +348,12 @@ class TestResultFileDiscovery:
             assert results[0].scale == 0.01
 
     def test_discover_result_files_excludes_manifests(self):
-        """Test that manifest files are excluded from discovery."""
+
         from benchbox.cli.commands.compare import _discover_result_files_with_metadata
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmppath = Path(tmpdir)
 
-            # Create manifest file (has schema_version but no benchmark section)
             manifest = {
                 "schema_version": "1.0",
                 "type": "datagen_manifest",
@@ -395,13 +366,11 @@ class TestResultFileDiscovery:
             assert len(results) == 0
 
     def test_discover_result_files_sorted_by_timestamp(self):
-        """Test that discovered files are sorted by timestamp (newest first)."""
         from benchbox.cli.commands.compare import _discover_result_files_with_metadata
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmppath = Path(tmpdir)
 
-            # Create v2.0 files with different timestamps
             for i, ts in enumerate(["2025-12-13", "2025-12-15", "2025-12-14"]):
                 result = make_v2_result_dict(
                     version="2.0",
@@ -421,13 +390,12 @@ class TestResultFileDiscovery:
             results = _discover_result_files_with_metadata(search_dirs=[tmppath])
 
             assert len(results) == 3
-            # Should be sorted newest first
             assert "2025-12-15" in results[0].timestamp
             assert "2025-12-14" in results[1].timestamp
             assert "2025-12-13" in results[2].timestamp
 
     def test_discover_result_files_handles_empty_directory(self):
-        """Test discovery with empty directory."""
+
         from benchbox.cli.commands.compare import _discover_result_files_with_metadata
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -435,7 +403,7 @@ class TestResultFileDiscovery:
             assert len(results) == 0
 
     def test_discover_result_files_handles_nonexistent_directory(self):
-        """Test discovery with nonexistent directory."""
+
         from benchbox.cli.commands.compare import _discover_result_files_with_metadata
 
         results = _discover_result_files_with_metadata(search_dirs=[Path("/nonexistent/path/that/does/not/exist")])
@@ -443,24 +411,18 @@ class TestResultFileDiscovery:
 
 
 class TestComparePlansDeprecation:
-    """Test that compare-plans command is deprecated and hidden."""
-
     def test_compare_plans_hidden_from_help(self):
-        """Test that compare-plans is hidden from main help."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
 
         assert result.exit_code == 0
-        # compare-plans should not appear in main help
         assert "compare-plans" not in result.output
 
     def test_compare_plans_still_functional(self):
-        """Test that compare-plans command still works (backwards compatibility)."""
         runner = CliRunner()
-        # Just check the help works
         result = runner.invoke(cli, ["compare-plans", "--help"])
 
-        # May show deprecation warning but should still work
         assert "Compare query plans" in result.output or "DEPRECATED" in result.output
 
 

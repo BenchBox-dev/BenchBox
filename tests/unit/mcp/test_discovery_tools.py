@@ -1,16 +1,12 @@
-"""Tests for BenchBox MCP discovery tools.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import sys
 from pathlib import Path
 
 import pytest
 
-# Skip all tests if Python < 3.10
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
@@ -18,10 +14,7 @@ pytestmark = [
 
 
 class TestListPlatformsTool:
-    """Tests for list_platforms tool functionality."""
-
     def test_returns_platform_list(self):
-        """Test that list_platforms returns a list of platforms."""
         from benchbox.core.platform_registry import PlatformRegistry
 
         all_metadata = PlatformRegistry.get_all_platform_metadata()
@@ -30,7 +23,6 @@ class TestListPlatformsTool:
         assert "duckdb" in all_metadata
 
     def test_platform_has_required_fields(self):
-        """Test that platforms have required metadata fields."""
         from benchbox.core.platform_registry import PlatformRegistry
 
         all_metadata = PlatformRegistry.get_all_platform_metadata()
@@ -41,10 +33,7 @@ class TestListPlatformsTool:
 
 
 class TestListBenchmarksTool:
-    """Tests for list_benchmarks tool functionality."""
-
     def test_returns_benchmark_list(self):
-        """Test that benchmarks are discoverable."""
         from benchbox.core.benchmark_registry import get_all_benchmarks
 
         benchmarks = get_all_benchmarks()
@@ -54,7 +43,6 @@ class TestListBenchmarksTool:
         assert "tpcds" in benchmarks
 
     def test_benchmark_has_required_fields(self):
-        """Test that benchmarks have required metadata fields."""
         from benchbox.core.benchmark_registry import get_all_benchmarks
 
         benchmarks = get_all_benchmarks()
@@ -67,7 +55,6 @@ class TestListBenchmarksTool:
             assert "support_status" in meta
 
     def test_list_benchmarks_projects_registry_support_status(self):
-        """MCP benchmark discovery should consume registry support status."""
         from benchbox.mcp.tools.discovery import _list_benchmarks_impl
 
         result = _list_benchmarks_impl()
@@ -78,11 +65,6 @@ class TestListBenchmarksTool:
         assert "joinorder_synthetic" not in benchmarks
 
     def test_list_benchmarks_matches_registry_for_every_public_benchmark(self):
-        """No drift: MCP discovery must label every public benchmark with its registry tier.
-
-        Robust to future promotions/demotions and covers current public beta and
-        experimental benchmarks without hard-coding which ones they are.
-        """
         from benchbox.core.benchmark_registry import get_benchmark_support_status, list_public_benchmark_ids
         from benchbox.mcp.tools.discovery import _list_benchmarks_impl
 
@@ -90,12 +72,10 @@ class TestListBenchmarksTool:
         expected = {bid: get_benchmark_support_status(bid) for bid in list_public_benchmark_ids()}
 
         assert projected == expected
-        # The fleet still spans non-stable public tiers, so the labeling path is exercised.
         assert "beta" in projected.values()
         assert "experimental" in projected.values()
 
     def test_discovery_reads_live_registry_not_import_bound_metadata(self, monkeypatch: pytest.MonkeyPatch):
-        """Discovery must not depend on a BENCHMARK_METADATA object captured at import."""
         from unittest.mock import patch
 
         from benchbox.core import benchmark_registry
@@ -130,10 +110,7 @@ class TestListBenchmarksTool:
 
 
 class TestGetBenchmarkInfoTool:
-    """Tests for get_benchmark_info tool functionality."""
-
     def test_get_tpch_info(self):
-        """Test getting TPC-H benchmark info."""
         from benchbox.core.benchmark_registry import get_all_benchmarks
 
         benchmarks = get_all_benchmarks()
@@ -145,7 +122,6 @@ class TestGetBenchmarkInfoTool:
         assert meta["support_status"] == "stable"
 
     def test_get_benchmark_info_projects_support_status(self):
-        """Detailed MCP benchmark info should expose registry support status."""
         from benchbox.mcp.tools.discovery import _get_benchmark_info_impl
 
         result = _get_benchmark_info_impl("tpch")
@@ -154,7 +130,6 @@ class TestGetBenchmarkInfoTool:
         assert result["support_status"] == "stable"
 
     def test_get_tpcds_info(self):
-        """Test getting TPC-DS benchmark info."""
         from benchbox.core.benchmark_registry import get_all_benchmarks
 
         benchmarks = get_all_benchmarks()
@@ -165,14 +140,12 @@ class TestGetBenchmarkInfoTool:
         assert meta["num_queries"] == 99
 
     def test_unknown_benchmark_error(self):
-        """Test that unknown benchmark returns appropriate error info."""
         from benchbox.core.benchmark_registry import get_all_benchmarks
 
         benchmarks = get_all_benchmarks()
         assert "nonexistent_benchmark" not in benchmarks
 
     def test_get_benchmark_info_docstring_does_not_repeat_registry_list(self):
-        """Human-facing MCP hints should point callers at registry-backed discovery."""
 
         source = Path("benchbox/mcp/tools/discovery.py").read_text(encoding="utf-8")
 
@@ -181,10 +154,7 @@ class TestGetBenchmarkInfoTool:
 
 
 class TestSystemProfileTool:
-    """Tests for system_profile tool functionality."""
-
     def test_returns_system_info(self):
-        """Test that system profile returns CPU and memory info."""
         import psutil
 
         cpu_count = psutil.cpu_count(logical=True)
@@ -196,7 +166,6 @@ class TestSystemProfileTool:
         assert memory.available > 0
 
     def test_benchbox_version_available(self):
-        """Test that BenchBox version is available."""
         import benchbox
 
         version = getattr(benchbox, "__version__", None)
@@ -204,8 +173,6 @@ class TestSystemProfileTool:
 
 
 class TestChartDiscoveryContract:
-    """Tests for visualization discovery metadata."""
-
     def test_chart_discovery_returns_complete_semantic_registry(self):
         from benchbox.core.visualization.chart_types import ALL_CHART_TYPES, CHART_TYPE_DESCRIPTIONS
         from benchbox.mcp.tools.discovery import _list_chart_templates_impl

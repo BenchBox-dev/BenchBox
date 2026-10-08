@@ -73,3 +73,44 @@ test('known child_process exec bindings route shell source, local exec stays dat
   assert.equal(scan('a.ts', 'function exec(value){ return value; } exec("Q1",20);').length, 0);
   assert.equal(scan('a.ts', 'const match = /text/.exec("// data");').length, 0);
 });
+test('node script operands from process.execPath and path.resolve are not inline source', () => {
+  const source = 'import {resolve} from "node:path"; const script = resolve(root, "scripts", "gen.mjs"); spawnSync(process.execPath, [script, "--port", String(port)]);';
+  assert.deepEqual(scan('a.mjs', source), []);
+  const unresolved = 'spawnSync(process.execPath, [operand, "x"]);';
+  assert.equal(scan('a.mjs', unresolved)[0].kind, 'coverage-error');
+});
+test('local wrapper parameters resolve at each in-file call site', () => {
+  const source = 'function run(source){ spawnSync("uv", ["run", "--", "python", "-c", source]); } run("import os  # note");';
+  const findings = scan('a.mjs', source);
+  assert.deepEqual(findings.map(f => [f.kind, f.language, f.text]), [['payload', 'python', 'import os  # note']]);
+  const arrays = 'function runUv(args){ spawnSync("uv", args); } runUv(["run", "--", "python", "-c", "x = 1  # note"]);';
+  assert.equal(scan('a.mjs', arrays)[0].text, 'x = 1  # note');
+  const exported = 'export function run(source){ spawnSync("uv", ["run", "--", "python", "-c", source]); } run("x");';
+  assert.equal(scan('a.mjs', exported)[0].kind, 'coverage-error');
+});
+test('reviewed SQL wrappers scan call sites and accept pass-through bodies', () => {
+  const callers = scan('a.ts', 'const rows = await queryRows("SELECT 1 -- note", []);');
+  assert.deepEqual(callers.map(f => [f.kind, f.language, f.text]), [['payload', 'sql', 'SELECT 1 -- note']]);
+  const body = 'export async function queryRows(sql: string){ return conn.query(sql); }';
+  assert.deepEqual(scan('a.ts', body), []);
+  const mock = 'conn.query = async (sql) => { return query(sql); };';
+  assert.deepEqual(scan('a.ts', mock), []);
+  const spread = 'const statement = await conn.prepare(sql); statement.query(...params);';
+  assert.deepEqual(scan('a.ts', spread).filter(f => f.text.includes('params')), []);
+});
+test('path.join on an absolute root is an absolute script operand', () => {
+  const source = 'import {join, resolve} from "node:path"; const root = resolve(here, ".."); const gen = join(root, "scripts", "gen.mjs"); spawnSync(process.execPath, [gen]);';
+  assert.deepEqual(scan('a.mjs', source), []);
+  const relative = 'import {join} from "node:path"; const gen = join(base, "gen.mjs"); spawnSync(process.execPath, [gen]);';
+  assert.equal(scan('a.mjs', relative)[0].kind, 'coverage-error');
+});
+test('required path module resolves script operands', () => {
+  const source = 'const path = require("node:path"); const adapter = path.resolve(__dirname, "x.cjs"); spawnSync("node", [adapter]);';
+  assert.deepEqual(scan('a.cjs', source), []);
+});
+test('method-form reviewed wrappers and spread SQL arguments stay visible', () => {
+  assert.equal(scan('a.ts', 'db.queryRows("SELECT 1 -- hi");')[0].text, 'SELECT 1 -- hi');
+  assert.equal(scan('a.ts', 'db.queryRows(dynamicSql);')[0].kind, 'coverage-error');
+  assert.equal(scan('a.ts', 'query(...["SELECT 1 -- hi"]);')[0].kind, 'coverage-error');
+  assert.deepEqual(scan('a.ts', 'let statement; statement = await conn.prepare("SELECT ?"); statement.query(...params);').filter(f => f.kind !== 'payload'), []);
+});

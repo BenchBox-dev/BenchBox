@@ -1,0 +1,76 @@
+# Pages under docs/development/ and docs/operations/ that are published on
+# the public site. Any other page in those directories is left out of both the
+# Sphinx and the Astro build.
+#
+# Add a page here only if it is for people who use BenchBox or for outside
+# contributors. Maintainer runbooks, governance, release and CI procedure,
+# dated evidence, incident records and planning documents belong in
+# docs/internal/, which is never published. A page in these directories that
+# stays unpublished must be listed in docs/publish-exclusions.txt.
+#
+# tests/unit/docs/test_publish_policy.py and website/tests/sources.test.ts
+# enforce this list.
+
+development/adding-dataframe-platform.md
+development/adding-new-platforms.md
+development/adr/0001-unified-platform-registration.md
+development/adr/README.md
+development/adr/adr-billing-unit-tb-tib-contract.md
+development/adr/adr-clickhouse-server-containerization.md
+development/adr/adr-client-link-locality-disclosure.md
+development/adr/adr-concurrency-outcome-and-ownership-contract.md
+development/adr/adr-concurrency-public-api-reconciliation.md
+development/adr/adr-corpus-validation-admission-policy.md
+development/adr/adr-cross-benchmark-power-throughput-scores.md
+development/adr/adr-ducklake-maturity-and-publishability.md
+development/adr/adr-flightdata-month-source-policy.md
+development/adr/adr-one-engine-scoped-surfaces.md
+development/adr/adr-public-result-id-permanence.md
+development/adr/adr-published-identifier-field-set.md
+development/adr/adr-read-primitives-cloud-variants.md
+development/adr/adr-runtime-composition-boundary.md
+development/adr/adr-sql-compat-phase-aware-pipeline.md
+development/adr/adr-sqlglot-use-and-non-use.md
+development/adr/adr-textcharts-extraction.md
+development/adr/adr-tpcdi-enhanced-parallel-support-decision.md
+development/adr/adr-tpchavoc-submission-variant-coverage.md
+development/architecture-design.md
+development/data-dependencies.md
+development/data-sharing.md
+development/db-api-2.md
+development/dependency-compatibility.md
+development/development.md
+development/getting-started.md
+development/import-patterns.md
+development/index.md
+development/mcp-platform-option-contract.md
+development/new-platform-acceptance-checklist.md
+development/platform-development.md
+development/pytest-xdist-safety.md
+development/read-primitives-catalog.md
+development/read-primitives-skips-reference.md
+development/result-execution-environment.md
+development/result-integrity-validation.md
+development/result-validation.md
+development/results-explorer-browser-testing.md
+development/roadmap.md
+development/run-lifecycle-map.md
+development/runtime-modules.md
+development/test-quality-guidelines.md
+development/test-tier-policy.md
+development/testing.md
+development/tpc-compilation-guide.md
+development/tpcds-dataframe-parity.md
+development/tuning-adr-001-trust-and-hash-semantics.md
+development/tuning-adr-002-mode-vocabulary-fallback-facets.md
+development/tuning-adr-003-baseline-and-single-renderer.md
+development/tuning-introspection-receipts.md
+operations/ci-local-parity.md
+operations/concurrency-proof-matrix.md
+operations/fast-lane-budget.md
+operations/guards-fix.md
+operations/mcp-remote-security.md
+operations/results-explorer-token-scan.md
+operations/uat-framework.md
+operations/uat-local-provisioning.md
+operations/uat-methodology.md

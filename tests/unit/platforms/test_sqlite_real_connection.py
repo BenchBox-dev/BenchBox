@@ -1,8 +1,3 @@
-"""Behavior-verifying tests for SQLite adapter using real in-memory connections.
-
-Every test creates a real SQLite connection - no MagicMock on the connection path.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -15,7 +10,7 @@ pytestmark = [
 
 @pytest.fixture()
 def adapter(tmp_path):
-    """Create a SQLite adapter with in-memory database."""
+
     from benchbox.platforms.sqlite import SQLiteAdapter
 
     return SQLiteAdapter(database_path=":memory:")
@@ -23,7 +18,7 @@ def adapter(tmp_path):
 
 @pytest.fixture()
 def connection(adapter):
-    """Create a real in-memory SQLite connection."""
+
     conn = adapter.create_connection()
     yield conn
     try:
@@ -76,11 +71,11 @@ class TestSQLiteRealConnection:
     def test_platform_info_returns_sqlite_version(self, adapter, connection):
         info = adapter.get_platform_info(connection)
         assert "platform_version" in info
-        # SQLite version is a string like "3.45.0"
+
         assert "." in info["platform_version"]
 
     def test_wal_mode_applied_for_file_database(self, adapter, tmp_path):
-        """Verify WAL mode is applied for file-based databases."""
+
         from benchbox.platforms.sqlite import SQLiteAdapter
 
         db_path = str(tmp_path / "test.db")
@@ -88,7 +83,7 @@ class TestSQLiteRealConnection:
         conn = file_adapter.create_connection()
 
         journal_mode = conn.execute("PRAGMA journal_mode").fetchone()
-        # WAL mode should be set for file databases
+
         assert journal_mode is not None
         conn.close()
 

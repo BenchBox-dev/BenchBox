@@ -84,7 +84,7 @@ report that proves the export preserves the imported database:
 ```sh
 SHADOW_DB="${TMPDIR:-/tmp}/benchbox-todo-shadow.sqlite"
 REPORT="${TMPDIR:-/tmp}/benchbox-todo-shadow.json"
-rm -f "$SHADOW_DB" "$REPORT"  # only these explicitly named temp files
+rm -f "$SHADOW_DB" "$REPORT"
 
 uv run --project _project/scripts -- python _project/scripts/todo_db_shadow.py \
   --todo-dir _project/TODO \
@@ -92,6 +92,8 @@ uv run --project _project/scripts -- python _project/scripts/todo_db_shadow.py \
   --db "$SHADOW_DB" \
   --report "$REPORT"
 ```
+
+The `rm -f` command deletes only the two explicitly named temporary files.
 
 The shadow tool invokes `todo-db` only as `uv run --project
 _project/scripts --locked -- todo-db`. The package must be present in the locked

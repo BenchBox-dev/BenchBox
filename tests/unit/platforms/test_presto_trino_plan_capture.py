@@ -1,9 +1,3 @@
-"""Wiring tests for Presto / Starburst / Athena query plan capture.
-
-Uses a fake DBAPI connection that returns the recorded EXPLAIN (FORMAT JSON)
-fixture for EXPLAIN statements, so no live engine is required.
-"""
-
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -20,8 +14,6 @@ _FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "query_plans"
 
 
 class _FakeCursor:
-    """Returns the EXPLAIN fixture for EXPLAIN statements, one row otherwise."""
-
     def __init__(self, explain_json: str):
         self._explain_json = explain_json
         self._last_sql = ""
@@ -99,7 +91,7 @@ class TestGetQueryPlanUsesFormatJson:
     def test_presto_get_query_plan_requests_format_json(self, presto_adapter):
         conn = _FakeConn(_load("presto_explain_sample.json"))
         cursor = conn.cursor()
-        conn.cursor = lambda: cursor  # reuse so we can inspect the last SQL
+        conn.cursor = lambda: cursor
         plan = presto_adapter.get_query_plan(conn, "SELECT 1")
         assert "FORMAT JSON" in cursor._last_sql.upper()
         assert plan.strip().startswith("{")

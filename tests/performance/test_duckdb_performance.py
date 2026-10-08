@@ -1,12 +1,6 @@
-"""Performance tests using DuckDB for BenchBox benchmarks.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module contains comprehensive performance tests for DuckDB execution of
-benchmark queries, including scaling behavior, memory usage, and regression detection.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import threading
 import time
@@ -27,8 +21,6 @@ pytestmark = [
 
 
 class MemoryMonitor:
-    """Monitor memory usage during test execution."""
-
     def __init__(self, interval: float = 0.1):
         self.interval = interval
         self.measurements = []
@@ -36,7 +28,6 @@ class MemoryMonitor:
         self.thread = None
 
     def start(self):
-        """Start memory monitoring in a separate thread."""
         self.running = True
         self.measurements = []
         self.thread = threading.Thread(target=self._monitor)
@@ -44,7 +35,6 @@ class MemoryMonitor:
         self.thread.start()
 
     def stop(self) -> dict[str, float]:
-        """Stop memory monitoring and return statistics."""
         self.running = False
         if self.thread:
             self.thread.join()
@@ -59,7 +49,6 @@ class MemoryMonitor:
         return {"peak_mb": peak_mb, "avg_mb": avg_mb, "min_mb": min_mb}
 
     def _monitor(self):
-        """Monitor memory usage in a loop."""
         process = psutil.Process()
         while self.running:
             try:
@@ -72,13 +61,11 @@ class MemoryMonitor:
 
 @pytest.fixture
 def memory_monitor():
-    """Provide memory monitoring for performance tests."""
     return MemoryMonitor()
 
 
 @pytest.fixture
 def performance_config():
-    """Configuration for performance tests."""
     return {
         "timeout_seconds": 60,
         "memory_limit_mb": 1024,
@@ -89,24 +76,18 @@ def performance_config():
     }
 
 
-@pytest.mark.slow  # Memory thresholds are flaky depending on system state
+@pytest.mark.slow
 @pytest.mark.performance
 @pytest.mark.duckdb
 class TestDuckDBQueryPerformance:
-    """Test DuckDB query execution performance."""
-
     def test_tpch_complex_query_performance(self, duckdb_with_extensions, tmp_path, memory_monitor):
-        """Test performance of complex TPC-H queries."""
         tpch = TPCH(scale_factor=0.1, output_dir=tmp_path / "tpch_complex", verbose=False)
 
-        # Mock data generation
         with patch.object(tpch, "generate_data") as mock_gen:
             mock_gen.return_value = self._create_mock_data_files(tmp_path, 0.1)
 
-            # Setup tables
             self._setup_tpch_tables(duckdb_with_extensions, 0.1)
 
-            # Test TPC-H Query 1 (complex aggregation)
             query_1 = """
                 SELECT
                     l_returnflag,
@@ -126,30 +107,23 @@ class TestDuckDBQueryPerformance:
             """
 
             memory_monitor.start()
-            # Use manual timing instead of benchmark fixture
             start_time = time.time()
             self._execute_query(duckdb_with_extensions, query_1)
             end_time = time.time()
             exec_time = end_time - start_time
             memory_stats = memory_monitor.stop()
 
-            # Verify performance thresholds
-            # Note: Memory threshold accounts for entire process memory (Python + DuckDB + test framework)
             assert exec_time < 10.0, f"Complex query too slow: {exec_time}s"
             assert memory_stats["peak_mb"] < 2500, f"Memory usage too high: {memory_stats['peak_mb']}MB"
 
     def test_tpch_join_performance(self, duckdb_with_extensions, tmp_path, memory_monitor):
-        """Test performance of TPC-H join queries."""
         tpch = TPCH(scale_factor=0.1, output_dir=tmp_path / "tpch_join", verbose=False)
 
-        # Mock data generation
         with patch.object(tpch, "generate_data") as mock_gen:
             mock_gen.return_value = self._create_mock_data_files(tmp_path, 0.1)
 
-            # Setup tables
             self._setup_tpch_tables(duckdb_with_extensions, 0.1)
 
-            # Test multi-table join
             join_query = """
                 SELECT
                     c.c_name,
@@ -164,30 +138,23 @@ class TestDuckDBQueryPerformance:
             """
 
             memory_monitor.start()
-            # Use manual timing instead of benchmark fixture
             start_time = time.time()
             self._execute_query(duckdb_with_extensions, join_query)
             end_time = time.time()
             exec_time = end_time - start_time
             memory_stats = memory_monitor.stop()
 
-            # Verify join performance
-            # Note: Memory threshold accounts for entire process memory (Python + DuckDB + test framework)
             assert exec_time < 5.0, f"Join query too slow: {exec_time}s"
             assert memory_stats["peak_mb"] < 2500, f"Join memory usage too high: {memory_stats['peak_mb']}MB"
 
     def test_tpcds_query_performance(self, duckdb_with_extensions, tmp_path, memory_monitor):
-        """Test TPC-DS query performance."""
         tpcds = TPCDS(scale_factor=1.0, output_dir=tmp_path / "tpcds_perf", verbose=False)
 
-        # Mock data generation
         with patch.object(tpcds, "generate_data") as mock_gen:
             mock_gen.return_value = self._create_mock_tpcds_data_files(tmp_path)
 
-            # Setup basic TPC-DS tables
             self._setup_tpcds_tables(duckdb_with_extensions)
 
-            # Test a simple TPC-DS-style query
             query = """
                 SELECT
                     ss_store_sk,
@@ -200,62 +167,48 @@ class TestDuckDBQueryPerformance:
             """
 
             memory_monitor.start()
-            # Use manual timing instead of benchmark fixture
             start_time = time.time()
             self._execute_query(duckdb_with_extensions, query)
             end_time = time.time()
             exec_time = end_time - start_time
             memory_stats = memory_monitor.stop()
 
-            # Verify TPC-DS performance
-            # Note: Memory threshold accounts for entire process memory (Python + DuckDB + test framework)
             assert exec_time < 5.0, f"TPC-DS query too slow: {exec_time}s"
             assert memory_stats["peak_mb"] < 2500, f"TPC-DS memory usage too high: {memory_stats['peak_mb']}MB"
 
     def test_query_cache_performance(self, duckdb_with_extensions, tmp_path):
-        """Test query performance with and without caching."""
-        # Setup test data
         self._setup_tpch_tables(duckdb_with_extensions, 0.01)
 
         query = "SELECT COUNT(*) FROM lineitem WHERE l_shipdate <= '1998-12-01'"
 
-        # First execution (cold cache)
         start_time = time.time()
         self._execute_query(duckdb_with_extensions, query)
         end_time = time.time()
         first_time = end_time - start_time
 
-        # Second execution (potential cache hit)
         start_time = time.time()
         self._execute_query(duckdb_with_extensions, query)
         end_time = time.time()
         second_time = end_time - start_time
 
-        # Log performance for analysis
         print(f"First execution: {first_time:.4f}s")
         print(f"Second execution: {second_time:.4f}s")
         print(f"Speedup ratio: {first_time / second_time:.2f}x")
 
-        # Verify both executions complete successfully
         assert first_time > 0
         assert second_time > 0
 
     def _execute_query(self, conn, query: str) -> Any:
-        """Execute a query and return the result."""
         if hasattr(conn, "_mock_name"):
-            # Mock connection for testing
             return [[42]]
         else:
-            # Real DuckDB connection
             result = conn.execute(query).fetchall()
             return result
 
     def _create_mock_data_files(self, tmp_path: Path, scale_factor: float) -> dict[str, str]:
-        """Create mock data files for testing."""
         data_dir = tmp_path / "data"
         data_dir.mkdir(exist_ok=True)
 
-        # Calculate approximate row counts based on scale factor
         base_rows = {
             "region": 5,
             "nation": 25,
@@ -272,13 +225,12 @@ class TestDuckDBQueryPerformance:
             file_path = data_dir / f"{table}.csv"
             files[table] = str(file_path)
 
-            # Create minimal CSV files for testing
             with open(file_path, "w", encoding="utf-8") as f:
                 if table == "lineitem":
                     f.write(
                         "l_orderkey,l_partkey,l_suppkey,l_linenumber,l_quantity,l_extendedprice,l_discount,l_tax,l_returnflag,l_linestatus,l_shipdate,l_commitdate,l_receiptdate,l_shipinstruct,l_shipmode,l_comment\n"
                     )
-                    for i in range(min(row_count, 1000)):  # Limit for testing
+                    for i in range(min(row_count, 1000)):
                         f.write(
                             f"{i},{i},{i},{i},1.0,100.0,0.05,0.08,A,F,1998-01-01,1998-01-15,1998-01-20,DELIVER IN PERSON,TRUCK,test comment\n"
                         )
@@ -300,11 +252,9 @@ class TestDuckDBQueryPerformance:
         return files
 
     def _create_mock_tpcds_data_files(self, tmp_path: Path) -> dict[str, str]:
-        """Create mock TPC-DS data files for testing."""
         data_dir = tmp_path / "tpcds_data"
         data_dir.mkdir(exist_ok=True)
 
-        # Create minimal store_sales table
         store_sales_path = data_dir / "store_sales.csv"
         with open(store_sales_path, "w", encoding="utf-8") as f:
             f.write("ss_store_sk,ss_sales_price\n")
@@ -314,12 +264,9 @@ class TestDuckDBQueryPerformance:
         return {"store_sales": str(store_sales_path)}
 
     def _setup_tpch_tables(self, conn, scale_factor: float):
-        """Setup TPC-H tables for testing."""
         if hasattr(conn, "_mock_name"):
-            # Mock connection - no actual setup needed
             return
 
-        # Create minimal tables for testing
         tables = {
             "lineitem": """
                 CREATE TABLE IF NOT EXISTS lineitem (
@@ -379,17 +326,14 @@ class TestDuckDBQueryPerformance:
             """,
         }
 
-        # Create tables
         for table_name, create_sql in tables.items():
             try:
                 conn.execute(create_sql)
             except Exception as e:
                 print(f"Warning: Could not create table {table_name}: {e}")
 
-        # Insert test data
         row_count = max(1, int(1000 * scale_factor))
 
-        # Insert lineitem data
         try:
             for i in range(row_count):
                 conn.execute(
@@ -403,7 +347,6 @@ class TestDuckDBQueryPerformance:
         except Exception as e:
             print(f"Warning: Could not insert lineitem data: {e}")
 
-        # Insert orders data
         try:
             for i in range(row_count):
                 conn.execute(
@@ -416,7 +359,6 @@ class TestDuckDBQueryPerformance:
         except Exception as e:
             print(f"Warning: Could not insert orders data: {e}")
 
-        # Insert customer data
         try:
             for i in range(row_count):
                 conn.execute(
@@ -430,12 +372,9 @@ class TestDuckDBQueryPerformance:
             print(f"Warning: Could not insert customer data: {e}")
 
     def _setup_tpcds_tables(self, conn):
-        """Setup TPC-DS tables for testing."""
         if hasattr(conn, "_mock_name"):
-            # Mock connection - no actual setup needed
             return
 
-        # Create minimal store_sales table
         try:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS store_sales (
@@ -444,7 +383,6 @@ class TestDuckDBQueryPerformance:
                 )
             """)
 
-            # Insert test data
             for i in range(100):
                 conn.execute(
                     """
@@ -459,14 +397,9 @@ class TestDuckDBQueryPerformance:
 @pytest.mark.performance
 @pytest.mark.duckdb
 class TestDuckDBRegressionDetection:
-    """Test for performance regressions in DuckDB queries."""
-
     def test_baseline_performance_metrics(self, duckdb_with_extensions, tmp_path):
-        """Establish baseline performance metrics for regression detection."""
-        # Setup test data
         self._setup_baseline_tables(duckdb_with_extensions)
 
-        # Define baseline queries
         baseline_queries = {
             "simple_count": "SELECT COUNT(*) FROM test_table",
             "simple_aggregation": "SELECT category, COUNT(*) FROM test_table GROUP BY category",
@@ -475,22 +408,18 @@ class TestDuckDBRegressionDetection:
 
         baseline_results = {}
         for query_name, query in baseline_queries.items():
-            # Use manual timing instead of benchmark fixture
             start_time = time.time()
             self._execute_query(duckdb_with_extensions, query)
             end_time = time.time()
             exec_time = end_time - start_time
             baseline_results[query_name] = exec_time
 
-            # Store baseline for comparison (in real usage, this would be persisted)
             print(f"Baseline {query_name}: {exec_time:.4f}s")
 
-        # Verify all baselines are reasonable
         for query_name, exec_time in baseline_results.items():
             assert exec_time < 1.0, f"Baseline {query_name} too slow: {exec_time}s"
 
     def _setup_baseline_tables(self, conn):
-        """Setup baseline tables for regression testing."""
         if hasattr(conn, "_mock_name"):
             return
 
@@ -503,7 +432,6 @@ class TestDuckDBRegressionDetection:
                 )
             """)
 
-            # Insert test data
             for i in range(1000):
                 conn.execute(
                     """
@@ -515,7 +443,6 @@ class TestDuckDBRegressionDetection:
             print(f"Warning: Could not setup baseline tables: {e}")
 
     def _execute_query(self, conn, query: str) -> Any:
-        """Execute a query and return the result."""
         if hasattr(conn, "_mock_name"):
             return [[42]]
         else:

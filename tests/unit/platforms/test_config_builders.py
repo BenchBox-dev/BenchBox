@@ -1,9 +1,6 @@
-"""Tests for config builder pure functions: azure/config_utils + databend/__init__.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock, patch
 
@@ -16,8 +13,6 @@ pytestmark = [
 
 
 class TestAzureConfigUtils:
-    """Tests for benchbox.platforms.azure.config_utils.build_platform_config."""
-
     def _call(self, **kwargs):
         from benchbox.platforms.azure.config_utils import build_platform_config
 
@@ -53,7 +48,7 @@ class TestAzureConfigUtils:
 
     @patch("benchbox.security.credentials.CredentialManager")
     def test_option_merge_precedence(self, MockCM):
-        """overrides wins over options wins over saved_creds."""
+
         MockCM.return_value.get_platform_credentials.return_value = {"host": "from-saved"}
         config = self._call(
             platform_fields=["host"],
@@ -92,8 +87,7 @@ class TestAzureConfigUtils:
 
     @patch("benchbox.security.credentials.CredentialManager")
     def test_base_options_seed_value_appears_in_result(self, MockCM):
-        # Use model_dump() - "schema" conflicts with Pydantic's deprecated .schema classmethod
-        # when accessed as an attribute, but survives the model_dump() path used in production.
+
         MockCM.return_value.get_platform_credentials.return_value = {}
         config = self._call(
             platform_fields=["schema"],
@@ -127,8 +121,6 @@ class TestAzureConfigUtils:
 
 
 class TestDatabendConfigBuilder:
-    """Tests for benchbox.platforms.databend._build_databend_config."""
-
     def _call(self, **kwargs):
         from benchbox.platforms.databend import _build_databend_config
 

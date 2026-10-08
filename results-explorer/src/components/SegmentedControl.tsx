@@ -9,7 +9,6 @@ export interface SegmentedOption<T extends string> {
 }
 
 interface SegmentedControlProps<T extends string> {
-  /** Accessible label for the group. Required. */
   ariaLabel: string;
   options: SegmentedOption<T>[];
   value: T;

@@ -133,14 +133,12 @@ See `_sources/tpc-ds/PATCHES.md` for detailed documentation.
 After applying patches, verify they were applied correctly:
 
 ```bash
-# TPC-H: Check for -z flag
 grep -n "zstdout" _sources/tpc-h/dbgen/dss.h
-# Expected: "EXTERN int  zstdout;"
 
-# TPC-DS: Check FILTER fix
 grep -n '"FILTER"' _sources/tpc-ds/tools/params.h
-# Expected: "FILTER" without leading underscore
 ```
+
+The first command checks the TPC-H `-z` flag and should print `EXTERN int  zstdout;`. The second checks the TPC-DS FILTER fix and should show `"FILTER"` without a leading underscore.
 
 ## Compiling Binaries
 
@@ -159,16 +157,14 @@ grep -n '"FILTER"' _sources/tpc-ds/tools/params.h
 For quick local development on Apple Silicon:
 
 ```bash
-# TPC-H
 cd _sources/tpc-h/dbgen
 make -f makefile.suite CC=clang MACHINE=LINUX DATABASE=ORACLE WORKLOAD=TPCH
-# Output: dbgen, qgen
 
-# TPC-DS (requires patches applied first)
 cd _sources/tpc-ds/tools
 make CC=clang CFLAGS="-O2 -DMACOS -DMAXINT=INT_MAX -fcommon"
-# Output: dsdgen, dsqgen, distcomp
 ```
+
+The TPC-H build produces `dbgen` and `qgen`. The TPC-DS build requires the patches to be applied first and produces `dsdgen`, `dsqgen` and `distcomp`.
 
 ### Full Multi-Platform Compilation
 
@@ -196,34 +192,32 @@ cd _sources/compilation/scripts
 Build Docker images for cross-compilation:
 
 ```bash
-# Linux x86_64
 docker build -f _sources/compilation/docker/Dockerfile.linux-x86_64 \
     -t benchbox/tpc-linux-x86_64 _sources/compilation/docker/
 
-# Linux ARM64
 docker build -f _sources/compilation/docker/Dockerfile.linux-arm64 \
     -t benchbox/tpc-linux-arm64 _sources/compilation/docker/
 ```
+
+The first command builds the Linux x86_64 image and the second builds the Linux ARM64 image.
 
 ## Binary Verification
 
 After compilation, verify binaries work correctly:
 
 ```bash
-# TPC-H: Generate small dataset
 _binaries/tpc-h/darwin-arm64/dbgen -s 0.01 -f
-ls -la *.tbl  # Should create customer.tbl, orders.tbl, etc.
+ls -la *.tbl
 
-# TPC-H: Test stdout mode
 _binaries/tpc-h/darwin-arm64/dbgen -z -s 0.01 -T c | head -5
 
-# TPC-DS: Generate small dataset (bundled binaries require SCALE >= 1)
 _binaries/tpc-ds/darwin-arm64/dsdgen -SCALE 1 -TABLE ship_mode -DIR /tmp
 cat /tmp/ship_mode.dat | head -5
 
-# TPC-DS: Test stdout mode
 _binaries/tpc-ds/darwin-arm64/dsdgen -SCALE 1 -TABLE ship_mode -FILTER Y | head -5
 ```
+
+The four checks run in order: TPC-H small dataset, TPC-H stdout mode (`-z`), TPC-DS small dataset, and TPC-DS stdout mode (`-FILTER Y`). The first should create `customer.tbl`, `orders.tbl` and the other TPC-H tables. The TPC-DS checks use `-SCALE 1` because the bundled binaries require a scale factor of at least 1.
 
 ## Important Constraints
 
@@ -258,13 +252,14 @@ Neither dbgen nor dsdgen are thread-safe for parallel generation of the same tab
 Use the `-C` (chunks) and `-S` (step) flags for parallel generation:
 
 ```bash
-# Generate customer table in 4 parallel chunks
 for i in 1 2 3 4; do
     dbgen -s 10 -C 4 -S $i -T c &
 done
 wait
 cat customer.tbl.* > customer.tbl
 ```
+
+This generates the customer table in 4 parallel chunks and then concatenates them.
 
 ## Git Tracking Strategy
 

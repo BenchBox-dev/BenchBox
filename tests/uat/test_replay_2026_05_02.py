@@ -1,9 +1,3 @@
-"""Structural-parity assertion for the 2026-05-02 replay config.
-
-Marked @pytest.mark.slow because it walks the full registry-driven
-matrix even in dry-run mode; not in the fast-test default.
-"""
-
 from __future__ import annotations
 
 import json
@@ -19,20 +13,12 @@ pytestmark = pytest.mark.slow
 
 
 def test_replay_dry_run_produces_expected_columns(tmp_path: Path):
-    """Run the orchestrator in dry-run mode against the historical config.
-
-    Asserts the report header shape matches the fixture snapshot of the
-    historical 2026-05-02 retrospective. This is not a row-count replay.
-    """
     from tests.uat.config import load_config
     from tests.uat.orchestrator import run_sweep
 
     cfg = load_config(CONFIG)
-    cfg = replace(cfg, dry_run=True)  # force structural pass
+    cfg = replace(cfg, dry_run=True)
     result = run_sweep(cfg, log_dir_override=tmp_path)
-    # In dry_run mode every phase records 0; the report phase isn't asked
-    # to write the TSV under dry_run, so we compare only the column header
-    # we'd emit. The header is fixed.
     expected_columns = HEADER_FIXTURE.read_text(encoding="utf-8").rstrip("\n").split("\t")
     from tests.uat.phases.report import REPORT_HEADER
 
@@ -41,7 +27,6 @@ def test_replay_dry_run_produces_expected_columns(tmp_path: Path):
 
 
 def test_replay_config_has_expected_shape():
-    """Cheap structural smoke: the historical config keys match the retrospective."""
     import yaml
 
     raw = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))

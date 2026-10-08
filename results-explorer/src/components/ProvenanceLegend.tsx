@@ -3,34 +3,6 @@ import { useState } from "preact/hooks";
 import { FundingChip, fundingDescription, UNSPECIFIED_FUNDING } from "@/components/FundingChip";
 import { TrustBadge, trustLabelDescription } from "@/components/TrustBadge";
 
-// ---------------------------------------------------------------------------
-// ProvenanceLegend - collapsible "What do these labels mean?" panel.
-//
-// docs/reference/hosted-results-contract.md (§ Trust label rendering rules)
-// requires that "a legend explaining all trust labels is accessible from every
-// page that displays them". This is that legend, extended with the orthogonal
-// funding axis.
-//
-// Rows render the REAL TrustBadge / FundingChip components and pull their prose
-// from the components' own config via trustLabelDescription() /
-// fundingDescription(). The legend therefore cannot drift from the badges it
-// explains - there is one source for each string.
-//
-// Rendered on every page that shows a TrustBadge or FundingChip - ResultDetail,
-// BenchmarkIndex, PlatformIndex, Compare (loaded comparison), and Leaderboard
-// (the compare landing / meta leaderboard view, so /results/compare carries
-// the legend whether or not runs are selected) - per the
-// hosted-results-contract rule that a legend explaining the labels is reachable
-// from every surface that displays them. It is collapsed by default so it costs
-// a line of chrome, not a screenful.
-// ---------------------------------------------------------------------------
-
-/**
- * Canonical trust labels, one row each. TRUST_CONFIG additionally carries
- * alias keys (`ci`/`ci-verified`/`ci-validated`, `local`/`local-run`) that map
- * onto the same badge; listing every alias would show the reader duplicate
- * rows, so the legend names the canonical spelling only.
- */
 const LEGEND_TRUST_LABELS = [
   "maintainer-run",
   "community-submission",
@@ -40,11 +12,6 @@ const LEGEND_TRUST_LABELS = [
   "unofficial-research",
 ] as const;
 
-/**
- * Mirror of benchbox/core/results/provenance.py::FUNDING_SOURCES minus
- * `unspecified`, which is covered by its own explanatory row below because it
- * renders no chip at all.
- */
 const LEGEND_FUNDING_SOURCES = [
   "employer",
   "personal",

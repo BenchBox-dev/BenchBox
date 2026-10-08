@@ -18,14 +18,14 @@ from typing import Any
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from required_lane import (  # noqa: E402
+from required_lane import (
     REQUIRED_CHECK_NAMES,
     _parse_iso,
-    is_check_run_success,  # noqa: F401 - re-exported for compat
+    is_check_run_success,  # noqa: F401
     is_required_lane_green,
     latest_check_run,
 )
-from soundness_paths import any_soundness_path  # noqa: E402
+from soundness_paths import any_soundness_path
 
 FIXTURE_PATH = SCRIPT_DIR / "fixtures" / "soundness_drain_fixture.json"
 
@@ -36,17 +36,11 @@ DRAIN_LABEL = "awaiting-owner"
 DRAIN_LABEL_COLOR = "b60205"
 DRAIN_LABEL_DESCRIPTION = "Green, gated on owner review, parked >24h (see docs/operations/soundness-drain.md)"
 PINNED_ISSUE_TITLE = "Soundness-PR drain queue"
-# Body marker: proves the digest issue was written by this script, so
-# find_pinned_issue never adopts (and later clobbers) a human issue that
-# happens to reuse the title.
 DIGEST_BODY_MARKER = "<!-- soundness-drain-digest -->"
 IDLE_THRESHOLD_HOURS = 24.0
 API_ROOT = "https://api.github.com"
 
 
-# ---------------------------------------------------------------------------
-# Pure classification logic (unit-/self-tested; no git/network)
-# ---------------------------------------------------------------------------
 @dataclass(frozen=True)
 class ClassifiedPR:
     number: int
@@ -67,16 +61,6 @@ class ClassifiedPR:
 
 
 def required_lane_green_at(check_runs: list[dict[str, Any]]) -> str | None:
-    """Timestamp at which the required lane went green: the LAST context to finish.
-
-    A PR is only green once *every* required context has completed, so the
-    park-time anchor is the maximum ``completed_at`` across them -- not
-    ``ci-required-result``'s alone, which would overstate park time whenever
-    the browser gate finishes later and trip the >24h gate early. Returns
-    None when any required context lacks a completion timestamp, leaving the
-    caller to fall back rather than anchor on a half-finished lane.
-    Uses datetime parsing so fractional seconds and offsets sort correctly.
-    """
     stamps: list[dt.datetime] = []
     raw: list[str] = []
     for name in REQUIRED_CHECK_NAMES:
@@ -88,7 +72,6 @@ def required_lane_green_at(check_runs: list[dict[str, Any]]) -> str | None:
             stamps.append(_parse_iso(str(stamp)))
         except (ValueError, TypeError):
             return None
-    # Return the raw string of the latest timestamp (caller parses it).
     latest = max(zip(stamps, raw), key=lambda x: x[0])[1]
     return latest
 
@@ -103,7 +86,6 @@ def is_awaiting_owner(
     soundness_gated: bool,
     review_requested_owner: bool,
 ) -> bool:
-    """True when the PR is parked on the owner: auto-merge off AND gated."""
     return (not auto_merge_enabled) and (soundness_gated or review_requested_owner)
 
 
@@ -112,16 +94,6 @@ def idle_hours(updated_at: str, now: dt.datetime) -> float:
 
 
 def park_time_hours(pr: dict[str, Any], now: dt.datetime, *, required_green: bool) -> float | None:
-    """Hours since the PR became ready-and-green.
-
-    Anchored on the ``completed_at`` of the LAST required context to finish
-    -- the point the PR became green (the soundness-path/auto-merge-off state
-    is static from the diff and typically already true by then, so "went
-    green" is the later, load-bearing event in practice). Falls back to
-    ``updated_at`` if any required context lacks a completion timestamp.
-    Returns None when the required lane is not green (park time is undefined
-    until it is).
-    """
     if not required_green:
         return None
     anchor = required_lane_green_at(pr.get("check_runs") or []) or pr.get("updated_at")
@@ -137,7 +109,6 @@ def classify_pr(
     owner_login: str = OWNER_LOGIN,
     idle_threshold_hours: float = IDLE_THRESHOLD_HOURS,
 ) -> ClassifiedPR:
-    """Classify one normalized PR record. Pure -- no I/O."""
     check_runs = pr.get("check_runs") or []
     changed_files = pr.get("changed_files") or []
     requested_reviewers = pr.get("requested_reviewers") or []
@@ -154,10 +125,6 @@ def classify_pr(
     idle_h = idle_hours(pr["updated_at"], now)
     draft = bool(pr.get("draft"))
     park_h = park_time_hours(pr, now, required_green=required_green)
-    # Gate on park time (anchored to the required lane going green), NOT
-    # idle_hours: `updated_at` is bumped by this script's own label writes and
-    # by any human comment, so an updated_at-based gate flaps a genuinely
-    # parked PR out of the queue every time the signal fires.
     qualifies = (not draft) and required_green and awaiting_owner and (park_h or 0.0) > idle_threshold_hours
 
     return ClassifiedPR(
@@ -187,7 +154,6 @@ def classify_all(
 
 
 def qualifying(classified: list[ClassifiedPR]) -> list[ClassifiedPR]:
-    """Qualifying PRs, longest-parked first (most in need of attention)."""
     ready = [c for c in classified if c.qualifies]
     return sorted(ready, key=lambda c: c.park_time_hours or 0.0, reverse=True)
 
@@ -200,12 +166,6 @@ def _fmt_hours(hours: float) -> str:
 
 
 def build_digest(classified: list[ClassifiedPR], *, now: dt.datetime, repo: str) -> str:
-    """Human-readable digest body.
-
-    Empty-queue body is used by local/manual runs and by the one-time
-    "mark existing digest empty" patch; --apply never CREATES an issue for
-    an empty queue.
-    """
     ready = qualifying(classified)
     stamp = now.strftime("%Y-%m-%d %H:%M UTC")
     lines = [
@@ -234,10 +194,6 @@ def build_digest(classified: list[ClassifiedPR], *, now: dt.datetime, repo: str)
     return "\n".join(lines)
 
 
-# ---------------------------------------------------------------------------
-# I/O: GitHub REST (token-source chain: GITHUB_TOKEN/GH_TOKEN env, else the
-# `gh` CLI's own token if it is on PATH -- never a separately-stored PAT).
-# ---------------------------------------------------------------------------
 def resolve_token() -> str | None:
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     if token:
@@ -261,11 +217,6 @@ def resolve_token() -> str | None:
 
 
 class GitHubClient:
-    """Thin REST client. GET pagination via Link headers; single-page
-    mutations otherwise. Mirrors detect_orphaned_commits.py's retry/urllib
-    conventions.
-    """
-
     def __init__(self, token: str) -> None:
         self.token = token
 
@@ -298,12 +249,11 @@ class GitHubClient:
         return None
 
     def get_all(self, path: str, params: dict[str, str] | None = None) -> list[dict[str, Any]]:
-        """GET a list endpoint, following `page` params up to a sane cap."""
         query = dict(params or {})
         query.setdefault("per_page", "100")
         out: list[dict[str, Any]] = []
         page = 1
-        while page <= 10:  # 1000 items is far beyond this repo's open-PR volume
+        while page <= 10:
             query["page"] = str(page)
             url = f"{API_ROOT}/{path}?{urllib.parse.urlencode(query)}"
             result = self._request("GET", url) or []
@@ -331,9 +281,6 @@ class GitHubClient:
 
 
 def fetch_open_prs(client: GitHubClient, owner: str, repo: str) -> list[dict[str, Any]]:
-    """Fetch + normalize every OPEN PR targeting develop into the internal
-    shape consumed by classify_pr (same shape as the self-test fixture).
-    """
     raw_prs = client.get_all(f"repos/{owner}/{repo}/pulls", {"state": "open", "base": "develop"})
     normalized: list[dict[str, Any]] = []
     for raw in raw_prs:
@@ -368,9 +315,6 @@ def fetch_open_prs(client: GitHubClient, owner: str, repo: str) -> list[dict[str
     return normalized
 
 
-# ---------------------------------------------------------------------------
-# Mutations (only reached under --apply): label sync + pinned issue upsert.
-# ---------------------------------------------------------------------------
 def ensure_label_exists(client: GitHubClient, owner: str, repo: str) -> None:
     existing = client.get_one(f"repos/{owner}/{repo}/labels/{DRAIN_LABEL}")
     if existing is not None:
@@ -382,9 +326,6 @@ def ensure_label_exists(client: GitHubClient, owner: str, repo: str) -> None:
 
 
 def sync_labels(client: GitHubClient, owner: str, repo: str, ready: list[ClassifiedPR]) -> tuple[list[int], list[int]]:
-    """Add DRAIN_LABEL to qualifying PRs, remove it from evaluated PRs that
-    no longer qualify but currently carry it. Returns (added, removed).
-    """
     ensure_label_exists(client, owner, repo)
     qualifying_numbers = {c.number for c in ready}
 
@@ -408,12 +349,6 @@ def sync_labels(client: GitHubClient, owner: str, repo: str, ready: list[Classif
 
 
 def find_pinned_issue(client: GitHubClient, owner: str, repo: str) -> dict[str, Any] | None:
-    """Locate the digest issue: exact title AND the body marker.
-
-    The marker requirement means a manually-created issue that happens to
-    reuse the title is never clobbered; the script only adopts issues it
-    wrote. Title matches without the marker are skipped.
-    """
     issues = client.get_all(f"repos/{owner}/{repo}/issues", {"state": "all"})
     for item in issues:
         if "pull_request" in item:
@@ -424,7 +359,6 @@ def find_pinned_issue(client: GitHubClient, owner: str, repo: str) -> dict[str, 
 
 
 def upsert_pinned_issue(client: GitHubClient, owner: str, repo: str, body: str) -> str:
-    """Create/update the single digest issue (non-empty queue path)."""
     existing = find_pinned_issue(client, owner, repo)
     if existing is None:
         created = client.post(
@@ -439,9 +373,6 @@ def upsert_pinned_issue(client: GitHubClient, owner: str, repo: str, body: str) 
     return f"updated issue #{existing['number']}"
 
 
-# ---------------------------------------------------------------------------
-# Self-test (fixture-driven, no network)
-# ---------------------------------------------------------------------------
 def run_self_test() -> int:
     fixture = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
     now = _parse_iso(fixture["as_of"])
@@ -483,7 +414,6 @@ def run_self_test() -> int:
         elif reason == "draft":
             expect(c.draft, f"PR #{number} expected draft=True")
 
-    # park_time_hours is only defined once the required lane is green.
     for c in classified:
         if c.required_green:
             expect(c.park_time_hours is not None, f"PR #{c.number}: required_green but park_time_hours is None")
@@ -500,9 +430,6 @@ def run_self_test() -> int:
     return 0
 
 
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Report soundness-path PRs that have waited since their required checks went green.",
@@ -580,9 +507,6 @@ def main(argv: list[str] | None = None) -> int:
             outcome = upsert_pinned_issue(client, owner, repo, build_digest(classified, now=now, repo=args.repo))
             print(f"digest issue: {outcome}", file=sys.stderr)
         else:
-            # Silent-when-empty means no new issue and no repeated updates --
-            # but an existing digest must not keep showing yesterday's parked
-            # PRs forever. Patch it to the empty state exactly once.
             existing = find_pinned_issue(client, owner, repo)
             if existing is not None and "Queue is empty" not in (existing.get("body") or ""):
                 client.patch(

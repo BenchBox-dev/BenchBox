@@ -1,20 +1,4 @@
 #!/usr/bin/env python3
-"""Fail-closed trust policy for BenchBox skill-sync CI routing.
-
-The tool pin is a trust anchor owned by BenchBox maintainers. It is
-intentionally independent of every revision selected by ``skill-sync.conf``:
-``TOOL_REF`` names the upstream commit the vendored wrapper was copied from
-and ``TOOL_SHA256`` pins the exact vendored bytes, so a tampered
-``tools/skill-sync`` fails validation even when the config is untouched.
-Advance either only with a clean preview/apply/check/verify proof and full CI.
-
-The wrapper never fetches: ``skill-sync.conf`` names local source checkouts,
-so the config carries no origin URLs. URL identity is still checked, but on
-the committed per-target receipt instead: ``skill-sync`` records each
-source's ``remote.origin.url`` there at apply time, and validation requires
-exactly the approved set. Advancing a skill revision only with a reviewed
-receipt diff is what keeps a forked checkout from riding the narrow lane.
-"""
 
 from __future__ import annotations
 
@@ -26,6 +10,24 @@ import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+CLI_DESCRIPTION = (
+    "Fail-closed trust policy for BenchBox skill-sync CI routing.\n"
+    "\n"
+    "The tool pin is a trust anchor owned by BenchBox maintainers. It is\n"
+    "intentionally independent of every revision selected by ``skill-sync.conf``:\n"
+    "``TOOL_REF`` names the upstream commit the vendored wrapper was copied from\n"
+    "and ``TOOL_SHA256`` pins the exact vendored bytes, so a tampered\n"
+    "``tools/skill-sync`` fails validation even when the config is untouched.\n"
+    "Advance either only with a clean preview/apply/check/verify proof and full CI.\n"
+    "\n"
+    "The wrapper never fetches: ``skill-sync.conf`` names local source checkouts,\n"
+    "so the config carries no origin URLs. URL identity is still checked, but on\n"
+    "the committed per-target receipt instead: ``skill-sync`` records each\n"
+    "source's ``remote.origin.url`` there at apply time, and validation requires\n"
+    "exactly the approved set. Advancing a skill revision only with a reviewed\n"
+    "receipt diff is what keeps a forked checkout from riding the narrow lane.\n"
+)
+
 TOOL_REPOSITORY = "https://github.com/joeharris76/skill-sync.git"
 TOOL_REF = "25e1e47693d8b0b2aba91d3ad3dbc0c14b8d3c4c"
 TOOL_SHA256 = "01f2b383318c448e3ed94aed4781432ac69dbd33f1556dae9792e65f9883eb34"
@@ -34,9 +36,6 @@ MANIFEST_PATH = Path("skill-sync.conf")
 RECEIPT_PATH = Path(".claude/skills/skill-sync.receipt")
 _FULL_SHA_RE = re.compile(r"[0-9a-f]{40}")
 
-# Approved skill-source identity, checked against the committed receipt's
-# `source = <url>` lines (the config only names local checkout paths, which
-# legitimately differ per machine, so the config cannot carry this binding).
 APPROVED_SOURCE_URLS = frozenset(
     {
         "https://github.com/joeharris76/skill-sync-skills.git",
@@ -44,10 +43,6 @@ APPROVED_SOURCE_URLS = frozenset(
     }
 )
 
-# Every skill the config may select, grouped by exact source pin in config
-# order. There is no dependency resolver: shared prerequisites are listed
-# explicitly, and selecting anything else (a new catalog skill, a forked
-# project skill) is a structural change that forces full CI.
 EXPECTED_TARGETS = [".claude/skills", ".agents/skills"]
 EXPECTED_GROUPS = [
     {"skills": ["benchbox"]},
@@ -73,7 +68,7 @@ _REF_LINE_RE = re.compile(r"^(rev *= *)([0-9a-fA-F]+)( *)$")
 
 
 class PolicyError(ValueError):
-    """Config, receipt, tool, or Git evidence violates the skill CI trust boundary."""
+    pass
 
 
 @dataclass(frozen=True)
@@ -88,7 +83,6 @@ def _strip_comment(line: str) -> str:
 
 
 def parse_conf_groups(text: str) -> tuple[list[str], list[dict[str, object]]]:
-    """Parse targets and source groups from config text. Shared with validation."""
     targets: list[str] = []
     groups: list[dict[str, object]] = []
     current: dict[str, object] | None = None
@@ -131,7 +125,6 @@ def parse_conf_groups(text: str) -> tuple[list[str], list[dict[str, object]]]:
 
 
 def validate_conf_text(text: str) -> None:
-    """Validate target set, group shape, rev format, and skill selection."""
     targets, groups = parse_conf_groups(text)
     if targets != EXPECTED_TARGETS:
         raise PolicyError(f"targets must be exactly {EXPECTED_TARGETS}; got {targets}")
@@ -159,7 +152,6 @@ def validate_conf_text(text: str) -> None:
 
 
 def validate_receipt_text(text: str) -> None:
-    """Validate the committed receipt's source identity and skill selection."""
     urls: list[str] = []
     revs: list[str] = []
     skills: list[str] = []
@@ -195,7 +187,6 @@ def validate_receipt_text(text: str) -> None:
 
 
 def validate_tool_bytes(data: bytes) -> None:
-    """Pin the vendored wrapper bytes to the approved upstream revision."""
     digest = hashlib.sha256(data).hexdigest()
     if digest != TOOL_SHA256:
         raise PolicyError(
@@ -207,19 +198,14 @@ def validate_tool_bytes(data: bytes) -> None:
 
 
 def validate_manifest_text(text: str) -> None:
-    """Validate the skill-sync config (historic entry point name kept)."""
     validate_conf_text(text)
 
 
 def normalize_ref_only_manifest(text: str) -> str:
-    """Return a config with only approved immutable source revs erased."""
     validate_conf_text(text)
     normalized: list[str] = []
     replacements = 0
     for line in text.splitlines():
-        # Only `rev = ...` lines match: the pattern requires `=` (after
-        # optional spaces) immediately after the `rev` key, so a skill whose
-        # name merely starts with "rev" cannot match.
         if _REF_LINE_RE.match(line):
             normalized.append("rev = <immutable-rev>")
             replacements += 1
@@ -231,7 +217,6 @@ def normalize_ref_only_manifest(text: str) -> str:
 
 
 def compare_manifest_texts(base_text: str, head_text: str, *, base_ref: str | None = None) -> ManifestDecision:
-    """Allow only immutable-rev changes inside the approved config shape."""
     try:
         base_normalized = normalize_ref_only_manifest(base_text)
         head_normalized = normalize_ref_only_manifest(head_text)
@@ -257,7 +242,6 @@ def _git_show(base_ref: str, path: Path) -> str:
 
 
 def compare_repository_manifest(base_ref: str, *, manifest: Path = MANIFEST_PATH) -> ManifestDecision:
-    """Compare HEAD's config with the immutable pull-request event base."""
     try:
         base_text = _git_show(base_ref, manifest)
         head_text = manifest.read_text(encoding="utf-8")
@@ -267,7 +251,7 @@ def compare_repository_manifest(base_ref: str, *, manifest: Path = MANIFEST_PATH
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     subparsers = parser.add_subparsers(dest="command", required=True)
     validate = subparsers.add_parser("validate")
     validate.add_argument("--manifest", type=Path, default=MANIFEST_PATH)

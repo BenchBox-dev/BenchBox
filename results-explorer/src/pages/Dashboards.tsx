@@ -14,7 +14,6 @@ import {
   type Dashboard,
 } from "@/lib/dashboards";
 
-/** URL parameter carrying the open dashboard. */
 const DASHBOARD_URL_KEY = "dashboard";
 
 export function Dashboards(_: RoutableProps) {

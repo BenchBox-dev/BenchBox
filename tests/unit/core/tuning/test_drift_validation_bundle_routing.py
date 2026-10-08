@@ -1,15 +1,6 @@
-"""Tests for routing rerun drift-validation results into the .applied.json bundle.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Covers the ADR-001 addendum (drift-validation bundle routing): the reused-DB
-``MetadataValidationResult`` computed during validation is serialized into a
-``drift_check`` section of the applied-ledger companion, survives the
-"nothing captured" prune for an empty ledger, is gated to reused tuned runs,
-and is redacted for anonymized exports.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -52,8 +43,6 @@ class TestCompanionCarriesDriftCheck:
         assert payload["drift_check"]["is_valid"] is False
 
     def test_empty_ledger_with_drift_is_not_pruned(self):
-        # A reused DB re-applies no tuning DDL (empty statements/dropped) but its
-        # drift_check must still ship; build_applied_ledger_payload must keep it.
         from benchbox.core.results.schema import build_applied_ledger_payload
 
         ledger = AppliedTuningLedger()
@@ -113,8 +102,6 @@ class TestDriftCheckAnonymization:
             "dropped": [],
             "drift_check": _drifted_result().to_payload(),
         }
-        # _anonymize_applied_payload touches no instance attributes, so a bare
-        # instance is enough to exercise the redaction policy.
         exporter = ResultExporter.__new__(ResultExporter)
         sanitized = exporter._anonymize_applied_payload(payload)
         drift = sanitized["drift_check"]
@@ -123,5 +110,4 @@ class TestDriftCheckAnonymization:
         assert drift["drift_redacted"] is True
         for dropped in ("errors", "warnings", "configuration_mismatches", "missing_tables", "extra_tables"):
             assert dropped not in drift
-        # Original payload not mutated (deep copy).
         assert "errors" in payload["drift_check"]
