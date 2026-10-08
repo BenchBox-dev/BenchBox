@@ -21,7 +21,16 @@ from benchbox.platforms.dataframe.expression_family import (
     ExpressionFamilyAdapter,
 )
 from benchbox.platforms.dataframe.shared_loading import dialect_preserves_empty_strings
-from benchbox.platforms.polars_compat import csv_empty_string_option, reader_rechunk_effective, reader_rechunk_option
+from benchbox.platforms.polars_compat import (
+    OBSERVED_EXECUTION_NOT_CAPTURED,
+    active_runtime,
+    collect_engine_option,
+    collect_frame,
+    csv_empty_string_option,
+    reader_rechunk_effective,
+    reader_rechunk_option,
+    validate_collect_engine,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +64,7 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         rechunk: bool = True,
         n_rows: int | None = None,
         tuning_config: DataFrameTuningConfiguration | None = None,
+        engine: str = "default",
     ) -> None:
         if not POLARS_AVAILABLE:
             raise ImportError("Polars not installed. Install with: pip install polars")
@@ -69,10 +79,15 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         self.streaming = streaming
         self.rechunk = rechunk
         self.n_rows = n_rows
+        self.engine = engine
 
         pl.enable_string_cache()
 
         self._validate_and_apply_tuning()
+
+        if self.engine == "in-memory" and self.streaming:
+            raise ValueError("engine='in-memory' conflicts with streaming mode")
+        validate_collect_engine(self.collect_engine)
 
     def _apply_tuning(self) -> None:
         import os
@@ -107,6 +122,15 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
     @property
     def platform_name(self) -> str:
         return "Polars"
+
+    @property
+    def collect_engine(self) -> str:
+        if self.engine == "default" and self.streaming:
+            return "streaming"
+        return self.engine
+
+    def materialize(self, df: PolarsLazyDF) -> PolarsDF:
+        return collect_frame(df, self.collect_engine)
 
     def col(self, name: str) -> PolarsExpr:
         return pl.col(name)
@@ -182,19 +206,17 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
 
     def collect(self, df: PolarsLazyDF) -> PolarsDF:
         if isinstance(df, pl.LazyFrame):
-            if self.streaming:
-                return df.collect(engine="streaming")
-            return df.collect()
+            return self.materialize(df)
         return df
 
     def get_row_count(self, df: PolarsDF | PolarsLazyDF) -> int:
         if isinstance(df, pl.LazyFrame):
-            return df.select(pl.len()).collect().item()
+            return self.materialize(df.select(pl.len())).item()
         return len(df)
 
     def scalar(self, df: PolarsDF | PolarsLazyDF, column: str | None = None) -> Any:
         if isinstance(df, pl.LazyFrame):
-            df = df.collect()
+            df = self.materialize(df)
 
         if len(df) == 0:
             raise ValueError("Cannot extract scalar from empty DataFrame")
@@ -217,7 +239,7 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
 
     def _get_first_row(self, df: PolarsDF) -> tuple | None:
         if isinstance(df, pl.LazyFrame):
-            df = df.collect()
+            df = self.materialize(df)
 
         if len(df) == 0:
             return None
@@ -229,6 +251,9 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
             "platform": self.platform_name,
             "family": self.family,
             "streaming": self.streaming,
+            "engine_requested": self.engine,
+            "collect_engine_argument": collect_engine_option(self.collect_engine).get("engine"),
+            "observed_execution": OBSERVED_EXECUTION_NOT_CAPTURED,
             "rechunk": self.rechunk,
             "rechunk_effective": reader_rechunk_effective(self.rechunk),
             "working_dir": str(self.working_dir),
@@ -236,6 +261,7 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
 
         if POLARS_AVAILABLE:
             info["version"] = pl.__version__
+            info["polars_runtime_package"], info["polars_runtime_version"] = active_runtime()
 
         return info
 

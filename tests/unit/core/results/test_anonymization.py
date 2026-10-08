@@ -1332,6 +1332,29 @@ class TestCloudWarehouseAndOutputLocation:
         assert config["platform_option_sources"]["warehouse"].startswith("warehouse_")
         assert "bucket" not in json.dumps(config["platform_options"])
 
+    @pytest.mark.parametrize("engine", ["default", "in-memory", "streaming"])
+    def test_generic_engine_option_values_stay_readable(self, engine):
+        payload = {
+            "config": {"platform_options": {"engine": engine}},
+            "platform": {"raw_config": {"options": {"engine": engine}}},
+        }
+
+        anonymized = AnonymizationManager().anonymize_result_payload(payload)
+
+        assert anonymized["config"]["platform_options"]["engine"] == engine
+        assert anonymized["platform"]["raw_config"]["options"]["engine"] == engine
+
+    def test_other_engine_values_and_locations_stay_hashed(self):
+        payload = {
+            "config": {"platform_options": {"engine": "analytics-prod"}},
+            "platform": {"config": {"engine": "in-memory"}},
+        }
+
+        anonymized = AnonymizationManager().anonymize_result_payload(payload)
+
+        assert anonymized["config"]["platform_options"]["engine"].startswith("engine_")
+        assert anonymized["platform"]["config"]["engine"].startswith("engine_")
+
     def test_option_source_labels_match_metadata_source_vocabulary(self):
         from typing import get_args
 

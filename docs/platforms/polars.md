@@ -58,6 +58,7 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.1
 | Option | Default | Description |
 |--------|---------|-------------|
 | `streaming` | false | Enable streaming mode for large datasets |
+| `engine` | `default` | Collect engine: `default` (each Polars version's own default), `in-memory` or `streaming`; a version that cannot honour the value fails the run |
 | `rechunk` | true | Rechunk data for better memory layout |
 | `n_rows` | - | Limit rows to read (for testing) |
 | `driver_version` | (latest) | Pin the polars package version (e.g. `1.36.1`) |

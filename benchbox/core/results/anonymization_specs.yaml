@@ -142,3 +142,11 @@ message_keys:
 - message
 - stderr
 - stdout
+option_map_keys:
+- options
+- platformoptions
+public_option_values:
+  engine:
+  - default
+  - in-memory
+  - streaming

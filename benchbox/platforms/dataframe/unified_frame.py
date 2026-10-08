@@ -8,6 +8,8 @@ import logging
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar
 
+from benchbox.platforms.polars_compat import collect_frame
+
 if TYPE_CHECKING:
     import polars as pl
     from datafusion import DataFrame as DataFusionDataFrame, Expr as DataFusionExpr
@@ -2427,13 +2429,20 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
             )
         return UnifiedLazyFrame(result, self._adapter)
 
+    def _collect_polars(self) -> Any:
+        if not hasattr(self._df, "collect"):
+            return self._df
+        from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+
+        if isinstance(self._adapter, PolarsDataFrameAdapter):
+            return self._adapter.materialize(self._df)
+        return collect_frame(self._df)
+
     def collect(self) -> Any:
         if _is_pyspark_df(self._df):
             return self._df
         elif _is_polars_df(self._df):
-            if hasattr(self._df, "collect"):
-                return self._df.collect()
-            return self._df
+            return self._collect_polars()
         elif _is_datafusion_df(self._df):
             import pyarrow as pa
 
@@ -2450,8 +2459,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
         if _is_pyspark_df(self._df):
             return [row[column] for row in self._df.select(column).collect()]
         elif _is_polars_df(self._df):
-            collected = self._df.collect() if hasattr(self._df, "collect") else self._df
-            return collected[column].to_list()
+            return self._collect_polars()[column].to_list()
         elif _is_datafusion_df(self._df):
             import pyarrow as pa
 
@@ -2473,8 +2481,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
                 return None
             return rows[row][col]
         elif _is_polars_df(self._df):
-            collected = self._df.collect() if hasattr(self._df, "collect") else self._df
-            return collected[row, col]
+            return self._collect_polars()[row, col]
         elif _is_datafusion_df(self._df):
             import pyarrow as pa
 
