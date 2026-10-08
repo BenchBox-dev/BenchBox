@@ -21577,6 +21577,13 @@
       "status": "done",
       "title": "Add regression tests for TPC-H stdout data generation"
     },
+    "tpch-streams-qgen-permutation-off-by-one": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Fix TPCHStreams qgen path pairing -p stream_id + 1 with PERMUTATION_MATRIX[stream_id]"
+    },
     "tpch-throughput-dialect-translation": {
       "claim": null,
       "needs": [],

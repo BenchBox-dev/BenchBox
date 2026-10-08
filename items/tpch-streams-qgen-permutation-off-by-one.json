@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Either the unused qgen stream generator is removed with its tests, or both paths select the same permutation for a given stream id, shown by a test that fails before the change.",
+    "Stream numbering stays 1..S as decided for the throughput batch.",
+    "make comment-policy-check passes."
+  ],
+  "context": "Evidence at develop d2deb280e. Dead code today; no runtime impact.",
+  "description": "benchbox/core/tpch/streams.py:234 passes `-p stream_id + 1` to qgen, while the Python permutation path indexes PERMUTATION_MATRIX[stream_id] (streams.py:202). The two paths disagree on which permutation a stream uses. _generate_stream_queries_qgen (line 204) is dead code today, so nothing is wrong at runtime, but it would produce the wrong ordering if wired in. Decide whether to delete the dead method or align the indexing, and prove the choice with a test.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:2078d44d78bfbb5aca3865ea",
+      "at": "2026-10-08T13:38:35Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "a8569f70bab34afea0bec3e28e4c9e88",
+      "session_id": "0bdbb5bb32cc4bd0b5505d2dcb0e488e"
+    }
+  ]
+}
