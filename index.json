@@ -22725,6 +22725,18 @@
       "status": "done",
       "title": "Add one post-load tuning seam and move maintenance ops (OPTIMIZE/ANALYZE/VACUUM/ZORDER/RESUME RECLUSTER) into it"
     },
+    "tuning-profile-measured-outcomes-20261008": {
+      "claim": null,
+      "needs": [
+        "tuning-evidence-benefit-rule-20261008",
+        "duckdb-tuned-template-ablation-20261008",
+        "databricks-tuned-templates-vendor-guidance-20261008",
+        "snowflake-tuned-templates-clustering-guidance-20261008"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Record measured outcomes and vendor limits in the TPC tuning profile, and make the template generator respect them"
+    },
     "tuning-registry-mixin-honesty-20260717": {
       "claim": null,
       "needs": [],
