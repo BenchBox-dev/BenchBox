@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from . import dedup, selection
+from . import dedup, protocol, selection
 from .retry import ALL_ABSENT, FAILURE, INTEGRITY, PENDING, SUCCESS, UNREPORTED
 from .selection import Attempt, Step
 from .verdict import Finding, Placement, Verdict, comment_span, place
@@ -115,42 +115,43 @@ def finalize(
         None,
     )
     verdict = verdicts.get(terminal.slot) if terminal is not None else None
-    repeated: tuple[Finding, ...] = ()
-    if verdict is None:
-        placement = Placement((), ())
-    else:
-        fresh, repeated = dedup.split(verdict.findings, plan.get("open_findings", ()))
-        thread_severities = tuple(plan["blocking"]) if plan.get("findings_delivery") == "review" else None
-        placement = place(fresh, commentable, thread_severities)
-    blocking = verdict.blocking(tuple(plan["blocking"])) if verdict else ()
-    if state == SUCCESS:
-        description = f"{reviewer}: no blocking findings"
-    elif state == FAILURE:
-        description = f"{reviewer}: {len(blocking)} blocking finding(s)"
-    else:
+    judgement = protocol.judge(verdict, int(plan["max_defects"])) if verdict is not None else None
+    defects = judgement.defects if judgement is not None else ()
+    fresh, repeated = dedup.split(defects, plan.get("open_findings", ()))
+    placement = place(fresh, commentable)
+    if judgement is None:
         description = "pending: " + "; ".join(step.reasons or ("no reviewer available",))
+    elif judgement.decision == protocol.SHIP_WITH_FIXES:
+        description = f"{reviewer}: {judgement.label}, {len(defects)} defect(s) to fix"
+    else:
+        description = f"{reviewer}: {judgement.label}"
     delivery = plan.get("findings_delivery", "comment")
     findings_lines = [_finding_line(finding) for finding in placement.inline]
     other_lines = [_finding_line(finding) for finding in placement.summary]
-    lines = [*_header(plan, state), *_reviewer_line(plan, reviewer)]
-    if verdict is not None and verdict.summary:
-        lines += [verdict.summary, ""]
+    lines = [*_header(plan, state)]
+    if judgement is not None:
+        lines += [f"Decision: **{judgement.label}**.", ""]
+    lines += _reviewer_line(plan, reviewer)
+    if judgement is not None and judgement.summary:
+        lines += [judgement.summary, ""]
+    if judgement is not None and judgement.decision == protocol.DO_NOT_SHIP:
+        lines += ["No defects are listed for this decision. Rework the change and push a new head.", ""]
     if delivery == "comment":
-        lines += _section("Findings on diff lines", findings_lines)
+        lines += _section("Defects on diff lines", findings_lines)
     lines += _section(
-        "Findings without a review thread" if delivery == "review" else "Findings outside the diff", other_lines
+        "Defects without a review thread" if delivery == "review" else "Defects outside the diff", other_lines
     )
-    if any(finding in blocking for finding in placement.summary):
-        lines += ["Blocking findings outside the diff still fail the review.", ""]
+    if placement.summary:
+        lines += ["Defects outside the diff count like the others: fix them before merge.", ""]
     lines += _section(
-        "Findings already open as review threads, not posted again",
+        "Defects already open as review threads, not posted again",
         [f"- **{finding.severity}** `{finding.file}`: {finding.title}" for finding in repeated],
     )
     if plan.get("scope") == "changed":
         lines += [f"Scope: files changed since head `{plan['reviewed_head']}` was reviewed.", ""]
     lines += _section("Reviewers not available", _absences(attempts, step))
     body = "\n".join(lines).rstrip() + "\n"
-    has_content = bool(placement.inline or placement.summary or state != SUCCESS)
+    has_content = bool(defects or state != SUCCESS)
     review = _review_payload(plan, body, placement, commentable) if delivery == "review" else None
     cause = pending_cause if state == PENDING else None
     return Final(state, _clip(description), body if has_content else "", review, reviewer, cause)

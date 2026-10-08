@@ -13,7 +13,7 @@ from typing import Any
 
 from . import attempts as attempt_files, dedup, github, report, retry, runner, selection
 from .absence import ERROR, Absence
-from .brief import BRIEF_TEMPLATE, build_brief, with_full_diff, write_private
+from .brief import BRIEF_TEMPLATE, READ_RULES, build_brief, with_full_diff, with_read_rule, write_private
 from .classifier import ChangedFile, classify
 from .diff import commentable_lines, select_files
 from .policy import Policy, Reviewer, Tier, load_policy
@@ -98,7 +98,8 @@ def _base_plan(policy: Policy, repo: str, pr: int, run_id: str) -> dict[str, Any
         "decision_reason": "",
         "tier": None,
         "tier_reasons": [],
-        "blocking": [],
+        "max_defects": policy.protocol.max_defects,
+        "evidence_files": [],
         "chain": [],
         "diversity_exempt": [],
         "excluded_families": [],
@@ -169,7 +170,8 @@ def review_basis(merge_base: str, tier: Tier, policy: Policy, excluded: Iterable
     material = {
         "merge_base": merge_base,
         "tier": tier.name,
-        "blocking": list(tier.blocking),
+        "protocol": {"max_defects": policy.protocol.max_defects},
+        "read_rules": READ_RULES,
         "chain": [reviewer.to_json() for reviewer in policy.chain(tier.name)],
         "excluded_families": sorted(excluded),
         "policy": policy_text,
@@ -306,7 +308,7 @@ def command_plan(args: argparse.Namespace) -> int:
         base_sha=plan["base_sha"],
         head_sha=plan["head_sha"],
         tier=tier.name,
-        blocking=tier.blocking,
+        max_defects=policy.protocol.max_defects,
         files=changed if partial else files,
         diff_text=diff_text,
         max_bytes=policy.brief_max_bytes,
@@ -317,11 +319,12 @@ def command_plan(args: argparse.Namespace) -> int:
     )
     write_private(out_dir / BRIEF_FILE, brief.text)
     write_private(out_dir / DIFF_FILE, full_diff or "")
+    reviewed_now = changed if partial else files
     plan.update(
         {
             "decision": REVIEW,
             "decision_reason": rerun.reason,
-            "blocking": list(tier.blocking),
+            "evidence_files": sorted(item.path for item in reviewed_now if item.path in in_scope and not item.removed),
             "chain": [reviewer.to_json() for reviewer in policy.chain(tier.name)],
             "diversity_exempt": list(tier.diversity_exempt),
             "excluded_families": sorted(excluded),
@@ -375,7 +378,9 @@ def command_review(args: argparse.Namespace) -> int:
     brief_path.chmod(0o600)
     prompt = brief_path.read_text(encoding="utf-8") if plan["brief_mode"] != "oversize" else ""
     workspace = Path(args.workspace)
-    if prompt and plan.get("scope") == "changed":
+    if prompt:
+        prompt = with_read_rule(prompt, reviewer.harness)
+    if prompt and (plan.get("scope") == "changed" or plan["brief_mode"] == "file-list"):
         prompt = with_full_diff(prompt, runner.stage_pull_request_diff(plan_path.parent / DIFF_FILE, workspace))
     outcome = runner.review(
         reviewer,
@@ -384,6 +389,8 @@ def command_review(args: argparse.Namespace) -> int:
         prompt=prompt,
         scratch=Path(args.scratch),
         now=_now(),
+        brief_mode=plan["brief_mode"],
+        required=tuple(plan.get("evidence_files", ())),
     )
     artifact = attempt_files.build_artifact(
         run_id=os.environ["GITHUB_RUN_ID"],

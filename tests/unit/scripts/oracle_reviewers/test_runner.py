@@ -3,20 +3,33 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 
 from _project.scripts.oracle_reviewers import absence, cli, runner
-from _project.scripts.oracle_reviewers.brief import FULL_DIFF_LINE
+from _project.scripts.oracle_reviewers.brief import (
+    FILE_LIST_DIFF_LINE,
+    FULL_DIFF_LINE,
+    READ_RULE_PLACEHOLDER,
+    READ_RULES,
+)
 from _project.scripts.oracle_reviewers.commands import Invocation
 from _project.scripts.oracle_reviewers.policy import Policy
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 NOW = datetime(2026, 10, 5, 12, 0, tzinfo=UTC)
-VERDICT = {"summary": "fine", "findings": []}
+VERDICT = {
+    "status": "complete",
+    "incomplete_reason": "",
+    "decision": "SHIP",
+    "summary": "fine",
+    "files_examined": ["a.txt"],
+    "defects": [],
+    "prior_defects": [],
+}
 
 
 def _workspace(tmp_path: Path) -> tuple[Path, str]:
@@ -35,19 +48,74 @@ def _workspace(tmp_path: Path) -> tuple[Path, str]:
     return workspace, head
 
 
-def _fake_muse(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, body: str) -> None:
+def _fake_muse(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, body: str, name: str = "muse") -> None:
     bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    script = bin_dir / "muse"
+    bin_dir.mkdir(exist_ok=True)
+    script = bin_dir / name
     script.write_text(f"#!{sys.executable}\nimport sys\n{body}\n", encoding="utf-8")
     script.chmod(0o755)
     monkeypatch.setenv("PATH", f"{bin_dir}:/usr/bin:/bin")
 
 
-def _review(policy: Policy, tmp_path: Path, workspace: Path, head: str, prompt: str = "brief"):
+def _review(
+    policy: Policy,
+    tmp_path: Path,
+    workspace: Path,
+    head: str,
+    prompt: str = "brief",
+    *,
+    reviewer: str = "muse",
+    brief_mode: str = "inline",
+    required: tuple[str, ...] = (),
+):
     return runner.review(
-        policy.reviewers["muse"], workspace=workspace, head_sha=head, prompt=prompt, scratch=tmp_path / "s", now=NOW
+        policy.reviewers[reviewer],
+        workspace=workspace,
+        head_sha=head,
+        prompt=prompt,
+        scratch=tmp_path / "s",
+        now=NOW,
+        brief_mode=brief_mode,
+        required=required,
     )
+
+
+def _muse_says(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **over: object) -> None:
+    _fake_muse(tmp_path, monkeypatch, f"print({json.dumps(json.dumps({**VERDICT, **over}))})")
+
+
+def _claude_says(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reads: list[tuple[str, bool]], **over: object
+) -> None:
+    events: list[dict] = []
+    for index, (path, error) in enumerate(reads):
+        use = {"type": "tool_use", "id": f"t{index}", "name": "Read", "input": {"file_path": path}}
+        events.append({"type": "assistant", "message": {"content": [use]}})
+        result = {"type": "tool_result", "tool_use_id": f"t{index}", "is_error": error, "content": "x"}
+        events.append({"type": "user", "message": {"content": [result]}})
+    structured = {"type": "tool_use", "id": "s", "name": "StructuredOutput", "input": {}}
+    events.append({"type": "assistant", "message": {"content": [structured]}})
+    events.append(
+        {"type": "result", "is_error": False, "num_turns": len(reads) + 2, "structured_output": {**VERDICT, **over}}
+    )
+    lines = "\n".join(json.dumps(event) for event in events)
+    _fake_muse(tmp_path, monkeypatch, f"print({json.dumps(lines)})", name="claude")
+
+
+def _codex_says(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, events: list[dict], **over: object) -> None:
+    body = (
+        f"open(sys.argv[sys.argv.index('-o') + 1], 'w').write({json.dumps(json.dumps({**VERDICT, **over}))})\n"
+        f"for event in {events!r}:\n    print(__import__('json').dumps(event))"
+    )
+    _fake_muse(tmp_path, monkeypatch, body, name="codex")
+
+
+def _command(text: str, output: str = "", exit_code: int = 0) -> dict:
+    item = {"type": "command_execution", "command": text, "aggregated_output": output, "exit_code": exit_code}
+    return {"type": "item.completed", "item": {**item, "status": "completed"}}
+
+
+DEFECT = {"severity": "High", "file": "a.txt", "line": 1, "end_line": None, "title": "Wrong", "detail": "d"}
 
 
 def test_clean_verdict_is_recorded(policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -55,7 +123,7 @@ def test_clean_verdict_is_recorded(policy: Policy, tmp_path: Path, monkeypatch: 
     _fake_muse(tmp_path, monkeypatch, f"print({json.dumps(json.dumps(VERDICT))})")
     outcome = _review(policy, tmp_path, workspace, head)
     assert outcome.missing is None
-    assert outcome.verdict == VERDICT
+    assert outcome.verdict == {**VERDICT, "defect_count": 0}
 
 
 def test_workspace_change_makes_the_reviewer_absent(
@@ -263,3 +331,219 @@ def test_a_scoped_review_without_a_diff_drops_the_diff_line(
     _fake_muse(tmp_path, monkeypatch, _capture_prompt_body(tmp_path))
     _run_review(plan_path, workspace, tmp_path, monkeypatch)
     assert (tmp_path / "prompt.txt").read_text(encoding="utf-8") == "Intro.\nFiles.\n"
+
+
+def test_a_reviewer_that_reports_incomplete_is_absent_with_its_reason(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace, head = _workspace(tmp_path)
+    _muse_says(tmp_path, monkeypatch, status="incomplete", decision="NONE", incomplete_reason="could not read a.txt")
+    outcome = _review(policy, tmp_path, workspace, head)
+    assert outcome.verdict is None
+    assert outcome.missing == absence.Absence(absence.INCOMPLETE, "could not read a.txt")
+
+
+@pytest.mark.parametrize(
+    ("defect", "note"),
+    [
+        (
+            {"file": "invented.py"},
+            "Citation not found in the head commit: invented.py is not a file in the head commit.",
+        ),
+        ({"line": 2}, "Citation not found in the head commit: a.txt has 1 lines, so line 2 does not exist."),
+        ({"end_line": 9}, "Citation not found in the head commit: a.txt has 1 lines, so line 9 does not exist."),
+    ],
+)
+def test_a_miscited_defect_is_kept_and_marked_so_the_change_still_fails(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, defect: dict, note: str
+) -> None:
+    from _project.scripts.oracle_reviewers import protocol
+    from _project.scripts.oracle_reviewers.verdict import validate
+
+    workspace, head = _workspace(tmp_path)
+    _muse_says(tmp_path, monkeypatch, decision="SHIP", defects=[{**DEFECT, **defect}])
+    outcome = _review(policy, tmp_path, workspace, head, brief_mode="file-list", required=("a.txt",))
+    assert outcome.missing is None and outcome.verdict is not None
+    assert outcome.verdict["defects"][0]["detail"] == f"{note} d"
+    judged = protocol.judge(validate(outcome.verdict, trusted=True), 10)
+    assert judged.decision == "SHIP_WITH_FIXES"
+
+
+def test_a_path_outside_the_repository_is_rejected(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace, head = _workspace(tmp_path)
+    _muse_says(tmp_path, monkeypatch, decision="SHIP_WITH_FIXES", defects=[{**DEFECT, "file": "../outside.txt"}])
+    outcome = _review(policy, tmp_path, workspace, head)
+    assert outcome.missing == absence.Absence(absence.INVALID, "file must be a repository-relative path")
+
+
+def test_a_reviewer_cannot_supply_its_own_defect_count(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace, head = _workspace(tmp_path)
+    _muse_says(tmp_path, monkeypatch, decision="SHIP_WITH_FIXES", defect_count=3)
+    outcome = _review(policy, tmp_path, workspace, head)
+    assert outcome.missing == absence.Absence(absence.INVALID, "defect_count is set by the oracle, not the reviewer")
+
+
+def test_a_defect_citing_a_real_line_is_recorded(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace, head = _workspace(tmp_path)
+    _muse_says(tmp_path, monkeypatch, decision="SHIP_WITH_FIXES", defects=[DEFECT])
+    outcome = _review(policy, tmp_path, workspace, head)
+    assert outcome.missing is None and outcome.verdict is not None
+    assert [item["file"] for item in outcome.verdict["defects"]] == ["a.txt"]
+
+
+def test_a_file_list_ship_must_examine_every_required_file(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace, head = _workspace(tmp_path)
+    (workspace / "b.txt").write_text("b\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(workspace), "add", "b.txt"], check=True)
+    subprocess.run(
+        ["git", "-C", str(workspace), "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qm", "b"],
+        check=True,
+    )
+    head = subprocess.run(
+        ["git", "-C", str(workspace), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+    ).stdout.strip()
+    _muse_says(tmp_path, monkeypatch, files_examined=["a.txt"])
+    short = _review(policy, tmp_path, workspace, head, brief_mode="file-list", required=("a.txt", "b.txt"))
+    assert short.missing == absence.Absence(
+        absence.INCOMPLETE, "the reviewer found no defects but did not examine b.txt"
+    )
+    inline = _review(policy, tmp_path, workspace, head, brief_mode="inline", required=("a.txt", "b.txt"))
+    assert inline.missing is None
+
+
+def test_absolute_examined_paths_inside_the_workspace_count(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace, head = _workspace(tmp_path)
+    _muse_says(tmp_path, monkeypatch, files_examined=[str(workspace.resolve() / "a.txt")])
+    outcome = _review(policy, tmp_path, workspace, head, brief_mode="file-list", required=("a.txt",))
+    assert outcome.missing is None
+
+
+@pytest.mark.parametrize(
+    ("reads", "brief_mode", "accepted"),
+    [
+        ([], "file-list", False),
+        ([("a.txt", False)], "file-list", True),
+        ([("{ws}/a.txt", False)], "file-list", True),
+        ([("a.txt", True)], "file-list", False),
+        ([("other.txt", False)], "file-list", False),
+        ([], "inline", True),
+    ],
+    ids=["structured-output-only", "read", "absolute-read", "failed-read", "other-file", "inline"],
+)
+def test_claude_must_read_every_required_file_on_a_file_list_brief(
+    policy: Policy,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    reads: list[tuple[str, bool]],
+    brief_mode: str,
+    accepted: bool,
+) -> None:
+    workspace, head = _workspace(tmp_path)
+    resolved = [(path.format(ws=workspace.resolve()), error) for path, error in reads]
+    _claude_says(tmp_path, monkeypatch, resolved)
+    outcome = _review(policy, tmp_path, workspace, head, reviewer="sonnet", brief_mode=brief_mode, required=("a.txt",))
+    assert (outcome.missing is None and outcome.verdict is not None) is accepted
+    if not accepted:
+        assert outcome.missing is not None and outcome.missing.kind == absence.INCOMPLETE
+        assert "trace shows no" in outcome.missing.detail
+
+
+def test_a_codex_ship_without_any_read_command_is_a_hollow_review(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace, head = _workspace(tmp_path)
+    hollow = {"summary": "I could not review the files because I may not run commands.", "files_examined": ["a.txt"]}
+    _codex_says(tmp_path, monkeypatch, [{"type": "turn.completed"}], **hollow)
+    outcome = _review(policy, tmp_path, workspace, head, reviewer="sol", brief_mode="file-list", required=("a.txt",))
+    assert outcome.verdict is None
+    assert outcome.missing is not None and outcome.missing.kind == absence.INCOMPLETE
+    assert outcome.missing.detail == "the reviewer found no defects but its trace shows no successful file read"
+
+
+@pytest.mark.parametrize(
+    ("event", "accepted"),
+    [
+        (_command("/bin/zsh -lc 'cat -n a.txt'", "1 a"), True),
+        (_command("/bin/zsh -lc 'rg -n x a.txt'", "1:a"), True),
+        (_command("/bin/zsh -lc 'rg -n x .'", "./a.txt:1:a"), False),
+        (_command("/bin/zsh -lc 'ls -R'", "a.txt"), False),
+        (_command("/bin/zsh -lc 'cat .oracle-pull-request.diff'", "+++ b/a.txt"), False),
+        (_command("/bin/zsh -lc 'cat -n a.txt'", "", exit_code=1), False),
+    ],
+    ids=["cat", "rg-on-file", "rg-on-directory", "listing", "staged-diff-only", "failed"],
+)
+def test_a_codex_file_list_review_needs_a_successful_read_of_each_required_file(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, event: dict, accepted: bool
+) -> None:
+    workspace, head = _workspace(tmp_path)
+    _codex_says(tmp_path, monkeypatch, [event])
+    outcome = _review(policy, tmp_path, workspace, head, reviewer="sol", brief_mode="file-list", required=("a.txt",))
+    assert (outcome.missing is None) is accepted
+
+
+def test_codex_quota_reported_in_the_event_stream_is_quota(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace, head = _workspace(tmp_path)
+    error = {"type": "turn.failed", "error": {"message": "You've hit your usage limit. Resets in 2h"}}
+    body = f"print(__import__('json').dumps({error!r}))\nraise SystemExit(1)"
+    _fake_muse(tmp_path, monkeypatch, body, name="codex")
+    outcome = _review(policy, tmp_path, workspace, head, reviewer="sol")
+    assert outcome.missing is not None and outcome.missing.kind == absence.QUOTA
+    assert outcome.missing.reset_at == NOW + timedelta(hours=2)
+
+
+def test_the_review_fills_the_read_rule_for_the_reviewers_harness(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace, head = _workspace(tmp_path)
+    plan_path = _plan_dir(policy, tmp_path, head, "full", f"Rules: {READ_RULE_PLACEHOLDER}\n", None)
+    _fake_muse(tmp_path, monkeypatch, _capture_prompt_body(tmp_path))
+    _run_review(plan_path, workspace, tmp_path, monkeypatch)
+    assert (tmp_path / "prompt.txt").read_text(encoding="utf-8") == f"Rules: {READ_RULES['muse']}\n"
+
+
+def test_a_file_list_review_stages_the_whole_diff(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace, head = _workspace(tmp_path)
+    plan_path = _plan_dir(
+        policy, tmp_path, head, "full", f"Intro. {FILE_LIST_DIFF_LINE}Read.\n", "diff --git a/a.txt b/a.txt\n+whole\n"
+    )
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    plan_path.write_text(json.dumps({**plan, "brief_mode": "file-list", "evidence_files": ["a.txt"]}), "utf-8")
+    _fake_muse(tmp_path, monkeypatch, _capture_prompt_body(tmp_path))
+    artifact = _run_review(plan_path, workspace, tmp_path, monkeypatch)
+    staged = workspace / runner.STAGED_DIFF_NAME
+    assert (tmp_path / "prompt.txt").read_text(encoding="utf-8") == (
+        f"Intro. The whole pull request diff is at {staged}; read it with the changed files. Read.\n"
+    )
+    assert "+whole" in staged.read_text(encoding="utf-8")
+    assert artifact["outcome"] == "verdict"
+
+
+@pytest.mark.parametrize("reviewer", ["sol", "sonnet", "muse"])
+def test_a_do_not_ship_is_never_discarded_for_missing_read_evidence(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reviewer: str
+) -> None:
+    workspace, head = _workspace(tmp_path)
+    rework = {"decision": "DO_NOT_SHIP", "summary": "rework", "files_examined": []}
+    if reviewer == "sol":
+        _codex_says(tmp_path, monkeypatch, [], **rework)
+    elif reviewer == "sonnet":
+        _claude_says(tmp_path, monkeypatch, [], **rework)
+    else:
+        _muse_says(tmp_path, monkeypatch, **rework)
+    outcome = _review(policy, tmp_path, workspace, head, reviewer=reviewer, brief_mode="file-list", required=("a.txt",))
+    assert outcome.missing is None and outcome.verdict is not None
+    assert outcome.verdict["decision"] == "DO_NOT_SHIP"

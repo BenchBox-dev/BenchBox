@@ -3,6 +3,9 @@
 Date: 2026-10-05
 Status: Decided. The shadow workflow is added; the required `oracle-review`
 check and `_project/scripts/oracle_review_check.py` are unchanged.
+The blocking severities rule is superseded by
+`_project/decisions/oracle-review-protocol-2026-10-08.md`: severity orders
+defects and never gates.
 Related: `.github/workflows/oracle-review-shadow.yml`,
 `.github/oracle-reviewers.yml`, `_project/scripts/oracle_reviewers/`,
 `docs/operations/oracle-review-v2.md`.

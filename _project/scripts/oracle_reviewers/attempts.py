@@ -7,11 +7,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from . import absence, selection
+from . import absence, protocol, selection
 from .selection import Attempt, SelectionInput, Step
-from .verdict import Verdict, VerdictError, validate
+from .verdict import COMPLETE, SHIP, Verdict, VerdictError, validate
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 ARTIFACT_KEYS = frozenset(
     {
         "schema",
@@ -78,17 +78,19 @@ def _check(condition: bool, errors: list[str], message: str) -> bool:
     return condition
 
 
-def _attempt(data: Mapping[str, Any], blocking: tuple[str, ...], loaded: LoadedAttempts) -> Attempt:
+def _attempt(data: Mapping[str, Any], max_defects: int, loaded: LoadedAttempts) -> Attempt:
     slot = int(data["slot"])
     reviewer = str(data["reviewer"])
     if data["outcome"] == VERDICT_OUTCOME:
         try:
-            verdict = validate(data["verdict"])
+            verdict = validate(data["verdict"], trusted=True)
         except VerdictError as exc:
             return Attempt(slot, reviewer, selection.ABSENT, absence.INVALID, str(exc))
+        if verdict.status != COMPLETE:
+            return Attempt(slot, reviewer, selection.ABSENT, absence.INCOMPLETE, verdict.incomplete_reason)
         loaded.verdicts[slot] = verdict
-        outcome = selection.FAIL if verdict.blocking(blocking) else selection.PASS
-        return Attempt(slot, reviewer, outcome)
+        shipped = protocol.judge(verdict, max_defects).decision == SHIP
+        return Attempt(slot, reviewer, selection.PASS if shipped else selection.FAIL)
     missing = data["absence"] or {}
     kind = missing.get("kind")
     if kind not in absence.KINDS or kind == absence.OK:
@@ -107,7 +109,7 @@ def _attempt(data: Mapping[str, Any], blocking: tuple[str, ...], loaded: LoadedA
 def load(directory: Path, plan: Mapping[str, Any], run_id: str) -> LoadedAttempts:
     loaded = LoadedAttempts()
     chain = {item["name"] for item in plan["chain"]}
-    blocking = tuple(plan["blocking"])
+    max_defects = int(plan["max_defects"])
     seen: set[int] = set()
     paths = sorted(directory.glob("attempt-*.json")) if directory.is_dir() else []
     for path in paths:
@@ -140,7 +142,7 @@ def load(directory: Path, plan: Mapping[str, Any], run_id: str) -> LoadedAttempt
         if not _check(data["slot"] not in seen, errors, f"{path.name}: duplicate slot"):
             continue
         seen.add(data["slot"])
-        loaded.attempts.append(_attempt(data, blocking, loaded))
+        loaded.attempts.append(_attempt(data, max_defects, loaded))
     loaded.attempts.sort(key=lambda attempt: attempt.slot)
     expected = list(range(1, len(loaded.attempts) + 1))
     _check([attempt.slot for attempt in loaded.attempts] == expected, loaded.errors, "attempt slots are not contiguous")

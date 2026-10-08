@@ -79,16 +79,21 @@ def test_max_attempts_must_cover_the_longest_enabled_chain() -> None:
         parse_policy(raw)
 
 
-def test_tier_orders_and_blocking(policy: Policy) -> None:
+def test_tier_orders(policy: Policy) -> None:
     assert policy.tiers["low-medium"].order == ("luna", "muse", "agy", "sonnet", "sol")
     assert policy.tiers["medium-high"].order == ("sonnet", "sol", "luna", "muse", "agy")
     assert policy.tiers["very-high"].order == ("opus", "sol")
-    assert policy.tiers["low-medium"].blocking == ("Critical", "High")
-    assert policy.tiers["medium-high"].blocking == ("Critical", "High")
-    assert policy.tiers["very-high"].blocking == ("Critical", "High", "Medium")
     assert policy.tiers["very-high"].diversity_exempt == ("opus",)
     assert policy.tiers["low-medium"].diversity_exempt == ()
     assert policy.tiers["medium-high"].diversity_exempt == ()
+
+
+def test_protocol_limits(policy: Policy) -> None:
+    assert (policy.protocol.max_defects, policy.protocol.max_do_not_ship) == (10, 3)
+
+
+def test_only_agy_does_not_read_files(policy: Policy) -> None:
+    assert {name for name, reviewer in policy.reviewers.items() if not reviewer.reads_files} == {"agy"}
 
 
 def test_opus_never_serves_the_lower_tiers(policy: Policy) -> None:
@@ -120,7 +125,11 @@ def test_brief_cap_fits_one_argument(policy: Policy) -> None:
         (lambda raw: raw["reviewers"]["agy"].pop("disabled_reason"), "needs a disabled_reason"),
         (lambda raw: raw["reviewers"]["sol"].update(pool="openai"), "unknown pool"),
         (lambda raw: raw["reviewers"]["sol"].update(harness="gemini"), "unknown harness"),
-        (lambda raw: raw["tiers"]["very-high"].update(blocking=["Severe"]), "invalid severities"),
+        (lambda raw: raw["tiers"]["very-high"].update(blocking=["Critical"]), "never gates"),
+        (lambda raw: raw["reviewers"]["sol"].update(reads_files="yes"), "reads_files must be a boolean"),
+        (lambda raw: raw["reviewers"]["sol"].pop("reads_files"), "reads_files must be a boolean"),
+        (lambda raw: raw["protocol"].update(max_defects=0), "protocol limits must be positive"),
+        (lambda raw: raw.pop("protocol"), "protocol limits must be positive"),
         (lambda raw: raw["tiers"].pop("medium-high"), "tiers must be exactly"),
         (lambda raw: raw.update(version=2), "version must be 1"),
     ],

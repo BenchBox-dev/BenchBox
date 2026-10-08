@@ -1,0 +1,74 @@
+from __future__ import annotations
+
+from typing import Any
+
+import pytest
+
+from _project.scripts.oracle_reviewers.protocol import DO_NOT_SHIP_SUMMARY, judge
+from _project.scripts.oracle_reviewers.verdict import validate
+
+pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
+
+def _defect(line: int = 1, severity: str = "High") -> dict[str, Any]:
+    return {"severity": severity, "file": "a.py", "line": line, "end_line": None, "title": f"t{line}", "detail": ""}
+
+
+def _verdict(decision: str, defects: list[dict[str, Any]], summary: str = "s", **over: Any):
+    return validate(
+        {
+            "status": "complete",
+            "incomplete_reason": "",
+            "decision": decision,
+            "summary": summary,
+            "files_examined": ["a.py"],
+            "defects": defects,
+            "prior_defects": [],
+            **over,
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    ("decision", "count", "expected"),
+    [
+        ("SHIP", 0, "SHIP"),
+        ("SHIP", 1, "SHIP_WITH_FIXES"),
+        ("SHIP_WITH_FIXES", 0, "SHIP"),
+        ("SHIP_WITH_FIXES", 3, "SHIP_WITH_FIXES"),
+        ("SHIP_WITH_FIXES", 10, "SHIP_WITH_FIXES"),
+        ("SHIP_WITH_FIXES", 11, "DO_NOT_SHIP"),
+        ("SHIP", 11, "DO_NOT_SHIP"),
+        ("DO_NOT_SHIP", 0, "DO_NOT_SHIP"),
+        ("DO_NOT_SHIP", 2, "DO_NOT_SHIP"),
+    ],
+)
+def test_the_decision_is_computed_and_the_stricter_outcome_wins(decision: str, count: int, expected: str) -> None:
+    judgement = judge(_verdict(decision, [_defect(line) for line in range(1, count + 1)]), 10)
+    assert judgement.decision == expected
+    assert len(judgement.defects) == (count if expected == "SHIP_WITH_FIXES" else 0)
+
+
+@pytest.mark.parametrize("severity", ["Critical", "High", "Medium", "Low"])
+def test_a_relabelled_severity_never_produces_ship(severity: str) -> None:
+    assert judge(_verdict("SHIP", [_defect(severity=severity)]), 10).decision == "SHIP_WITH_FIXES"
+
+
+def test_too_many_defects_become_do_not_ship_with_the_count_in_the_summary() -> None:
+    verdict = _verdict("SHIP_WITH_FIXES", [_defect(line) for line in range(1, 61)], summary="x" * 3000)
+    judgement = judge(verdict, 10)
+    assert judgement.decision == "DO_NOT_SHIP" and judgement.defects == ()
+    assert judgement.summary.endswith("The reviewer listed 60 defects, more than the 10 allowed.")
+    assert len(judgement.summary) <= DO_NOT_SHIP_SUMMARY
+
+
+def test_do_not_ship_keeps_only_a_short_summary() -> None:
+    judgement = judge(_verdict("DO_NOT_SHIP", [_defect()], summary="y" * 4000), 10)
+    assert len(judgement.summary) == DO_NOT_SHIP_SUMMARY
+    assert judgement.label == "DO NOT SHIP"
+
+
+def test_an_incomplete_review_cannot_be_judged() -> None:
+    verdict = _verdict("NONE", [], status="incomplete", incomplete_reason="no access")
+    with pytest.raises(ValueError, match="only a complete review"):
+        judge(verdict, 10)

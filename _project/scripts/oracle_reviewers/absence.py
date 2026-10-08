@@ -14,7 +14,8 @@ TIMEOUT = "timeout"
 INVALID = "invalid"
 EMPTY = "empty"
 ERROR = "error"
-KINDS = (OK, QUOTA, AUTH, TIMEOUT, INVALID, EMPTY, ERROR)
+INCOMPLETE = "incomplete"
+KINDS = (OK, QUOTA, AUTH, TIMEOUT, INVALID, EMPTY, ERROR, INCOMPLETE)
 
 CALIBRATED_QUOTA_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
     "agy": (re.compile(r"RESOURCE_EXHAUSTED \(code 429\)"),),

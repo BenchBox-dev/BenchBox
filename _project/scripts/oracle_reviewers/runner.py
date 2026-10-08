@@ -9,10 +9,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from . import absence
+from . import absence, evidence
 from .commands import Invocation, build
 from .policy import Reviewer
-from .verdict import VerdictError, parse_output, validate
+from .verdict import INCOMPLETE, VerdictError, parse_output, validate
 
 
 @dataclass(frozen=True)
@@ -92,6 +92,8 @@ def review(
     prompt: str,
     scratch: Path,
     now: datetime,
+    brief_mode: str = evidence.INLINE,
+    required: tuple[str, ...] = (),
 ) -> ReviewOutcome:
     if _git(workspace, "rev-parse", "HEAD") != head_sha:
         return ReviewOutcome(None, absence.Absence(absence.ERROR, "the workspace is not at the reviewed head"), "")
@@ -106,11 +108,12 @@ def review(
     if invocation.output_file is not None:
         output = invocation.output_file.read_text(encoding="utf-8") if invocation.output_file.is_file() else ""
     diagnostic = _diagnostic(result)
+    events = evidence.codex_errors(result.stdout) if reviewer.harness == "codex" else ""
     missing = absence.classify(
         reviewer.harness,
         result.exit_code,
         output,
-        f"{result.stderr}\n{result.stdout}",
+        f"{result.stderr}\n{result.stdout}\n{events}",
         timed_out=result.timed_out,
         now=now,
     )
@@ -122,4 +125,18 @@ def review(
         verdict = validate(parse_output(reviewer.harness, output))
     except VerdictError as exc:
         return ReviewOutcome(None, absence.Absence(absence.INVALID, str(exc)), diagnostic)
+    if verdict.status == INCOMPLETE:
+        reason = verdict.incomplete_reason or "the reviewer reported its review incomplete"
+        return ReviewOutcome(None, absence.Absence(absence.INCOMPLETE, reason), diagnostic)
+    verdict = evidence.mark_citations(verdict, workspace)
+    problem = evidence.check(
+        verdict,
+        harness=reviewer.harness,
+        brief_mode=brief_mode,
+        workspace=workspace,
+        required=required,
+        run=evidence.trace(reviewer.harness, result.stdout),
+    )
+    if problem is not None:
+        return ReviewOutcome(None, absence.Absence(absence.INCOMPLETE, problem), diagnostic)
     return ReviewOutcome(verdict.to_json(), None, diagnostic)

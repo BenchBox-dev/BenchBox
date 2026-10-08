@@ -26,6 +26,7 @@ class Reviewer:
     model: str
     effort: str
     read_only: str
+    reads_files: bool
     timeout_minutes: int
     turn_cap: int | None
     allowed_tiers: tuple[str, ...]
@@ -41,6 +42,7 @@ class Reviewer:
             "model": self.model,
             "effort": self.effort,
             "read_only": self.read_only,
+            "reads_files": self.reads_files,
             "timeout_minutes": self.timeout_minutes,
             "turn_cap": self.turn_cap,
             "allowed_tiers": list(self.allowed_tiers),
@@ -58,6 +60,7 @@ class Reviewer:
             model=data["model"],
             effort=data["effort"],
             read_only=data["read_only"],
+            reads_files=bool(data["reads_files"]),
             timeout_minutes=int(data["timeout_minutes"]),
             turn_cap=data["turn_cap"],
             allowed_tiers=tuple(data["allowed_tiers"]),
@@ -69,7 +72,6 @@ class Reviewer:
 @dataclass(frozen=True)
 class Tier:
     name: str
-    blocking: tuple[str, ...]
     order: tuple[str, ...]
     diversity_exempt: tuple[str, ...]
 
@@ -83,6 +85,12 @@ class ClassifierRules:
     gate_paths: tuple[str, ...]
     logic_paths: tuple[str, ...]
     data_paths: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ProtocolRules:
+    max_defects: int
+    max_do_not_ship: int
 
 
 @dataclass(frozen=True)
@@ -104,6 +112,7 @@ class Policy:
     default_author_family: str
     tier_labels: Mapping[str, str]
     retry: RetryRules
+    protocol: ProtocolRules
     pools: tuple[str, ...]
     reviewers: Mapping[str, Reviewer]
     tiers: Mapping[str, Tier]
@@ -137,6 +146,7 @@ def _reviewer(name: str, data: Mapping[str, Any], pools: tuple[str, ...]) -> Rev
         model=data.get("model", ""),
         effort=data.get("effort", ""),
         read_only=data.get("read_only", ""),
+        reads_files=data.get("reads_files"),
         timeout_minutes=data.get("timeout_minutes", 0),
         turn_cap=data.get("turn_cap"),
         allowed_tiers=_str_tuple(data.get("allowed_tiers"), f"reviewer {name} allowed_tiers"),
@@ -148,6 +158,7 @@ def _reviewer(name: str, data: Mapping[str, Any], pools: tuple[str, ...]) -> Rev
     _require(reviewer.family in HARNESSES, f"reviewer {name} has unknown family {reviewer.family!r}")
     _require(bool(reviewer.model) and bool(reviewer.effort), f"reviewer {name} needs a model and an effort")
     _require(reviewer.read_only in READ_ONLY_KINDS, f"reviewer {name} has unknown read_only {reviewer.read_only!r}")
+    _require(isinstance(reviewer.reads_files, bool), f"reviewer {name} reads_files must be a boolean")
     _require(
         isinstance(reviewer.timeout_minutes, int) and 0 < reviewer.timeout_minutes <= 60,
         f"reviewer {name} timeout_minutes must be between 1 and 60",
@@ -165,11 +176,12 @@ def _reviewer(name: str, data: Mapping[str, Any], pools: tuple[str, ...]) -> Rev
 def _tier(name: str, data: Mapping[str, Any], reviewers: Mapping[str, Reviewer]) -> Tier:
     tier = Tier(
         name=name,
-        blocking=_str_tuple(data.get("blocking"), f"tier {name} blocking"),
         order=_str_tuple(data.get("order"), f"tier {name} order"),
         diversity_exempt=_str_tuple(data.get("diversity_exempt", []), f"tier {name} diversity_exempt"),
     )
-    _require(bool(tier.blocking) and set(tier.blocking) <= set(SEVERITIES), f"tier {name} has invalid severities")
+    _require(
+        "blocking" not in data, f"tier {name}: severity orders defects and never gates, so blocking is not allowed"
+    )
     _require(bool(tier.order), f"tier {name} has no reviewers")
     _require(len(set(tier.order)) == len(tier.order), f"tier {name} repeats a reviewer")
     for reviewer_name in tier.order:
@@ -193,6 +205,7 @@ def parse_policy(data: Mapping[str, Any]) -> Policy:
     tiers = {name: _tier(name, tiers_data[name], reviewers) for name in TIERS}
     classifier = data.get("classifier") or {}
     retry = data.get("retry") or {}
+    protocol = data.get("protocol") or {}
     tier_labels = data.get("tier_labels") or {}
     _require(all(value in TIERS for value in tier_labels.values()), "tier_labels must map to known tiers")
     policy = Policy(
@@ -209,6 +222,10 @@ def parse_policy(data: Mapping[str, Any]) -> Policy:
             daily_budget=int(retry.get("daily_budget", 0)),
             backoff_start_minutes=int(retry.get("backoff_start_minutes", 0)),
             sweep_max_dispatches=int(retry.get("sweep_max_dispatches", 0)),
+        ),
+        protocol=ProtocolRules(
+            max_defects=int(protocol.get("max_defects", 0)),
+            max_do_not_ship=int(protocol.get("max_do_not_ship", 0)),
         ),
         pools=pools,
         reviewers=reviewers,
@@ -234,6 +251,9 @@ def parse_policy(data: Mapping[str, Any]) -> Policy:
         f"max_attempts must cover the longest enabled chain ({policy.longest_enabled_chain()})",
     )
     _require(policy.default_author_family in policy.families, "default_author_family must be a reviewer family")
+    _require(
+        policy.protocol.max_defects > 0 and policy.protocol.max_do_not_ship > 0, "protocol limits must be positive"
+    )
     _require(policy.retry.daily_budget > 0 and policy.retry.backoff_start_minutes > 0, "retry rules must be positive")
     _require(
         policy.classifier.area_depth > 0 and policy.classifier.small_max_lines > 0,

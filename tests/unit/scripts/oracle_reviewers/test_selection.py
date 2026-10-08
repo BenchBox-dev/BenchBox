@@ -138,6 +138,15 @@ def test_brief_over_cap_leaves_only_hard_read_only_reviewers(policy: Policy) -> 
     assert with_inline == ["muse", "agy", "sonnet"]
 
 
+def test_a_hard_read_only_reviewer_that_cannot_read_files_skips_a_file_list_brief(policy: Policy) -> None:
+    selection_input = _input(policy, "low-medium", ("author-family:codex",), brief_mode="file-list")
+    blind = [replace(item, reads_files=False) if item.name == "muse" else item for item in selection_input.chain]
+    step = next_step(replace(selection_input, chain=blind), [])
+    assert step.reviewer is not None and step.reviewer.name == "sonnet"
+    inline = next_step(replace(selection_input, chain=blind, brief_mode="inline"), [])
+    assert inline.reviewer is not None and inline.reviewer.name == "muse"
+
+
 def test_oversize_brief_leaves_everyone_absent(policy: Policy) -> None:
     step = next_step(_input(policy, "very-high", brief_mode="oversize"), [])
     assert step.kind == selection.PENDING
