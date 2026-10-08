@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "The matrix runs to completion on an otherwise idle host with BENCHBOX_ENABLE_THROUGHPUT_MATRIX set, and the log path is recorded.",
+    "Any failure caused by 1..S numbering is fixed or tracked; DataFrame timeouts are classified as load or real.",
+    "The command, host load and result are reported."
+  ],
+  "context": "Owner paused the matrix runs on 2026-10-08. Do not start this item until the owner lifts the pause.",
+  "description": "tests/integration/test_local_platform_benchmark_matrix.py was not run to completion after throughput streams moved to 1..S numbering. The owner paused the run. Its DataFrame cases timed out under load, and its throughput cases run only when BENCHBOX_ENABLE_THROUGHPUT_MATRIX is set (line 217). The numbering change is therefore unverified by this suite.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:2078d44d78bfbb5aca3865ea",
+      "at": "2026-10-08T13:38:46Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "eba62ab8c3e948e3ab7ea332d285ebb4",
+      "session_id": "0bdbb5bb32cc4bd0b5505d2dcb0e488e"
+    }
+  ]
+}

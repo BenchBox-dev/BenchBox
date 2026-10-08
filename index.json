@@ -11830,6 +11830,13 @@
       "status": "done",
       "title": "Add cost tracking for local/self-hosted platforms"
     },
+    "local-platform-matrix-throughput-stream-numbering-unrun": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Run the local platform benchmark matrix against 1..S throughput stream numbering"
+    },
     "local-tpcdi-bundles-regenerate-current-generator": {
       "claim": null,
       "needs": [],
