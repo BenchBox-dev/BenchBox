@@ -722,8 +722,6 @@ def _top_level_config_paths() -> tuple[Path, ...]:
 
 @pytest.mark.parametrize("config_path", _top_level_config_paths(), ids=lambda p: p.name)
 def test_top_level_config_carries_recognized_lifecycle_header(config_path: Path):
-    if config_path.name == "uat-throughput-cedardb-nightly.yaml":
-        return
     first_line = config_path.read_text(encoding="utf-8").splitlines()[0]
     assert first_line.startswith(_RECOGNIZED_CONFIG_HEADERS), (
         f"{config_path.name}: first line {first_line!r} does not start with one of "
