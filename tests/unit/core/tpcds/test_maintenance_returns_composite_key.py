@@ -1,10 +1,3 @@
-"""Return inserts must not duplicate the composite primary key of the returns tables.
-
-The maintenance workload derives each new return from an existing sale and reuses the sale's
-(item, ticket/order number) as the return's key. Sales that already have a return would produce a
-duplicate key on engines that enforce the specification's composite primary keys.
-"""
-
 from __future__ import annotations
 
 import logging

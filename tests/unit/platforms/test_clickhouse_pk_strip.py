@@ -1,11 +1,3 @@
-"""Edge-case coverage for ClickHouse primary-key stripping.
-
-Pins `_strip_primary_key_constraints` on unusual DDL: quoted table names,
-named constraints, inline column constraints, string literals and comments
-mentioning primary keys, and nested type commas. Every byte outside a real
-primary-key constraint must survive unchanged.
-"""
-
 from __future__ import annotations
 
 import pytest

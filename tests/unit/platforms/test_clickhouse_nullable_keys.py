@@ -1,12 +1,3 @@
-"""Nullable-key rejection for tuned ClickHouse MergeTree keys.
-
-Key columns render non-Nullable, so a tuned sort/partition key on a
-schema-nullable column would load its NULLs as 0 and silently change query
-answers. ``_optimize_table_definition`` must reject that configuration loudly
-instead. Statement inline keys keep their existing rendering (untuned DDL is
-byte-identical); only tuning-contributed keys raise.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -76,13 +67,6 @@ def test_untuned_nullable_columns_never_raise() -> None:
 
 
 def test_registry_tunings_reject_nullable_keys_on_the_real_tpcds_schema(tmp_path) -> None:
-    """Pin the exact tables whose registry tunings sort on nullable columns.
-
-    The shared ``get_tunings()`` defaults specify nullable sort/partition
-    keys for seven TPC-DS tables; rendering any of them tuned must fail
-    loudly rather than silently load NULLs as 0. The set is exact so a
-    future fix to the defaults fails closed here and forces a revisit.
-    """
     from benchbox.core.tpcds.benchmark.runner import TPCDSBenchmark
     from benchbox.core.tpcds.schema.registry import get_tunings
     from benchbox.platforms.clickhouse.adapter import ClickHouseAdapter
@@ -118,11 +102,6 @@ def test_registry_tunings_reject_nullable_keys_on_the_real_tpcds_schema(tmp_path
 
 
 def test_statement_inline_pk_on_nullable_column_keeps_existing_rendering() -> None:
-    """Statement inline keys are out of scope: only tuning-contributed keys raise.
-
-    Pins the existing rendering (inline PK columns stay non-Nullable) so the
-    tuned-only rule cannot silently widen to untuned DDL.
-    """
     statement = "CREATE TABLE t (a INTEGER, b INTEGER, PRIMARY KEY (b))"
     tunings = {
         "t": TableTuning(
@@ -130,8 +109,6 @@ def test_statement_inline_pk_on_nullable_column_keeps_existing_rendering() -> No
             sorting=[TuningColumn(name="a", type="INTEGER", order=1)],
         )
     }
-    # Primary keys disabled, as in the curated template: the inline PK must
-    # not trip the tuned-key prefix validation, nor the nullable-key rule.
     rendered = _optimize(statement, tunings, {"b"}, primary_keys_enabled=False)
     assert "ORDER BY (a)" in rendered
     assert "Nullable(" not in rendered
