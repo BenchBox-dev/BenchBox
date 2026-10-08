@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "validate_corpus.py verifies that len(stream_results) matches the configured stream count in run.streams (or config.streams) when present",
+    "Explorer pipeline transformer validates stream_results length against run.streams and raises/flags mismatches",
+    "Unit tests cover matching, missing, and mismatched stream count payloads"
+  ],
+  "context": "Opus review finding O1 on PR #2761 (feat/throughput-corpus-three-engines).",
+  "description": "In results-data/validate_corpus.py (lines 97-101) and _project/scripts/explorer_pipeline/transformer.py (_stream_count), stream_count is derived solely as len(phases.throughput_test.stream_results). If a benchmark configuration specifies --streams S but fewer or more stream entries are recorded in the bundle, or if run.streams disagrees with stream_results, the discrepancy is silently masked rather than flagged as an invalid run.",
+  "sessions": [
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:2a10096285872d23ac8a3bfe",
+      "at": "2026-10-08T23:39:00Z",
+      "client": "antigravity-client",
+      "op": "create",
+      "op_id": "b40d45a1ba2847c2b207ba66c8bec8d8",
+      "session_id": "414237a6e56140ed97e26a248092ab35"
+    }
+  ]
+}
