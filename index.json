@@ -3290,6 +3290,19 @@
       "status": "done",
       "title": "create_path_handler drops cloud_target when re-wrapping a CloudStagingPath"
     },
+    "cloud-tuned-benefit-measurement-20261008": {
+      "claim": null,
+      "needs": [
+        "tuning-evidence-benefit-rule-20261008",
+        "databricks-tuned-templates-vendor-guidance-20261008",
+        "snowflake-tuned-templates-clustering-guidance-20261008",
+        "tuning-post-load-live-certification-20261005",
+        "snowflake-tuned-live-certification-20261001"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Measure tuned against notuning on Databricks and Snowflake, with clustering state and cost"
+    },
     "code-review-checklist-additions-for-spec-docs": {
       "claim": null,
       "needs": [],

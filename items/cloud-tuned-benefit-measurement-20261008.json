@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Owner approvals (command, runtime, cost cap, log path, stop condition) are recorded in context before each run.",
+    "Each platform and template has harness output with clustering state, settle condition, load and maintenance time, cost and CIs (paths in context).",
+    "Each template has a benefit-rule verdict, and its evidence state is updated.",
+    "Any template change the verdict calls for is filed or made through the profile and generator."
+  ],
+  "context": "Source: tuning-evidence plan (2026-10-08), plan step 9. Covers muse F11/F13/F15 (cost metering and clustering state). The plan first put this inside the existing live-certification items. It is a separate item so that certification (does tuning apply and verify) stays apart from benefit (does it help).",
+  "description": "## Problem\nNo Databricks or Snowflake tuned template has been measured against `notuning`. On both platforms, layout work is asynchronous and costs money: Databricks OPTIMIZE/ZORDER, and Snowflake automatic reclustering (\"reclustering consumes credits\"; rows are \"not necessarily updated immediately\"). A comparison that ignores clustering state or cost can mislead either way.\n\n## Change\nAfter live certification has passed, run the harness on Databricks and Snowflake for TPC-H, and TPC-DS if the budget allows. For each arm, record:\n- clustering state before timing: Snowflake `SYSTEM$CLUSTERING_INFORMATION`, and Databricks `DESCRIBE DETAIL` (numFiles, size) plus OPTIMIZE metrics;\n- the settle condition used (for example, reclustering idle, or OPTIMIZE finished);\n- load time and OPTIMIZE or reclustering time;\n- cost from billing or query-history views (Snowflake credits, Databricks DBUs).\n\nApply the benefit rule, record a verdict per template and tier, and update the evidence states.\n\n## Decision gates\n- Each live run needs explicit owner approval naming the command, maximum runtime, maximum cost, log path and stop condition.\n- The owner picks the scale factor(s), and the evidence records that they are far below the vendors' 1 TB / multi-TB guidance.\n\n## Guardrails (must preserve)\n- Use dedicated database names; never shared ones.\n- Never relax a certification assertion.\n- Stop at the approved cost cap.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit owner approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop 5ca12e6ca.",
+  "links": [
+    "https://docs.snowflake.com/en/user-guide/tables-clustering-keys",
+    "https://docs.databricks.com/aws/en/delta/clustering"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T23:33:37Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "907712132a494fe8a8635aff56ba2983",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
+    }
+  ]
+}
