@@ -19731,6 +19731,13 @@
       "status": "done",
       "title": "soundness_drain_report keys only on ci-required-result, not all ruleset required checks"
     },
+    "soundness-merge-digest-external-review-author-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "The soundness merge digest accepts an external-review comment from any author"
+    },
     "soundness-path-prefix-not-exact-file": {
       "claim": null,
       "needs": [],

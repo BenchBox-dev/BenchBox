@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "The external-review signal requires a listed reviewer or attester account",
+    "A test shows a comment from another author is not counted"
+  ],
+  "description": "soundness_merge_digest.EXTERNAL_REVIEW_PATTERN matches the review text in a comment from any commenter, so anyone who can comment can make a merged soundness change look reviewed in the daily digest.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-08T23:31:10Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "50ce35fb36d3405dbd09f59f71e1e9c4",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}
