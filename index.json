@@ -3301,10 +3301,15 @@
       "title": "Harden TODO verification commands: audit buggy DONE examples, schema-enforce single-line commands, decide actioned-completion convention"
     },
     "comment-checker-review-followups": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-09T14:10:43Z",
+        "generation": "4dfe65482259490398d22fa0b90545c2",
+        "renewals": 0,
+        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:8dff0892e031f17231e04e2e"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Close the comment-policy checker's Medium and Low review follow-ups"
     },
     "comment-cleanup-ai-primitives": {
