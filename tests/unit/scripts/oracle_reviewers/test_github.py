@@ -24,6 +24,7 @@ def _run(**over: Any) -> dict[str, Any]:
         "repository": {"full_name": REPO},
         "event": "issue_comment",
         "head_sha": SHA,
+        "created_at": "2026-10-07T23:05:42Z",
     }
     run.update(over)
     return run
@@ -159,6 +160,7 @@ def test_latest_state_skips_untrusted_runs(monkeypatch: pytest.MonkeyPatch) -> N
         return subprocess.CompletedProcess(argv, 0, "", "")
 
     monkeypatch.setattr(github, "get_json", get_json)
+    monkeypatch.setattr(github, "get_paginated", lambda path: [])
     monkeypatch.setattr(github.subprocess, "run", fake_run)
     assert github.latest_state(REPO, 7) == state
     assert downloaded == ["1"]
@@ -176,7 +178,98 @@ def test_latest_state_skips_a_pull_request_target_run_not_based_on_develop(monke
         raise AssertionError("an untrusted run must not be downloaded")
 
     monkeypatch.setattr(github, "get_json", get_json)
+    monkeypatch.setattr(github, "get_paginated", lambda path: [])
     monkeypatch.setattr(github.subprocess, "run", no_download)
+    assert github.latest_state(REPO, 7) is None
+
+
+BEFORE_RETARGET = "2026-10-07T22:00:00Z"
+RETARGET = "2026-10-07T23:00:00Z"
+AFTER_RETARGET = "2026-10-07T23:05:42Z"
+
+
+def _retarget() -> datetime:
+    return datetime(2026, 10, 7, 23, 0, tzinfo=UTC)
+
+
+def test_trusted_run_rejects_a_pull_request_target_run_started_before_the_retarget() -> None:
+    early = _target_run(created_at=BEFORE_RETARGET)
+    assert not github.trusted_run(early, REPO, PR, _always, _retarget())
+    assert github.trusted_run(_target_run(created_at=AFTER_RETARGET), REPO, PR, _always, _retarget())
+    assert github.trusted_run(early, REPO, PR, _always, None)
+
+
+@pytest.mark.parametrize("created_at", [None, "", "not a time"])
+def test_trusted_run_rejects_an_unreadable_start_time_once_retargeted(created_at: Any) -> None:
+    run = _target_run(created_at=created_at)
+    assert not github.trusted_run(run, REPO, PR, _always, _retarget())
+
+
+def test_a_retarget_does_not_affect_events_that_run_develop_code() -> None:
+    assert github.trusted_run(_run(created_at=BEFORE_RETARGET), REPO, PR, _always, _retarget())
+
+
+def test_base_changed_at_takes_the_latest_base_change(monkeypatch: pytest.MonkeyPatch) -> None:
+    paths: list[str] = []
+
+    def paginated(path: str) -> list[Any]:
+        paths.append(path)
+        return [
+            {"event": "labeled", "created_at": "2026-10-07T23:30:00Z"},
+            {"event": "base_ref_changed", "created_at": BEFORE_RETARGET},
+            {"event": "base_ref_changed", "created_at": RETARGET},
+        ]
+
+    monkeypatch.setattr(github, "get_paginated", paginated)
+    assert github.base_changed_at(REPO, 7) == _retarget()
+    assert paths == [f"repos/{REPO}/issues/7/timeline?per_page=100"]
+
+
+def test_base_changed_at_is_none_without_a_base_change(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(github, "get_paginated", lambda path: [{"event": "labeled", "created_at": RETARGET}])
+    assert github.base_changed_at(REPO, 7) is None
+
+
+def test_base_changed_at_refuses_an_unreadable_time(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(github, "get_paginated", lambda path: [{"event": "base_ref_changed", "created_at": "?"}])
+    with pytest.raises(github.GitHubError):
+        github.base_changed_at(REPO, 7)
+
+
+def _state_listing(run_id: int) -> dict[str, Any]:
+    return {"artifacts": [{"created_at": "2026-10-07T23:10:00Z", "workflow_run": {"id": run_id}, "expired": False}]}
+
+
+def _no_download(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+    raise AssertionError("an untrusted run must not be downloaded")
+
+
+def test_latest_state_skips_a_pull_request_target_run_started_before_a_retarget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def get_json(path: str) -> Any:
+        if path.startswith(f"repos/{REPO}/actions/artifacts"):
+            return _state_listing(5)
+        return _target_run(created_at=BEFORE_RETARGET)
+
+    monkeypatch.setattr(github, "get_json", get_json)
+    monkeypatch.setattr(github, "get_paginated", lambda path: [{"event": "base_ref_changed", "created_at": RETARGET}])
+    monkeypatch.setattr(github.subprocess, "run", _no_download)
+    assert github.latest_state(REPO, 7) is None
+
+
+def test_latest_state_fails_closed_when_the_timeline_cannot_be_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    def get_json(path: str) -> Any:
+        if path.startswith(f"repos/{REPO}/actions/artifacts"):
+            return _state_listing(5)
+        return _target_run()
+
+    def broken(path: str) -> list[Any]:
+        raise github.GitHubError("HTTP 502")
+
+    monkeypatch.setattr(github, "get_json", get_json)
+    monkeypatch.setattr(github, "get_paginated", broken)
+    monkeypatch.setattr(github.subprocess, "run", _no_download)
     assert github.latest_state(REPO, 7) is None
 
 

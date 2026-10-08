@@ -5,6 +5,7 @@ import re
 import subprocess
 import tempfile
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -112,8 +113,34 @@ def _targets_develop(run: dict[str, Any], pr: int) -> bool:
     )
 
 
+def _parse_time(value: Any) -> datetime | None:
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _started_after(run: dict[str, Any], base_changed_at: datetime | None) -> bool:
+    if base_changed_at is None:
+        return True
+    started = _parse_time(run.get("created_at"))
+    return started is not None and started > base_changed_at
+
+
+def base_changed_at(repo: str, pr: int) -> datetime | None:
+    events = get_paginated(f"repos/{repo}/issues/{pr}/timeline?per_page=100")
+    moments = [_parse_time(event.get("created_at")) for event in events if event.get("event") == "base_ref_changed"]
+    if any(moment is None for moment in moments):
+        raise GitHubError(f"a base change on #{pr} has no readable time")
+    return max(filter(None, moments), default=None)
+
+
 def trusted_run(
-    run: dict[str, Any], repo: str, pr: int, is_on_develop: Callable[[str, str], bool] = on_develop
+    run: dict[str, Any],
+    repo: str,
+    pr: int,
+    is_on_develop: Callable[[str, str], bool] = on_develop,
+    retargeted_at: datetime | None = None,
 ) -> bool:
     head_sha = str(run.get("head_sha", ""))
     event = run.get("event")
@@ -125,7 +152,7 @@ def trusted_run(
     ):
         return False
     if event == "pull_request_target":
-        return _targets_develop(run, pr)
+        return _targets_develop(run, pr) and _started_after(run, retargeted_at)
     return is_on_develop(repo, head_sha)
 
 
@@ -137,9 +164,13 @@ def latest_state(repo: str, pr: int) -> State | None:
         key=lambda item: item.get("created_at", ""),
         reverse=True,
     )
+    try:
+        retargeted_at = base_changed_at(repo, pr)
+    except GitHubError:
+        retargeted_at = datetime.max.replace(tzinfo=UTC)
     for candidate in candidates:
         run_id = str(candidate["workflow_run"]["id"])
-        if not trusted_run(get_json(f"repos/{repo}/actions/runs/{run_id}"), repo, pr):
+        if not trusted_run(get_json(f"repos/{repo}/actions/runs/{run_id}"), repo, pr, retargeted_at=retargeted_at):
             continue
         with tempfile.TemporaryDirectory() as directory:
             result = subprocess.run(
