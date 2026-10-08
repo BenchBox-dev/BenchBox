@@ -30,9 +30,11 @@ have usage left.
   large multi-area diff). A label may raise the tier, never lower it. Files
   that make up the gate count as soundness paths even before the manifest
   lists them.
-- **Reviewers.** Low–medium: muse `muse-spark-1.3`, agy
-  `gemini-3.8-flash-medium`, codex `gpt-6-luna` at high effort, then the
-  medium–high reviewers. Medium–high: claude `claude-sonnet-5-5`, codex
+- **Reviewers.** Low–medium: codex `gpt-6-luna` at high effort, muse
+  `muse-spark-1.3-contributor`, agy `gemini-3.8-flash-medium`, then the
+  medium–high reviewers. Luna runs first because it has completed shadow
+  reviews; muse uses the contributor model, the one the maintainer's Muse
+  account provides. Medium–high: claude `claude-sonnet-5-5`, codex
   `gpt-6.1-sol`, then the low–medium reviewers. Very high: claude
   `claude-opus-5-5` at medium effort, then `gpt-6.1-sol` at medium effort,
   then pending. Opus never serves a lower tier.

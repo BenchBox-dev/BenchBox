@@ -68,7 +68,7 @@ def test_muse_reviewer_disables_write_and_shell(policy: Policy, tmp_path: Path) 
         "--disable-write",
         "--disable-shell",
         "--model",
-        "muse-spark-1.3",
+        "muse-spark-1.3-contributor",
     )
     assert argv[argv.index("--reasoning-effort") + 1] == "medium"
     assert argv[argv.index("--max-model-steps") + 1] == "80"

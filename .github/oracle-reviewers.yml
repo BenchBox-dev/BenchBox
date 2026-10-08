@@ -65,7 +65,7 @@ reviewers:
     harness: muse
     family: muse
     pool: muse
-    model: muse-spark-1.3
+    model: muse-spark-1.3-contributor
     effort: medium
     read_only: hard
     timeout_minutes: 25
@@ -87,7 +87,7 @@ reviewers:
 tiers:
   low-medium:
     blocking: [Critical, High]
-    order: [muse, agy, luna, sonnet, sol]
+    order: [luna, muse, agy, sonnet, sol]
     diversity_exempt: []
   medium-high:
     blocking: [Critical, High]

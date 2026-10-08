@@ -62,7 +62,7 @@ def test_missing_or_unknown_author_label_means_claude(policy: Policy) -> None:
 
 
 def test_low_medium_for_a_claude_author_skips_claude_and_never_reaches_opus(policy: Policy) -> None:
-    assert _walk(_input(policy, "low-medium"), {}) == ["muse", "luna", "sol"]
+    assert _walk(_input(policy, "low-medium"), {}) == ["luna", "muse", "sol"]
     assert "opus" not in [reviewer.name for reviewer in policy.chain("low-medium")]
 
 
