@@ -20799,6 +20799,15 @@
       "status": "blocked",
       "title": "Clean up stale auto-mirror branches/PRs after sync workflow runs in prod"
     },
+    "t3-drift-dispatch-verify-20261008": {
+      "claim": null,
+      "needs": [
+        "t3-drift-pricing-refresh-20261008"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Dispatch nightly-v2 with run_drift=true and confirm all four drift checks pass"
+    },
     "t3-drift-pricing-refresh-20261008": {
       "claim": null,
       "needs": [],

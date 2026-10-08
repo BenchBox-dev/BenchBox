@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A dispatched nightly-v2 run shows the t3:drift job green with all four checks passing",
+    "Issue #2471 is closed by the reporter, or the reason it stayed open is recorded on the issue"
+  ],
+  "context": "Dispatching a workflow is outward-facing; do it only with the owner's go-ahead. Other T3 domains (durations, docker clickhouse, perf) were red on 2026-10-08, which does not affect the drift issue but will keep the overall run red.",
+  "description": "After the pricing refresh merges, dispatch nightly-v2.yml with run_drift=true (scheduled runs evaluate drift on Mondays only, so the issue would otherwise stay open until the next Monday). Confirm the corpus, pricing, validator and cross-surface baseline checks all pass in the t3:drift job. The Report job should then close issue #2471. If a check fails, record which one and why on the issue rather than re-dispatching.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/issues/2471"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-08T23:55:38Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "0bd67113fb144f91b75171b77ec2d206",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    }
+  ]
+}
