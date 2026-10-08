@@ -78,6 +78,10 @@ file	_project/scripts/soundness_paths.py
 file	_project/scripts/oracle_review_check.py
 file	.github/workflows/oracle-review.yml
 file	_project/scripts/check_soundness_review.py
+file	.github/oracle-reviewers.yml
+prefix	_project/scripts/oracle_reviewers/
+file	_project/scripts/ruleset_review_enforcement.py
+file	scripts/ruleset_drift_check.py
 file	.github/soundness-paths.txt
 file	.github/PULL_REQUEST_TEMPLATE.md
 file	.github/workflows/ci.yml
