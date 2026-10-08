@@ -3793,7 +3793,12 @@
       "title": "Resolve external tools and skill mirrors in comment-removal scope"
     },
     "comment-cleanup-final-enforcement": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-09T23:57:19Z",
+        "generation": "c0c67374772b4c52b87a73124a503953",
+        "renewals": 0,
+        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:8dff0892e031f17231e04e2e"
+      },
       "needs": [
         "comment-cleanup-scope-policy",
         "comment-cleanup-checker",
@@ -3802,7 +3807,7 @@
         "comment-cleanup-shared-infrastructure"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Verify complete comment removal and enable strict whole-project enforcement"
     },
     "comment-cleanup-flightdata": {
