@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "The vendor price diff has been reviewed and each change confirmed against the vendor's published list price",
+    "Refreshed evidence and tables are committed together in one change",
+    "The pricing-data-drift-check workflow passes on develop after the change"
+  ],
+  "context": "Evidence: nightly-v2 run 37339234759 (2026-10-05) failed steps 'Submission validator drift' and 'Pricing data drift'; its corpus step reported 'No develop-ahead corpus drift', so corpus lag was not the cause. An earlier analysis blamed published-results lagging develop; the logs do not support that.",
+  "description": "The nightly T3 drift job failed on 2026-10-05 in two steps: submission validator drift and pricing data drift. The validator drift has since cleared (the submission-validator-drift-check push run on 2026-10-08 succeeded). Pricing drift has not: the pricing-data-drift-check push run on 2026-10-08 00:20Z failed with exit code 2, which the workflow reports as upstream vendor prices having moved. Dispatching the drift job again without fixing this will fail the same way. A person must review the price changes before committing them; the workflow says to confirm the new list prices, then run `make pricing-data` and commit the refreshed evidence and tables together.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/issues/2471"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-08T23:54:32Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "706b40c504fd4d17bd9d7892c298217b",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    }
+  ]
+}

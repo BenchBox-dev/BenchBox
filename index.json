@@ -20748,6 +20748,13 @@
       "status": "blocked",
       "title": "Clean up stale auto-mirror branches/PRs after sync workflow runs in prod"
     },
+    "t3-drift-pricing-refresh-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Review moved vendor prices and commit refreshed pricing evidence so t3:drift can pass"
+    },
     "table-format-integration-ci-coverage": {
       "claim": null,
       "needs": [],
