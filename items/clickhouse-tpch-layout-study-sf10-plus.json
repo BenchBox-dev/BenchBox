@@ -1,9 +1,11 @@
 {
   "acceptance": [
-    "Run layout_study.py comparing untuned, sort-only and partitioned layouts, with and without the tuned session pack, at SF10 or larger on a host with enough memory; record the memory rung per docs/operations/uat-framework.md",
-    "Record whether any partitioning helps, and update the ADR-3 addendum if the SF1 conclusion changes"
+    "Harness output for every arm at SF10 or larger is recorded with CIs, settle time, failures and the memory rung (paths in context).",
+    "The benefit-rule verdict on partitioning at that scale is recorded, and the ADR-3 addendum's scale statement is updated to match.",
+    "If partitioning wins at that scale, a follow-up item for a scale-tiered template is filed."
   ],
   "context": "PR #2766 and the ADR-3 addendum (docs/development/tuning-adr-003-baseline-and-single-renderer.md, 2026-10-07) measured SF1 only, on ClickHouse 25.8 in a 5.25 GiB container. SF100 does not fit the 16 GB measurement host and SF10 needs more memory than the 5.25 GiB rung. The decision to ship the TPC-H template with date sort keys and no partitioning rests on the argument that sort-key pruning does not depend on scale; it has not been measured at larger scale. Tool: layout_study.py (build SRC_DB TAG LAYOUT..., run TAG QUERY_DIR ROUNDS LAYOUT[@pack]... --out F, report F), currently in /tmp/tpch-tuned-regression-tools-20261007/ and to be copied into the repository or the new item's notes before that directory is cleaned.",
+  "description": "## Problem\nThe ClickHouse TPC-H decision (date sort keys, no partitioning) was measured at SF1 only, in a 5.25 GiB container on ClickHouse 25.8. The claim that partitioning cannot help at larger scale was argued, not measured. Partitioning changes part counts, merges and parallelism, all of which depend on scale.\n\n## Change\nWith the measurement harness (`tuning-evidence-measurement-harness-20261008`), run TPC-H at SF10 or larger on a host with enough memory, in these arms: untuned, sort-only and partitioned (monthly and yearly), each with and without the tuned session pack. Record settle time per arm, and report Q21 and every failing query, not drop them. Apply the benefit rule (`tuning-evidence-benefit-rule-20261008`).\n\n## Decision gate\n- The owner approves the host and memory rung before the run. If no suitable host exists, leave this item open and record why.\n\n## Guardrails (must preserve)\n- Do not change the template unless the rule's verdict calls for it.\n- Record the memory rung per docs/operations/uat-framework.md.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/pull/2766"
   ],
@@ -14,6 +16,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "98c06b8496f0431998ff611badde615e",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T23:34:05Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "16e938be867c4df7a1c173af67f42360",
       "session_id": "11344d8456c14298801d7c917bc4b4db"
     }
   ]

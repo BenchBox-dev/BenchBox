@@ -3018,7 +3018,9 @@
     },
     "clickhouse-tpch-layout-study-sf10-plus": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "tuning-evidence-benefit-rule-20261008"
+      ],
       "priority": "low",
       "status": "open",
       "title": "Repeat the ClickHouse TPC-H layout and session-settings study at SF10 or larger"
