@@ -15111,7 +15111,7 @@
         "pvm-d0-external-plan-review"
       ],
       "priority": "medium-high",
-      "status": "open",
+      "status": "blocked",
       "title": "Make the Polars DataFrame benchmarks run correctly on Polars 2.0 without breaking 1.x"
     },
     "pvm-s0b-polars-engine-option": {
