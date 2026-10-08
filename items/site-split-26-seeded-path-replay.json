@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Each pass (before 25, before 40, before 50) recorded with its core range and the site PRs that ported it",
+    "The list is empty when site-split-50's PR is opened",
+    "No Python or shell file is ported to the site repo"
+  ],
+  "context": "Owner decision D-Q (2026-10-08, in chat). Found during the batch handoff re-evaluation: the plan had no rule for core changes to seeded paths between the seed and the core deletions.",
+  "description": "The seed copies website/, results-explorer/, landing/, docs/blog/, _blog/ and _project/design/site-inventory/ from core once. Core keeps changing those paths until site-split-50 deletes them; five such PRs merged in one day (#2726, #2753, #2763, #2768, #2614). Without a rule, those changes would be lost.\n\nOwner decision D-Q: replay, no freeze.\n\n1. Use the seed commit recorded in site-split-20 as the starting point.\n2. Before site-split-25, before site-split-40, and as a precondition of site-split-50, list `git log <last replayed>..origin/develop -- <seeded paths>`.\n3. Port each listed commit to the site repo in a site PR, applying the seed renames (results-explorer/ to explorer/, docs/blog/ to blog/, _blog/ to drafts/, _project/design/site-inventory/ to inventory/). Name the core commit in the PR body.\n4. Record the last replayed core commit in this item's context after each pass.\n\nFinish this item when site-split-50's PR is ready and the list is empty.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de",
+      "at": "2026-10-08T23:25:08Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "cd88d68f155f49c287f234d73bdc44a4",
+      "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
+    }
+  ]
+}
