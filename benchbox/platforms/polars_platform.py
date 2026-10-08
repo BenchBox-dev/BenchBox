@@ -18,6 +18,7 @@ except ImportError:
 
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
 from benchbox.platforms.base.no_constraint_mixin import NoConstraintEnforcementMixin
+from benchbox.platforms.polars_compat import reader_rechunk_effective, reader_rechunk_option
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +172,7 @@ class PolarsAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
                 "streaming": self.streaming,
                 "n_rows_limit": self.n_rows,
                 "rechunk": self.rechunk,
+                "rechunk_effective": reader_rechunk_effective(self.rechunk),
                 "result_cache_enabled": False,
             },
         }
@@ -373,14 +375,14 @@ class PolarsAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
 
     def _load_parquet(self, file_paths: list[Path]) -> pl.LazyFrame:
         if len(file_paths) == 1:
-            return pl.scan_parquet(file_paths[0])
+            return pl.scan_parquet(file_paths[0], **reader_rechunk_option("scan_parquet", self.rechunk))
 
         parent_dir = file_paths[0].parent
         if all(f.parent == parent_dir for f in file_paths):
             pattern = str(parent_dir / "*.parquet")
-            return pl.scan_parquet(pattern)
+            return pl.scan_parquet(pattern, **reader_rechunk_option("scan_parquet", self.rechunk))
 
-        lfs = [pl.scan_parquet(f) for f in file_paths]
+        lfs = [pl.scan_parquet(f, **reader_rechunk_option("scan_parquet", self.rechunk)) for f in file_paths]
         return cast(pl.LazyFrame, pl.concat(lfs))
 
     def _load_csv(
@@ -401,6 +403,7 @@ class PolarsAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         scan_kwargs: dict[str, Any] = {
             "separator": delimiter,
             "has_header": False,
+            **reader_rechunk_option("scan_csv", self.rechunk),
             "ignore_errors": True,
         }
 
