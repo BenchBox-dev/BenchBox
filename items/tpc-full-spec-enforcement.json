@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "The mode requires a seed, enforces the spec's minimum stream count per scale factor, refuses query subsets and partial phases, for TPC-H and TPC-DS",
+    "RF1/RF2 (and the TPC-DS data maintenance functions) run as the specification requires, or any remaining deviation is recorded in the result and the docs",
+    "compliance classification depends on the enforced conditions, with tests for each refusal"
+  ],
+  "description": "The mode now called --official only checks that the scale factor is a TPC scale point and refuses tuned-fallback (benchbox/cli/commands/run.py ~540-562, ~112-122); a missing seed only warns (run.py ~554). The throughput stream minimum is a flat 2 (benchbox/core/run_service.py ~29, core/schemas.py ~23) instead of the spec's per-scale-factor minimum. compliance_class \"official\" means only flag set and SF is a scale point (core/tpc_patterns.py ~48-57), independent of phases, query subset or streams. RF1/RF2 run in a maintenance phase after the throughput test, not concurrently (docs/benchmarks/tpc-h.md ~121-127). Owner decision 2026-10-08: enforce the full specification before the mode is renamed to \"full-spec\".",
+  "links": [
+    "benchbox/cli/commands/run.py",
+    "benchbox/core/run_service.py",
+    "benchbox/core/schemas.py",
+    "benchbox/core/tpc_patterns.py",
+    "benchbox/core/tpch/compliance.py",
+    "benchbox/core/tpcds/compliance.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:667f75493d6fbd10b32fdee5",
+      "at": "2026-10-08T12:44:33Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "a34d904b7ca74f6a9d2da4412ae38a95",
+      "session_id": "bcebd139f88a4c38a6dc9549b9b03523"
+    }
+  ]
+}

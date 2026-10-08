@@ -21116,6 +21116,13 @@
       "status": "done",
       "title": "TPC-DS Streaming Data Generation Compression ✅"
     },
+    "tpc-full-spec-enforcement": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Make the TPC spec-following run mode enforce the full specification"
+    },
     "tpc-h-stream-processing-implementation": {
       "claim": null,
       "needs": [],
