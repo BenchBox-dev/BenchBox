@@ -1,0 +1,14 @@
+{
+  "context": "Follows canary run 37933180828 (dispatched 2026-10-09 on develop head containing PRs #2809, #2810, #2811): shards 3/6 and 4/6 error at teardown with 'test leaked stub-installer state: benchbox.platforms.clickhouse._dependencies.chdb' on tests/integration/platforms/test_tpchavoc_clickhouse_equivalence.py::test_clickhouse_skip_list_wiring and ::test_skipped_variants_are_excluded_never_marked_equivalent. Root cause: import_chdb() in benchbox/platforms/clickhouse/_dependencies.py unconditionally assigns the module global chdb as a cache side effect; tests/utilities/optional_engines.py chdb_skip_reason() (lru_cached) and client/metadata call sites trigger it process-wide on Linux where chdb loads, while the PR #2810 autouse fixture only resets the global for tests inside one module and converts later tests into guard victims (baseline polluted, fixture resets to None, guard flags the change). No production code reads the _dependencies.chdb global; importlib already caches in sys.modules, so the global write is redundant.",
+  "description": "Remove the redundant _dependencies.chdb global write in import_chdb() so importing chdb no longer mutates adapter-module state process-wide; keep the exported name bound (None) and the cwd-restore behavior covered by tests/unit/platforms/test_clickhouse_chdb_import.py; drop the now-redundant per-module restore fixture in test_tpchavoc_clickhouse_equivalence.py only if the guard stays green without it; keep the isolation-suite negative control proving the guard still flags a directly written attribute. Verify with the focused equivalence/isolation tests (fake chdb on macOS), ruff check/format, and a second release-canary dispatch (last of the 2-run budget) showing no chdb guard errors.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:905c6dff9634822e3c6b98bd",
+      "at": "2026-10-09T14:30:01Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "15959e0cbf8f4aa9a78fc8c608a88aaf",
+      "session_id": "ab67646309d04d93ac312505060c58eb"
+    }
+  ]
+}
