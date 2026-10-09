@@ -4321,17 +4321,12 @@
       "title": "Remove comments from cross-module unit tests: CLI, MCP, scripts, workflows and the rest"
     },
     "comment-cleanup-unit-tests-core": {
-      "claim": {
-        "expires_at": "2026-10-10T01:06:29Z",
-        "generation": "a2b5b5db07124d75a138ed7286e34dff",
-        "renewals": 0,
-        "worker": "mcp:antigravity-worker-2"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments from cross-module unit tests: core, benchmarks and small subsystems"
     },
     "comment-cleanup-unit-tests-platforms": {
