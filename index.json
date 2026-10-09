@@ -21368,6 +21368,13 @@
       "status": "done",
       "title": "G5: cut over to the DB-backed TODO tracker (freeze & delete legacy)"
     },
+    "todo-db-git-backend-checkout-timeout-resilience": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Handle git checkout timeouts in todo_db git_backend with structured error and retry"
+    },
     "todo-db-runtime-schema3-batch-capability": {
       "claim": null,
       "needs": [

@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "git_backend.py catches subprocess.TimeoutExpired on all checkout calls and returns a structured error or retry outcome instead of crashing",
+    "Unit test verifies timeout handling on checkout"
+  ],
+  "context": "Discovered during batch comment cleanup closeout when git checkout FETCH_HEAD or checkout --detach tip timed out under HTTPS fetch burst pressure.",
+  "description": "In todo_db/git_backend.py, git checkout calls (such as _git(['checkout', '--quiet', '--detach', tip], work) and in _fetch_tip_snapshot) do not catch subprocess.TimeoutExpired, unlike fetch calls which return MutationOutcome(code=E_OFFLINE, ...). When git checkout times out on HTTPS or lock contention, an unhandled TimeoutExpired exception crashes the calling process without a structured error, retry, or recovery hint.",
+  "sessions": [
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:8dff0892e031f17231e04e2e",
+      "at": "2026-10-09T12:50:06Z",
+      "client": "antigravity-client",
+      "op": "create",
+      "op_id": "04bd96a719e04feabd50e34a6ef5d125",
+      "session_id": "2c188abafba54577ab5700a7c822554e"
+    }
+  ]
+}
