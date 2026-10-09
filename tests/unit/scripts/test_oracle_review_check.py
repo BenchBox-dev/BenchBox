@@ -38,7 +38,7 @@ def _oracle_review(state: str = "success", submitted_at: str = AFTER_HEAD, **ove
         "commit_id": HEAD,
         "state": "COMMENTED",
         "submitted_at": submitted_at,
-        "body": f"### oracle-review-shadow: {state} for `{over.get('commit_id', HEAD)}`\n\nDetails.",
+        "body": f"### oracle-verdict: {state} for `{over.get('commit_id', HEAD)}`\n\nDetails.",
     }
     return {**review, **over}
 
@@ -86,8 +86,8 @@ def test_no_review_waits_and_names_the_standin_marker() -> None:
         [_oracle_review("pending")],
         [_oracle_review("success", submitted_at=BEFORE_HEAD), _oracle_review("failure")],
         [_oracle_review(body="No verdict header")],
-        [_oracle_review(body=f"### oracle-review-shadow: success for `{OLDER}`")],
-        [_oracle_review(body=f"Intro\n### oracle-review-shadow: success for `{HEAD}`")],
+        [_oracle_review(body=f"### oracle-verdict: success for `{OLDER}`")],
+        [_oracle_review(body=f"Intro\n### oracle-verdict: success for `{HEAD}`")],
     ],
     ids=["failure", "pending", "latest-failure", "no-header", "other-sha", "header-not-first"],
 )
@@ -336,7 +336,7 @@ def test_a_review_without_a_verdict_does_not_advance_the_standin_window() -> Non
 def test_a_review_for_another_head_does_not_advance_the_standin_window() -> None:
     stale = {
         **_oracle_review("failure", submitted_at=LATER),
-        "body": f"### oracle-review-shadow: failure for `{OLDER}`",
+        "body": f"### oracle-verdict: failure for `{OLDER}`",
     }
     reviews = [_oracle_review("failure", submitted_at=HEAD_DATE), stale]
     assert _oracle(reviews=reviews, comments=[_standin_at(AFTER_HEAD)])[0] == 0
@@ -419,7 +419,7 @@ def _refusal_body() -> str:
 
     patches = {"aaaaaaaa": "11111111"}
     plan = {
-        "status_context": "oracle-review-shadow",
+        "status_context": "oracle-verdict",
         "head_sha": HEAD,
         "mode": "shadow",
         "tier": "very-high",
@@ -448,7 +448,7 @@ def test_a_refused_pull_request_is_told_to_open_a_new_one() -> None:
 
 
 def test_a_refusal_header_keeps_the_verdict_line_the_check_parses() -> None:
-    assert _refusal_body().startswith(f"### oracle-review-shadow: failure for `{HEAD}`\n")
+    assert _refusal_body().startswith(f"### oracle-verdict: failure for `{HEAD}`\n")
 
 
 def test_a_standin_after_a_refusal_passes() -> None:
@@ -467,3 +467,17 @@ def test_a_standin_never_overrides_an_open_oracle_thread_after_a_refusal() -> No
         reviews=reviews, threads=threads, comments=[_attestation(created_at="2026-10-08T23:59:59Z")]
     )
     assert status == oracle_review_check.WAITING and "unresolved oracle review thread" in message
+
+
+@pytest.mark.parametrize("context", ["oracle-verdict", "oracle-review-shadow"], ids=["current", "legacy"])
+def test_the_check_reads_the_current_and_the_legacy_first_line(context: str) -> None:
+    success = _oracle_review(body=f"### {context}: success for `{HEAD}`\n\nDetails.")
+    failure = _oracle_review("failure", body=f"### {context}: failure for `{HEAD}`\n\nDetails.")
+    assert _oracle(reviews=[success])[0] == 0
+    status, message = _oracle(reviews=[failure])
+    assert status != 0 and "the oracle's latest review" in message
+
+
+def test_new_reviews_open_with_the_current_first_line() -> None:
+    assert oracle_review_check.ORACLE_CONTEXT == "oracle-verdict"
+    assert _refusal_body().startswith(f"### {oracle_review_check.ORACLE_CONTEXT}: failure for `{HEAD}`\n")

@@ -76,7 +76,7 @@ def test_a_first_review_records_its_decision_and_numbers_its_defects(policy: Pol
     thread = final.review["comments"][0]["body"]
     assert thread.index("<!-- oracle-defect: c1-D1 -->") < thread.index("<!-- oracle-finding:")
     assert thread.rstrip().endswith("-->") and thread.rstrip().splitlines()[-1].startswith("<!-- oracle-finding:")
-    assert final.review["body"].startswith(f"### oracle-review-shadow: failure for `{HEAD}`\n")
+    assert final.review["body"].startswith(f"### oracle-verdict: failure for `{HEAD}`\n")
 
 
 def test_ship_records_a_marker_and_a_non_empty_review(policy: Policy, tmp_path: Path) -> None:
@@ -343,7 +343,7 @@ def test_the_post_guard_skips_a_head_that_already_has_a_decision(
                     "login": "benchbox-oracle[bot]",
                     "user_type": "Bot",
                     "state": "COMMENTED",
-                    "body": f"### oracle-review-shadow: success for `{head}`\n\n{protocol.encode_marker(record)}",
+                    "body": f"### oracle-verdict: success for `{head}`\n\n{protocol.encode_marker(record)}",
                     "submitted_at": f"2026-10-08T1{index}:00:00Z",
                 }
             )

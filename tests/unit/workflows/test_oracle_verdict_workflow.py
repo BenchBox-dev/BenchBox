@@ -13,7 +13,7 @@ from _project.scripts.oracle_reviewers.policy import load_policy
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-WORKFLOW = REPO_ROOT / ".github" / "workflows" / "oracle-review-shadow.yml"
+WORKFLOW = REPO_ROOT / ".github" / "workflows" / "oracle-verdict.yml"
 LEGACY = REPO_ROOT / ".github" / "workflows" / "oracle-review.yml"
 POLICY = load_policy(REPO_ROOT / ".github" / "oracle-reviewers.yml")
 HARNESS_SECRETS = {
@@ -74,7 +74,7 @@ def test_triggers() -> None:
 def test_existing_gate_is_untouched() -> None:
     legacy = yaml.safe_load(LEGACY.read_text(encoding="utf-8"))
     assert legacy["jobs"]["oracle-review"]["name"] == "oracle-review"
-    assert POLICY.status_context == "oracle-review-shadow"
+    assert POLICY.status_context == "oracle-verdict"
     assert "context: oracle-review\n" not in WORKFLOW.read_text(encoding="utf-8")
 
 
@@ -135,7 +135,7 @@ def test_plan_job_holds_no_secret_and_resolves_the_head_by_api() -> None:
     assert "_project.scripts.oracle_reviewers.cli plan" in run
     assert plan["outputs"]["head_sha"] == "${{ steps.plan.outputs.head_sha }}"
     upload = next(step for step in plan["steps"] if step["name"] == "Upload the plan")
-    assert upload["with"]["name"] == "oracle-review-shadow-plan"
+    assert upload["with"]["name"] == "oracle-verdict-plan"
 
 
 def test_reviewer_slots_cover_the_policy_and_run_sequentially() -> None:
@@ -239,7 +239,7 @@ def test_reviewer_attempts_always_leave_an_artifact() -> None:
         )
         upload = next(step for step in job["steps"] if step["name"] == "Upload the attempt")
         assert ensure["if"] == "always()" and upload["if"] == "always()"
-        assert upload["with"]["name"] == f"oracle-review-shadow-attempt-{name.split('-')[1]}"
+        assert upload["with"]["name"] == f"oracle-verdict-attempt-{name.split('-')[1]}"
 
 
 def test_post_job_mints_the_app_token_and_tolerates_missing_secrets() -> None:

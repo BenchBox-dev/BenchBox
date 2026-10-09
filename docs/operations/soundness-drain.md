@@ -13,7 +13,7 @@ current head from the `benchbox-oracle` App. CI cannot catch a change that
 redefines the oracle it validates against, so such a PR can sit green but
 unmergeable while it waits for that review. The oracle reviews each push on its own; to rerun it,
 post a top-level `/oracle-review` comment or run
-`gh workflow run oracle-review-shadow.yml --ref develop -f pr=<number>`.
+`gh workflow run oracle-verdict.yml --ref develop -f pr=<number>`.
 
 When the oracle cannot review, or its verdict must be overruled, a
 listed attester in `STANDIN_ATTESTERS` (`_project/scripts/oracle_review_check.py`)

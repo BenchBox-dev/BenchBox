@@ -21,7 +21,7 @@ PR = 7
 
 def _run(**over: Any) -> dict[str, Any]:
     run = {
-        "path": ".github/workflows/oracle-review-shadow.yml",
+        "path": ".github/workflows/oracle-verdict.yml",
         "repository": {"full_name": REPO},
         "event": "issue_comment",
         "head_sha": SHA,
@@ -426,3 +426,69 @@ def test_oracle_reviews_reads_every_page_through_gh_api(tmp_path: Path, monkeypa
     assert reviews[150]["login"] == "benchbox-oracle[bot]" and reviews[150]["body"] == "r150"
     argv = json.loads(argv_log.read_text(encoding="utf-8"))
     assert argv[0] == "api" and argv[-1] == f"repos/{REPO}/pulls/{PR}/reviews?per_page=100"
+
+
+def _state_sources(
+    monkeypatch: pytest.MonkeyPatch, artifacts: dict[str, list[dict[str, Any]]], runs: dict[str, dict[str, Any]]
+) -> list[str]:
+    downloaded: list[str] = []
+
+    def get_json(path: str) -> Any:
+        if path.startswith(f"repos/{REPO}/actions/artifacts?name="):
+            return {"artifacts": artifacts.get(path.split("name=", 1)[1].split("&", 1)[0], [])}
+        if path.startswith(f"repos/{REPO}/actions/runs/"):
+            return runs[path.rsplit("/", 1)[1]]
+        if "/compare/" in path:
+            return {"status": "ahead"}
+        raise AssertionError(f"unexpected request {path}")
+
+    def fake_run(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        name = argv[argv.index("-n") + 1]
+        downloaded.append(name)
+        strikes = 2 if name.startswith(github.LEGACY_STATE_ARTIFACT_PREFIX) else 1
+        state = State(7, "a" * 40, "failure", datetime(2026, 10, 5, tzinfo=UTC), strikes=strikes)
+        (Path(argv[argv.index("-D") + 1]) / github.STATE_FILE).write_text(json.dumps(state.to_json()), "utf-8")
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    monkeypatch.setattr(github, "get_json", get_json)
+    monkeypatch.setattr(github, "get_paginated", lambda path: [])
+    monkeypatch.setattr(github.subprocess, "run", fake_run)
+    return downloaded
+
+
+def _artifact(run_id: int) -> dict[str, Any]:
+    return {"created_at": "2026-10-05T12:00:00Z", "workflow_run": {"id": run_id}, "expired": False}
+
+
+def test_latest_state_falls_back_to_the_legacy_artifact_and_workflow(monkeypatch: pytest.MonkeyPatch) -> None:
+    legacy = github.state_artifact_name(7, github.LEGACY_STATE_ARTIFACT_PREFIX)
+    runs = {"1": _run(path=github.LEGACY_WORKFLOW_PATH)}
+    downloaded = _state_sources(monkeypatch, {legacy: [_artifact(1)]}, runs)
+    state = github.latest_state(REPO, 7)
+    assert state is not None and state.strikes == 2
+    assert downloaded == ["oracle-review-shadow-state-7"]
+
+
+def test_latest_state_prefers_the_current_artifact(monkeypatch: pytest.MonkeyPatch) -> None:
+    legacy = github.state_artifact_name(7, github.LEGACY_STATE_ARTIFACT_PREFIX)
+    runs = {"1": _run(path=github.LEGACY_WORKFLOW_PATH), "2": _run()}
+    downloaded = _state_sources(monkeypatch, {"oracle-verdict-state-7": [_artifact(2)], legacy: [_artifact(1)]}, runs)
+    state = github.latest_state(REPO, 7)
+    assert state is not None and state.strikes == 1
+    assert downloaded == ["oracle-verdict-state-7"]
+
+
+@pytest.mark.parametrize(
+    ("name", "path"),
+    [
+        ("oracle-verdict-state-7", github.LEGACY_WORKFLOW_PATH),
+        ("oracle-review-shadow-state-7", github.WORKFLOW_PATH),
+    ],
+    ids=["current-artifact-from-legacy-workflow", "legacy-artifact-from-current-workflow"],
+)
+def test_latest_state_pairs_each_artifact_name_with_its_own_workflow(
+    monkeypatch: pytest.MonkeyPatch, name: str, path: str
+) -> None:
+    downloaded = _state_sources(monkeypatch, {name: [_artifact(1)]}, {"1": _run(path=path)})
+    assert github.latest_state(REPO, 7) is None
+    assert downloaded == []

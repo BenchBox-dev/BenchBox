@@ -318,7 +318,7 @@ def _record(diff: str, decision: str, **over: Any) -> dict[str, Any]:
 
 
 def _review(record: dict[str, Any] | None, **over: Any) -> dict[str, Any]:
-    body = f"### oracle-review-shadow: failure for `{OLD_HEAD}`\n\nDecision text.\n"
+    body = f"### oracle-verdict: failure for `{OLD_HEAD}`\n\nDecision text.\n"
     if record is not None:
         patches = record.get("patch_map")
         body += "\n" + protocol.encode_marker({k: v for k, v in record.items() if k != "patch_map"}, patches)

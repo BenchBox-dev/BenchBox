@@ -78,7 +78,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `nightly.yml` | product-safety | Scheduled validation; replaced by nightly T3; Windows legs, scheduled-workflow liveness and the Postgres throughput cell are non-blocking; ruleset drift runs as advisory |
 | `nightly-v2.yml` | product-safety | Nightly T3: platform matrix, docker engines, cross-browser, extension, install, drift, external documentation links |
 | `oracle-review.yml` | product-safety | Result-affecting changes need a success review of the head from the `benchbox-oracle` App, whose Bot identity only the owner controls, or a stand-in approval comment from an attester account posted after the oracle's latest review; that account is also the one local automation uses, so the stand-in records who vouched, not that a human read it |
-| `oracle-review-shadow.yml` | product-safety | Shadow run of the self-hosted soundness review: reviewers chosen by tier and availability, each with only its own credential, and a non-required `oracle-review-shadow` status posted by the owner's App |
+| `oracle-verdict.yml` | product-safety | Self-hosted soundness review: reviewers chosen by tier and availability, each with only its own credential, and a review and non-required `oracle-verdict` status posted by the owner's App, which the required `oracle-review` check reads |
 | `perf-smoke.yml` | product-safety | Performance smoke |
 | `pricing-data-drift-check.yml` | product-safety | Pricing data integrity |
 | `publication-canaries.yml` | product-safety | Publication canary protection |
@@ -120,7 +120,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_nightly_t3_workflow.py` | product-safety | Nightly T3 domain coverage |
 | `test_nightly_legacy_test_job.py` | product-safety | Legacy nightly matrix timeout bound and Windows legs |
 | `test_oracle_review_workflow.py` | product-safety | The required check name, triggers, read-only token and script invocation of the oracle-review check |
-| `test_oracle_review_shadow_workflow.py` | product-safety | Shadow review triggers, guards, per-job secret scoping, sequential reviewer slots and App-only posting |
+| `test_oracle_verdict_workflow.py` | product-safety | Oracle review triggers, guards, per-job secret scoping, sequential reviewer slots and App-only posting |
 | `test_t2_partition_workflow.py` | product-safety | Complete medium selection, correctness gate conservation, and binary framing placement |
 | `test_public_site_visual_workflow.py` | product-safety | Visual acceptance |
 | `test_trunk_workflow.py` | product-safety | Develop-push triggers, retained pending runs and read-only test permissions |

@@ -6,7 +6,8 @@ check and `_project/scripts/oracle_review_check.py` are unchanged.
 The blocking severities rule is superseded by
 `_project/decisions/oracle-review-protocol-2026-10-08.md`: severity orders
 defects and never gates.
-Related: `.github/workflows/oracle-review-shadow.yml`,
+Related: `.github/workflows/oracle-verdict.yml` (formerly
+`.github/workflows/oracle-review-shadow.yml`),
 `.github/oracle-reviewers.yml`, `_project/scripts/oracle_reviewers/`,
 `docs/operations/oracle-review-v2.md`.
 
@@ -135,3 +136,12 @@ requires the `benchbox-oracle` App's success review of the head and no
 unresolved App thread. The connector's result is still logged on `parity:`
 lines. The connector App is uninstalled separately; the soundness-path and
 ruleset steps above remain separate changes.
+
+2026-10-09: the oracle's name dropped "shadow", which read as advisory after
+the cut-over. The workflow is `.github/workflows/oracle-verdict.yml`, the
+status context and the first line of each review are `oracle-verdict`, and the
+retry state artifact is `oracle-verdict-state-<number>`. The required check
+also reads the old `### oracle-review-shadow:` line until no open pull
+request's latest oracle review uses it; the merge digest reads both lines for
+good. `plan` falls back to the old state artifact and workflow path when no
+new state exists. This record keeps the old name where it describes history.

@@ -63,7 +63,7 @@ def test_larger_or_multi_area_code_diff_is_medium_high(policy: Policy) -> None:
     [
         "_project/scripts/oracle_review_check.py",
         ".github/workflows/oracle-review.yml",
-        ".github/workflows/oracle-review-shadow.yml",
+        ".github/workflows/oracle-verdict.yml",
         ".github/soundness-paths.txt",
         "_project/scripts/soundness_paths.py",
         "_project/scripts/ruleset_review_enforcement.py",
