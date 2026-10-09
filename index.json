@@ -20360,15 +20360,10 @@
       "title": "Decide Snowpark tuning surface: warehouse sizing and session params"
     },
     "soundness-classifier-prefix-vs-exact-file": {
-      "claim": {
-        "expires_at": "2026-10-10T23:33:42Z",
-        "generation": "13a0173d957f49668285b55b8227097d",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
-      },
+      "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "active",
+      "status": "done",
       "title": "SOUNDNESS_PREFIXES matches exact-file entries by prefix so sibling files are gated"
     },
     "soundness-drain-all-ruleset-required-checks-20260806": {
