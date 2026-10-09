@@ -4330,12 +4330,17 @@
       "title": "Remove comments from cross-module unit tests: core, benchmarks and small subsystems"
     },
     "comment-cleanup-unit-tests-platforms": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T01:07:07Z",
+        "generation": "94da2b28ffa6476e8376a9574485979a",
+        "renewals": 0,
+        "worker": "mcp:antigravity-worker-2"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments from cross-module unit tests: platforms"
     },
     "comment-cleanup-utilities": {
