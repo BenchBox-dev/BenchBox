@@ -3,7 +3,7 @@
     "The Documentation workflow linkcheck job passes on develop",
     "The blog index links either point at pages Sphinx builds or are excluded with a documented reason"
   ],
-  "context": "Found while checking documentation outcomes after the live-cloud corpus merges. None of those merges touched the blog. The Astro migration items (astro-site-33-blog-collection-and-feed, astro-site-54-retire-sphinx-and-legacy-site) may make the links obsolete, but the Sphinx linkcheck is red until then.",
+  "context": "Found while checking documentation outcomes after the live-cloud corpus merges. None of those merges touched the blog. The Astro migration items (astro-site-33-blog-collection-and-feed, astro-site-54-retire-sphinx-and-legacy-site) may make the links obsolete, but the Sphinx linkcheck is red until then.\n\nClosed 2026-10-09 (tracker review against develop 34de720b8): docs/blog/index.rst no longer exists, because the blog index moved in #2597. The three links are excluded with a stated reason in docs/linkcheck_ignore.txt:69-76 (#2717). Linkcheck passed in the last 8 develop Documentation runs (37976115475 to 37995649912). The codespell failures in the same runs were Docker Hub rate limits, tracked in ci-docker-hub-unauthenticated-pulls-20261009.",
   "description": "The Documentation workflow's linkcheck job fails on every recent develop run with the same three broken links in `docs/blog/index.rst`: `archive.html`, `tag.html` and `author.html`. These are relative `.html` targets that Sphinx does not build. Build, spellcheck, example validation and visual checks pass, so the red runs hide any new docs failure.\n\nSeen in runs 37138879947 (`3428753dc`), 37163832053 (`c373a1a54`), 37163873730 (`7a3dc8355`) and 37202138826 (`058f664da`), and in every run checked between them. The links sit at lines 25-27, or 28-30 after #2597 edited the file.",
   "sessions": [
     {
@@ -21,6 +21,14 @@
       "generation": "c879deea1e37434e8f685452f36286bb",
       "op": "take",
       "op_id": "05ab0f682acc4a0eb65bece1056d20b7",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:33:29Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "d45770d3196f42a6821d374d0d6a1acc",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
