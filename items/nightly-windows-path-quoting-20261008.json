@@ -4,7 +4,7 @@
     "No test builds a bash command string by interpolating a native Windows path",
     "Ubuntu and macOS results are unchanged"
   ],
-  "context": "PR #2814 is merged, but the remaining nightly T3 path assertions are in shared PR #2835 and the required post-fix Windows run has not occurred. Follow-ups nightly-windows-pr-visual-approval-20261009 and nightly-windows-verification-run-20261009 own the unblock and evidence.",
+  "context": "PR #2814 is merged, but the remaining nightly T3 path assertions are in shared PR #2835 and the required post-fix Windows run has not occurred. Follow-ups nightly-windows-pr-visual-approval-20261009 and nightly-windows-verification-run-20261009 own the unblock and evidence.\n\nClosed 2026-10-09 (tracker review against develop 34de720b8): PR #2814 (3031f1674) skipped the make-shim tests on Windows. The corpus-allowlist backslash problem was fixed by #2814 and #2849 (0a3c27f53). test_ledger_coverage passes on Windows. The duckdb-matrix quoting was fixed by #2849. The remaining test_nightly_t3_workflow fixes moved to nightly-v2-windows-unit-leg-20261009 (PR #2835), and the encoding error at test_pr_arm.py:245 moved to nightly-windows-utf8-reads-20261008.",
   "description": "The largest single Windows cluster is tests/unit/scripts/test_pr_arm.py (31 failures): the make wrapper's arguments are quoted differently on Windows (for example '--repo must be owner/name, got \"'7'\"'). Other clusters: a Windows interpreter path with backslashes interpolated into a `bash -c` script becomes 'D:aBenchBoxBenchBox.venvScriptspython.exe: command not found' (test_validate_submission_corpus_allowlist.py); and test_ledger_coverage.py compares paths using '\\\\' where the ledger uses '/'. Use POSIX-form paths (Path.as_posix()) for anything passed to bash or compared with ledger entries, and quote arguments with shlex or an argv list rather than a shell string. Where a test exercises a POSIX-only script, mark it skipped on Windows with the reason instead of emulating bash.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2568"
@@ -33,6 +33,14 @@
       "generation": "e7c10252cb694ca999477a97cd14fdee",
       "op": "take",
       "op_id": "17f75bf90f9b43d4ab172da74cd59de0",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:23:57Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "c885ec4963044bac99774c3b6fe26b2a",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
