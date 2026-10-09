@@ -19520,10 +19520,10 @@
     },
     "site-split-00-adr-soundness-scope": {
       "claim": {
-        "expires_at": "2026-10-08T13:48:25Z",
-        "generation": "6f748f69641b4b49940f953ae5684ed7",
+        "expires_at": "2026-10-10T00:25:24Z",
+        "generation": "5db313bf781d4f8c80254b2c1b6cf67a",
         "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:86f6da90fc8e4c14af03225c"
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de"
       },
       "needs": [
         "site-split-agy-plan-review"
