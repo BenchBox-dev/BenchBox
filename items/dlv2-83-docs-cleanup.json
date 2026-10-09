@@ -1,11 +1,12 @@
 {
   "acceptance": [
-    "Sphinx build with warnings-as-errors passes",
+    "Core doc contract tests pass, and a docs-only core PR reaches production through the site-inputs bundle (run ids recorded)",
     "No doc links to a deleted page",
-    "repo-admin-settings.md matches the live ruleset (drift check green)"
+    "repo-admin-settings.md matches the live ruleset after site-split-53 (drift check green)",
+    "soundness-drain.md and fast-lane-budget.md still exist; develop-push-drop-inventory.md is deleted only after docs.yml is gone"
   ],
-  "context": "Guardrails G4, G10.",
-  "description": "Rewrite docs/development/{testing.md, makefile-architecture.md, quality-gate-policy.md}, docs/operations/{repo-admin-settings.md (final rulesets; drift expected settings), merge-queue-governance.md, pr-triage.md}. Delete docs/operations/{ci-local-parity.md, develop-post-merge-gaps.md, develop-push-drop-inventory.md, fast-lane-budget.md, guards-fix.md, merge-queue-canary-runbook.md, soundness-drain.md, branch-rename-runbook.md (D1 keeps develop)} and docs/development/pr-base-branch-policy.md. Update the Sphinx toctrees and docs/linkcheck_ignore.txt accordingly.",
+  "context": "Guardrails G4, G10.\n\n2026-10-09 tracker review: the old acceptance (Sphinx build with warnings-as-errors) cannot pass after site-split-50 removes Sphinx. dlv2-61 was merged into site-split-50 and dlv2-62 no longer exists as a need; the needs now name site-split-50, site-split-51 and site-split-53. The earlier delete list wrongly included soundness-drain.md and fast-lane-budget.md, which are live, and develop-push-drop-inventory.md, which docs.yml still relates to until it is deleted.",
+  "description": "Rewrite docs/development/{testing.md, makefile-architecture.md, quality-gate-policy.md} and docs/operations/{merge-queue-governance.md, pr-triage.md}. merge-queue-governance.md is the live governance doc: rewrite it for the current required checks, do not delete it. docs/operations/repo-admin-settings.md stays unchanged until site-split-53 lands; after that, update it to the final rulesets and drift-expected settings.\n\nDelete docs/operations/{ci-local-parity.md, develop-post-merge-gaps.md, guards-fix.md, merge-queue-canary-runbook.md (historical), branch-rename-runbook.md (D1 keeps develop)} and docs/development/pr-base-branch-policy.md. Delete docs/operations/develop-push-drop-inventory.md only after docs.yml is deleted (site-split-50).\n\nDo not delete these live docs: docs/operations/soundness-drain.md (updated by #2843) and docs/operations/fast-lane-budget.md (describes the current code-test lane).\n\nSite-split-50 deletes the Sphinx build, the toctrees and docs/linkcheck_ignore.txt, so this item only has to leave no link to a deleted page.",
   "sessions": [
     {
       "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
@@ -22,6 +23,14 @@
       "op": "update",
       "op_id": "5f9cf397eb4347289a016f938de0a60b",
       "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:26:14Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "61e39a4a1d2f4235aef0c71330de8e40",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
