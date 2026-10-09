@@ -22903,10 +22903,15 @@
       "title": "Write the benefit rule for keeping a tuned template, with thresholds taken from the measured noise"
     },
     "tuning-evidence-measurement-harness-20261008": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T16:13:34Z",
+        "generation": "11d8e1f5bf7344659e4d3a368034d026",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Build an internal harness that measures a tuned template against notuning with calibrated noise"
     },
     "tuning-evidence-merge-settle-recorded-20261008": {
