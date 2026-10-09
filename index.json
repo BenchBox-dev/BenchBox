@@ -15149,6 +15149,13 @@
       "status": "done",
       "title": "Close PR-gate gap: darwin/windows TPC-H binaries behaviorally validated only on nightly"
     },
+    "pr-landing-soundness-refusal-unreachable-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "pr_landing refuses soundness PRs on an approval that can never be given; defer to the required oracle-review check"
+    },
     "pr-local-validation-singleflight": {
       "claim": null,
       "needs": [
