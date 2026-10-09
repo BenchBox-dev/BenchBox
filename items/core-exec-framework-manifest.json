@@ -1,0 +1,30 @@
+{
+  "acceptance": [
+    "benchbox/core/execution_engine.py exists; resolve_requested accepts `default` for every platform, accepts only declared selectable names otherwise, and raises with the allowed names listed (unit tests cover a platform with no engines, polars-df, an unknown value and an observed-only value)",
+    "Manifest validation rejects: an unknown class, a declared `default`, a duplicate name, and the same name with different classes on two platforms (unit tests for each)",
+    "polars-df declares its engines in the manifest exactly as the ADR specifies; the SQL `polars` platform declares none; make platform-manifest-check passes and registry/inventory counts are unchanged apart from the new capability",
+    "tests/unit/core/test_execution_vocabulary_parity.py passes on the current tree with the ADR's grandfather list, and fails when a test fixture registers a new bare-word key such as `engine` on another platform (demonstrated in the PR)",
+    "No CLI, MCP, adapter or result-bundle behavior changes in this PR: existing unit tests pass unchanged and a polars-df tpch SF 0.01 dry run produces the same output as before",
+    "Production diff is at most about 250 lines excluding tests, or the split was agreed with the user",
+    "PR merged through the normal flow; durable text carries no tracker IDs"
+  ],
+  "context": "Decision gates:\n- G1 Start only when core-exec-d0-vocabulary-adr is done (ADR accepted).\n- G2 If the manifest schema change forces a manifest schema version bump or breaks platform-manifest consumers outside benchbox/ (site, explorer, scripts), stop and list them before continuing.\n- G3 If the grandfather list in the parity test differs from the ADR's list, stop: update the ADR first.\n\nVerification rubric: uv run -- python -m pytest tests/unit/core/test_execution_engine.py tests/unit/core/test_execution_vocabulary_parity.py and the manifest/registry tests; make platform-manifest-check; make lint; make comment-policy-check; fast unit lane via make pr-preflight.\n\nGuardrails: shared core-exec guardrails in core-exec-d0-vocabulary-adr context apply. Reuse the deployment_modes parsing pattern rather than inventing a new one.",
+  "description": "Establish the platform-neutral framework from the accepted ADR without changing any user-facing behavior yet.\n\nWork:\n1. New benchbox/core/execution_engine.py: the closed class vocabulary, the `default` sentinel, an ExecutionEngineReceipt dataclass (requested, applied, applied_class, applied_native, resolution, observed, observed_source), supported_execution_engines(platform) read from the platform registry, resolve_requested(platform, value) that fails closed with an error listing the allowed names, and ExecutionEngineUnavailableError.\n2. Manifest capability `execution_engines` (per ADR D3): validate in core/platform_manifest.py (_validate_capabilities, near :100-130): unknown class, a platform declaring `default`, duplicate names, missing fields, and selectable flag type are rejected. Parse into an ExecutionEngineCapability on PlatformCapability (core/platform_registry.py:97-106, 528-572) with accessors mirroring supports_deployment_mode.\n3. Declare polars-df engines per the ADR (expected: auto=adaptive, in-memory, streaming; gpu deferred behind a dependency gate). The SQL-mode `polars` platform declares none.\n4. Parity test tests/unit/core/test_execution_vocabulary_parity.py: every manifest class is in the core list; one value name maps to one class across all platforms; no platform registers a reserved bare-word key (ADR D11) outside the grandfather list, checked across PlatformHookRegistry specs, cli/platform_defaults.py and the MCP allowlist; anonymizer identifier_keys contain none of the core vocabulary keys.\n5. Regenerate generated inventories with make platform-manifest (never by hand).",
+  "links": [
+    "docs/development/adr/adr-core-execution-variants.md",
+    "benchbox/core/platform_manifest.py",
+    "benchbox/core/platform_registry.py",
+    "benchbox/platforms/adapter_factory.py",
+    "benchbox/platforms/polars_compat.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:31:43Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "fd41bc8ad8c44440805cc95770776573",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
+    }
+  ]
+}
