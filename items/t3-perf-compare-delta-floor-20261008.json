@@ -5,7 +5,7 @@
     "A large slowdown on a long-running query still fails the gate in a test",
     "docs/development/perf-smoke.md and the compare CLI reference describe the floor"
   ],
-  "context": "Failing queries differ from night to night (2026-10-05 failed on a different set than 2026-10-08), which points to noise rather than a stable slowdown. Checked at plan time: `uv run benchbox compare --help` lists only --fail-on-regression for this purpose.",
+  "context": "Failing queries differ from night to night (2026-10-05 failed on a different set than 2026-10-08), which points to noise rather than a stable slowdown. Checked at plan time: `uv run benchbox compare --help` lists only --fail-on-regression for this purpose.\n\nHANDOFF NOTE (session claude-code, 2026-10-09): implemented and in review as PR #2812 (branch feat/compare-min-regression-delta, armed for auto-merge). Do NOT reimplement; finish this item only after #2812 is merged. Floor is 7 ms, not 5 ms: compare reads the last recorded execution per query, and the largest per-query spread across the 9 retained nightlies on that value is 5.4 ms (1.25 x 5.4 rounds up to 7). Derivation is in the PR body.",
   "description": "The nightly T3 perf gate and the per-PR Performance Smoke workflow (.github/workflows/perf-smoke.yml) both compare against _project/baselines/perf_smoke_duckdb_tpch_001.json with `--fail-on-regression 10%`, which judges each query by percentage change alone. In nightly run 37794806634 (2026-10-08) total time improved 20.35% and 19 of 22 queries got faster, but Q8 (9.0 to 11.6 ms, +28.9%) and Q20 (10.0 to 11.9 ms, +19.0%) failed on a 2 to 3 ms change. `benchbox compare` has no minimum absolute delta, so it cannot tell scheduling jitter from a regression at this scale. Raising the threshold to 20% is not enough: Q8 would still fail. Add `--min-regression-delta` (a duration such as 5ms or 0.005s, default none so existing callers are unchanged). A per-query comparison then counts as a regression only when it exceeds the percentage threshold and the absolute slowdown exceeds the floor; aggregate metrics stay percentage-only; using the option without --fail-on-regression is a usage error. Use it in the nightly-v2 perf step and perf-smoke.yml. Choose the floor from retained t3-perf-result artifacts: 5 ms unless their per-query run-to-run spread exceeds 4 ms, in which case 1.25 times the largest spread rounded up to whole milliseconds, capped at 15 ms. Update docs/development/perf-smoke.md and the compare CLI reference.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2778"
@@ -43,6 +43,14 @@
       "generation": "6a559c34592b49da9749b60e36597bbb",
       "op": "release",
       "op_id": "27971627174f4dfb853b35a837b57283",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-09T12:34:38Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "7371b022df3041d1aa7f3ea2e1629104",
       "session_id": "e40b1c8674df4499842f44749410458f"
     }
   ]
