@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from _project.scripts.oracle_reviewers import github, protocol, report
+from _project.scripts.oracle_reviewers import cli, github, protocol, report
 from _project.scripts.oracle_reviewers.absence import Absence
 from _project.scripts.oracle_reviewers.diff import commentable_lines
 from _project.scripts.oracle_reviewers.policy import Policy
@@ -303,19 +304,35 @@ def test_strikes_ignore_carried_and_refused_records() -> None:
 
 
 @pytest.mark.parametrize(
-    ("heads", "skip"),
-    [([HEAD], "true"), (["c" * 40], "false"), ([HEAD, "c" * 40], "false"), (None, "false")],
-    ids=["already-decided", "other-head", "revert-to-an-older-head", "unreadable"],
+    ("heads", "failures", "skip"),
+    [
+        ([HEAD], 0, "true"),
+        (["c" * 40], 0, "false"),
+        ([HEAD, "c" * 40], 0, "false"),
+        ([HEAD], 2, "true"),
+        ([HEAD], 3, "false"),
+    ],
+    ids=["already-decided", "other-head", "revert-to-an-older-head", "recovers-on-the-third-read", "unreadable"],
 )
 def test_the_post_guard_skips_a_head_that_already_has_a_decision(
-    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, heads: list[str] | None, skip: str
+    policy: Policy,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    heads: list[str],
+    failures: int,
+    skip: str,
 ) -> None:
     plan = _protocol_plan(policy)
     plan_path = tmp_path / "plan.json"
     plan_path.write_text(json.dumps({**plan, "bot_login": "benchbox-oracle"}), encoding="utf-8")
+    calls: list[int] = []
+    pauses: list[float] = []
+    monkeypatch.setattr(cli.time, "sleep", pauses.append)
 
     def reviews(repo: str, pr: int) -> list[dict[str, Any]]:
-        if heads is None:
+        calls.append(pr)
+        if len(calls) <= failures:
             raise github.GitHubError("down")
         posted = []
         for index, head in enumerate(heads):
@@ -335,6 +352,10 @@ def test_the_post_guard_skips_a_head_that_already_has_a_decision(
     monkeypatch.setattr(github, "oracle_reviews", reviews)
     out = _run_cli(monkeypatch, tmp_path, "guard", "--plan", str(plan_path))
     assert out == {"skip": skip}
+    reads = min(failures + 1, cli.GUARD_ATTEMPTS)
+    assert len(calls) == reads and pauses == [cli.GUARD_PAUSE_SECONDS] * (reads - 1)
+    unconfirmed = f"posting without confirming that head {HEAD} has no decision yet"
+    assert (unconfirmed in capsys.readouterr().out) is (failures >= cli.GUARD_ATTEMPTS)
 
 
 def test_finalize_writes_the_strike_count_into_the_state_artifact(
@@ -528,3 +549,34 @@ def test_a_defect_path_cannot_plant_a_protocol_marker(policy: Policy, tmp_path: 
         "benchbox-oracle",
     )
     assert found.error is None and found.latest is not None
+
+
+def test_a_follow_up_lists_at_most_five_defects_as_not_counted(policy: Policy, tmp_path: Path) -> None:
+    plan = _follow_up(policy, [], [CHECKER])
+    outside = [{**_finding("Low", line), "file": OTHER, "title": f"outside {line}"} for line in range(1, 8)]
+    final = _final(policy, tmp_path, plan, _v("s", outside, decision="SHIP"))
+    assert final.state == "success" and final.review is not None
+    hidden = final.review["body"].split("<details><summary>Not counted", 1)[1].split("</details>", 1)[0]
+    listed = [line for line in hidden.splitlines() if line.startswith("- **")]
+    assert len(listed) == protocol.NOT_COUNTED_LIMIT == 5
+    assert [f"outside {line}" in hidden for line in range(1, 8)] == [True] * 5 + [False] * 2
+
+
+def _boundary(record: Callable[[dict[str, str]], dict[str, Any]]) -> int:
+    count = 1
+    while True:
+        patches = _hashed(count + 1)
+        decoded = protocol.decode_marker(protocol.encode_marker(record(patches), patches))
+        if decoded is None or "patch_map" not in decoded:
+            return count
+        count += 1
+
+
+def test_the_patch_map_is_kept_up_to_about_two_hundred_files_and_dropped_above() -> None:
+    largest = _boundary(_big_record)
+    kept, dropped = _hashed(largest), _hashed(largest + 1)
+    fits = protocol.decode_marker(protocol.encode_marker(_big_record(kept), kept))
+    over = protocol.decode_marker(protocol.encode_marker(_big_record(dropped), dropped))
+    assert fits is not None and fits["patch_map"] == kept
+    assert over is not None and "patch_map" not in over and over["patch_digest"] == DIGEST
+    assert 190 <= largest <= 210

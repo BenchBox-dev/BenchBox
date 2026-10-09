@@ -5,6 +5,7 @@ import json
 import os
 import re
 import sys
+import time
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
@@ -34,6 +35,8 @@ CARRY = "carry"
 REFUSED = "refused"
 HOLD = "hold"
 PROSE_SUFFIXES = (".md", ".mdx", ".rst")
+GUARD_ATTEMPTS = 3
+GUARD_PAUSE_SECONDS = 2
 
 
 def _now() -> datetime:
@@ -500,13 +503,25 @@ def command_finalize(args: argparse.Namespace) -> int:
     return 0
 
 
+def _reread_history(plan: Mapping[str, Any]) -> protocol.History:
+    error: Exception | None = None
+    for attempt in range(GUARD_ATTEMPTS):
+        if attempt:
+            time.sleep(GUARD_PAUSE_SECONDS)
+        try:
+            return protocol.history(github.oracle_reviews(plan["repo"], plan["pr"]), plan["bot_login"])
+        except (github.GitHubError, KeyError, TypeError, ValueError) as exc:
+            error = exc
+    _summary(
+        f"oracle-review-shadow: posting without confirming that head {plan['head_sha']} has no decision yet; "
+        f"the review list could not be re-read after {GUARD_ATTEMPTS} attempts: {error}"
+    )
+    return protocol.History()
+
+
 def command_guard(args: argparse.Namespace) -> int:
     plan = _read_json(Path(args.plan))
-    try:
-        found = protocol.history(github.oracle_reviews(plan["repo"], plan["pr"]), plan["bot_login"])
-    except (github.GitHubError, KeyError, TypeError, ValueError) as exc:
-        _summary(f"oracle-review-shadow: the review list could not be re-read before posting: {exc}")
-        found = protocol.History()
+    found = _reread_history(plan)
     done = found.latest is not None and found.latest["head_sha"] == plan["head_sha"]
     _output({"skip": "true" if done else "false"})
     if done:

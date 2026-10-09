@@ -5,11 +5,17 @@ from dataclasses import dataclass
 from typing import Any
 
 from . import dedup, protocol, selection
-from .retry import ALL_ABSENT, FAILURE, INTEGRITY, PENDING, SUCCESS, UNREPORTED
+from .retry import ALL_ABSENT, FAILURE, INTEGRITY, OVERSIZE, PENDING, SUCCESS, UNREPORTED
 from .selection import Attempt, Step
 from .verdict import Finding, Placement, Verdict, comment_span, place
 
 DESCRIPTION_LIMIT = 140
+OVERSIZE_DESCRIPTION = "pending: too large for the oracle; split the pull request or ask the owner for a stand-in"
+OVERSIZE_NOTE = (
+    "This pull request is too large for the oracle: its brief exceeds the size cap even without the diff, "
+    "so no reviewer can run and this head is not retried. Split it into smaller pull requests, or ask the "
+    "owner for a stand-in review of this head."
+)
 STATES = {selection.PASS: SUCCESS, selection.FAIL: FAILURE, selection.PENDING: PENDING}
 
 
@@ -141,6 +147,15 @@ def _review_payload(
     }
 
 
+def _settled(plan: Mapping[str, Any], step: Step) -> tuple[Step, str]:
+    if step.kind == selection.REVIEW:
+        reason = f"{step.reviewer.name if step.reviewer else 'a reviewer'}: selected but did not report"
+        return Step(selection.PENDING, None, (*step.reasons, reason)), UNREPORTED
+    if step.kind == selection.PENDING and plan.get("brief_mode") == "oversize":
+        return step, OVERSIZE
+    return step, ALL_ABSENT
+
+
 def finalize(
     plan: Mapping[str, Any],
     step: Step,
@@ -159,11 +174,7 @@ def finalize(
             else None
         )
         return Final(PENDING, "result withheld: artifacts failed validation", body, review, None, INTEGRITY)
-    pending_cause = ALL_ABSENT
-    if step.kind == selection.REVIEW:
-        reason = f"{step.reviewer.name if step.reviewer else 'a reviewer'}: selected but did not report"
-        step = Step(selection.PENDING, None, (*step.reasons, reason))
-        pending_cause = UNREPORTED
+    step, pending_cause = _settled(plan, step)
     state = STATES[step.kind]
     reviewer = step.reviewer.name if step.reviewer else None
     terminal = next(
@@ -183,7 +194,9 @@ def finalize(
     strikes = int(rules.get("strikes", 0))
     if judgement is not None and judgement.decision == protocol.DO_NOT_SHIP:
         strikes += 1
-    if judgement is None:
+    if pending_cause == OVERSIZE:
+        description = OVERSIZE_DESCRIPTION
+    elif judgement is None:
         description = "pending: " + "; ".join(step.reasons or ("no reviewer available",))
     elif judgement.decision == protocol.SHIP_WITH_FIXES:
         description = f"{reviewer}: {judgement.label}, {judgement.open_count} defect(s) to fix"
@@ -193,6 +206,8 @@ def finalize(
     findings_lines = [_finding_line(finding, ids[finding]) for finding in placement.inline]
     other_lines = [_finding_line(finding, ids[finding]) for finding in placement.summary]
     lines = [*_header(plan, state)]
+    if pending_cause == OVERSIZE:
+        lines += [OVERSIZE_NOTE, ""]
     if judgement is not None:
         lines += [f"Decision: **{judgement.label}**.", ""]
     lines += _reviewer_line(plan, reviewer)

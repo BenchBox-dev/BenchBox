@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from _project.scripts.oracle_reviewers import attempts, cli, report, selection
+from _project.scripts.oracle_reviewers import attempts, cli, report, retry, selection
 from _project.scripts.oracle_reviewers.absence import Absence
 from _project.scripts.oracle_reviewers.dedup import fingerprint, marker
 from _project.scripts.oracle_reviewers.diff import commentable_lines
 from _project.scripts.oracle_reviewers.policy import Policy
-from _project.scripts.oracle_reviewers.retry import ALL_ABSENT, INTEGRITY, UNREPORTED
+from _project.scripts.oracle_reviewers.retry import ALL_ABSENT, INTEGRITY, OVERSIZE, UNREPORTED
 from _project.scripts.oracle_reviewers.selection import Attempt, SelectionInput, Step, excluded_families
 from _project.scripts.oracle_reviewers.verdict import Finding, validate
 
@@ -502,3 +502,90 @@ def test_withheld_result_is_posted_as_a_pending_review(policy: Policy, tmp_path:
     final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, {})
     assert final.state == "pending" and final.review is not None
     assert final.review["body"].startswith(f"### oracle-review-shadow: pending for `{HEAD}`")
+
+
+def test_an_oversize_plan_finalizes_pending_for_its_size_and_names_the_ways_forward(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan = {**_plan(policy, tier="very-high", labels=()), "brief_mode": "oversize", "findings_delivery": "review"}
+    plan_path = tmp_path / "plan.json"
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+    attempts_dir = tmp_path / "attempts"
+    attempts_dir.mkdir()
+    out = _run_cli(
+        monkeypatch,
+        tmp_path,
+        "finalize",
+        "--plan",
+        str(plan_path),
+        "--attempts-dir",
+        str(attempts_dir),
+        "--out-dir",
+        str(tmp_path / "o"),
+    )
+    assert out["state"] == "pending" and out["review"] == "true"
+    state = json.loads((tmp_path / "o" / "state" / "state.json").read_text(encoding="utf-8"))
+    assert state["pending_cause"] == OVERSIZE
+    status = json.loads((tmp_path / "o" / "status.json").read_text(encoding="utf-8"))
+    assert status["description"] == report.OVERSIZE_DESCRIPTION
+    assert len(status["description"]) <= 140 and "stand-in" in status["description"]
+    body = json.loads((tmp_path / "o" / "review.json").read_text(encoding="utf-8"))["body"]
+    assert "Split it into smaller pull requests" in body and "stand-in review of this head" in body
+    previous = retry.State.from_json(state)
+    for manual in (True, False):
+        decision = retry.decide_rerun(
+            manual=manual, new_diff=False, head_sha=HEAD, previous=previous, now=NOW, rules=policy.retry
+        )
+        assert not decision.allowed and "pending for oversize" in decision.reason
+    later = NOW + timedelta(days=1)
+    assert not retry.due_for_retry(previous, HEAD, later, policy.retry)
+    assert retry.decide_rerun(
+        manual=False, new_diff=True, head_sha=HEAD, previous=previous, now=NOW, rules=policy.retry
+    ).allowed
+
+
+def test_an_inline_plan_with_every_reviewer_absent_stays_retryable(policy: Policy, tmp_path: Path) -> None:
+    plan = _plan(policy, tier="very-high", labels=())
+    _write(tmp_path, 1, "opus", missing=Absence("quota", "limit"))
+    _write(tmp_path, 2, "sol", missing=Absence("auth", "bad key"))
+    loaded, step, errors = _decide(policy, plan, tmp_path)
+    final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, {})
+    assert final.pending_cause == ALL_ABSENT
+    assert report.OVERSIZE_NOTE not in final.body
+
+
+def test_a_held_plan_finalizes_to_a_pending_status_with_no_decision_or_marker(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reason = "the oracle's review history could not be read: down"
+    plan = {**_plan(policy), "findings_delivery": "review", "decision": "hold", "decision_reason": reason}
+    plan_path = tmp_path / "plan.json"
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+    out = _run_cli(
+        monkeypatch,
+        tmp_path,
+        "finalize",
+        "--plan",
+        str(plan_path),
+        "--attempts-dir",
+        str(tmp_path),
+        "--out-dir",
+        str(tmp_path / "o"),
+    )
+    assert out == {"state": "pending", "comment": "false", "review": "false", "has_state": "false"}
+    status = json.loads((tmp_path / "o" / "status.json").read_text(encoding="utf-8"))
+    assert status["state"] == "pending" and status["description"] == reason
+    assert sorted(path.name for path in (tmp_path / "o").iterdir()) == ["status.json"]
+
+
+def test_a_long_status_description_is_cut_to_the_status_limit(policy: Policy, tmp_path: Path) -> None:
+    plan = _plan(policy, tier="very-high", labels=())
+    _write(tmp_path, 1, "opus", missing=Absence("quota", "limit " * 60))
+    _write(tmp_path, 2, "sol", missing=Absence("auth", "bad key"))
+    loaded, step, errors = _decide(policy, plan, tmp_path)
+    final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, {})
+    full = "pending: " + "; ".join(step.reasons)
+    assert len(full) > report.DESCRIPTION_LIMIT
+    assert len(final.description) == report.DESCRIPTION_LIMIT == 140
+    assert final.description == full[:139] + "…"
+    assert report.status_payload(plan, final, "u")["description"] == final.description
