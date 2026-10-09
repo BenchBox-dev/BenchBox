@@ -4231,12 +4231,17 @@
       "title": "Decide remaining TPC-DS legacy stream and RNG migration"
     },
     "comment-cleanup-tpch": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:59:45Z",
+        "generation": "d41280d74eea49d8a6530d34a103001e",
+        "renewals": 0,
+        "worker": "mcp:antigravity-worker-2"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from TPC-H benchmark modules"
     },
     "comment-cleanup-tpch-skew": {
