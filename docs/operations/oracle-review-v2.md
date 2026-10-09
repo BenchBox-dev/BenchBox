@@ -27,9 +27,12 @@ App's pull request reviews (see Cut-over). The policy lives in
      claude jobs;
    - `OPENAI_API_KEY`, used only by the codex jobs through
      `codex login --with-api-key`;
-   - `META_API_KEY`, used only by the muse jobs. muse is installed unpinned from
-     `https://dev.meta.ai/install.sh`, so a compromised download would run with
-     this key; the owner accepted that risk on 2026-10-05.
+   - `META_API_KEY`, used only by the muse jobs. Each muse job installs the
+     latest `muse-stable` release through `https://dev.meta.ai/install.sh`,
+     unpinned, and writes the installed version to its job summary. A
+     compromised download would run with this key and a read-only checkout of
+     this public repository, and nothing else. The owner accepted that on
+     2026-10-05 and confirmed it on 2026-10-09.
 
    agy is disabled and has no job, so it needs no secret yet.
 4. Remove `CLAUDE_CODE_OAUTH_TOKEN` from the repository secrets, because

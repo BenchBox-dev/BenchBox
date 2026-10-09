@@ -217,9 +217,9 @@ def test_cli_installs_come_from_official_sources_with_pins() -> None:
             install = next(step for step in job["steps"] if step["name"] == "Install muse")
             assert install["run"].startswith("curl -fsSL --proto '=https' --tlsv1.2 https://dev.meta.ai/install.sh -o ")
             lines = install["run"].splitlines()
-            check = 'test "$(sha256sum "$RUNNER_TEMP/muse-install.sh" | cut -d \' \' -f 1)" = "$MUSE_INSTALLER_SHA256"'
-            assert lines.index(check) < lines.index('bash "$RUNNER_TEMP/muse-install.sh"')
-            assert re.fullmatch(r"[0-9a-f]{64}", install["env"]["MUSE_INSTALLER_SHA256"])
+            version = 'echo "Installed $("$HOME/.local/bin/muse" --version)" | tee -a "$GITHUB_STEP_SUMMARY"'
+            assert lines.index('bash "$RUNNER_TEMP/muse-install.sh"') < lines.index(version)
+            assert "env" not in install
             assert not any(line.strip().startswith("sh ") for line in install["run"].splitlines())
             assert job["permissions"] == {"contents": "read"}
             assert _secrets(job) == {"META_API_KEY"}
@@ -228,6 +228,8 @@ def test_cli_installs_come_from_official_sources_with_pins() -> None:
             assert "dev.meta.ai" not in job_text and "META_API_KEY" not in job_text, name
     assert "printenv OPENAI_API_KEY | codex login --with-api-key" in text
     assert "--dangerously" not in text and "--yolo" not in text
+    for pinned in ("MUSE_INSTALLER_SHA256", "MUSE_NO_AUTO_UPDATE", "MUSE_CHANNEL", "sha256sum"):
+        assert pinned not in text
 
 
 def test_reviewer_attempts_always_leave_an_artifact() -> None:
