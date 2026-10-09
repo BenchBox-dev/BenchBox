@@ -4980,6 +4980,16 @@
       "status": "open",
       "title": "Add the core execution-engine module and manifest capability, with a vocabulary parity test"
     },
+    "core-exec-gateway-capability": {
+      "claim": null,
+      "needs": [
+        "core-exec-framework-manifest",
+        "core-exec-result-schema-2-3"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Make gateway routing a core manifest capability with shared engine vocabulary and a core comparability guard"
+    },
     "core-exec-polars-cli-mcp-adoption": {
       "claim": null,
       "needs": [

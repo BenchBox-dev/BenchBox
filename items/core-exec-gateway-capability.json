@@ -1,0 +1,32 @@
+{
+  "acceptance": [
+    "The manifest validates gateways declarations (unknown engine class, missing host requirement) with unit tests; Snowflake and Databricks declare the values above",
+    "--gateway on a platform without declared gateways fails before any work with the allowed values listed; --gateway custom without gateway_host fails",
+    "A fixture run with a gateway records platform.gateway, tpc_compliant=false and per-query execution_engine values drawn only from routes_to plus unknown",
+    "variants_comparable is unit-tested and wired into compare, regression baseline selection and analytics: a gateway run cannot enter a native baseline set unless --allow-heterogeneous-comparison is given",
+    "Gateway connection options are absent from the MCP allowlist and the MCP contract doc lists them as rejected alternatives",
+    "No proxy_* names introduced; no live vendor calls in tests (loopback mocks only)",
+    "PR merged through the normal flow"
+  ],
+  "context": "Decision gates:\n- G1 Start after core-exec-framework-manifest and core-exec-result-schema-2-3.\n- G2 Reconcile with the gateway plan's locked decisions (gateway values, TLS gating, PAT-only Databricks, no blended metrics). If a core design choice contradicts a locked decision, stop and resolve with the user before coding.\n- G3 This item builds only the core capability, validation, recording and guard; adapter connection mechanics stay in gw-snowflake-conn and gw-databricks, which now depend on this item.\n\nVerification rubric: manifest and validation unit tests, compare/regression tests, results tests for the gateway block, MCP contract tests, make pr-preflight.\n\nGuardrails: shared core-exec guardrails (see core-exec-d0-vocabulary-adr context); gateway plan guardrails (never blend native and gateway numbers; userinfo stripped from hosts; insecure modes double-gated).",
+  "description": "The Espresso/Greybeam gateway plan (/Users/joe/.jcode/scratch/espresso-greybeam-plan-v2.md) adds a `gateway` label and per-query execution_engine to the Snowflake and Databricks adapters separately. Baseline guards, tpc_compliant=false, cost suppression and identity are cross-cutting, so the gateway concept belongs in core (ADR D9) and the adapters only supply connection mechanics.\n\nWork:\n1. Manifest capability `gateways` {name: {routes_to: {engine_name: {class}}, requires_host: bool}}; `custom` requires a host; `native` is accepted and recorded as no gateway. Snowflake declares espresso, greybeam (routes_to snowflake=standard, duckdb=delegated) and custom; Databricks declares espresso and custom.\n2. Core `gateway` setting: CLI --gateway and config key, validated by one core function (not exposed through MCP per ADR D10); gateway connection options (gateway_host, gateway_port, gateway_protocol, gateway_ca_bundle, gateway_ocsp_fail_open, allow_insecure_gateway) registered only on declaring platforms with connection security class.\n3. Results: platform.gateway{name, routed}; queries[].execution_engine limited to routes_to names plus `unknown`; platform.execution_engine.observed=mixed when queries differ; tpc_compliant=false whenever routed.\n4. Core variants_comparable(a, b) over (deployment, requested engine, gateway), used by benchbox/cli/commands/compare.py, benchbox/core/results/regression_policy.py and analytics baseline selection; it replaces the plan's adapter-level is_native_run.\n5. Update docs/development/new-platform-acceptance-checklist.md with the gateway section.",
+  "links": [
+    "/Users/joe/.jcode/scratch/espresso-greybeam-plan-v2.md",
+    "benchbox/core/platform_manifest.py",
+    "benchbox/cli/commands/compare.py",
+    "benchbox/core/results/regression_policy.py",
+    "item:gw-snowflake-conn",
+    "item:gw-databricks",
+    "item:gw-metadata-guards"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:35:24Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "f6d81e3a574c4d78a28f33d1de897730",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
+    }
+  ]
+}
