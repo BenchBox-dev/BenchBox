@@ -5,7 +5,7 @@
     "An agent session following AGENTS.md end-to-end (preflight, open PR, enqueue) succeeds on the new targets",
     "makefile-inventory-check updated or superseded consistently (full replacement is dlv2-82)"
   ],
-  "context": "agy A6, muse M15. The flip PR (dlv2-f1) already updates AGENTS.md and .claude/commands/pr.md for the new checks; this item handles the Make target replacement and the skill-sync source. Release targets untouched until dlv2-53 (G7).",
+  "context": "agy A6, muse M15. The flip PR (dlv2-f1) already updates AGENTS.md and .claude/commands/pr.md for the new checks; this item handles the Make target replacement and the skill-sync source. Release targets untouched until dlv2-53 (G7).\n\n2026-10-09 tracker review: Merged into dlv2-42-retire-dev-loop-scripts-tests and dropped. Most of the targets in the delete list (pr-landing-*, local-validation*, soundness-drain-*, test-unlock, pr-status and others) are the current documented workflow under ADR D5 (docs/development/adr/adr-dev-loop-v2.md:163-167), and `make test-queue` names the retired merge queue, so acceptance 3 (an agent session enqueueing on the new targets) cannot be met. The still-valid part moved to dlv2-42: removing Make targets whose scripts that item deletes, and the agent-instruction and skill-source sweep for those names. The wider target consolidation is dlv2-82. The needs of dlv2-44 and dlv2-82 were re-pointed.",
   "description": "Guardrail G10. Delete targets: pr-arm-auto-merge, pr-conflict-scan, pr-content-guard, pr-fanout, pr-followup-record, pr-followup-resume, pr-landing-ready, pr-landing-start, pr-landing-withdraw, pr-refresh, pr-review-followups, pr-review-followups-list, pr-status, local-validation, local-validation-path, local-validation-show, soundness-drain-report, soundness-drain-self-test, dev-loop-metrics, guards-fix, lane-isolation-check, test-unlock.\nAdd tier targets: `make check` (T0), `make test` (T1 local for touched units), `make test-queue` (T2 local mirror), keep `make ci-linux` as a thin Docker wrapper for macOS hosts. pr-preflight*, pr-open, pr-ready, ci-docs, ci-linkcheck, ci-lint, ci-local, ci-test become aliases that print their replacement and run it, for one release.\nSame PR: update AGENTS.md (write closeout currently mandates make pr-preflight/pr-open/pr-ready and make ci-linux on macOS), CONTRIBUTING.md, .claude/commands/pr.md, docs/development/testing.md, and the skill-sync SOURCE for the benchbox, code, test, and todo skills (not the generated .claude/skills mirror), then re-sync.",
   "sessions": [
     {
@@ -23,6 +23,14 @@
       "op": "update",
       "op_id": "e54e0a4917f540c9a1a539412f9e8d1f",
       "session_id": "ebb0f23e7526462c929aaf5d2651ef0a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:24:40Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "045397aab3f64a889f11c7d391202b9b",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
