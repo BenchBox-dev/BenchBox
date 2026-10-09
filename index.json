@@ -19596,17 +19596,12 @@
       "title": "Make the site and Explorer build only from the repo and the fetched core bundle"
     },
     "site-split-23-node-deploy-plane": {
-      "claim": {
-        "expires_at": "2026-10-10T05:51:07Z",
-        "generation": "ea72cde388ef4cb9b1d32964f5e52305",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de"
-      },
+      "claim": null,
       "needs": [
         "site-split-20-seed-site-repo"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Build the Node deploy plane in the site repo: resolve, gates, Pages deploy, probes, receipts, rollback"
     },
     "site-split-24-blog-drafts": {
