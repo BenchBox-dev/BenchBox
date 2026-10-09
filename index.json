@@ -20500,10 +20500,15 @@
       "title": "Fix SSB generator 3-digit p_category emission (MFGR#212 vs MFGR#12) causing empty Q2/Q3/Q4 results"
     },
     "ssb-tuned-merge-settle-retest-20261008": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T14:31:27Z",
+        "generation": "00d74e83737d49cba04d16fec5311f8b",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d"
+      },
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Re-test SSB tuned template with merge-settle and decide keep/adjust/disable"
     },
     "stabilize-full-test-suite-failures": {
