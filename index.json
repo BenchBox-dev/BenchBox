@@ -24615,6 +24615,13 @@
       "status": "done",
       "title": "Windows Nightly: test unreadable-file propagation without chmod semantics"
     },
+    "windows-iceberg-vacuum-local-paths-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Make Iceberg vacuum recognize Windows local table locations before it deletes files"
+    },
     "windows-nightly-bash-resolves-to-wsl-stub": {
       "claim": null,
       "needs": [],

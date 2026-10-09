@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "TestIcebergVacuum passes on windows-latest 3.12 in a dispatched nightly.yml run, or the owner records why a Windows run is not possible",
+    "A test shows a vacuum on a Windows-style location deletes only unreferenced files and keeps every referenced one",
+    "Linux and macOS vacuum behaviour is unchanged"
+  ],
+  "context": "Found by triage of the 2026-10-08 Windows 3.12 log (run 37776283388) during the nightly-red-issues batch. Split out of nightly-windows-teardown-and-singles-20261008 because a wrong fix could delete live data.",
+  "description": "benchbox/platforms/dataframe/iceberg_maintenance.py: _local_table_dir (about line 457) calls urlparse on a plain Windows warehouse path such as C:\\...\\warehouse/default.db/probe and gets scheme 'c', so it returns None and vacuum reports metadata-only with 0 reclaimable files (tests/unit/platforms/dataframe/test_lakehouse_optimization.py TestIcebergVacuum, 2 tests, fail on windows-latest). _normalize_file_ref (about line 431) has the same drive-letter problem. Add one helper mapping a table or file location to a Path (single-letter scheme or no scheme -> Path(uri); file scheme -> Path(url2pathname(parsed.path)); anything else -> None) and use it in BOTH places. Fixing only _local_table_dir would make _reclaim_orphan_files treat live files as unreferenced and delete them, so both must change together. This path deletes files: confirm on a Windows run before merging.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/issues/2568"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-09T15:04:09Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "5144140d06504674903dcd9cb8d07bd2",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    }
+  ]
+}
