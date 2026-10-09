@@ -13966,6 +13966,13 @@
       "status": "done",
       "title": "Make the oracle coverage map disclose oracle STRENGTH and SCALE, not just existence"
     },
+    "oracle-followup-read-bypass-out-of-scope-defect-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "A file-list follow-up can ship without reading the changed files by listing one defect in an unchanged file"
+    },
     "oracle-map-staged-gate-scale-and-label-vocabulary": {
       "claim": null,
       "needs": [],
