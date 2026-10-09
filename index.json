@@ -4467,7 +4467,7 @@
       "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "dropped",
       "title": "Triage and reconcile remaining 530 strict-mode findings across full repository inventory"
     },
     "comment-policy-strict-scope-mismatch": {
