@@ -6,7 +6,7 @@
     "Wrong-digest dispatch refused before deploy and issue opened",
     "noindex present on rehearsal pages"
   ],
-  "context": "Owner pre-work: the next.benchbox.dev DNS record exists. Owner decision D3. muse AR-01, AR-07 and AR-21 (accepted). Never set SITE_DEPLOY_TARGET=production in this item.",
+  "context": "Owner pre-work: the next.benchbox.dev DNS record exists. Owner decision D3. muse AR-01, AR-07 and AR-21 (accepted). Never set SITE_DEPLOY_TARGET=production in this item.\nOwner decision D-Y (2026-10-09, decision dialog): start as soon as DNS exists. Steps 1, 2, the push-triggered deploy, the rollback drill and the noindex check need only DNS. The bundle-dispatch deploy (step 3, second half) and the wrong-digest failure path (step 5) wait for the bridge App and SITE_BRIDGE_APP_ID / SITE_BRIDGE_PRIVATE_KEY in both repos. As of 2026-10-09 ~15:30Z neither DNS nor the App exists.",
   "description": "Site configuration plus evidence; open a PR only for fixes.\n\n1. Set the site Pages custom domain to next.benchbox.dev via gh api. Poll the Pages API every 2 minutes, for at most 60 minutes, until the certificate is approved, then enforce HTTPS. On timeout, remove the domain and stop.\n2. Set SITE_DEPLOY_TARGET=rehearsal.\n3. Run one deploy from a push to main and one from a core-bundle dispatch. Check:\n   - every route class: /, /docs/, /docs/dev/, /blog/ and /results/;\n   - 404.html and objects.inv;\n   - every page carries noindex, and the origin gate passed.\n4. Rollback drill: dispatch mode=rollback to the first rehearsal receipt, check the probes, then deploy forward again.\n5. Failure path: a workflow_dispatch whose payload carries a wrong digest must not deploy, and must open or update the site-bundle-failed issue in core. \"Newest certified\" comes from core runs, so this test cannot poison later resolves.",
   "sessions": [
     {
@@ -16,6 +16,14 @@
       "op": "create",
       "op_id": "4de321df434f4917871a379c663b12e7",
       "session_id": "2d03f81d904c4b488222c4b6be81ba33"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de",
+      "at": "2026-10-09T16:24:14Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "10963fcdcd2641f7891804a28633299d",
+      "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
     }
   ]
 }
