@@ -3610,17 +3610,12 @@
       "title": "Remove comments and docstrings from data acquisition and organization"
     },
     "comment-cleanup-dataframe-adapters": {
-      "claim": {
-        "expires_at": "2026-10-10T00:13:48Z",
-        "generation": "7b01e2d117e540b2b27285953f093d96",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from concrete DataFrame adapters"
     },
     "comment-cleanup-dataframe-expressions": {
