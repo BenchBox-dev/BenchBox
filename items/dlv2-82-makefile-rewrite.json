@@ -1,12 +1,12 @@
 {
   "acceptance": [
-    "Target count 199 -> <=90 (aliases counted until removed); root Makefile short, modules grouped",
+    "Target count is at most 90 by the same `make -pRrq` method used for the new baseline (241 on 2026-10-09; aliases counted until removed); root Makefile short, modules grouped",
     "Documented-target test passes and fails when a doc names a missing target",
-    "No literal consumer of the old inventory remains (G4)",
-    "make check, make test, make test-queue, make build, make docs, make ci-linux verified on macOS and Linux"
+    "No literal consumer of the old inventory or monolith-baseline contract remains (G4)",
+    "make test, make lint and make ci-linux (or their renamed replacements, each confirmed to exist in the new target list) verified on macOS and Linux"
   ],
-  "context": "muse M5/M15/M16: baseline is 2,050 root lines + 529 module lines, 199 targets per inventory.",
-  "description": "First migrate literal consumers of make/inventory.json and Makefile text (tests/unit/test_standardized_test_commands.py remnants, tests/system/test_ci_lint_parity.py, scripts/check_release_curation.py if kept, docs). Then restructure into make/{test,quality,build,docs,explorer,platform-tests,uat,reports,worktrees}.mk with a short root Makefile; move cross-surface equivalence report targets to make/reports.mk; keep docker/live/UAT/data-generator targets. Consolidate duplicate test aliases (test-quick, test-fast, test-dev, test-pytest, test-verbose, test-parallel, test-parallel-fast, test-full, test-all, test-ci, test-medium, test-medium-selected, test-smoke, test-window, test-no-cloud, test-olap) into tier targets; aliases print the replacement for one release, then are removed in a follow-up. Replace make/{inventory.json, monolith-baseline.json, migration-proof.json, check_makefile_inventory.py} and makefile-inventory-check with one test: every make target named in AGENTS.md, CONTRIBUTING.md, docs/, and the skill-sync source resolves with make -n.",
+  "context": "muse M5/M15/M16: baseline is 2,050 root lines + 529 module lines, 199 targets per inventory.\n\n2026-10-09 tracker review: those counts are stale; the re-measured baseline is in the description. The earlier text said the contract files were to be created, but check_makefile_inventory.py, monolith-baseline.json and migration-proof.json already exist, and inventory.json is generated and git-ignored. The earlier acceptance named make check, make test-queue, make build and make docs, which do not exist (make test-queue also assumed the retired merge queue); use only targets that will exist after site-split-50, which deletes docs-build and the site targets. site-split-50-core-site-removal is a need because it removes many targets and their help.mk entries. The dlv2-53 edge exists only for the release-cut and release-finalize targets; the owner may move those two targets to make/release.mk to remove that edge.",
+  "description": "First migrate literal consumers of the Makefile contract files and Makefile text (tests/unit/test_standardized_test_commands.py remnants, tests/system/test_ci_lint_parity.py, scripts/check_release_curation.py if kept, docs). Then restructure into grouped modules under make/ with a short root Makefile. Modules that already exist: documentation.mk, help.mk, platform-tests.mk, site-inputs.mk, worktree-maintenance.mk, worktrees.mk. Add test, quality, build, reports and uat modules as needed; move cross-surface equivalence report targets to make/reports.mk; keep docker/live/UAT/data-generator targets. The site-split-50 deletions remove the docs-build, site-* and explorer targets first, so do not create docs or explorer modules for them. Consolidate duplicate test aliases (test-quick, test-fast, test-dev, test-pytest, test-verbose, test-parallel, test-parallel-fast, test-full, test-all, test-ci, test-medium, test-medium-selected, test-smoke, test-window, test-no-cloud, test-olap) into tier targets; aliases print the replacement for one release, then are removed in a follow-up.\n\nThe contract files already exist: make/check_makefile_inventory.py, make/monolith-baseline.json and make/migration-proof.json are tracked. make/inventory.json is generated and git-ignored (.gitignore:195, #2575). Replace the four contract pieces and the makefile-inventory-check target with one test: every make target named in AGENTS.md, CONTRIBUTING.md, docs/, and the skill-sync source resolves with make -n.\n\nMeasure the baseline again before starting. On origin/develop (2026-10-09) `make -pRrq : | awk -v RS= -F: '/^# Files/,/^# Finished Make data base/ {if ($1 !~ \"^[#.]\") {print $1}}' | sort -u | grep -E -v -e '^[^[:alnum:]]' -e '^\\$@$'` lists 241 targets; make/monolith-baseline.json records 195 public targets; the Makefile has 1532 lines and the six modules 695 more.",
   "sessions": [
     {
       "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
@@ -22,6 +22,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "4f31023691b94c26bf6c9ce9849fd0aa",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:25:50Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "40e9ea25c7f74f0a97b9a5ac3569f1fe",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
