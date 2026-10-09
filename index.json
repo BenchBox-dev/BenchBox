@@ -14143,7 +14143,12 @@
       "title": "A file-list follow-up can ship without reading the changed files by listing one defect in an unchanged file"
     },
     "oracle-followup-sequence-verification-20261009": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T20:25:34Z",
+        "generation": "ee25e735db6a4a839c140b6885293094",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
+      },
       "needs": [
         "oracle-followup-read-bypass-out-of-scope-defect-20261009",
         "oracle-oversize-pr-pending-loop-20261009",
@@ -14156,7 +14161,7 @@
         "oracle-merged-pr-descriptions-stale-20261009"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Verify the oracle follow-up sequence end to end after its last change merges"
     },
     "oracle-map-staged-gate-scale-and-label-vocabulary": {
