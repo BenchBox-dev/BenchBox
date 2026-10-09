@@ -4367,17 +4367,12 @@
       "title": "Remove comments and docstrings from Vector search modules"
     },
     "comment-cleanup-visualization": {
-      "claim": {
-        "expires_at": "2026-10-10T01:09:20Z",
-        "generation": "1eb826d69e4f4ca2a9f9581cbcefc08b",
-        "renewals": 0,
-        "worker": "mcp:antigravity-worker-2"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from visualization and ASCII charts"
     },
     "comment-cleanup-windows-consumer": {
