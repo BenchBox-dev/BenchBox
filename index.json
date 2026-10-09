@@ -4339,12 +4339,17 @@
       "title": "Remove comments from cross-module unit tests: platforms"
     },
     "comment-cleanup-utilities": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T01:07:43Z",
+        "generation": "4353a36012764dd3b33dbdf4ec9f5745",
+        "renewals": 0,
+        "worker": "mcp:antigravity-worker-2"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from utility and format conversion modules"
     },
     "comment-cleanup-validation": {
