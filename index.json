@@ -4004,17 +4004,12 @@
       "title": "Remove comments and docstrings from adapter registration and shared cloud support"
     },
     "comment-cleanup-postgresql-family": {
-      "claim": {
-        "expires_at": "2026-10-10T00:29:08Z",
-        "generation": "85a01fe4dbcd4550bdc4c0cb6cea3139",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from PostgreSQL family adapters"
     },
     "comment-cleanup-presto-trino": {
