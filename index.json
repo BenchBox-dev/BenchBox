@@ -8520,10 +8520,10 @@
     "exasol-docker-ci-smoke": {
       "claim": null,
       "needs": [
-        "exasol-local-evaluation-runs"
+        "exasol-live-differential-harness"
       ],
       "priority": "low",
-      "status": "open",
+      "status": "blocked",
       "title": "Add a Linux CI smoke test for Exasol using exasol/docker-db"
     },
     "exasol-lift-benchmark-gates": {
