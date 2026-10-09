@@ -4936,6 +4936,13 @@
       "status": "done",
       "title": "Copyright and License Declaration Updates ✅ COMPLETED"
     },
+    "core-exec-d0-vocabulary-adr": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Gate: approve an ADR that defines BenchBox's core execution-variant vocabulary (engine, compute, deployment, gateway)"
+    },
     "corpus-65-bundles-carry-failed-queries": {
       "claim": null,
       "needs": [],
