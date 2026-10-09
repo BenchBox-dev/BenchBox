@@ -6,8 +6,8 @@
     "Gateway selection uses the core gateway setting and validator from core-exec-gateway-capability (no adapter-level choice list or separate --gateway definition); the gateway connection options are registered only for Snowflake through that item's mechanism and are not exposed via MCP; test_advertised_platform_options passes",
     "No live-vendor calls in tests; mock tokens only"
   ],
-  "context": "Plan: /Users/joe/.jcode/scratch/espresso-greybeam-plan-v2.md items A1-A5, now layered on the core gateway capability (core-exec-gateway-capability, ADR docs/development/adr/adr-core-execution-variants.md D9/D10). Sources: benchbox/platforms/snowflake.py (_get_connection_params ~L511, _create_admin_connection ~L521, create_connection ~L600, add_cli_arguments ~L180, from_config ~L217); specs table benchbox/platforms/__init__.py _OPTION_SPEC_ROWS ~L623. Guardrails: linked worktree off develop (make worktree-create + agent-write-preflight), never git add -A, no credentials in git, never name anything proxy_host. Decision gate G1 depends on this item. Updated 2026-10-09: gateway is a core manifest capability; this item supplies the Snowflake connection mechanics only.",
-  "description": "Add gateway-endpoint override to SnowflakeAdapter per plan v2 A1-A5: config params and validation, centralized gateway mapping in _get_connection_params covering benchmark and admin paths, CLI args, from_config fields, and option-spec registration in benchbox/platforms/__init__._OPTION_SPEC_ROWS.",
+  "context": "Plan: /Users/joe/.jcode/scratch/espresso-greybeam-plan-v2.md items A1-A5, now layered on the core gateway capability (core-exec-gateway-capability, ADR docs/development/adr/adr-core-execution-variants.md D9/D10). Sources: benchbox/platforms/snowflake.py (_get_connection_params ~L511, _create_admin_connection ~L521, create_connection ~L600, add_cli_arguments ~L180, from_config ~L217); specs table benchbox/platforms/__init__.py _OPTION_SPEC_ROWS ~L623. Guardrails: linked worktree off develop (make worktree-create + agent-write-preflight), never git add -A, no credentials in git, never name anything proxy_host. The gateway plan's decision gate G1 (mock-gateway connection behavior, evaluated in gw-tests-gates) depends on this item.",
+  "description": "Add gateway-endpoint override to SnowflakeAdapter per plan v2 A1-A5, on top of the core gateway capability (core-exec-gateway-capability): config params and validation, centralized gateway mapping in _get_connection_params covering benchmark and admin paths, and from_config fields. The gateway choice itself (--gateway and its allowed values) comes from the core setting and the manifest gateways declaration; this item registers only the Snowflake gateway connection options through the mechanism that item defines, not separate adapter CLI args or _OPTION_SPEC_ROWS choice lists.",
   "sessions": [
     {
       "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
@@ -23,6 +23,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "460ec1a2b2884a34a00dadd45e18d437",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:48:10Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "ddd12bce69ff40379335b2f2ee87d36b",
       "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
     }
   ]
