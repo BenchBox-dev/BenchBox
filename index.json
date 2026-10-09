@@ -1086,9 +1086,7 @@
         "renewals": 0,
         "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
       },
-      "needs": [
-        "astro-site-50-parity-harness"
-      ],
+      "needs": [],
       "priority": "medium-high",
       "status": "active",
       "title": "Move the required public-site visual check onto the Astro build without weakening it"

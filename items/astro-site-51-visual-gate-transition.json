@@ -5,7 +5,7 @@
     "test_public_site_visual_workflow.py updated and green; ruleset drift check unchanged",
     "No change to required-context names or exact-base-SHA semantics"
   ],
-  "context": "Resumption 2026-10-04: implemented on wip/astro-51 (7853f283, f4b055b8, 15869e56), merged into wip/astro-52; independent re-review PASS. Non-required dry-run job captures the 6x4 matrix from the Astro build; renderer switch is an approvable difference (exact-head approval); runbook documents PR-head slot (wired) and that the merge_group slot is not wired (develop expects no merge queue per #2566). Ships in the PR after #2606. site-split-01 (2026-10-07): shipped (visual check runs on Astro in CI, verified in current develop); cutover approval slots superseded by site-split-40 (owner go-live approval). Remaining verification owned by site-split-30 and site-split-40. Do not finish here.",
+  "context": "Resumption 2026-10-04: implemented on wip/astro-51 (7853f283, f4b055b8, 15869e56), merged into wip/astro-52; independent re-review PASS. Non-required dry-run job captures the 6x4 matrix from the Astro build; renderer switch is an approvable difference (exact-head approval); runbook documents PR-head slot (wired) and that the merge_group slot is not wired (develop expects no merge queue per #2566). Ships in the PR after #2606. site-split-01 (2026-10-07): shipped (visual check runs on Astro in CI, verified in current develop); cutover approval slots superseded by site-split-40 (owner go-live approval). Remaining verification owned by site-split-30 and site-split-40. Do not finish here.\n\nNeed astro-site-50-parity-harness removed 2026-10-09 (tracker review against develop 34de720b8): astro-site-50's code shipped in #2606, and its parity sign-off is approved in _project/decisions/astro-parity-signoff.md. The site-parity check passed on cutover PR #2685 (run 37364773750). astro-site-50 itself stays open.\n\nClosed 2026-10-09 (tracker review against develop 34de720b8): all four acceptance criteria are met. The non-required \"Public-site visual Astro dry run\" job is at ci.yml:1877-1934 (#2606, b77ccf7c7). The slot procedure is in docs/internal/public-site-visual-baseline.md:47; the merge_group slot no longer applies. tests/unit/workflows/test_public_site_visual_workflow.py covers the dry run. Required contexts are unchanged. The required visual job still checks the Sphinx assembly while production serves Astro (since #2685); that gap is recorded in site-split-50-core-site-removal, which deletes the job.",
   "description": "The required context \"Public-site visual acceptance\" (ci-dedupe-11) compares captures from e2e/captures/public-site-pages.spec.ts with exact-base-SHA baseline artifacts.\n\nPrepare the renderer switch:\n- Capture the same routes from the Astro build. Routes are unchanged under D3; if any changes, update the route/viewport matrix in the same PR.\n- Point visual-inputs path classification at website/ and docs/.\n- Plan the intentional baseline change through the astro-site-03 procedure: separate exact-head approvals for the PR head and the merge_group head_sha. Queue position does not substitute for either.\n\nNever skip, disable or loosen the comparison. The baseline producer must publish an Astro-rendered baseline for the merge commit that switches the CI renderer.",
   "links": [
     "results-explorer/e2e/captures/public-site-pages.spec.ts",
@@ -53,6 +53,14 @@
       "generation": "d6144cc51afa44389aa229c5f4a659c6",
       "op": "take",
       "op_id": "335bdd777e7d45e2983683a48f0eb3b7",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:34:30Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "668ed913e06643ceb1bc36863fbc8793",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
