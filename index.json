@@ -19704,12 +19704,17 @@
       "title": "Carry the core files that docs link to outside docs/ in the site-inputs bundle (schema 2)"
     },
     "site-split-13-bundle-result-json": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T14:16:29Z",
+        "generation": "1e6ccc0102104be5b2ac5ee71a6d139e",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de"
+      },
       "needs": [
         "site-split-12-bundle-downloads"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Carry the per-result JSON files in the site-inputs bundle (schema 3)"
     },
     "site-split-20-seed-site-repo": {
