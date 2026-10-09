@@ -3,7 +3,7 @@
     "A dispatched nightly-v2 run shows the t3:drift job green with all four checks passing",
     "Issue #2471 is closed by the reporter, or the reason it stayed open is recorded on the issue"
   ],
-  "context": "Live nightly-v2 run 37991400931 on develop head 52d0c0db0 completed the t3:drift gate with corpus, pricing, validator and baseline checks, but the corpus drift step failed; the pricing/validator/baseline checks were not reported as failing. The run is still open for unrelated domains. No issue closure claimed. Next action: inspect the completed drift log when the workflow run closes, record the corpus mismatch on #2471, and have the reporter/owner resolve or revalidate the corpus drift before finishing.",
+  "context": "Live nightly-v2 run 37991400931 on develop head 52d0c0db0 completed the t3:drift gate with corpus, pricing, validator and baseline checks, but the corpus drift step failed; the pricing/validator/baseline checks were not reported as failing. The run is still open for unrelated domains. No issue closure claimed. Blocked on owner follow-up item t3-drift-corpus-mismatch-20261009. Next action: inspect the completed drift log when the workflow run closes, record the corpus mismatch on #2471, and revalidate before finishing.",
   "description": "After the pricing refresh merges, dispatch nightly-v2.yml with run_drift=true (scheduled runs evaluate drift on Mondays only, so the issue would otherwise stay open until the next Monday). Confirm the corpus, pricing, validator and cross-surface baseline checks all pass in the t3:drift job. The Report job should then close issue #2471. If a check fails, record which one and why on the issue rather than re-dispatching.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2471"
@@ -23,6 +23,14 @@
       "client": "omp-coding-agent",
       "op": "update",
       "op_id": "5867d5a93fa64e3a82c41aadb066f71b",
+      "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:8d0fa0e2ef22aacc5284a44c",
+      "at": "2026-10-09T21:28:00Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "b8a4509440f14f5797ad7eabc40bce91",
       "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
     }
   ]
