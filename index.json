@@ -3879,12 +3879,17 @@
       "title": "Remove comments and docstrings from DataFusion, Polars and SQLite adapters"
     },
     "comment-cleanup-managed-warehouses": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:22:49Z",
+        "generation": "7e82855a1f924c47afcf4975de80a01e",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from Snowflake, Firebolt and SingleStore"
     },
     "comment-cleanup-manifest": {
