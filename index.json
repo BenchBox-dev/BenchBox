@@ -13259,15 +13259,10 @@
       "title": "Activate native merge queue on develop ruleset and verify live operations"
     },
     "merge-queue-drain-20260926": {
-      "claim": {
-        "expires_at": "2026-10-10T23:32:45Z",
-        "generation": "004e366e672043bcbc00be24e698c11f",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Drain develop merge queue to zero after bulk-enrollment backlog"
     },
     "metadata-primitives-benchmark": {
