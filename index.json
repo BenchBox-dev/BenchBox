@@ -4358,17 +4358,12 @@
       "title": "Remove comments and docstrings from expected-results and validation"
     },
     "comment-cleanup-vector-search": {
-      "claim": {
-        "expires_at": "2026-10-10T01:09:00Z",
-        "generation": "6adcb058763d41faa2994e25b41f4068",
-        "renewals": 0,
-        "worker": "mcp:antigravity-worker-2"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from Vector search modules"
     },
     "comment-cleanup-visualization": {
