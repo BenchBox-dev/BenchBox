@@ -4475,7 +4475,7 @@
       "needs": [],
       "priority": "medium",
       "status": "open",
-      "title": "comment-policy-strict can never pass: flags vendored, binary, and out-of-scope files"
+      "title": "make comment-policy-strict fails on a clean develop checkout because it ignores the ownership manifest and a wheel entry is stale"
     },
     "comment-policy-transition-mode-exception-ratchet": {
       "claim": null,

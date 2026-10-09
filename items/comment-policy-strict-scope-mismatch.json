@@ -1,9 +1,11 @@
 {
   "acceptance": [
-    "make comment-policy-strict either passes on a clean tree or its documented scope matches the files it actually enforces"
+    "`make comment-policy-strict` exits 0 on a clean develop checkout. Strict mode applies the ownership manifest: --ownership-base defaults to HEAD (Makefile:451) when not given.",
+    "The stale todo_db wheel entry at quality/comment-policy.json:76 names the current wheel version (0.9.1), and a test or check fails if a pinned vendored-wheel path no longer exists.",
+    "The paragraph at docs/development/comment-policy.md around lines 66-68 that tells readers to run `make comment-policy-strict` before a flip to blocking is removed. Lines 16-18 and 58 keep describing strict as a diagnostic, and they state that strict applies the ownership manifest."
   ],
-  "context": "Observed while verifying the #2614 develop merge: scripts/check_comment_policy.py --mode strict reports 531 violations across 6882 files, including vendored _sources/tpc-ds/PATCHES.md, tracked binaries under benchbox/_binaries, .github/workflows files, and .gitignore. The enforced gates (run_comment_policy.py --native-tests in CI, --staged pre-commit) do not cover these paths, so strict-mode output is advisory noise that cannot go green. Either scope strict mode to enforced paths or document that it is informational.",
-  "description": "Check whether comment-policy-strict is meant to gate anything; if so, exclude vendored/binary/out-of-scope paths, else mark it informational so a red target does not confuse contributors.",
+  "context": "Observed while verifying the #2614 develop merge: scripts/check_comment_policy.py --mode strict reports 531 violations across 6882 files, including vendored _sources/tpc-ds/PATCHES.md, tracked binaries under benchbox/_binaries, .github/workflows files, and .gitignore. The enforced gates (run_comment_policy.py --native-tests in CI, --staged pre-commit) do not cover these paths, so strict-mode output is advisory noise that cannot go green. Either scope strict mode to enforced paths or document that it is informational.\n\n2026-10-09 tracker review: Counts re-measured on develop 34de720b8: 188 strict findings, all outside first-party code (114 _sources/tpc-ds, 54 binary coverage-errors in benchbox/_binaries, 19 _sources/tpc-h, 1 vendored wheel); 1 finding with --ownership-base. Absorbs comment-policy-strict-mode-reconciliation (its 530-finding triage is moot).",
+  "description": "On develop 34de720b8, `scripts/check_comment_policy.py --mode strict` reports 188 findings. None is in first-party code: 114 are in _sources/tpc-ds, 54 are binary coverage-errors in benchbox/_binaries, 19 are in _sources/tpc-h, and 1 is a vendored wheel. With `--ownership-base` the count drops to 1: quality/comment-policy.json:76 still names `_project/scripts/vendor/todo_db-0.8.1-py3-none-any.whl`, but the wheel was bumped in #2633.\n\n`make comment-policy-strict` (Makefile:449-451) passes no ownership base, so the ownership manifest is not applied. The docs already call strict a diagnostic (docs/development/comment-policy.md:16-18 and :58), but docs/development/comment-policy.md around lines 66-68 still says the PR that flips the mode to blocking should be checked with `make comment-policy-strict`. That flip can no longer happen.\n\nAbsorbs comment-policy-strict-mode-reconciliation: no first-party findings remain, so there is nothing left to triage into batches. This also meets the unmet \"strict passes on develop\" criterion of the done item comment-cleanup-final-enforcement.",
   "sessions": [
     {
       "actor": "mcp:tbh:joe@joe-mac-mini.local:7f8e006c86fd5a1a15b08122",
@@ -12,6 +14,14 @@
       "op": "create",
       "op_id": "ea8ff93020fa48a0863dcd6f0f1aead4",
       "session_id": "cae197c525fe4eac8de35a156719a321"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:26:28Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "91f27be4441c48109b0dd82084976571",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
