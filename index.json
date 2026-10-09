@@ -4285,12 +4285,17 @@
       "title": "Remove comments and docstrings from Transaction primitives modules"
     },
     "comment-cleanup-tsbs-devops": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T01:02:51Z",
+        "generation": "8cbea09fa6d446339e6b7b596e4f842f",
+        "renewals": 0,
+        "worker": "mcp:antigravity-worker-2"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from TSBS DevOps modules"
     },
     "comment-cleanup-tuning": {
