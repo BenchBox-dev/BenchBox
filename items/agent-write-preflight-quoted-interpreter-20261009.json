@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "test_configured_hook_allows_linked_worktree_commit passes on windows-latest 3.12",
+    "A test covers a single-quoted interpreter path with a space on Linux",
+    "The preflight still refuses a missing or non-executable interpreter"
+  ],
+  "context": "Found by triage of the 2026-10-08 Windows 3.12 log. Split out because the script gates all agent writes.",
+  "description": "pre-commit writes INSTALL_PYTHON with shell quoting when the interpreter path contains characters such as a backslash or colon (for example INSTALL_PYTHON='D:\\a\\BenchBox\\...\\python.exe'). scripts/agent_write_preflight.sh (about lines 177-178) takes the raw text after '=', quotes included, and tests it with [ ! -x ... ], so it reports 'shared pre-commit hook is not usable'. The same refusal would hit any POSIX interpreter path containing a space. Strip one pair of surrounding single quotes after reading the value (hook_interpreter=${hook_interpreter#\\\\'}; hook_interpreter=${hook_interpreter%\\\\'}). This script gates every agent write on every platform, so test it with a quoted and an unquoted path and confirm on a Windows run that [ -x \"D:\\\\a\\\\...\\\\python.exe\" ] passes under Git Bash. tests/unit/test_agent_write_preflight.py test_configured_hook_allows_linked_worktree_commit currently fails on windows-latest 3.12 and later steps of that test may reveal more.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/issues/2568"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-09T15:04:24Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "52edf34075334b58b602b8baffbc37d4",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    }
+  ]
+}
