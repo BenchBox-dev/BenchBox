@@ -4,7 +4,7 @@
     "Pilot stack merged through the queue with every layer's checks green",
     "AGENTS.md section on when to stack (dependent core changes only)"
   ],
-  "context": "Sources: GitHub docs 'About stacked pull requests' and 'Merging stacked pull requests'; changelog 2026-07-30.",
+  "context": "Sources: GitHub docs 'About stacked pull requests' and 'Merging stacked pull requests'; changelog 2026-07-30.\n\n2026-10-09 tracker review: Dropped. The premise of this pilot was merge-queue support for native stacks, and the merge queue was retired on 2026-10-03. GitHub native stacks cannot use auto-merge, so layers could not land without manual merges. Dependent changes are already covered by the stacked-PR base guard in .github/workflows/ci.yml:63-88 (tested by tests/unit/workflows/test_stacked_pr_base_guard.py). Re-file if native stacks gain auto-merge.",
   "description": "DECISION GATE: start only when GitHub confirms merge-queue support for native stacks on BenchBox-dev/BenchBox (public preview since 2026-07-30; queue support rolling out; stacks cannot use auto-merge; same-repo only; gh extension install github/gh-stack). Pilot one dependent core change (2-3 layers): each layer gets ci.yml on pull_request (no branch filter), layers land bottom-up through the queue, children auto-rebase. Document the workflow in AGENTS.md. No custom stack tooling or guards.",
   "sessions": [
     {
@@ -22,6 +22,14 @@
       "op": "update",
       "op_id": "486ce40348b14564a4e477361369f0d1",
       "session_id": "ebb0f23e7526462c929aaf5d2651ef0a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:26:58Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "fa263b3c3c844ec0838e7baa8fa46fdd",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
