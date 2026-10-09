@@ -1,12 +1,12 @@
 {
   "acceptance": [
-    "get_platform_info carries gateway:{vendor,host,port,protocol} (sanitized), gateway_routed bool, execution_engine default, tpc_compliant=false when gateway active, cache_control slot",
-    "Per-query gateway_routing:{execution_engine,receipt_source,fallback} defaulting unknown/none/false; separate DuckDB/Snowflake/unknown buckets, never blended",
-    "is_native_run helper wired into compare.py (block unless --allow-heterogeneous-comparison), regression_policy.py, analytics.py baseline selection; unit test proves gateway run cannot enter native baseline set",
+    "Gateway runs record the core platform.gateway{name, routed} block and tpc_compliant=false from core-exec-gateway-capability; get_platform_info adds only adapter-specific details (sanitized host, port, protocol, cache_control slot) and an ExecutionEngineReceipt with the default engine",
+    "Per-query queries[].execution_engine uses the shared vocabulary (manifest routes_to names plus unknown), with receipt_source and fallback recorded; DuckDB, Snowflake and unknown buckets are reported separately, never blended",
+    "Baseline selection uses the core variants_comparable guard (not a separate is_native_run) in compare.py (block unless --allow-heterogeneous-comparison), regression_policy.py and analytics.py; a unit test proves a gateway run cannot enter a native baseline set",
     "SHOW WAREHOUSES/CURRENT_REGION probes degrade gracefully (metadata_degraded:true, never IndexError) on empty/truncated/synthetic gateway rows",
     "Cost suppression: cost_estimated null + cost_status not_comparable_gateway in both Snowflake and Databricks normalized metadata when gateway active"
   ],
-  "context": "Plan v2 C1-C5. Depends on gw-snowflake-conn, gw-databricks, gw-snowflake-querytag. Run make duplicate-check-delta before adding is_native_run. Guardrails: never blend native/gateway numbers; tpc_compliant:false unconditional; sanitize userinfo.",
+  "context": "Plan v2 C1-C5, layered on core-exec-gateway-capability (ADR docs/development/adr/adr-core-execution-variants.md D9). Depends on gw-snowflake-conn, gw-databricks, gw-snowflake-querytag. Run make duplicate-check-delta before adding helpers; reuse the core variants_comparable instead of adding is_native_run. Guardrails: never blend native/gateway numbers; tpc_compliant:false unconditional; sanitize userinfo.",
   "description": "Gateway-aware run metadata for both adapters: platform-info gateway block, per-query routing payload with unknown default, wired baseline guard (is_native_run in compare/regression/analytics), hardened metadata probes, wired cost suppression in normalized metadata.",
   "sessions": [
     {
@@ -16,6 +16,14 @@
       "op": "create",
       "op_id": "e58aff054a5349fdad1cbaeb3ed5fcb6",
       "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:37:49Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "838334da58174535b9431c522316e77b",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
     }
   ]
 }
