@@ -3970,12 +3970,7 @@
       "title": "Remove comments from operational and quality scripts"
     },
     "comment-cleanup-pilot-budget": {
-      "claim": {
-        "expires_at": "2026-10-10T00:03:09Z",
-        "generation": "b4616f584e4a475a90c9948aa0f52f37",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:8dff0892e031f17231e04e2e"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-checker",
         "comment-cleanup-contracts-gate",
@@ -3987,7 +3982,7 @@
         "comment-cleanup-coffeeshop"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Pilot safe deletion and approve module batch and review budgets"
     },
     "comment-cleanup-platform-base": {
