@@ -4,7 +4,7 @@
     "Every remaining Windows-only failure is fixed, skipped with a reason in the test, or linked to its own tracker item",
     "The Windows 3.11 and 3.12 'Run fast tests' steps pass in a dispatched nightly.yml run on develop"
   ],
-  "context": "The issue reports 1 error in addition to the failures on both Python versions. Do this after the encoding and path items so the residual list is short.",
+  "context": "PR #2825 is merged. Live run 37967682464 still showed 38 Windows 3.12 failures and a Windows 3.11 cancellation at the 90-minute timeout. Follow-up nightly-windows-verification-run-20261009 owns the next develop-headed run and the required fix/skip decisions.",
   "description": "Two groups remain after encoding and path fixes. First, 'PermissionError [WinError 32]' at teardown where files are still open: find the unclosed handles and close them, or release them in the fixture. Second, about 20 single failures in platform adapter and utility tests that the issue did not cluster, plus an error in the 'Run fast tests' step. Triage each from the latest Windows log into fix, Windows skip with a stated reason, or a separate tracked defect. Do not leave a failure unexplained.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2568"
@@ -61,6 +61,14 @@
       "op": "release",
       "op_id": "cf336ad076c64dceb77a1de408be51bc",
       "session_id": "e40b1c8674df4499842f44749410458f"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:8d0fa0e2ef22aacc5284a44c",
+      "at": "2026-10-09T22:29:52Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "5e63aa8d1d084f79a549813cda1e73f6",
+      "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
     }
   ]
 }

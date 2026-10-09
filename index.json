@@ -13745,7 +13745,7 @@
       "claim": null,
       "needs": [],
       "priority": "medium-high",
-      "status": "open",
+      "status": "blocked",
       "title": "Windows unit suite: close files before teardown and triage the remaining single failures"
     },
     "nightly-windows-trust-gate-subprocess-env": {
