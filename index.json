@@ -15462,18 +15462,13 @@
       "title": "Add a Polars engine option that every collect respects, and record the engine and runtime package in results"
     },
     "pvm-s1-version-correctness-probe": {
-      "claim": {
-        "expires_at": "2026-10-09T20:55:13Z",
-        "generation": "1ea1a06bb7f94d9eb558cfab6b5a8754",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c"
-      },
+      "claim": null,
       "needs": [
         "pvm-s0a-polars2-compat-fixes",
         "pvm-s0b-polars-engine-option"
       ],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Probe candidate Polars versions for correctness and engine support, and fix the matrix version list"
     },
     "pvm-s2-sf10-memory-time-probe": {
