@@ -5,7 +5,7 @@
     "Each staged gate runs green in report mode with empty-or-classified baseline and measurable vacuity accounting (reference_row_counts[qid] > 0 per query; zero unclassified vacuous cells)",
     "Cheapest discriminating scale recorded per gate; no gate left with an unprobed scale choice"
   ],
-  "context": "Adversarial findings: nyctaxi is not-cheaply-gateable at bounded scale because downloader.py fetches CloudFront Parquet before synthetic fallback; the builder must force offline synthesis. Vacuity has exact mechanics (reference_row_counts > 0 or legitimately_empty with written reason). tpcds_obt is excluded entirely (abandoned decision). Full review: /Users/joe/.jcode/scratch/agy_review.txt findings 1, 8, 9. Depends on df-parity-id-mapping-builders for the nyctaxi/tsbs maps.",
+  "context": "Adversarial findings: nyctaxi is not-cheaply-gateable at bounded scale because downloader.py fetches CloudFront Parquet before synthetic fallback; the builder must force offline synthesis. Vacuity has exact mechanics (reference_row_counts > 0 or legitimately_empty with written reason). tpcds_obt is excluded entirely (abandoned decision). Full review: /Users/joe/.jcode/scratch/agy_review.txt findings 1, 8, 9. Depends on df-parity-id-mapping-builders for the nyctaxi/tsbs maps.\n\nClosed 2026-10-09 (tracker review against develop 34de720b8): PR #2427 staged the nyctaxi, tsbs_devops and tpch_skew cross-surface builders (offline synthesis, scale 0.01). PR #2435 later promoted them to GATES.",
   "description": "Wire STAGED_GATES builders for nyctaxi, tsbs_devops, and tpch_skew. nyctaxi builder must bypass network download and call _generate_synthetic_month directly; verify with network disabled. Probe SF 0.01 vs 0.1 and record the cheapest fully discriminating cell per gate. Confirm tpch_skew generator discriminating at the small cell. Burn down divergences to empty-or-classified baselines with honest surface_independence rationales. Guardrails: STAGED only, no GATES promotion, no Make/CI wiring in this item; tpcds_obt must not be touched (abandoned verdict); legitimately_empty entries only with written reasons, never to mute a fixable query.",
   "sessions": [
     {
@@ -23,6 +23,14 @@
       "generation": "0c50e12c3e6746a0a7c6150c045abffe",
       "op": "take",
       "op_id": "57a96b9e0f3b4bfeb48f53d155b46ae4",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:29:53Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "d834575382a9441c9de61c58d8f36d70",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
