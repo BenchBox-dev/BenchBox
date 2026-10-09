@@ -1,10 +1,11 @@
 {
   "acceptance": [
     "Every needed item is done",
-    "On develop, tests/unit/core/test_execution_vocabulary_parity.py passes with an empty grandfather list, or the ADR records each remaining entry with the user's approval",
-    "End-to-end on develop: `benchbox run --platform polars-df --benchmark tpch --scale 0.01 --execution-engine streaming` and the same via MCP run_benchmark produce bundles with identical platform.execution_engine requested/applied and a distinct variant_id from a default run",
-    "grep across benchbox/, docs/ and scripts/ finds no registered or documented platform option named `engine`, `mode` or `warehouse` outside ADR-approved exceptions (command and output in this item's context)",
-    "Planned-platform items reference the new-platform checklist section and the parity test is part of the CI fast lane",
+    "On develop, tests/unit/core/test_execution_vocabulary_parity.py passes; the grandfather list holds only canonical keys whose removal the ADR assigns to core-exec-remove-deprecated-aliases, and every remaining native spelling is a registered alias per ADR D12",
+    "End-to-end on develop: `benchbox run --platform polars-df --benchmark tpch --scale 0.01 --execution-engine streaming` and the same via MCP run_benchmark produce bundles with identical platform.execution_engine requested/applied and a distinct platform.variant from a default run",
+    "No canonical option key named engine, mode, backend, runtime, executor or warehouse is registered or documented anywhere in benchbox/, docs/ or scripts/ (aliases per ADR D12 excepted); command and output recorded in this item's context",
+    "Planned-platform items reference the new-platform checklist section and the parity test runs in the CI fast lane",
+    "core-exec-remove-deprecated-aliases exists with its release-window gate recorded",
     "A short close-out note in this item's context lists the PRs, the final schema version and any follow-ups"
   ],
   "context": "Decision gate: finish only after all needs are done and the final verification has been run on develop by the finisher (not inferred from item closures). Guardrails: shared core-exec guardrails (see core-exec-d0-vocabulary-adr context). The gateway adapter work (gw-* items) is a separate effort that depends on core-exec-gateway-capability; it is not required to close this umbrella.",
@@ -20,6 +21,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "e0087349bd4345459b48fcada6a80aa1",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:48:46Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "7cf9474992264aa590eb82f989e208c3",
       "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
     }
   ]
