@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "Windows 3.11 'Run fast tests' finishes (pass or fail) in a dispatched nightly.yml run instead of hanging",
+    "The cause of the GIL fatal error at xdist teardown is recorded"
+  ],
+  "context": "Found while checking why 3.11 was cancelled on 2026-10-08. Run 37001178603 (2026-10-02) had a completed Windows 3.11 job, so the hang is intermittent.",
+  "description": "In nightly.yml run 37776283388 (2026-10-08), job 'test (windows-latest, 3.11)' ran 360.97 minutes and was cancelled. The test job has no timeout-minutes, so the 360 minute default applied. The log shows 'Fatal Python error: PyEval_SaveThread ... GIL' at 18:23:48Z during pytest-xdist teardown (execnet termkill), after which pytest hung until the job limit; no 'exceeded the maximum execution time' text is logged, so the timeout is the likely but not confirmed canceller. The 3.12 job finishes in 39 minutes. This item is for the hang itself: find whether the fatal error comes from a test, an xdist/execnet version, or a Python 3.11 build on the runner, and fix or pin it. The nightly-windows-teardown-and-singles change only bounds the job with a timeout so a hang fails in about an hour.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/issues/2568"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-09T15:04:38Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "b6b59c7d84ab402583f47c09a294d170",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    }
+  ]
+}

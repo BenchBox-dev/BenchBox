@@ -24766,6 +24766,13 @@
       "status": "done",
       "title": "Keep PR-followups mock-runner tests independent of installed Codex"
     },
+    "windows-pytest-xdist-teardown-hang-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Windows Python 3.11 fast-test job hangs at xdist teardown and runs to the 6 hour limit"
+    },
     "windows-session-lock-holder-readable-20261009": {
       "claim": null,
       "needs": [],
