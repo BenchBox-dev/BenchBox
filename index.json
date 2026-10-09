@@ -4076,13 +4076,18 @@
       "title": "Remove comments and docstrings from Read primitives modules"
     },
     "comment-cleanup-results": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:33:39Z",
+        "generation": "5bf44a401b764fc4abae6a4ce2224d96",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget",
         "comment-cleanup-core-registries"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from result models, policy and serialization"
     },
     "comment-cleanup-scope-policy": {
