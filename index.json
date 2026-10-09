@@ -24405,6 +24405,13 @@
       "status": "dropped",
       "title": "An older local uv silently downgrades uv.lock revision 3 to 2"
     },
+    "v-tag-ruleset-allows-tag-moves-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "The v-tag ruleset blocks only tag creation, so release tags can be moved or deleted"
+    },
     "validate-agent-behavioral-eval-rubrics": {
       "claim": null,
       "needs": [],

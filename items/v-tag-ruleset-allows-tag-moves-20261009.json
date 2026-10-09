@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "The v-tag ruleset blocks update and deletion of refs/tags/v*, or the docs no longer claim it does and the release workflow verifies the tag object before publishing.",
+    "scripts/ruleset_drift_check.py records the chosen rule set so drift is caught."
+  ],
+  "context": "Found in the 2026-10-09 tracker review of dlv2-51. Changing the ruleset is an owner action. Agents share the owner account (ADR D4), so the real human gate for publishing is the pypi environment's required reviewers.",
+  "description": "The live ruleset v-tag-restricted (18774756) has only a `creation` rule. It does not block update or deletion of refs/tags/v*. docs/development/adr/adr-dev-loop-v2.md:187 says it prevents \"creation or mutation\", and docs/operations/release-artifacts.md says the tag ruleset \"is what forbids moves\". A moved tag would point a release at a different commit than the one that was tested.\n\nAdd update and deletion rules to the ruleset (owner settings change), or correct the ADR and docs and make the release workflow re-check the tag object at publish time.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:19:25Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "4e4b257681354c2dbf40ce162b92e1f8",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}
