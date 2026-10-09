@@ -5,6 +5,8 @@
 from __future__ import annotations
 
 import json
+import math
+import re
 import statistics
 import sys
 import warnings
@@ -177,6 +179,10 @@ def _discover_result_files_with_metadata(
         "    benchbox compare baseline.json current.json --fail-on-regression 10%\n"
         "\n"
         "\b\n"
+        "    # Ignore query slowdowns of 5 ms or less (CI/CD on small scale factors)\n"
+        "    benchbox compare baseline.json current.json --fail-on-regression 10% --min-regression-delta 5ms\n"
+        "\n"
+        "\b\n"
         "    # Compare files with query plan analysis\n"
         "    benchbox compare baseline.json current.json --include-plans\n"
         "\n"
@@ -271,6 +277,14 @@ def _discover_result_files_with_metadata(
     help='Fail (exit 1) if regression exceeds threshold (e.g., "10%", "0.1", "5%")',
 )
 @click.option(
+    "--min-regression-delta",
+    type=str,
+    help=(
+        "With --fail-on-regression, count a query as regressed only when it also slows by more than this "
+        'duration (e.g., "5ms", "0.005s"). Aggregate metrics are judged by percentage alone.'
+    ),
+)
+@click.option(
     "--format",
     "output_format",
     type=click.Choice(["text", "json", "markdown", "html"], case_sensitive=False),
@@ -331,6 +345,7 @@ def compare(
     data_dir,
     list_platforms,
     fail_on_regression,
+    min_regression_delta,
     output_format,
     output_file,
     generate_charts,
@@ -343,6 +358,12 @@ def compare(
     if list_platforms:
         _list_available_platforms()
         return
+
+    if min_regression_delta is not None and not fail_on_regression:
+        raise click.UsageError("--min-regression-delta requires --fail-on-regression")
+
+    if min_regression_delta is not None and platforms:
+        raise click.UsageError("--min-regression-delta applies to result file comparison, not platform runs")
 
     if run_mode_flag:
         warnings.warn(
@@ -385,6 +406,7 @@ def compare(
         _run_file_comparison(
             result_files=result_files,
             fail_on_regression=fail_on_regression,
+            min_regression_delta=min_regression_delta,
             output_format=output_format,
             output_file=output_file,
             show_all_queries=show_all_queries,
@@ -415,6 +437,7 @@ def compare(
             theme=theme,
             fail_on_regression=fail_on_regression,
             show_all_queries=show_all_queries,
+            min_regression_delta=min_regression_delta,
         )
 
 
@@ -425,6 +448,7 @@ def _run_interactive_wizard(
     theme: str,
     fail_on_regression: str | None,
     show_all_queries: bool,
+    min_regression_delta: str | None = None,
 ):
     console.print("\n[bold blue]BenchBox Platform Comparison[/bold blue]")
     console.print("Compare benchmark performance across different platforms.\n")
@@ -440,6 +464,8 @@ def _run_interactive_wizard(
     )
 
     if mode_choice == "1":
+        if min_regression_delta is not None:
+            raise click.UsageError("--min-regression-delta applies to result file comparison, not platform runs")
         _interactive_platform_comparison(
             output_format=output_format,
             output_file=output_file,
@@ -452,6 +478,7 @@ def _run_interactive_wizard(
             output_file=output_file,
             fail_on_regression=fail_on_regression,
             show_all_queries=show_all_queries,
+            min_regression_delta=min_regression_delta,
         )
 
 
@@ -575,6 +602,7 @@ def _interactive_file_comparison(
     output_file: str | None,
     fail_on_regression: str | None,
     show_all_queries: bool,
+    min_regression_delta: str | None = None,
 ):
     console.print("\n[bold]Step 2:[/bold] How do you want to select files?\n")
     console.print("  [cyan]1[/cyan]  Browse by benchmark/platform/scale (recommended)")
@@ -610,6 +638,7 @@ def _interactive_file_comparison(
         show_all_queries=show_all_queries,
         include_plans=include_plans,
         plan_threshold=0.0,
+        min_regression_delta=min_regression_delta,
     )
 
 
@@ -1060,6 +1089,7 @@ def _run_file_comparison(
     show_all_queries: bool,
     include_plans: bool = False,
     plan_threshold: float = 0.0,
+    min_regression_delta: str | None = None,
 ):
     if len(result_files) < 2:
         console.print("[red]Error: At least 2 result files required for comparison[/red]")
@@ -1071,6 +1101,7 @@ def _run_file_comparison(
         sys.exit(1)
 
     regression_threshold = _validate_regression_threshold(fail_on_regression)
+    min_delta_ms = _validate_min_regression_delta(min_regression_delta)
 
     if len(result_files) > 2:
         console.print("[yellow]Note: Multi-file comparison not yet supported. Comparing first 2 files only.[/yellow]\n")
@@ -1086,7 +1117,20 @@ def _run_file_comparison(
 
     _output_file_comparison(comparison, baseline, current, output_format, output_file, show_all_queries)
 
-    _check_regression_threshold(comparison, regression_threshold)
+    _check_regression_threshold(comparison, regression_threshold, min_delta_ms)
+
+
+def _validate_min_regression_delta(min_regression_delta: str | None) -> float | None:
+    if min_regression_delta is None:
+        return None
+    min_delta_ms = _parse_duration_ms(min_regression_delta)
+    if min_delta_ms is None:
+        console.print(
+            f'[red]Error: Invalid duration "{min_regression_delta}". '
+            'Use milliseconds (e.g., "5ms") or seconds (e.g., "0.005s")[/red]'
+        )
+        sys.exit(1)
+    return min_delta_ms
 
 
 def _validate_regression_threshold(fail_on_regression: str | None) -> float | None:
@@ -1186,19 +1230,22 @@ def _output_file_comparison(
         console.print(content)
 
 
-def _check_regression_threshold(comparison: dict[str, Any], regression_threshold: float | None) -> None:
+def _check_regression_threshold(
+    comparison: dict[str, Any],
+    regression_threshold: float | None,
+    min_delta_ms: float | None = None,
+) -> None:
     if regression_threshold is None:
         return
-    has_regression = _check_regression(comparison, regression_threshold)
+    criteria = f"threshold: {regression_threshold * 100:.1f}%"
+    if min_delta_ms is not None:
+        criteria += f", minimum query slowdown: {min_delta_ms:g} ms"
+    has_regression = _check_regression(comparison, regression_threshold, min_delta_ms)
     if has_regression:
-        console.print(
-            f"\n[bold red]❌ Performance regression detected (threshold: {regression_threshold * 100:.1f}%)[/bold red]"
-        )
+        console.print(f"\n[bold red]❌ Performance regression detected ({criteria})[/bold red]")
         sys.exit(1)
     else:
-        console.print(
-            f"\n[bold green]✓ No performance regression (threshold: {regression_threshold * 100:.1f}%)[/bold green]"
-        )
+        console.print(f"\n[bold green]✓ No performance regression ({criteria})[/bold green]")
 
 
 def _build_execution_map(results: Any) -> dict[str, Any]:
@@ -1308,7 +1355,28 @@ def _parse_threshold(threshold_str: str) -> float | None:
         return None
 
 
-def _check_regression(comparison: dict[str, Any], threshold: float) -> bool:
+_DURATION_PATTERN = re.compile(r"(?P<number>[0-9]+(?:\.[0-9]+)?)(?P<unit>ms|s)")
+
+
+def _parse_duration_ms(duration_str: str) -> float | None:
+    match = _DURATION_PATTERN.fullmatch(duration_str.strip().lower())
+    if match is None:
+        return None
+    value_ms = float(match["number"]) * (1000.0 if match["unit"] == "s" else 1.0)
+    return value_ms if math.isfinite(value_ms) else None
+
+
+def _query_slowdown_exceeds(query: dict[str, Any], min_delta_ms: float | None) -> bool:
+    if min_delta_ms is None:
+        return True
+    baseline_ms = query.get("baseline_time_ms")
+    current_ms = query.get("current_time_ms")
+    if baseline_ms is None or current_ms is None:
+        return True
+    return (current_ms - baseline_ms) > min_delta_ms
+
+
+def _check_regression(comparison: dict[str, Any], threshold: float, min_delta_ms: float | None = None) -> bool:
     threshold_percent = threshold * 100
 
     perf_changes = comparison.get("performance_changes", {})
@@ -1320,7 +1388,9 @@ def _check_regression(comparison: dict[str, Any], threshold: float) -> bool:
 
     query_comparisons = comparison.get("query_comparisons", [])
     for query in query_comparisons:
-        if is_regression(query.get("change_percent", 0), threshold_percent):
+        if is_regression(query.get("change_percent", 0), threshold_percent) and _query_slowdown_exceeds(
+            query, min_delta_ms
+        ):
             return True
 
     return False

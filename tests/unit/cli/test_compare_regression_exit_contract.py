@@ -1,15 +1,23 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import pytest
+from click.testing import CliRunner
 
+from benchbox.cli.app import cli
 from benchbox.cli.commands.compare import (
     _check_regression,
     _check_regression_threshold,
+    _parse_duration_ms,
     _parse_threshold,
+    _validate_min_regression_delta,
     _validate_regression_threshold,
 )
+from tests.fixtures.result_dict_fixtures import make_v2_result_dict
 
 pytestmark = [
     pytest.mark.unit,
@@ -96,3 +104,237 @@ class TestFailOnRegressionUsesTheSharedPolicy:
         comparison = {"query_comparisons": [], "performance_changes": {"geometric_mean": "not-a-dict"}}
 
         assert _check_regression(comparison, 0.10) is False
+
+
+def _timed_query(baseline_ms: float, current_ms: float) -> dict[str, Any]:
+    return {
+        "query_id": "8",
+        "baseline_time_ms": baseline_ms,
+        "current_time_ms": current_ms,
+        "change_percent": (current_ms - baseline_ms) / baseline_ms * 100.0,
+    }
+
+
+def _timed_comparison(*queries: dict[str, Any]) -> dict[str, Any]:
+    return {"query_comparisons": list(queries), "performance_changes": {}}
+
+
+class TestMinRegressionDelta:
+    def test_exceeding_both_limits_is_a_regression(self):
+        comparison = _timed_comparison(_timed_query(100.0, 120.0))
+
+        assert _check_regression(comparison, 0.10, 5.0) is True
+
+    def test_exceeding_only_the_percentage_is_not_a_regression(self):
+        comparison = _timed_comparison(_timed_query(9.0, 11.6))
+
+        assert _check_regression(comparison, 0.10, 5.0) is False
+        assert _check_regression(comparison, 0.10) is True
+
+    def test_exceeding_only_the_delta_is_not_a_regression(self):
+        comparison = _timed_comparison(_timed_query(1000.0, 1060.0))
+
+        assert _check_regression(comparison, 0.10, 5.0) is False
+
+    def test_slowdown_equal_to_the_floor_is_not_a_regression(self):
+        comparison = _timed_comparison(_timed_query(10.0, 15.0))
+
+        assert _check_regression(comparison, 0.10, 5.0) is False
+
+    def test_large_slowdown_on_a_long_query_still_fails(self):
+        comparison = _timed_comparison(_timed_query(5000.0, 5600.0))
+
+        with pytest.raises(SystemExit) as exit_info:
+            _check_regression_threshold(comparison, 0.10, 5.0)
+
+        assert exit_info.value.code == 1
+
+    def test_floor_does_not_apply_to_aggregate_metrics(self):
+        comparison = {
+            "query_comparisons": [],
+            "performance_changes": {"total_execution_time": {"change_percent": 25.0}},
+        }
+
+        assert _check_regression(comparison, 0.10, 1_000_000.0) is True
+
+    def test_one_query_over_both_limits_fails_among_jittery_ones(self):
+        comparison = _timed_comparison(_timed_query(9.0, 11.6), _timed_query(10.0, 11.9), _timed_query(80.0, 100.0))
+
+        assert _check_regression(comparison, 0.10, 5.0) is True
+
+    def test_query_without_timings_falls_back_to_the_percentage(self):
+        assert _check_regression(_comparison(query_change=25.0), 0.10, 5.0) is True
+
+    def test_floor_is_reported_in_the_verdict(self, capsys: pytest.CaptureFixture[str]):
+        _check_regression_threshold(_timed_comparison(_timed_query(9.0, 11.6)), 0.10, 5.0)
+
+        assert "minimum query slowdown: 5 ms" in capsys.readouterr().out
+
+
+class TestDurationParsing:
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [("5ms", 5.0), ("0.005s", 5.0), (" 6MS ", 6.0), ("2.5ms", 2.5), ("1s", 1000.0), ("0ms", 0.0)],
+    )
+    def test_accepted_spellings(self, raw: str, expected: float):
+        assert _parse_duration_ms(raw) == pytest.approx(expected)
+
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            "5",
+            "ms",
+            "s",
+            "-1ms",
+            "+5ms",
+            "fast",
+            "5m",
+            "nanms",
+            "infs",
+            "1_0ms",
+            "1e3ms",
+            "٥ms",
+            "5 ms",
+            "9" * 400 + "s",
+        ],
+    )
+    def test_rejected_spellings(self, raw: str):
+        assert _parse_duration_ms(raw) is None
+
+    def test_invalid_duration_exits_one(self):
+        with pytest.raises(SystemExit) as exit_info:
+            _validate_min_regression_delta("soon")
+
+        assert exit_info.value.code == 1
+
+    def test_absent_option_yields_no_floor(self):
+        assert _validate_min_regression_delta(None) is None
+
+    def test_empty_value_exits_one(self):
+        with pytest.raises(SystemExit) as exit_info:
+            _validate_min_regression_delta("")
+
+        assert exit_info.value.code == 1
+
+
+def _write_result(path: Path, query_ms: dict[str, float]) -> str:
+    queries = [
+        {"id": query_id, "ms": ms, "rows": 1, "iter": 1, "stream": 0, "run_type": "measurement", "status": "SUCCESS"}
+        for query_id, ms in query_ms.items()
+    ]
+    path.write_text(json.dumps(make_v2_result_dict(queries=queries, total_ms=1000)), encoding="utf-8")
+    return str(path)
+
+
+class TestMinRegressionDeltaCommand:
+    @pytest.fixture
+    def placeholder_files(self, tmp_path: Path) -> tuple[str, str]:
+        baseline = tmp_path / "baseline.json"
+        current = tmp_path / "current.json"
+        baseline.write_text("{}")
+        current.write_text("{}")
+        return str(baseline), str(current)
+
+    def _compare(self, tmp_path: Path, baseline_ms: dict[str, float], current_ms: dict[str, float], *options: str):
+        baseline = _write_result(tmp_path / "baseline.json", baseline_ms)
+        current = _write_result(tmp_path / "current.json", current_ms)
+        return CliRunner().invoke(cli, ["compare", baseline, current, "--fail-on-regression", "10%", *options])
+
+    def test_without_fail_on_regression_is_a_usage_error(self, placeholder_files: tuple[str, str]):
+        result = CliRunner().invoke(cli, ["compare", *placeholder_files, "--min-regression-delta", "5ms"])
+
+        assert result.exit_code == 2
+        assert "--min-regression-delta requires --fail-on-regression" in result.output
+
+    def test_empty_value_is_rejected_instead_of_disabling_the_floor(self, placeholder_files: tuple[str, str]):
+        result = CliRunner().invoke(
+            cli, ["compare", *placeholder_files, "--fail-on-regression", "10%", "--min-regression-delta", ""]
+        )
+
+        assert result.exit_code == 1
+        assert "Invalid duration" in result.output
+
+    def test_platform_runs_reject_the_option(self):
+        result = CliRunner().invoke(
+            cli,
+            ["compare", "-p", "duckdb", "-p", "sqlite", "--fail-on-regression", "10%", "--min-regression-delta", "5ms"],
+        )
+
+        assert result.exit_code == 2
+        assert "result file comparison" in result.output
+
+    def test_list_platforms_ignores_the_option_check(self):
+        result = CliRunner().invoke(cli, ["compare", "--list-platforms", "--min-regression-delta", "5ms"])
+
+        assert result.exit_code == 0
+
+    def test_help_documents_the_option(self):
+        result = CliRunner().invoke(cli, ["compare", "--help"])
+
+        assert "--min-regression-delta" in result.output
+        assert "--fail-on-regression" in result.output
+
+    def test_jitter_on_a_short_query_passes_with_the_floor(self, tmp_path: Path):
+        result = self._compare(
+            tmp_path, {"8": 9.0, "20": 10.0}, {"8": 11.6, "20": 11.9}, "--min-regression-delta", "5ms"
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "No performance regression" in result.output
+
+    def test_jitter_on_a_short_query_fails_without_the_floor(self, tmp_path: Path):
+        result = self._compare(tmp_path, {"8": 9.0, "20": 10.0}, {"8": 11.6, "20": 11.9})
+
+        assert result.exit_code == 1
+
+    def test_large_slowdown_on_a_long_query_fails_with_the_floor(self, tmp_path: Path):
+        result = self._compare(
+            tmp_path, {"8": 9.0, "9": 5000.0}, {"8": 9.0, "9": 5600.0}, "--min-regression-delta", "5ms"
+        )
+
+        assert result.exit_code == 1
+        assert "Performance regression detected" in result.output
+
+    def test_seconds_spelling_is_equivalent(self, tmp_path: Path):
+        result = self._compare(tmp_path, {"8": 9.0}, {"8": 11.6}, "--min-regression-delta", "0.005s")
+
+        assert result.exit_code == 0, result.output
+
+    def test_interactive_file_comparison_forwards_the_floor(self):
+        from benchbox.cli.commands import compare as compare_module
+
+        with (
+            patch.object(compare_module, "_direct_file_selection", return_value=(Path("a.json"), Path("b.json"))),
+            patch.object(compare_module.Prompt, "ask", return_value="2"),
+            patch.object(compare_module.Confirm, "ask", return_value=True),
+            patch.object(compare_module, "_run_file_comparison") as run_file_comparison,
+        ):
+            compare_module._interactive_file_comparison(
+                output_format="text",
+                output_file=None,
+                fail_on_regression="10%",
+                show_all_queries=False,
+                min_regression_delta="5ms",
+            )
+
+        assert run_file_comparison.call_args.kwargs["min_regression_delta"] == "5ms"
+
+    def test_interactive_platform_comparison_rejects_the_floor(self):
+        from benchbox.cli.commands import compare as compare_module
+
+        with (
+            patch.object(compare_module.Prompt, "ask", return_value="1"),
+            patch.object(compare_module, "_interactive_platform_comparison") as platform_comparison,
+            pytest.raises(compare_module.click.UsageError, match="result file comparison"),
+        ):
+            compare_module._run_interactive_wizard(
+                output_format="text",
+                output_file=None,
+                generate_charts=False,
+                theme="light",
+                fail_on_regression="10%",
+                show_all_queries=False,
+                min_regression_delta="5ms",
+            )
+
+        platform_comparison.assert_not_called()

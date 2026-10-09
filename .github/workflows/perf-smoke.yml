@@ -56,7 +56,8 @@ jobs:
           uv run benchbox compare \
             _project/baselines/perf_smoke_duckdb_tpch_001.json \
             "${{ steps.current.outputs.path }}" \
-            --fail-on-regression 10%
+            --fail-on-regression 10% \
+            --min-regression-delta 7ms
 
       - name: Upload result artifact
         if: always()

@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 import yaml
 
-from tests.utilities.posix_shell import posix_shell, skip_without_posix_shell
+from tests.utilities.posix_shell import posix_shell, run_posix_shell, skip_without_posix_shell
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -57,10 +57,8 @@ def _run_text(job: dict[str, Any]) -> str:
 
 def _run_workflow_script(script: str, cwd: Path, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     skip_without_posix_shell()
-    shell = posix_shell()
-    assert shell is not None
-    return subprocess.run(
-        [shell, "--noprofile", "--norc", "-e", "-o", "pipefail", "-c", 'export PATH="$PWD:$PATH"\n' + script],
+    return run_posix_shell(
+        'set -eo pipefail\nexport PATH="$PWD:$PATH"\n' + script,
         cwd=cwd,
         env={**os.environ, **(env or {})},
         capture_output=True,
@@ -240,6 +238,8 @@ def test_perf_comparison_preserves_threshold_and_failure(tmp_path: Path, compare
         str(current),
         "--fail-on-regression",
         "10%",
+        "--min-regression-delta",
+        "7ms",
     ]
 
 
@@ -354,3 +354,19 @@ def test_actions_are_pinned_by_sha() -> None:
             if uses and not _PINNED_ACTION.match(str(uses)):
                 unpinned.append(f"{name}: {uses}")
     assert not unpinned, f"actions must be pinned to a full commit SHA: {unpinned}"
+
+
+def test_perf_smoke_workflow_uses_the_same_regression_gate_options() -> None:
+    workflow = _load(WORKFLOWS_DIR / "perf-smoke.yml")
+    compare = next(
+        step for step in _steps(workflow["jobs"]["perf-smoke"]) if str(step.get("name", "")).startswith("Compare")
+    )
+    nightly = next(
+        step
+        for step in _steps(_load()["jobs"]["perf"])
+        if step.get("name") == "Compare against baseline (fail on >10% regression)"
+    )
+
+    for step in (compare, nightly):
+        assert "--fail-on-regression 10%" in step["run"]
+        assert "--min-regression-delta 7ms" in step["run"]

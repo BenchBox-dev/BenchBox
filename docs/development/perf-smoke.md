@@ -12,10 +12,29 @@ benchmark DuckDB itself.
 1. CI runs `benchbox run --platform duckdb --benchmark tpch --scale 0.01 --phases power`.
 2. CI calls `benchbox compare` against the checked-in baseline at
    `_project/baselines/perf_smoke_duckdb_tpch_001.json` with
-   `--fail-on-regression 10%`.
+   `--fail-on-regression 10% --min-regression-delta 7ms`.
 3. Result JSON (baseline + current) is uploaded as a 14-day artifact.
 
-Workflow lives at `.github/workflows/perf-smoke.yml`.
+Workflow lives at `.github/workflows/perf-smoke.yml`. The nightly T3 perf
+domain in `.github/workflows/nightly-v2.yml` runs the same comparison against
+the same baseline.
+
+## Noise floor
+
+At SF=0.01 every TPC-H query runs in 3 to 13 ms on a hosted runner, so a
+percentage threshold alone flags scheduling jitter. A query counts as
+regressed only when it is more than 10% slower **and** more than 7 ms
+slower than the baseline. Totals and other aggregates are judged by
+percentage alone.
+
+The floor comes from the nine `t3-perf-result` artifacts retained from
+scheduled nightly runs between 2026-09-30 and 2026-10-08. `benchbox compare`
+judges each query by its last recorded execution, so the spread is measured
+on that value: for each query, the difference between its highest and
+lowest value across those runs. The largest spread was 5.4 ms (Q18). That is
+above the 4 ms level at which a flat 5 ms floor stops being safe, so the
+floor is 1.25 times the largest spread rounded up to a whole millisecond:
+7 ms. Recompute it from fresh artifacts whenever the baseline is refreshed.
 
 ## Skipping the check
 
