@@ -21,6 +21,7 @@ from benchbox.mcp.schemas import (
     validate_platform_options,
 )
 from benchbox.mcp.security import JobLimits, TenantWorkspaceProvider
+from benchbox.utils.clock import mono_time
 from tests.integration.mcp._security import authenticated_http_client, write_security_config
 
 pytestmark = [pytest.mark.integration, pytest.mark.fast]
@@ -409,6 +410,26 @@ def test_fairness_state_is_shared_across_worker_handles(tmp_path: Path) -> None:
     assert served is not None and served.principal_id == "tenant-b"
 
 
+async def _recover_until_unknown(
+    worker: DurableJobWorker,
+    repository: DurableJobRepository,
+    execution_id: str,
+    *,
+    timeout_seconds: float = 5.0,
+    interval_seconds: float = 0.01,
+):
+    deadline = mono_time() + timeout_seconds
+    job = repository.get(execution_id)
+    while job is None or job.state != "unknown":
+        if mono_time() >= deadline:
+            state = None if job is None else job.state
+            pytest.fail(f"job {execution_id} still {state!r} {timeout_seconds}s after its lease should have expired")
+        await anyio.sleep(interval_seconds)
+        worker.recover_expired()
+        job = repository.get(execution_id)
+    return job
+
+
 def test_benchmark_capacity_tool_is_tenant_scoped(tmp_path: Path) -> None:
     token_a = "tenant-a-capacity-token"
     token_b = "tenant-b-capacity-token"
@@ -441,9 +462,7 @@ def test_benchmark_capacity_tool_is_tenant_scoped(tmp_path: Path) -> None:
             assert direct.claim("lost-worker") is not None
             fence = DurableJobWorker(direct, TenantWorkspaceProvider(tmp_path / "fence-workspaces"))
             fence.recover_expired()
-            await anyio.sleep(0.06)
-            fence.recover_expired()
-            lost = direct.get(lost_execution_id)
+            lost = await _recover_until_unknown(fence, direct, lost_execution_id)
             assert lost is not None and lost.state == "unknown"
             capacity = json.loads((await client_a.call_tool("get_benchmark_capacity", {})).content[0].text)
             assert capacity["states"]["unknown"] == 1
