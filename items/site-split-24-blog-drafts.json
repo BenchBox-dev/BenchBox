@@ -4,7 +4,7 @@
     "Chart script runs against a pinned benchbox version and regenerates one existing chart identically or with a recorded, explained difference",
     "No Python in the site repo"
   ],
-  "context": "Read-only inventory 2026-10-07 (core side; site drafts/ unavailable until item 20 seeds the site repo): core _blog/ + docs/blog/ hold 110 png, 2 json (tpch measurement files under building-benchbox/research/), 1 py (_blog/table-formats/research/format_benchmark.py), 1 sh (_blog/benchbox-in-action/research/scripts/run_platform_optimization_matrix.sh). Keep/delete/port decisions and drafts/ASSETS.md belong to S1 implementation.",
+  "context": "Read-only inventory 2026-10-07 (core side; site drafts/ unavailable until item 20 seeds the site repo): core _blog/ + docs/blog/ hold 110 png, 2 json (tpch measurement files under building-benchbox/research/), 1 py (_blog/table-formats/research/format_benchmark.py), 1 sh (_blog/benchbox-in-action/research/scripts/run_platform_optimization_matrix.sh). Keep/delete/port decisions and drafts/ASSETS.md belong to S1 implementation.\n2026-10-09 03:45Z: in S1 (benchbox-site PR #1, commit 5f88829). drafts/ASSETS.md: 58 images keep (byte-identical copies of blog/images; 57 linked by drafts, comparison_template.png kept with its published twin), 2 research JSON keep, chart definitions/data moved from core scripts/_chart_data; core format_benchmark.py and run_platform_optimization_matrix.sh marked delete from core with site-split-50 (no current draft needs them; use the benchbox CLI). npm run charts = scripts/render-blog-charts.mjs (uvx --from benchbox==<bundle package_version>, ansi-to-html, Playwright screenshot); --publish copies into blog/images. Regenerated sf1_before_after with benchbox 0.4.2: same text, numbers and layout; recorded differences: 862 px content crop vs 1050 px window, bar shading from a different ANSI converter. Published image untouched.",
   "description": "PR group S1, with site-split-21 and site-split-22.\n\n1. Inventory every non-Markdown file in the site's `drafts/` (formerly `_blog/`), plus the .py and .sh files the seed left behind in core `_blog/`. These include `_blog/table-formats/research/format_benchmark.py` and the shell script.\n2. Decide keep, delete or port for each file, and commit the decision table as `drafts/ASSETS.md`.\n3. Chart rendering: add a Node script that calls the published CLI as an external tool, pinned to the bundle's version: `uvx benchbox==<package_version> visualize ...`. It replaces `scripts/_render_blog_charts.py` and `capture_chart_images.py` for blog use, and writes the images into `drafts/` or `blog/`.\n4. Port any research script still needed for a current draft to TS. Mark the rest for deletion from core in site-split-50.",
   "sessions": [
     {
@@ -22,6 +22,14 @@
       "op": "update",
       "op_id": "1583d78553ce40b984133d608d115159",
       "session_id": "bded665cd1c546e5acaf7fa074a0853d"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de",
+      "at": "2026-10-09T03:44:17Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "7565012a864e406393a6d3f2a432135b",
+      "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
     }
   ]
 }
