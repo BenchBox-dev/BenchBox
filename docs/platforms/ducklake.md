@@ -32,7 +32,7 @@ The first command installs DuckDB 1.3 or later, which the `ducklake` extension r
 
 ## Requirements
 
-DuckLake requires **DuckDB >= 1.3** — the `ducklake` extension is not available on earlier releases. The adapter checks the version when it connects. If the detected DuckDB version is too old, the adapter raises immediately with the detected version and a remediation hint (e.g. `uv add 'duckdb>=1.3,<2.0'` or `--driver-version 1.3.2`).
+DuckLake requires **DuckDB >= 1.3** — the `ducklake` extension is not available on earlier releases. The adapter checks the version when it connects. If the detected DuckDB version is too old, the adapter raises immediately with the detected version and a remediation hint (e.g. `uv add 'duckdb>=1.3,<2.0'` or `--platform-option driver_version=1.3.2`).
 
 The first run also needs network access once, to `INSTALL` the `ducklake` extension.
 
@@ -251,7 +251,7 @@ RuntimeError: DuckLake requires DuckDB >= 1.3 (the 'ducklake' extension is not
 available on earlier releases). Detected DuckDB version: 1.2.x. ...
 ```
 
-**Solution:** Upgrade the `duckdb` package, e.g. `uv add 'duckdb>=1.3,<2.0'`, or pin a compatible driver with `--driver-version 1.3.2 --platform-option driver_auto_install=true`.
+**Solution:** Upgrade the `duckdb` package, e.g. `uv add 'duckdb>=1.3,<2.0'`, or pin a compatible driver with `--platform-option driver_version=1.3.2 --platform-option driver_auto_install=true`.
 
 ### Catalog Attach Failure
 

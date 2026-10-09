@@ -25,11 +25,9 @@ Onehouse Quanton is a serverless managed Spark compute runtime that delivers 2-3
 
 ```bash
 pip install requests boto3
-
-pip install "benchbox[quanton]"
 ```
 
-Install the required dependencies directly, or through the BenchBox extra.
+Install the required dependencies directly. There is no dedicated BenchBox extra for Quanton.
 
 ## Configuration
 

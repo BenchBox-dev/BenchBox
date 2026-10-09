@@ -26,8 +26,8 @@ Looking ahead? See the [Development Roadmap](../development/roadmap.md) for plan
 | **BigQuery**              | Available | Serverless data warehouse (Google Cloud)                                                                   | `uv add google-cloud-bigquery google-cloud-storage` |
 | **Redshift**              | Available | Cloud data warehouse (AWS)                                                                                 | `uv add redshift-connector boto3`                   |
 | **Snowflake**             | Available | Data Cloud / Multi-cloud data warehouse                                                                    | `uv add snowflake-connector-python`                 |
-| **Trino**                 | Available | Distributed SQL (Trino/Starburst)                                                                          | `uv add benchbox[trino]`                            |
-| **PrestoDB**              | Available | Distributed SQL (Meta's Presto)                                                                            | `uv add benchbox[presto]`                           |
+| **Trino**                 | Available | Distributed SQL (Trino/Starburst)                                                                          | `uv add benchbox --extra trino`                   |
+| **PrestoDB**              | Available | Distributed SQL (Meta's Presto)                                                                            | `uv add benchbox --extra presto`                  |
 | **LakeSail Sail**         | Available | Rust drop-in Spark replacement (SQL + DataFrame via Spark Connect)                                         | `uv add benchbox --extra lakesail`                  |
 | **Apache Gluten + Velox** | Available | Native C++ acceleration for Spark SQL (Linux-only local; Docker on macOS/Windows)                          | `uv add benchbox --extra velox`                     |
 | **SQLite**                | Built-in  | Embedded transactional database                                                                            | (built-in)                                          |
@@ -64,19 +64,19 @@ benchbox run --platform lakesail-df --benchmark tpch --scale 0.1
 Install all cloud platforms at once:
 
 ```bash
-uv add benchbox[cloud]
+uv add benchbox --extra cloud
 ```
 
 Or install individual platforms:
 
 ```bash
-uv add benchbox[clickhouse-local]
+uv add benchbox --extra clickhouse-local
 
-uv add benchbox[clickhouse-server]
+uv add benchbox --extra clickhouse-server
 
-uv add benchbox[clickhouse-cloud]
+uv add benchbox --extra clickhouse-cloud
 
-uv add benchbox[databricks]
+uv add benchbox --extra databricks
 ```
 
 The extras install ClickHouse Local (chDB, zero-config), ClickHouse Server (self-hosted), ClickHouse Cloud (managed) and Databricks SQL.

@@ -5,13 +5,13 @@
 ```{tags} intermediate, guide, questdb, sql-platform, self-hosted, timeseries
 ```
 
-QuestDB is a high-performance open-source time-series database optimized for fast ingestion and SQL queries. It supports the PostgreSQL wire protocol (port 8812) for query execution and a REST API (port 9000) for efficient bulk data import. BenchBox connects via psycopg2 over the PG wire protocol and uses the REST API `/imp` endpoint for high-throughput CSV ingestion. SQL translation targets the `postgres` dialect via SQLGlot.
+QuestDB is a high-performance open-source time-series database optimized for fast ingestion and SQL queries. It supports the PostgreSQL wire protocol (port 8812) for query execution and a REST API (port 9000) for efficient bulk data import. BenchBox connects via psycopg 3 over the PG wire protocol and uses the REST API `/imp` endpoint for high-throughput CSV ingestion. SQL translation targets the `postgres` dialect via SQLGlot.
 
 QuestDB is designed for time-series and event-driven workloads, with features like designated timestamps, automatic partitioning by time, and the SYMBOL type for low-cardinality string columns. It delivers competitive ingestion throughput against InfluxDB, TimescaleDB, and ClickHouse on time-series workloads.
 
 ## Features
 
-- **PostgreSQL wire protocol** - Standard PG wire protocol via psycopg2 (port 8812)
+- **PostgreSQL wire protocol** - Standard PG wire protocol via psycopg 3 (port 8812)
 - **REST API CSV import** - High-throughput bulk data loading via `/imp` endpoint (port 9000)
 - **Full TPC-H support** - All 22 queries with row count validation
 - **PostgreSQL dialect** - SQL translation via SQLGlot `postgres` dialect
@@ -23,12 +23,10 @@ QuestDB is designed for time-series and event-driven workloads, with features li
 
 ## Quick Start
 
-The commands install the `psycopg2` dependency (or the QuestDB extra), configure the connection (QuestDB must be
+The commands install the QuestDB extra (which provides the `psycopg` 3 driver), configure the connection (QuestDB must be
 running), and run the TPC-H benchmark.
 
 ```bash
-uv add psycopg2-binary
-
 uv add benchbox --extra questdb
 
 export QUESTDB_HOST=localhost
@@ -184,7 +182,7 @@ BenchBox CLI
     v
 QuestDBAdapter
     |
-    +-- PG Wire Protocol (psycopg2) --> QuestDB (port 8812)
+    +-- PG Wire Protocol (psycopg 3) --> QuestDB (port 8812)
     |       - Schema DDL (CREATE TABLE, DROP TABLE)
     |       - Query execution (SELECT, EXPLAIN)
     |       - Autocommit mode required
@@ -278,15 +276,15 @@ Error: Failed to connect to QuestDB
 3. For Docker deployments, ensure port mapping is correct (`-p 8812:8812`)
 4. Test connectivity directly: `psql -h <host> -p 8812 -U admin -d qdb -c "SELECT 1"`
 
-### Missing psycopg2 Dependency
+### Missing psycopg Dependency
 
 ```
-Error: Missing dependencies for questdb platform: psycopg2
+Error: Missing dependencies for questdb platform: psycopg
 ```
 
 **Solutions:**
-1. Install psycopg2: `uv add psycopg2-binary`
-2. Or install the QuestDB extra: `uv add benchbox --extra questdb`
+1. Install the QuestDB extra: `uv add benchbox --extra questdb`
+2. Or install the driver directly: `uv add "psycopg[binary]"`
 
 ### REST API Import Failures
 
