@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "#2797's description states the Bot-only default and why",
+    "#2784's 300-file statement is corrected (or the item oracle-marker-patch-map-file-limit-20261009 records the correction)",
+    "#2758's PR title describes the change"
+  ],
+  "context": "Found in the completion audit of the oracle replacement on 2026-10-09. Editing a merged PR's title or body is a GitHub write the owner approves.",
+  "description": "PR descriptions are the durable record readers search later. Two merged ones are wrong:\n- #2797 says the follow-up sweep defaults `DEFAULT_REVIEW_AUTHORS` to `benchbox-oracle[bot]` and `benchbox-oracle`. Its second commit (881873c51, \"trust only the oracle Bot account as a default review author\") changed that: develop has only `benchbox-oracle[bot]`, and _graphql_login adds `[bot]` only when GitHub reports a Bot account, so a human account named benchbox-oracle is not trusted.\n- #2784 says a 300-file marker keeps its patch map; it keeps it only up to about 200 files (see oracle-marker-patch-map-file-limit-20261009).\nAlso, #2758's squash commit title on develop is \"feat/oracle review cutover\" (96c26ad3c), which reads as a branch name; a commit title cannot be changed, so the PR title is the only place to correct it.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/pull/2797",
+    "https://github.com/BenchBox-dev/BenchBox/pull/2784",
+    "https://github.com/BenchBox-dev/BenchBox/pull/2758"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T12:48:59Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "92f13c7677904ebeb82b122aaf2c0a60",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}

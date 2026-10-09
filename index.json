@@ -13968,6 +13968,13 @@
       "status": "open",
       "title": "The oracle's protocol marker keeps its per-file patch map only up to about 200 files, not 300 as #2784 claims"
     },
+    "oracle-merged-pr-descriptions-stale-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Two merged oracle PR descriptions state behaviour the merged code does not have"
+    },
     "oracle-muse-contributor-model-first-attempt-20261008": {
       "claim": null,
       "needs": [],
