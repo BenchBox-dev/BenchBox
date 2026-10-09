@@ -21122,7 +21122,7 @@
         "t3-drift-pricing-refresh-20261008"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "blocked",
       "title": "Dispatch nightly-v2 with run_drift=true and confirm all four drift checks pass"
     },
     "t3-drift-pricing-refresh-20261008": {
