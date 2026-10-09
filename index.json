@@ -13809,16 +13809,10 @@
     },
     "nightly-windows-unquarantine-20261008": {
       "claim": null,
-      "needs": [
-        "nightly-windows-utf8-reads-20261008",
-        "nightly-windows-path-quoting-20261008",
-        "nightly-windows-teardown-and-singles-20261008",
-        "nightly-mcp-capacity-lease-race-20261008",
-        "nightly-liveness-diagnose-harden-20261008"
-      ],
+      "needs": [],
       "priority": "medium-high",
-      "status": "blocked",
-      "title": "Remove the three quarantines from nightly.yml after a dispatched run on develop shows each leg passing"
+      "status": "open",
+      "title": "Remove the quarantines from the nightly.yml Windows integration-smoke and scheduled-workflow-liveness legs"
     },
     "nightly-windows-utf8-reads-20261008": {
       "claim": null,

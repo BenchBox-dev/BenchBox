@@ -1,13 +1,12 @@
 {
   "acceptance": [
-    "A dispatched nightly.yml run on develop shows no failed steps in each leg that is un-quarantined",
-    "continue-on-error and the quarantine suffix are removed from those legs, with workflow tests updated",
-    "Issues #2568, #2569 and #2570 are closed with run evidence, or each leg that stayed quarantined has its own tracker item"
+    "A dispatched nightly.yml run on develop shows no failed steps in the Windows integration-smoke leg and the scheduled-workflow-liveness leg",
+    "continue-on-error and the quarantine suffix are removed from those two legs, with workflow tests updated",
+    "Issues #2569 and #2570 are closed with run evidence, or each leg that stayed quarantined has its own tracker item"
   ],
-  "context": "Run 37967682464 proves only that scheduled-workflow-liveness and Windows integration-smoke steps passed; the Windows test legs remain quarantined, with 38 Windows 3.12 failures and a 3.11 timeout. Follow-up nightly-windows-verification-run-20261009 owns the next develop-headed evidence before any quarantine removal PR or issue closure.",
-  "description": "Three legs of .github/workflows/nightly.yml are non-blocking: the Windows 'test' legs (#2568), the Windows integration-smoke leg (#2569) and scheduled-workflow-liveness (#2570). After the fixes for all three have merged, dispatch nightly.yml on develop and judge each leg by step results, not job conclusion, because continue-on-error reports a failed job as success. For every leg whose steps all pass, remove continue-on-error and the quarantine suffix from its name, update any workflow tests that assert them, and close its issue with a comment linking the run and the fix. A leg that still fails keeps its quarantine and gets a tracker item with the failing step. Skip the Windows 'test' legs if the coverage decision retires them.",
+  "context": "Run 37967682464 proves only that scheduled-workflow-liveness and Windows integration-smoke steps passed; the Windows test legs remain quarantined, with 38 Windows 3.12 failures and a 3.11 timeout. Follow-up nightly-windows-verification-run-20261009 owns the next develop-headed evidence before any quarantine removal PR or issue closure.\n\n2026-10-09 tracker review: narrowed to the integration-smoke and liveness legs. The Windows test legs and issue #2568 moved to nightly-v2-windows-unit-leg-20261009. Needs cleared: nightly-mcp-capacity-lease-race-20261008 and nightly-liveness-diagnose-harden-20261008 are done, and the three Windows fix items (utf8-reads, path-quoting, teardown-and-singles) only affect the test legs. The liveness job also runs in nightly-v2 (PR #2835) until dlv2-70 removes nightly.yml.",
+  "description": "Two legs of .github/workflows/nightly.yml are still non-blocking and now pass: the Windows integration-smoke leg (#2569) and scheduled-workflow-liveness (#2570). In every completed nightly.yml run from 2026-10-03 to 2026-10-09, all steps of both legs passed (for example run 37967682464). Judge each leg by step results, not job conclusion, because continue-on-error reports a failed job as success.\n\nFor each leg, remove continue-on-error and the quarantine suffix from its name, update any workflow tests that assert them, and close its issue with a comment linking the run and the fix. If a leg fails in a fresh dispatched run, it keeps its quarantine and gets a tracker item with the failing step.\n\nOut of scope: the Windows 'test' legs (#2568). Leave their quarantine in nightly.yml until dlv2-70 retires nightly.yml. Their coverage and the closing of #2568 moved to nightly-v2-windows-unit-leg-20261009.",
   "links": [
-    "https://github.com/BenchBox-dev/BenchBox/issues/2568",
     "https://github.com/BenchBox-dev/BenchBox/issues/2569",
     "https://github.com/BenchBox-dev/BenchBox/issues/2570"
   ],
@@ -35,6 +34,14 @@
       "op": "update",
       "op_id": "533bd79d47cd4584b1bfca6e15551afa",
       "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:24:21Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "da4e0a9f20354b19915883903c402bd1",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
