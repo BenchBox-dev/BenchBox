@@ -3571,18 +3571,13 @@
       "title": "Remove comments and docstrings from benchmark and platform registries"
     },
     "comment-cleanup-cost": {
-      "claim": {
-        "expires_at": "2026-10-10T00:57:11Z",
-        "generation": "36937a8aba1d45ff81fd79f99a544136",
-        "renewals": 1,
-        "worker": "mcp:antigravity-worker-2"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget",
         "comment-cleanup-pricing-consumer"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from cost estimation"
     },
     "comment-cleanup-cross-module-integration-tests": {
