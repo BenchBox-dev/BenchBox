@@ -13565,11 +13565,13 @@
       "needs": [
         "nightly-windows-utf8-reads-20261008",
         "nightly-windows-path-quoting-20261008",
-        "nightly-windows-teardown-and-singles-20261008"
+        "nightly-windows-teardown-and-singles-20261008",
+        "nightly-mcp-capacity-lease-race-20261008",
+        "nightly-liveness-diagnose-harden-20261008"
       ],
       "priority": "medium-high",
       "status": "open",
-      "title": "Remove continue-on-error from the Windows test legs of nightly.yml once they pass"
+      "title": "Remove the three quarantines from nightly.yml after a dispatched run on develop shows each leg passing"
     },
     "nightly-windows-utf8-reads-20261008": {
       "claim": null,

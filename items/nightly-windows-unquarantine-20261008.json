@@ -1,12 +1,14 @@
 {
   "acceptance": [
-    "The Windows 3.11 and 3.12 'Run fast tests' steps pass on at least three consecutive scheduled nightlies before the change",
-    "continue-on-error and the quarantine suffix are removed from those legs",
-    "Issue #2568 is closed"
+    "A dispatched nightly.yml run on develop shows no failed steps in each leg that is un-quarantined",
+    "continue-on-error and the quarantine suffix are removed from those legs, with workflow tests updated",
+    "Issues #2568, #2569 and #2570 are closed with run evidence, or each leg that stayed quarantined has its own tracker item"
   ],
-  "description": "After the encoding, path and teardown fixes merge, remove continue-on-error and the '(quarantine #2568)' suffix from the Windows legs of the 'test' job in nightly.yml, so a Windows failure blocks again. Judge readiness by the 'Run fast tests' step on both Windows Python versions, not by job conclusion, because continue-on-error reports a failed job as success. Skip this item if the coverage decision retires the Windows leg instead.",
+  "description": "Three legs of .github/workflows/nightly.yml are non-blocking: the Windows 'test' legs (#2568), the Windows integration-smoke leg (#2569) and scheduled-workflow-liveness (#2570). After the fixes for all three have merged, dispatch nightly.yml on develop and judge each leg by step results, not job conclusion, because continue-on-error reports a failed job as success. For every leg whose steps all pass, remove continue-on-error and the quarantine suffix from its name, update any workflow tests that assert them, and close its issue with a comment linking the run and the fix. A leg that still fails keeps its quarantine and gets a tracker item with the failing step. Skip the Windows 'test' legs if the coverage decision retires them.",
   "links": [
-    "https://github.com/BenchBox-dev/BenchBox/issues/2568"
+    "https://github.com/BenchBox-dev/BenchBox/issues/2568",
+    "https://github.com/BenchBox-dev/BenchBox/issues/2569",
+    "https://github.com/BenchBox-dev/BenchBox/issues/2570"
   ],
   "sessions": [
     {
@@ -15,6 +17,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "3d39555c3f804cfea1ea06dcf9bd2a69",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-09T11:35:18Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "97c2d7f7d2f347eb859381d34e759da6",
       "session_id": "e40b1c8674df4499842f44749410458f"
     }
   ]
