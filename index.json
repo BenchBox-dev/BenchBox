@@ -15520,13 +15520,18 @@
       "title": "Analyze the Polars matrix: engine-separated 2.0 vs 1.x results with disclosed limits"
     },
     "pvm-s6-publish-polars-results": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T11:22:50Z",
+        "generation": "c1860ac431aa4ef3b9b6d4aced1d0a03",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c"
+      },
       "needs": [
         "pvm-s5-analyze-polars-matrix",
         "pvm-d1-publication-scope-decision"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Publish the Polars matrix results in the scope the user chose"
     },
     "pvm-s6b-polars-2-blog-draft": {
