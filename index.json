@@ -4150,17 +4150,12 @@
       "title": "Remove comments and docstrings from Star Schema Benchmark modules"
     },
     "comment-cleanup-test-support": {
-      "claim": {
-        "expires_at": "2026-10-10T00:38:07Z",
-        "generation": "eb9976c4e8ac43c09da3fddc131de8a5",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from shared test support"
     },
     "comment-cleanup-timeseries-adapters": {
