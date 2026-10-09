@@ -6,7 +6,7 @@
     "No live-vendor calls in tests; mock tokens only"
   ],
   "context": "Plan: /Users/joe/.jcode/scratch/espresso-greybeam-plan-v2.md items B1-B3, now layered on the core gateway capability (core-exec-gateway-capability; ADR docs/development/adr/adr-core-execution-variants.md D9/D10). Sources: benchbox/platforms/databricks/adapter.py (__init__ ~L269, add_cli_arguments ~L483, from_config ~L497 key loop). server_hostname override channel already exists; this item is label plumbing + OAuth guardrail + docs. Guardrails: worktree policy, never git add -A, no credentials in git, userinfo sanitization before logging.",
-  "description": "Add gateway label plumbing to DatabricksAdapter per plan v2 B1-B3: forward gateway through from_config key loop, add --gateway CLI arg and option-spec row, enforce PAT-only guardrail via OAuth env-var detection, document Espresso server_hostname usage.",
+  "description": "Add gateway support to DatabricksAdapter per plan v2 B1-B3, on top of the core gateway capability (core-exec-gateway-capability): forward the core gateway setting through the from_config key loop, enforce the PAT-only guardrail via OAuth env-var detection, and document Espresso server_hostname usage. The gateway choice and its allowed values come from the core setting and the manifest gateways declaration; no separate --gateway CLI arg or option-spec choice row in the adapter.",
   "sessions": [
     {
       "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
@@ -22,6 +22,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "ce01cfb3ff294a20898eff6497b8f2f1",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:48:16Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "e7f964eabc0248efb5841ce1e834228d",
       "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
     }
   ]
