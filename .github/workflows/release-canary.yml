@@ -303,12 +303,17 @@ jobs:
     timeout-minutes: 10
     outputs:
       drift_exit_code: ${{ steps.drift.outputs.drift_exit_code }}
+      drift_sha: ${{ steps.drift-ref.outputs.drift_sha }}
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: ${{ env.RELEASE_CANARY_REF }}
           fetch-depth: 0
+
+      - name: Record checked ref
+        id: drift-ref
+        run: echo "drift_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
@@ -389,6 +394,7 @@ jobs:
           CHECKED_SHA: ${{ needs.collect-credential-free-non-fast.outputs.checked_sha }}
           NON_FAST_RESULT: ${{ needs.credential-free-non-fast.result }}
           RULESET_DRIFT_RESULT: ${{ needs.ruleset-drift.result }}
+          RULESET_DRIFT_SHA: ${{ needs.ruleset-drift.outputs.drift_sha }}
           PYPI_LATEST_RESULT: ${{ needs.pypi-latest-installability.result }}
           NON_FAST_COUNT: ${{ needs.collect-credential-free-non-fast.outputs.collected_count }}
           SHARD_COUNT: ${{ env.RELEASE_CANARY_SHARD_COUNT }}
@@ -407,6 +413,7 @@ jobs:
             "collection_result": "${COLLECTION_RESULT}",
             "non_fast_result": "${NON_FAST_RESULT}",
             "ruleset_drift_result": "${RULESET_DRIFT_RESULT}",
+            "ruleset_drift_sha": "${RULESET_DRIFT_SHA}",
             "pypi_latest_installability_result": "${PYPI_LATEST_RESULT}",
             "non_fast_collected_count": "${NON_FAST_COUNT}",
             "non_fast_shard_count": "${SHARD_COUNT}"
