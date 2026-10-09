@@ -4422,10 +4422,15 @@
       "title": "Comment-policy exceptions keyed to a whole-file digest and read only from the base force a separate PR for any edit"
     },
     "comment-policy-fixture-exception-wording-cleanup": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T16:26:51Z",
+        "generation": "aef007df8a264091b45c493ddd428af4",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:3a93d76fab1934bd71f35b65"
+      },
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Update wording and consumer metadata for standardized test commands and release flow fixtures in comment-policy.json"
     },
     "comment-policy-hook-saturates-shared-host": {
