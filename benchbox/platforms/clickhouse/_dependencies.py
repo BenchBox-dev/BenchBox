@@ -28,9 +28,7 @@ def _import_with_cwd_restore(module_name: str) -> ModuleType:
 
 
 def import_chdb() -> ModuleType:
-    global chdb
-    chdb = _import_with_cwd_restore("chdb")
-    return chdb
+    return _import_with_cwd_restore("chdb")
 
 
 def import_chdb_session() -> ModuleType:
