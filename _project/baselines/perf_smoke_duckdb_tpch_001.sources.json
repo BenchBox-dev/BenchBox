@@ -1,0 +1,76 @@
+{
+  "method": "Hosted runners come from several CPU models whose totals differ by up to 25%. The baseline uses only the source results from the slowest CPU model that has enough of them, so a slower night cannot fail the gate for hardware alone. Each query entry (warmup and every measured iteration) is the median of the same entry across those results; summary timings are recomputed from the measured entries; all other fields come from the newest of them. The floor is derived from every source result, because a night on any CPU model is compared with this baseline.",
+  "baseline_cpu_model": "AMD EPYC 7763 64-Core Processor",
+  "regression_floor": {
+    "largest_spread_ms": 5.4,
+    "largest_spread_query": "18",
+    "floor_ms": 7,
+    "rule": "5 ms, or 1.25 x the largest spread rounded up when that spread exceeds 4 ms, capped at 15 ms"
+  },
+  "duckdb": "1.5.5",
+  "source_runs": [
+    {
+      "workflow_run_id": "36725610281",
+      "benchbox_timestamp": "2026-09-30T13:59:18.631817",
+      "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+      "total_ms": 465.0,
+      "in_baseline": false
+    },
+    {
+      "workflow_run_id": "36877777981",
+      "benchbox_timestamp": "2026-10-01T14:43:28.384968",
+      "cpu_model": "AMD EPYC 7763 64-Core Processor",
+      "total_ms": 539.8,
+      "in_baseline": true
+    },
+    {
+      "workflow_run_id": "37016617498",
+      "benchbox_timestamp": "2026-10-02T13:59:08.318178",
+      "cpu_model": "AMD EPYC 7763 64-Core Processor",
+      "total_ms": 542.9,
+      "in_baseline": true
+    },
+    {
+      "workflow_run_id": "37123557641",
+      "benchbox_timestamp": "2026-10-03T12:47:24.729167",
+      "cpu_model": "INTEL(R) XEON(R) PLATINUM 8573C",
+      "total_ms": 534.0,
+      "in_baseline": false
+    },
+    {
+      "workflow_run_id": "37205219594",
+      "benchbox_timestamp": "2026-10-04T13:26:56.328753",
+      "cpu_model": "AMD EPYC 7763 64-Core Processor",
+      "total_ms": 548.9,
+      "in_baseline": true
+    },
+    {
+      "workflow_run_id": "37339234759",
+      "benchbox_timestamp": "2026-10-05T16:23:34.302179",
+      "cpu_model": "AMD EPYC 7763 64-Core Processor",
+      "total_ms": 586.1,
+      "in_baseline": true
+    },
+    {
+      "workflow_run_id": "37477777717",
+      "benchbox_timestamp": "2026-10-06T14:19:08.783438",
+      "cpu_model": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+      "total_ms": 518.8,
+      "in_baseline": false
+    },
+    {
+      "workflow_run_id": "37638195854",
+      "benchbox_timestamp": "2026-10-07T14:37:40.929878",
+      "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+      "total_ms": 409.7,
+      "in_baseline": false
+    },
+    {
+      "workflow_run_id": "37794806634",
+      "benchbox_timestamp": "2026-10-08T15:08:46.543505",
+      "cpu_model": "AMD EPYC 7763 64-Core Processor",
+      "total_ms": 546.4,
+      "in_baseline": true
+    }
+  ]
+}
