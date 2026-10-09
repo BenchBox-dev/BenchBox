@@ -70,6 +70,16 @@ def _lazy_query_parser(module_name: str, class_name: str) -> Any:
     return getattr(importlib.import_module(module_name), class_name)()
 
 
+_PROJECT_SCOPED_INFORMATION_SCHEMA_VIEWS = frozenset({"SCHEMATA"})
+
+
+def _is_project_scoped_information_schema_view(name: str) -> bool:
+    upper = (name or "").upper()
+    if not upper.startswith("INFORMATION_SCHEMA."):
+        return False
+    return upper.rsplit(".", 1)[-1] in _PROJECT_SCOPED_INFORMATION_SCHEMA_VIEWS
+
+
 class BigQueryAdapter(PlatformAdapter):
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
@@ -1948,6 +1958,7 @@ class BigQueryAdapter(PlatformAdapter):
             table_names = list(self._FALLBACK_QUALIFY_TABLES)
         if self._batch_temp_tables:
             table_names = [name for name in table_names if name not in self._batch_temp_tables]
+        table_names = [name for name in table_names if not _is_project_scoped_information_schema_view(name)]
 
         literal_pattern = r"'(?:[^'\\]|\\.|'')*'|\"(?:[^\"\\]|\\.|\"\")*\"|--[^\n]*|/\*.*?\*/"
 
