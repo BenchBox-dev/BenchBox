@@ -1,5 +1,11 @@
 {
+  "context": "Core execution-variant guardrails (added 2026-10-09; ADR docs/development/adr/adr-core-execution-variants.md, plan item core-exec-execution-variants):\n- Do not register bare generic option keys (engine, mode, backend, runtime, executor, warehouse); the vocabulary parity test fails on them.\n- Deployment is declared through the manifest deployment_modes capability and selected with --platform ovhcloud-clickhouse:<mode>.\n- The OVHcloud cluster/service is a named compute resource: use the core compute_resource/compute_size per core-exec-compute-resource-unification, with vendor spellings as aliases. If that item has not landed, stop and ask whether to wait or add a native key that will become an alias.\n- Follow the execution-variant section of docs/development/new-platform-acceptance-checklist.md.",
   "description": "Add the OVHcloud Managed ClickHouse native platform adapter, modeled on ch-altinity-adapter (OVHCloudAdapter(ClickHouseAdapter), key `ovhcloud-clickhouse`, experimental). Covers the European sovereign-cloud angle; OVH publishes provisioning, scaling, and querying guides.\n\nDECISION GATE: proceeds only after ch-tier2-spike records a go for OVHcloud AND wave 1 (Altinity adapter) has landed.\n\nGuardrails: same as Altinity adapter (manifest authority, lazy imports, compat-docs-check, no credentials, 7-10 files).",
+  "links": [
+    "docs/development/new-platform-acceptance-checklist.md",
+    "item:core-exec-execution-variants",
+    "item:core-exec-compute-resource-unification"
+  ],
   "sessions": [
     {
       "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
@@ -16,6 +22,14 @@
       "op": "update",
       "op_id": "5fdd9787870844fd860a38525ece1165",
       "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:38:42Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "23b1cdcaa62b4b788f61339f3d46abcf",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
     }
   ]
 }
