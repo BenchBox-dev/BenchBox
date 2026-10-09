@@ -8,7 +8,7 @@
     "After the run, the environment polars version equals the lock version (command output recorded in context)",
     "git status in the main checkout shows no changes from this item"
   ],
-  "context": "2026-10-08 BLOCKED: needs pvm-s3b (spec), which needs pvm-s1 and pvm-s2, which need pvm-s0b merged. pvm-s0b's PR #2781 waits on the Codex connector review; owner: Codex connector / repository owner.",
+  "context": "Run complete 2026-10-09: output ~/Developer/benchmark_runs/polars-version-matrix-20261009, manifest complete=true, 120 records (3 rounds x 40, seed 20261009), commit ecd08a9f0 for every run, wall about 1 h. Dry-run file (120 invocations, 129 lines with header) copied into the output dir as dry-run.txt. Datagen stamps in manifest pins: tpch generator_binary_sha256 281563c8..., tpcds 14c6f116...; datagen manifest hashes for all four benchmarks recorded. Pins checked after every cell; no void or pin-change entries in matrix.log; no round voided. Outcomes: 96 completed, 21 resource-policy-exceeded (tpcds: 1.31.0 A, 1.35.2 A, 1.40.1 A, 1.44.2 A, 1.40.1 C, 2.0.0 B, each x3; tpch: 1.31.0 A x1, 1.40.1 A x2), 3 execution-failure (1.31.0 setup C tpcds, exit 138/139 at 17-23 s in all three rounds: a repeatable crash, not an infrastructure fault). Min free disk across records 172.0 GiB (threshold 80). End-of-run top header saved to _s4-prep/top-end.txt (start in top-start.txt; the end header shows load 15-22 from the run itself). Probe worktree after run: uv sync done, polars==1.44.2 and polars-runtime-32==1.44.2, clean at ecd08a9f0. Main checkout git status clean. For pvm-s5: the 1.31.0 C tpcds crash is not in the qualification eligibility (it was marked clean).",
   "description": "Execute the full matrix defined by pvm-s3b, within the budget outcome recorded in pvm-s2 (handoff D2).\n\nProcedure:\n1. Use a new, empty output directory outside the checkout: ~/Developer/benchmark_runs/polars-version-matrix-<YYYYMMDD>.\n2. Run from the BenchBox commit pinned in the spec, in the separate worktree and environment.\n3. Prepare the machine: on mains power, under `caffeinate -dims`, with no other heavy processes (record the `top -l 1` header at start and end).\n4. Run the dry run and confirm the command count matches the spec's formula before starting.\n5. Run the matrix.\n6. Afterwards, restore the environment with `uv sync` and confirm the installed polars matches the lock.\n\nGuardrails:\n- No ad-hoc reruns of individual cells. If infrastructure fails (crash, sleep, power loss, disk full), the whole round is void: record the cause and rerun the complete round in a fresh shuffled order, with a new seed recorded. Query errors are recorded failures, not voids.\n- A cell classed resource-policy-exceeded, timeout or oom-killed under the pvm-s2 rules is recorded as such, not retried.\n- POLARS_TEMP_DIR spill directory is cleaned per cell; free disk is checked before each cell (stop the round as an infrastructure fault if under 80 GiB).\n- Nothing from this item is committed to the repository.",
   "sessions": [
     {
@@ -66,6 +66,14 @@
       "generation": "4c6cd00126404c34bab4ef4d9b379064",
       "op": "take",
       "op_id": "5a296439edc743c7b81d5439729ccfb8",
+      "session_id": "1f74fac6df92445cbacc470514ed2645"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c",
+      "at": "2026-10-09T11:20:13Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "3051946de1dd4a64a436bb24219c44a5",
       "session_id": "1f74fac6df92445cbacc470514ed2645"
     }
   ]
