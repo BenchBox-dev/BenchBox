@@ -2092,7 +2092,7 @@
       ],
       "priority": "high",
       "status": "open",
-      "title": "Run the impacted canary tests in the merge queue as a non-blocking shadow job"
+      "title": "Run the impacted canary tests after each merge as a non-blocking shadow job in trunk.yml"
     },
     "canary-impact-05-shadow-watch": {
       "claim": null,
