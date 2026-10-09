@@ -3870,17 +3870,12 @@
       "title": "Remove comments from worktree, PR and agent lifecycle tooling"
     },
     "comment-cleanup-local-native-adapters": {
-      "claim": {
-        "expires_at": "2026-10-10T00:22:21Z",
-        "generation": "60e12d0e32ad470995b784b7c4b0e064",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from DataFusion, Polars and SQLite adapters"
     },
     "comment-cleanup-managed-warehouses": {
