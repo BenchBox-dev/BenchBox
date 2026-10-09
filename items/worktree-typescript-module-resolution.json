@@ -2,7 +2,7 @@
   "acceptance": [
     "node tests/unit/scripts/test_comment_syntax_js.cjs runs successfully in any linked worktree without requiring manual COMMENT_POLICY_TYPESCRIPT environment configuration when node_modules is installed in the primary clone."
   ],
-  "context": "Implemented in worktree branch feat/comment-scanner-enhancements (/Users/joe/Developer/BenchBox.wt-scanner-enhancements): 3-step TS resolution in scripts/comment_syntax_js.cjs (env, local node_modules, git-common-dir fallback), resolve_typescript_dir helper in scripts/comment_syntax.py, skip-check uses helper, 3 new unit tests. node --test 19/19 green in fresh worktree without env vars.",
+  "context": "Implemented in worktree branch feat/comment-scanner-enhancements (/Users/joe/Developer/BenchBox.wt-scanner-enhancements): 3-step TS resolution in scripts/comment_syntax_js.cjs (env, local node_modules, git-common-dir fallback), resolve_typescript_dir helper in scripts/comment_syntax.py, skip-check uses helper, 3 new unit tests. node --test 19/19 green in fresh worktree without env vars.\n\nTakeover progress: fixed the four current-head Oracle findings on the same PR and committed/pushed as 6cb8c1203fe71ccf2ec227d21968c5dace9f8beb. `make pr-preflight` passed 706 tests; `make comment-policy-check` scanned 5,749 source files with 0 violations and passed 19 native tests. Replied to and resolved all four old review threads. PR #2821 is open; current-head oracle-review and full CI are not yet complete. Do not arm or merge until the current-head review and required CI pass. The linked-worktree TypeScript resolution acceptance is exercised by the fresh-worktree Node test.",
   "description": "Running node tests/unit/scripts/test_comment_syntax_js.cjs in a linked worktree fails with MODULE_NOT_FOUND for typescript unless COMMENT_POLICY_TYPESCRIPT is explicitly exported to point at the primary clone's results-explorer/node_modules. Update scripts/comment_syntax_js.cjs to fall back to the primary git repository root's results-explorer/node_modules when run in a linked worktree, or provide a worktree-init helper that symlinks or resolves node_modules.",
   "sessions": [
     {
@@ -46,6 +46,14 @@
       "generation": "542b804d9c0042799f617e65f6b391b0",
       "op": "take",
       "op_id": "3d59119078274f6abb77ad4d3a770b60",
+      "session_id": "760b0930a01047bb8025dda090b79735"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:bd5956809339499407531943",
+      "at": "2026-10-09T22:18:43Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "1a027def03374f649096d3f159fe56e0",
       "session_id": "760b0930a01047bb8025dda090b79735"
     }
   ]
