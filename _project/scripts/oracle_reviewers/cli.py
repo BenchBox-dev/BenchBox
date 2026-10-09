@@ -396,8 +396,7 @@ def command_review(args: argparse.Namespace) -> int:
         prompt=prompt,
         scratch=Path(args.scratch),
         now=_now(),
-        brief_mode=plan["brief_mode"],
-        required=tuple(plan.get("evidence_files", ())),
+        plan=plan,
     )
     artifact = attempt_files.build_artifact(
         run_id=os.environ["GITHUB_RUN_ID"],

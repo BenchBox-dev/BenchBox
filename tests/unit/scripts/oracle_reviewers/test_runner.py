@@ -67,7 +67,9 @@ def _review(
     reviewer: str = "muse",
     brief_mode: str = "inline",
     required: tuple[str, ...] = (),
+    rules: dict | None = None,
 ):
+    plan = {"brief_mode": brief_mode, "evidence_files": list(required), "max_defects": 10, "protocol": rules or {}}
     return runner.review(
         policy.reviewers[reviewer],
         workspace=workspace,
@@ -75,8 +77,7 @@ def _review(
         prompt=prompt,
         scratch=tmp_path / "s",
         now=NOW,
-        brief_mode=brief_mode,
-        required=required,
+        plan=plan,
     )
 
 
@@ -254,6 +255,7 @@ def _plan_dir(policy: Policy, tmp_path: Path, head: str, scope: str, brief: str,
         "pr": 7,
         "head_sha": head,
         "brief_mode": "inline",
+        "max_defects": 10,
         "scope": scope,
         "chain": [policy.reviewers["muse"].to_json()],
     }
@@ -412,9 +414,7 @@ def test_a_file_list_ship_must_examine_every_required_file(
     ).stdout.strip()
     _muse_says(tmp_path, monkeypatch, files_examined=["a.txt"])
     short = _review(policy, tmp_path, workspace, head, brief_mode="file-list", required=("a.txt", "b.txt"))
-    assert short.missing == absence.Absence(
-        absence.INCOMPLETE, "the reviewer found no defects but did not examine b.txt"
-    )
+    assert short.missing == absence.Absence(absence.INCOMPLETE, "the verdict would ship but did not examine b.txt")
     inline = _review(policy, tmp_path, workspace, head, brief_mode="inline", required=("a.txt", "b.txt"))
     assert inline.missing is None
 
@@ -467,7 +467,7 @@ def test_a_codex_ship_without_any_read_command_is_a_hollow_review(
     outcome = _review(policy, tmp_path, workspace, head, reviewer="sol", brief_mode="file-list", required=("a.txt",))
     assert outcome.verdict is None
     assert outcome.missing is not None and outcome.missing.kind == absence.INCOMPLETE
-    assert outcome.missing.detail == "the reviewer found no defects but its trace shows no successful file read"
+    assert outcome.missing.detail == "the verdict would ship but its trace shows no successful file read"
 
 
 @pytest.mark.parametrize(
@@ -582,3 +582,130 @@ def test_a_reviewer_that_rewrites_the_staged_diff_is_invalid(
         assert outcome.missing == absence.Absence(absence.INVALID, "the reviewer changed the staged pull request diff")
     else:
         assert outcome.missing is None
+
+
+FOLLOW_UP = {"kind": "follow-up", "changed": ["a.txt"], "prior": []}
+OUTSIDE = {**DEFECT, "file": "b.txt", "severity": "Low", "title": "Unchanged"}
+INSIDE = {**DEFECT, "title": "Changed"}
+
+
+def _two_files(tmp_path: Path) -> tuple[Path, str]:
+    workspace, _ = _workspace(tmp_path)
+    (workspace / "b.txt").write_text("b\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(workspace), "add", "b.txt"], check=True)
+    subprocess.run(
+        ["git", "-C", str(workspace), "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qm", "b"],
+        check=True,
+    )
+    head = subprocess.run(
+        ["git", "-C", str(workspace), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+    ).stdout.strip()
+    return workspace, head
+
+
+def _judged(outcome: runner.ReviewOutcome, rules: dict):
+    from _project.scripts.oracle_reviewers import protocol
+    from _project.scripts.oracle_reviewers.verdict import validate
+
+    assert outcome.missing is None and outcome.verdict is not None
+    return protocol.judge_planned(validate(outcome.verdict, trusted=True), {"max_defects": 10, "protocol": rules})
+
+
+@pytest.mark.parametrize("reviewer", ["sol", "sonnet"])
+def test_a_follow_up_ship_with_only_an_unchanged_file_defect_still_needs_reads(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reviewer: str
+) -> None:
+    workspace, head = _two_files(tmp_path)
+    if reviewer == "sol":
+        _codex_says(tmp_path, monkeypatch, [{"type": "turn.completed"}], defects=[OUTSIDE])
+    else:
+        _claude_says(tmp_path, monkeypatch, [], defects=[OUTSIDE])
+    outcome = _review(
+        policy,
+        tmp_path,
+        workspace,
+        head,
+        reviewer=reviewer,
+        brief_mode="file-list",
+        required=("a.txt",),
+        rules=FOLLOW_UP,
+    )
+    assert outcome.verdict is None
+    assert outcome.missing == absence.Absence(
+        absence.INCOMPLETE, "the verdict would ship but its trace shows no successful file read"
+    )
+
+
+@pytest.mark.parametrize("reviewer", ["sol", "sonnet"])
+def test_a_follow_up_that_read_the_changed_files_ships_with_the_unchanged_defect_not_counted(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reviewer: str
+) -> None:
+    workspace, head = _two_files(tmp_path)
+    if reviewer == "sol":
+        _codex_says(tmp_path, monkeypatch, [_command("/bin/zsh -lc 'cat -n a.txt'", "1 a")], defects=[OUTSIDE])
+    else:
+        _claude_says(tmp_path, monkeypatch, [("a.txt", False)], defects=[OUTSIDE])
+    outcome = _review(
+        policy,
+        tmp_path,
+        workspace,
+        head,
+        reviewer=reviewer,
+        brief_mode="file-list",
+        required=("a.txt",),
+        rules=FOLLOW_UP,
+    )
+    judged = _judged(outcome, FOLLOW_UP)
+    assert judged.decision == "SHIP"
+    assert [item.title for item in judged.not_counted] == ["Unchanged"]
+
+
+def test_a_follow_up_defect_in_a_changed_file_needs_no_reads(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace, head = _two_files(tmp_path)
+    _codex_says(tmp_path, monkeypatch, [{"type": "turn.completed"}], decision="SHIP", defects=[INSIDE, OUTSIDE])
+    outcome = _review(
+        policy, tmp_path, workspace, head, reviewer="sol", brief_mode="file-list", required=("a.txt",), rules=FOLLOW_UP
+    )
+    judged = _judged(outcome, FOLLOW_UP)
+    assert judged.decision == "SHIP_WITH_FIXES"
+    assert [item.title for item in judged.defects] == ["Changed"]
+
+
+def test_a_follow_up_leaving_a_prior_defect_open_needs_no_reads(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace, head = _two_files(tmp_path)
+    prior = {"id": "D1", "severity": "High", "file": "a.txt", "line": 1, "end_line": None, "title": "Old"}
+    rules = {**FOLLOW_UP, "prior": [prior]}
+    _codex_says(tmp_path, monkeypatch, [{"type": "turn.completed"}], defects=[OUTSIDE])
+    outcome = _review(
+        policy, tmp_path, workspace, head, reviewer="sol", brief_mode="file-list", required=("a.txt",), rules=rules
+    )
+    assert _judged(outcome, rules).decision == "SHIP_WITH_FIXES"
+
+
+@pytest.mark.parametrize("defect", [INSIDE, OUTSIDE], ids=["changed-file", "other-file"])
+def test_a_first_round_file_list_defect_needs_no_reads(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, defect: dict
+) -> None:
+    workspace, head = _two_files(tmp_path)
+    _codex_says(tmp_path, monkeypatch, [{"type": "turn.completed"}], decision="SHIP", defects=[defect])
+    outcome = _review(policy, tmp_path, workspace, head, reviewer="sol", brief_mode="file-list", required=("a.txt",))
+    assert _judged(outcome, {}).decision == "SHIP_WITH_FIXES"
+
+
+@pytest.mark.parametrize(("examined", "accepted"), [([], False), (["a.txt"], True)], ids=["unlisted", "listed"])
+def test_an_untraced_follow_up_ship_with_an_unchanged_file_defect_must_list_the_changed_files(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, examined: list[str], accepted: bool
+) -> None:
+    workspace, head = _two_files(tmp_path)
+    _muse_says(tmp_path, monkeypatch, files_examined=examined, defects=[OUTSIDE])
+    outcome = _review(policy, tmp_path, workspace, head, brief_mode="file-list", required=("a.txt",), rules=FOLLOW_UP)
+    if accepted:
+        assert _judged(outcome, FOLLOW_UP).decision == "SHIP"
+    else:
+        assert outcome.missing == absence.Absence(
+            absence.INCOMPLETE, "the verdict would ship but did not examine a.txt"
+        )

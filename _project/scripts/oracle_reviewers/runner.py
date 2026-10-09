@@ -5,15 +5,16 @@ import os
 import shutil
 import signal
 import subprocess
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from . import absence, evidence
+from . import absence, evidence, protocol
 from .commands import Invocation, build
 from .policy import Reviewer
-from .verdict import INCOMPLETE, VerdictError, parse_output, validate
+from .verdict import INCOMPLETE, SHIP, VerdictError, parse_output, validate
 
 
 @dataclass(frozen=True)
@@ -100,8 +101,7 @@ def review(
     prompt: str,
     scratch: Path,
     now: datetime,
-    brief_mode: str = evidence.INLINE,
-    required: tuple[str, ...] = (),
+    plan: Mapping[str, Any],
 ) -> ReviewOutcome:
     if _git(workspace, "rev-parse", "HEAD") != head_sha:
         return ReviewOutcome(None, absence.Absence(absence.ERROR, "the workspace is not at the reviewed head"), "")
@@ -143,10 +143,11 @@ def review(
     verdict = evidence.mark_citations(verdict, workspace)
     problem = evidence.check(
         verdict,
+        ships=protocol.judge_planned(verdict, plan).decision == SHIP,
         harness=reviewer.harness,
-        brief_mode=brief_mode,
+        brief_mode=plan["brief_mode"],
         workspace=workspace,
-        required=required,
+        required=tuple(plan.get("evidence_files", ())),
         run=evidence.trace(reviewer.harness, result.stdout),
     )
     if problem is not None:
