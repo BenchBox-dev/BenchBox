@@ -7704,9 +7704,10 @@
         "dlv2-80-github-cleanup",
         "dlv2-81-config-cleanup",
         "dlv2-82-makefile-rewrite",
-        "dlv2-83-docs-cleanup"
+        "dlv2-83-docs-cleanup",
+        "site-split-99-closeout"
       ],
-      "priority": "high",
+      "priority": "medium",
       "status": "open",
       "title": "Final audit: zero references to retired items, complete ledger, and 30-day success metrics"
     },
