@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "The completed drift log identifies the corpus mismatch and its cause",
+    "The corpus is reconciled or the remaining owner action is recorded on issue #2471",
+    "A later live drift verification passes or records the accepted exception"
+  ],
+  "context": "Created from nightly-red handoff verification of run 37991400931; no second dispatch is authorized until the failure is understood.",
+  "description": "Nightly-v2 run 37991400931 on develop reported a failure in the corpus drift check while the drift gate also ran pricing, validator and baseline checks. Inspect the completed run log after the workflow closes, identify the expected and observed corpus revisions, and reconcile the published corpus before the drift issue is closed.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/issues/2471"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:8d0fa0e2ef22aacc5284a44c",
+      "at": "2026-10-09T21:27:52Z",
+      "client": "omp-coding-agent",
+      "op": "create",
+      "op_id": "ab2523e4343f4399b8038cfcf5d701fa",
+      "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
+    }
+  ]
+}
