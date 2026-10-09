@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import shlex
 import sys
 from pathlib import Path
 
@@ -18,6 +19,10 @@ WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "validate-submission.yml"
 def _corpus_step() -> dict:
     workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
     return next(step for step in workflow["jobs"]["validate"]["steps"] if step.get("id") == "corpus-paths")
+
+
+def _validator_command() -> str:
+    return shlex.join([Path(sys.executable).as_posix(), (REPO_ROOT / "scripts" / "validate_submission.py").as_posix()])
 
 
 def _collapse(text: str) -> str:
@@ -39,8 +44,7 @@ def test_corpus_allowlist_step_fails_closed_on_disallowed_path(tmp_path: Path) -
     skip_without_posix_shell()
 
     script = _corpus_step()["run"]
-    validator = f"{sys.executable} {REPO_ROOT / 'scripts' / 'validate_submission.py'}"
-    script = script.replace("uv run -- python scripts/validate_submission.py", validator)
+    script = script.replace("uv run -- python scripts/validate_submission.py", _validator_command())
 
     run = run_posix_shell(
         f"set -e\n"
@@ -56,7 +60,7 @@ def test_corpus_allowlist_step_fails_closed_on_disallowed_path(tmp_path: Path) -
         cwd=tmp_path,
         env={
             "PATH": "/usr/bin:/bin:/usr/local/bin",
-            "CORPUS_CHANGED_PATHS_FILE": str(tmp_path / "changed.txt"),
+            "CORPUS_CHANGED_PATHS_FILE": (tmp_path / "changed.txt").as_posix(),
         },
     )
 
@@ -68,8 +72,7 @@ def test_corpus_allowlist_step_passes_for_only_supported_data(tmp_path: Path) ->
     skip_without_posix_shell()
 
     script = _corpus_step()["run"]
-    validator = f"{sys.executable} {REPO_ROOT / 'scripts' / 'validate_submission.py'}"
-    script = script.replace("uv run -- python scripts/validate_submission.py", validator)
+    script = script.replace("uv run -- python scripts/validate_submission.py", _validator_command())
 
     run = run_posix_shell(
         f"set -e\n"
@@ -85,7 +88,7 @@ def test_corpus_allowlist_step_passes_for_only_supported_data(tmp_path: Path) ->
         cwd=tmp_path,
         env={
             "PATH": "/usr/bin:/bin:/usr/local/bin",
-            "CORPUS_CHANGED_PATHS_FILE": str(tmp_path / "changed.txt"),
+            "CORPUS_CHANGED_PATHS_FILE": (tmp_path / "changed.txt").as_posix(),
         },
     )
 

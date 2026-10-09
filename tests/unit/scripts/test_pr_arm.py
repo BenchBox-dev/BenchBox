@@ -15,6 +15,11 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 ROOT = Path(__file__).resolve().parents[3]
 HEAD = "a" * 40
 
+skip_on_windows = pytest.mark.skipif(
+    os.name == "nt",
+    reason="the make recipes run through a POSIX shell and the shim is a shell script; Linux and macOS cover them",
+)
+
 
 def _load():
     spec = importlib.util.spec_from_file_location("pr_arm", ROOT / "scripts/pr_arm.py")
@@ -278,6 +283,7 @@ def _make_pr_arm(tmp_path: Path, *assignments: str) -> tuple[list[str], dict[str
     ],
 )
 @pytest.mark.parametrize("name", ["PR", "HEAD", "REPO"])
+@skip_on_windows
 def test_the_make_wrapper_hands_a_value_over_as_one_untouched_environment_value(
     tmp_path: Path, name: str, value: str
 ) -> None:
@@ -288,6 +294,7 @@ def test_the_make_wrapper_hands_a_value_over_as_one_untouched_environment_value(
 
 
 @pytest.mark.parametrize("name", ["PR", "HEAD", "REPO"])
+@skip_on_windows
 def test_the_make_wrapper_does_not_run_shell_metacharacters_in_a_value(tmp_path: Path, name: str) -> None:
     marker = tmp_path / "ran"
     for value in (f"7; touch {marker}", f"7`touch {marker}`", f"7 && touch {marker}", f"7 | touch {marker}"):
@@ -317,6 +324,7 @@ def _make_other_target(tmp_path: Path, target: str, *assignments: str) -> subpro
     ("target", "variable"),
     [("pr-landing-withdraw", "PR"), ("pr-landing-ready", "PR"), ("pr-ready", "HEAD"), ("pr-ready", "PR")],
 )
+@skip_on_windows
 def test_making_pr_arm_literal_does_not_change_how_other_targets_see_a_value(
     tmp_path: Path, target: str, variable: str
 ) -> None:
@@ -327,6 +335,7 @@ def test_making_pr_arm_literal_does_not_change_how_other_targets_see_a_value(
 
 
 @pytest.mark.parametrize("name", ["PR", "HEAD", "REPO"])
+@skip_on_windows
 def test_the_make_wrapper_tells_an_omitted_variable_from_an_empty_one(tmp_path: Path, name: str) -> None:
     _, omitted = _make_pr_arm(tmp_path)
     assert omitted.get(f"PR_ARM_{name}_SET", "") == ""

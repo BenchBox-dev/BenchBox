@@ -9,6 +9,8 @@ from typing import Any
 import pytest
 import yaml
 
+from tests.utilities.posix_shell import run_posix_shell, skip_without_posix_shell
+
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -22,8 +24,11 @@ GATE_STEP = "Require comparison for affected develop trees"
 RUNBOOK = REPO_ROOT / "docs" / "internal" / "public-site-visual-baseline.md"
 
 
-def _run_sh(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(*args, **kwargs)
+def _run_sh(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+    assert command[:2] == ["bash", "-c"] and len(command) == 3
+    skip_without_posix_shell()
+    kwargs.pop("check", None)
+    return run_posix_shell(command[2], check=False, **kwargs)
 
 
 def _workflow() -> dict[str, Any]:
@@ -384,8 +389,8 @@ def test_astro_capture_target_captures_dist_for_the_requested_source() -> None:
     recipe = _capture_recipe("SITE_VISUAL_SOURCE_SHA=" + "a" * 40, "SITE_VISUAL_DIR=out")
     assert "PUBLIC_SITE_VISUAL_RENDERER=astro" in recipe
     assert "PUBLIC_SITE_VISUAL_PHASE=capture" in recipe
-    assert f'E2E_SITE_DIR="{REPO_ROOT}/website/dist"' in recipe
-    assert f'PUBLIC_SITE_VISUAL_OUTPUT="{REPO_ROOT}/out"' in recipe
+    assert f'E2E_SITE_DIR="{REPO_ROOT.as_posix()}/website/dist"' in recipe
+    assert f'PUBLIC_SITE_VISUAL_OUTPUT="{REPO_ROOT.as_posix()}/out"' in recipe
     assert 'PUBLIC_SITE_VISUAL_SOURCE_SHA="' + "a" * 40 + '"' in recipe
     assert "PUBLIC_SITE_VISUAL_BASELINE" not in recipe
     assert "PUBLIC_SITE_VISUAL_REQUIRE_BASELINE" not in recipe
