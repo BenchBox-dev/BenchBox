@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
-DEFAULT_REVIEW_AUTHORS = ("chatgpt-codex-connector[bot]", "chatgpt-codex-connector")
+DEFAULT_REVIEW_AUTHORS = ("benchbox-oracle[bot]",)
 ACTION_MARKER = "benchbox-pr-review-followup-actioned"
 ACTION_MARKER_REGEX = re.compile(rf"(?m)^<!--\s*{re.escape(ACTION_MARKER)}\b")
 CODEX_USAGE_LIMIT_REVIEW_TEXT = "You have reached your Codex usage limits for code reviews"
@@ -375,7 +375,7 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
               originalCommit { oid }
               commit { oid }
               replyTo { databaseId }
-              author { login }
+              author { __typename login }
             }
           }
         }
@@ -403,13 +403,20 @@ query($thread: ID!, $cursor: String!) {
           originalCommit { oid }
           commit { oid }
           replyTo { databaseId }
-          author { login }
+          author { __typename login }
         }
       }
     }
   }
 }
 """.strip()
+
+
+def _graphql_login(author: dict[str, Any]) -> str:
+    login = str(author.get("login") or "")
+    if author.get("__typename") == "Bot" and login and not login.endswith("[bot]"):
+        return f"{login}[bot]"
+    return login
 
 
 def _graphql_comment_to_api_shape(node: dict[str, Any], *, thread: dict[str, Any]) -> dict[str, Any]:
@@ -422,7 +429,7 @@ def _graphql_comment_to_api_shape(node: dict[str, Any], *, thread: dict[str, Any
         "body": node.get("body") or "",
         "path": node.get("path") or "",
         "html_url": node.get("url") or "",
-        "user": {"login": author.get("login") or ""},
+        "user": {"login": _graphql_login(author)},
         "created_at": node.get("createdAt") or "",
         "diff_hunk": node.get("diffHunk") or "",
         "in_reply_to_id": reply_to.get("databaseId"),

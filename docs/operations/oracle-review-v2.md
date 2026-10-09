@@ -257,12 +257,9 @@ review the pull request actually received.
 ## Cut-over
 
 The cut-over is done: `.github/oracle-reviewers.yml` sets `mode: enforce` and
-`.github/workflows/oracle-review.yml` passes `--signal oracle`. The required
-`oracle-review` check takes `--signal connector` (the script's default) or
-`--signal oracle`. With `connector` it requires the Codex connector's review
-of the head, or its thumbs-up, and counts the connector's open threads. With
-`oracle`, the signal in use, it requires, from the `benchbox-oracle` App's Bot
-account:
+`.github/workflows/oracle-review.yml` passes `--signal oracle`, the only
+signal the checker accepts. The required `oracle-review` check requires, from
+the `benchbox-oracle` App's Bot account:
 
 - a review of the head, not pending or dismissed, submitted after any retarget,
   whose latest one opens with `### oracle-review-shadow: success for` the head
@@ -276,18 +273,19 @@ oracle signal needs `findings_delivery: review`, under which every run that
 reaches a result, including a pending one, posts a review, so the latest
 review is the latest result.
 
-The stand-in attestation passes under either signal. Under `oracle` it must be
-posted after the oracle's latest review of the head, so overriding a failing
-verdict is a deliberate act; it never overrides an open thread.
+The stand-in attestation must be posted after the oracle's latest review of
+the head, so overriding a failing verdict is a deliberate act; it never
+overrides an open thread.
 
-Every run also evaluates the signal it does not require and logs the result on
-two `parity:` lines. That evaluation fetches its own inputs, and an error in it
-is logged and never changes the check's result. Since the cut-over, the
-connector lines are informational only.
+The Codex connector is no longer a signal. The daily soundness merge digest
+still accepts a connector review or thumbs-up for merges before the cut-over
+(2026-10-09 00:16 UTC), so its history stays accurate. A pull request opened
+before the cut-over keeps check runs that required the connector; re-running
+them does not help, because a re-run reuses the original base, so such a pull
+request needs a new push, a fresh `pull_request` event, or a stand-in.
 
 The checker runs from the base commit, so the workflow can pass `--signal`
-only after `develop`'s copy of the script accepts it. The cut-over set
-`mode: enforce` in `.github/oracle-reviewers.yml` and added `--signal oracle`
-to `.github/workflows/oracle-review.yml` in the same change; a unit test fails
-if they disagree or if delivery is not `review`. To revert, set `mode: shadow`
-and remove `--signal oracle` in the same change.
+only after `develop`'s copy of the script accepts it. A unit test fails if
+`mode: enforce` and `--signal oracle` disagree or if delivery is not `review`.
+Going back to the connector would need this cleanup reverted and the connector
+App reinstalled.
