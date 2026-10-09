@@ -4195,17 +4195,12 @@
       "title": "Remove comments and docstrings from TPC-DS DataFrame queries"
     },
     "comment-cleanup-tpcds-generation": {
-      "claim": {
-        "expires_at": "2026-10-10T00:41:16Z",
-        "generation": "cd4dd0cb595c46189e209f1d70c836f9",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from TPC-DS data generation and schema"
     },
     "comment-cleanup-tpcds-obt": {
