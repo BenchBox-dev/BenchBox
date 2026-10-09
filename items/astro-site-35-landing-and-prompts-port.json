@@ -5,7 +5,7 @@
     "No cdnjs or other third-party script requests on / (network assertion in e2e)",
     "landing/prompts/a11y-checklist.md items pass"
   ],
-  "context": "IN PR https://github.com/BenchBox-dev/BenchBox/pull/2606 (35062d97, c558dd40, 7b585697, 5b21daa7, cd6c875a), 2026-10-04. Reviews: round 1 FAIL (quickstart tests on static composer) fixed; round 2 PASS; Mediums (Prism colour parity vs real Prism 1.29, light-mode code contrast >=4.5:1, prompt-content invariants mutation-checked) fixed in cd6c875a. CI: make site-test-built runs verify:landing with 176-state old-vs-new parity. site-split-01 (2026-10-07): code merged; inventory-diff and composer-behaviour evidence not recorded here with run ids. Remaining verification owned by site-split-25 and site-split-30. Do not finish here.",
+  "context": "IN PR https://github.com/BenchBox-dev/BenchBox/pull/2606 (35062d97, c558dd40, 7b585697, 5b21daa7, cd6c875a), 2026-10-04. Reviews: round 1 FAIL (quickstart tests on static composer) fixed; round 2 PASS; Mediums (Prism colour parity vs real Prism 1.29, light-mode code contrast >=4.5:1, prompt-content invariants mutation-checked) fixed in cd6c875a. CI: make site-test-built runs verify:landing with 176-state old-vs-new parity. site-split-01 (2026-10-07): code merged; inventory-diff and composer-behaviour evidence not recorded here with run ids. Remaining verification owned by site-split-25 and site-split-30. Do not finish here.\n\n2026-10-09 tracker review: this item's code shipped in #2606 and production deploys are green (site-deploy runs 37532428364, 37406123669). site-split-99-closeout should fold this astro-site chain into the site-split items. Not closed here, because this item's own text defers closing to the site-split items.",
   "description": "Port landing/index.html, style.css and script.js to an Astro page using the shared shell and tokens. Keep the section structure and copy unless the owner approves changes. Replace Prism (cdnjs) with build-time Shiki, so there are no CDN scripts (G-g).\n\nPort landing/prompts/ (index.html, prompts.js, prompts.css, catalog.generated.js from catalog.yaml) as a page with a Preact island for the interactive composer, at its current URL. Keep the generated quickstarts from generate_landing_quickstarts.py.\n\nDo not add the analytics placeholder in landing/script.js:188.",
   "links": [
     "landing/index.html",
@@ -37,6 +37,14 @@
       "op": "update",
       "op_id": "ec74de0210214ffcbf4fc48b874f38e6",
       "session_id": "17181812c7324e43a406f44f60eedacc"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:37:03Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "888c240edc664d3c8a5ae9954953c6e5",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
