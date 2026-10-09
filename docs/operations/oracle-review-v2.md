@@ -189,10 +189,14 @@ checkout before it records it; a failed check records the reviewer as absent
   not found, so it still fails the change; discarding the verdict would hand the
   change to the next reviewer, which might pass it.
 - When the brief lists files instead of carrying the diff (`file-list` mode),
-  a verdict that would ship (no defect and not DO NOT SHIP) must name, in
-  `files_examined`, every soundness-path
-  file the pull request changes that still exists at the head, and the
-  reviewer's trace must show it read each one. Claude runs with
+  a verdict that would be judged SHIP must name, in `files_examined`, every
+  soundness-path file under review that still exists at the head (in a
+  follow-up, the files changed since the last review), and the reviewer's
+  trace must show it read each one. That includes a follow-up whose
+  only defects are in unchanged files: those defects are not counted, so the
+  follow-up would ship and still needs the reads. A verdict that would fail
+  (DO NOT SHIP, a defect counted in scope, or an earlier defect not fixed)
+  needs no read evidence. Claude runs with
   `--output-format stream-json`, and each file needs a successful Read or Grep
   that names it; the structured-output call does not count. Codex runs with
   `--json`, and each file needs a successful content-reading command (`cat`,

@@ -8,7 +8,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from .verdict import DO_NOT_SHIP, Finding, Verdict
+from .verdict import Finding, Verdict
 
 INLINE = "inline"
 _LINE_SUFFIX = re.compile(r":\d+(?:-\d+)?$")
@@ -197,23 +197,24 @@ def _shown(paths: list[str]) -> str:
 def check(
     verdict: Verdict,
     *,
+    ships: bool,
     harness: str,
     brief_mode: str,
     workspace: Path,
     required: Iterable[str],
     run: Trace,
 ) -> str | None:
-    if brief_mode == INLINE or verdict.defects or verdict.decision == DO_NOT_SHIP:
+    if brief_mode == INLINE or not ships:
         return None
     needed = sorted(set(required))
     if harness in TRACED:
         if not run.reads:
-            return "the reviewer found no defects but its trace shows no successful file read"
+            return "the verdict would ship but its trace shows no successful file read"
         missing = unread(harness, needed, run, workspace)
         if missing:
-            return f"the reviewer found no defects but its trace shows no read of {_shown(missing)}"
+            return f"the verdict would ship but its trace shows no read of {_shown(missing)}"
     examined = {relative(path, workspace) for path in verdict.files_examined}
     missing = [path for path in needed if path not in examined]
     if missing:
-        return f"the reviewer found no defects but did not examine {_shown(missing)}"
+        return f"the verdict would ship but did not examine {_shown(missing)}"
     return None
