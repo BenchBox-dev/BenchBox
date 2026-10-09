@@ -22801,10 +22801,10 @@
     },
     "tuning-layout-op-skip-vs-fail-20261001": {
       "claim": {
-        "expires_at": "2026-10-07T18:33:14Z",
-        "generation": "e6e8c41126ca40ea9023b5149eeb7b13",
+        "expires_at": "2026-10-10T12:51:50Z",
+        "generation": "491896ecb23e459abe81fca32d26ad7e",
         "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:5ebb7e36c1d093f7e3b10f70"
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d"
       },
       "needs": [
         "tuning-gate-ledger-outcome-vocabulary-20261001",
