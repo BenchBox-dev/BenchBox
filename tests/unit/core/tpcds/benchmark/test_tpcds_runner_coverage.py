@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import itertools
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -387,6 +389,11 @@ def test_adapter_gate_refusal_propagates_without_a_metric(tpcds_benchmark):
 
 def test_run_power_test_withholds_power_at_size_when_any_query_fails(tpcds_benchmark, monkeypatch):
     monkeypatch.setattr(tpcds_benchmark, "get_query", lambda qid, **kwargs: f"SELECT {qid}")
+    ticks = itertools.count()
+    monkeypatch.setattr(
+        "benchbox.core.tpcds.benchmark.runner.time",
+        SimpleNamespace(time=lambda: next(ticks) * 0.001, sleep=time.sleep),
+    )
 
     failed = tpcds_benchmark.run_power_test(connection=_Conn(fail_on="SELECT 42"), warm_up=False)
     passed = tpcds_benchmark.run_power_test(connection=_Conn(), warm_up=False)
