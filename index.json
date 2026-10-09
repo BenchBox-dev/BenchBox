@@ -19550,19 +19550,14 @@
       "title": "Open a site-bundle-failed issue when the core site-inputs bundle build fails"
     },
     "site-split-20-seed-site-repo": {
-      "claim": {
-        "expires_at": "2026-10-10T01:28:11Z",
-        "generation": "96ad9aa401a54462ae722556ba44f89b",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de"
-      },
+      "claim": null,
       "needs": [
         "site-split-00-adr-soundness-scope",
         "site-split-10-core-site-inputs",
         "site-split-11-bundle-failure-alert"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Seed BenchBox-dev/benchbox-site from core with filtered, Python-free history and protect main"
     },
     "site-split-21-site-bootstrap-ci": {
