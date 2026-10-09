@@ -7392,17 +7392,12 @@
       "title": "Make optional-engine tests skip cleanly when the engine is installed but unusable"
     },
     "dlv2-12-hermeticity-leak-detector": {
-      "claim": {
-        "expires_at": "2026-10-10T23:17:49Z",
-        "generation": "84f90a119ce946038a37066b19d0ccda",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
-      },
+      "claim": null,
       "needs": [
         "dlv2-10-chdb-cwd-guard"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Make the unit tier hermetic: repo root from test location and a required state-leak detector"
     },
     "dlv2-13-durations-budget-quarantine": {
