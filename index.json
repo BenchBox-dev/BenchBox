@@ -13717,7 +13717,7 @@
       "claim": null,
       "needs": [],
       "priority": "medium-high",
-      "status": "open",
+      "status": "blocked",
       "title": "Windows unit suite: fix backslash paths in bash scripts, path-separator assertions, and make-wrapper argument quoting"
     },
     "nightly-windows-pr-visual-approval-20261009": {
