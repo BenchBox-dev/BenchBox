@@ -2003,15 +2003,10 @@
       "title": "Stop test_tpchavoc_clickhouse_equivalence from leaking the chdb module global past the stub-installer guard"
     },
     "canary-compat-gate-test-predicate-20261008": {
-      "claim": {
-        "expires_at": "2026-10-10T11:46:03Z",
-        "generation": "7fcd62fdcc39426ab258c8f137f03227",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:905c6dff9634822e3c6b98bd"
-      },
+      "claim": null,
       "needs": [],
       "priority": "critical",
-      "status": "active",
+      "status": "open",
       "title": "Fix the compat-lint canary test that still expects the benchmark gate in run.py"
     },
     "canary-flightdata-bad-width-shard": {
