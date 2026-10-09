@@ -13954,6 +13954,13 @@
       "status": "done",
       "title": "oracle map renders a staged gate's scale from the shared default and passes unknown provenance labels through"
     },
+    "oracle-marker-patch-map-file-limit-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "The oracle's protocol marker keeps its per-file patch map only up to about 200 files, not 300 as #2784 claims"
+    },
     "oracle-muse-contributor-model-first-attempt-20261008": {
       "claim": null,
       "needs": [],
