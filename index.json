@@ -4962,6 +4962,15 @@
       "status": "open",
       "title": "Replace the Polars engine option with the core --execution-engine setting across CLI, MCP, config and the Polars adapters"
     },
+    "core-exec-polars-matrix-docs-refresh": {
+      "claim": null,
+      "needs": [
+        "core-exec-polars-cli-mcp-adoption"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Update the committed Polars version-matrix methodology to name the core execution-engine setting"
+    },
     "core-exec-result-schema-2-3": {
       "claim": null,
       "needs": [
