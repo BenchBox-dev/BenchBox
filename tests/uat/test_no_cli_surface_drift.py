@@ -83,6 +83,7 @@ ALLOWED_INTERNAL_CLI_FILES = {
 ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     "benchbox/cli/commands/setup.py",
     "benchbox/cli/commands/calculate_qphh.py",
+    "benchbox/cli/commands/compare.py",
     "benchbox/cli/commands/compare_dataframes.py",
     "benchbox/cli/commands/compare_plans.py",
     "benchbox/cli/commands/df_tuning.py",
