@@ -1,10 +1,10 @@
 {
   "acceptance": [
-    "A dispatched nightly-v2 run shows the t3:drift job green with all four checks passing",
+    "A nightly-v2 dispatch with run_drift=true after PR #2837 merges shows the t3:drift job green with all five checks (corpus, privacy, validator, cross-surface baseline, pricing) passing",
     "Issue #2471 is closed by the reporter, or the reason it stayed open is recorded on the issue"
   ],
-  "context": "Live nightly-v2 run 37991400931 completed. The t3:drift corpus check failed because published-results is 25 paths behind develop (develop-ahead or content-changed); 10 paths exist only on published-results as accepted archive submissions and are not drift. Pricing, validator and baseline drift checks did not report failures. Issue #2471 has comment https://github.com/BenchBox-dev/BenchBox/issues/2471#issuecomment-6089964920. Blocked on t3-drift-corpus-mismatch-20261009; no issue closure claimed.",
-  "description": "After the pricing refresh merges, dispatch nightly-v2.yml with run_drift=true (scheduled runs evaluate drift on Mondays only, so the issue would otherwise stay open until the next Monday). Confirm the corpus, pricing, validator and cross-surface baseline checks all pass in the t3:drift job. The Report job should then close issue #2471. If a check fails, record which one and why on the issue rather than re-dispatching.",
+  "context": "Live nightly-v2 run 37991400931 completed. The t3:drift corpus check failed because published-results is 25 paths behind develop (develop-ahead or content-changed); 10 paths exist only on published-results as accepted archive submissions and are not drift. Pricing, validator and baseline drift checks did not report failures. Issue #2471 has comment https://github.com/BenchBox-dev/BenchBox/issues/2471#issuecomment-6089964920. Blocked on t3-drift-corpus-mismatch-20261009; no issue closure claimed.\n\n2026-10-09 tracker review: needs now point at t3-drift-corpus-mismatch-20261009 (the pricing refresh, t3-drift-pricing-refresh-20261008, is done). Status changed from blocked to open because readiness now comes from needs. Run 37991400931 results: pricing, validator, privacy and baseline passed; corpus failed. The corpus cause is seven unmerged mirror PRs; the fix is merging #2837.",
+  "description": "After the corpus mirror PR #2837 merges (tracked by t3-drift-corpus-mismatch-20261009), dispatch nightly-v2.yml with run_drift=true (scheduled runs evaluate drift on Mondays only, so the issue would otherwise stay open until the next Monday). Confirm all five drift checks pass in the t3:drift job: corpus, privacy, validator, cross-surface baseline and pricing. The Report job should then close issue #2471. If a check fails, record which one and why on the issue rather than re-dispatching.\n\nResult of the first dispatch, run 37991400931: the pricing, validator, privacy and baseline checks passed; the corpus check failed.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2471"
   ],
@@ -40,6 +40,14 @@
       "op": "update",
       "op_id": "4c12b136850449aab6d4eaaa153c5677",
       "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:30:08Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "67a5e0c5197c447c963cbdc52450e6da",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
