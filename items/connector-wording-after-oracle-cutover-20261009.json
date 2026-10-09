@@ -7,7 +7,7 @@
     "`git grep -i 'codex connector'` on develop matches only history: the merge digest's pre-cut-over rule and its docs, dated amendments, and blog posts (list the remaining matches in the PR body)",
     "Merged through the normal PR flow with an oracle success review of the merged head"
   ],
-  "context": "Found in the completion audit of the oracle replacement on 2026-10-09. The cleanup scope came from the 2026-10-07 replacement plan, which named only pr-triage.md, comment-cleanup-scope.md and dev-loop-property-ledger.md. The autodetect workflow is under the soundness prefix .github/workflows/; check the tier of the ADR paths before opening the PR. If the oracle cannot pass this PR, fix Critical/High findings, reply to the rest, and ask the owner for a stand-in naming the exact head SHA; never post one yourself. Three DO NOT SHIP decisions on one PR mean opening a new PR.",
+  "context": "Merged as #2836 (squash 79060f918, 2026-10-09 19:39 UTC) after an oracle SHIP on head 3934673e7; the stale oracle-review run 37964040629 was rerun and passed. Changes: the autodetect workflow's PR text names the oracle's review; dated 2026-10-09 amendments to ADR dev-loop D4 and site-split D14; oracle-review-v2.md drops the shadow-period sentence and links the protocol decision record; one fixture message updated. The remaining `codex connector` matches are history and are listed in the PR body.",
   "description": "The connector-era cleanup (#2797) removed the connector from the files it named, but other text still describes the connector as the soundness reviewer:\n- .github/workflows/cross-surface-baseline-autodetect.yml (two places: the automatic pull request's commit message and its body) tells the author that oracle-review needs the Codex connector's review. This one is live: every PR the workflow opens repeats it.\n- docs/development/adr/adr-dev-loop-v2.md D4 (\"Soundness hold via connector review and thread resolution\") still says the required check binds the Codex connector's review, with no amendment, and AGENTS.md points readers to \"dev-loop ADR D4\" for the stand-in.\n- docs/development/adr/adr-site-repo-split.md D14 says core PRs on soundness paths request the Codex connector.\n- docs/operations/oracle-review-v2.md still says \"During the shadow period, compare each oracle-review-shadow result ...\", and its opening paragraph links only the shadow decision record, not _project/decisions/oracle-review-protocol-2026-10-08.md.\n\nThe muse \"installed unpinned\" sentence in oracle-review-v2.md is handled by oracle-muse-installer-floating-channel-20261009, not here.\n\nGuardrails.\n- Wording only: no behaviour change. ADR decision text stays for history; add dated amendments rather than rewriting it.\n- Keep the merge digest's pre-cut-over connector rule and its docs: they describe history correctly.\n- The autodetect workflow is under .github/workflows/, a soundness path: the PR needs an oracle success review.\n- Run the workflow's tests if any assert the text (search tests/ for the old sentence).\n- Worktree via `make worktree-create BRANCH=docs/<slug> ...` and `make agent-write-preflight`; identity Joe Harris <joeharris76@gmail.com>; explicit staging; `make comment-policy-check`.\n- Wording that names the oracle's status or first line must use the current name `oracle-review-shadow`; the rename item updates it later.\n\nDecision gate. None.",
   "links": [
     ".github/workflows/cross-surface-baseline-autodetect.yml",
@@ -47,6 +47,14 @@
       "generation": "1719d66fdb424036b315b76ba2c981ee",
       "op": "take",
       "op_id": "25a7d7b9c8744049b7e5ffb6f1fd8fb9",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T19:41:24Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "6955dde19e744c3eab2155c8d76d8cbf",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
