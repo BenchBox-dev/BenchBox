@@ -13779,7 +13779,7 @@
       "claim": null,
       "needs": [],
       "priority": "medium-high",
-      "status": "open",
+      "status": "blocked",
       "title": "Windows unit suite: read repository text files as UTF-8 in tests and workflow-reading helpers"
     },
     "nightly-windows-verification-run-20261009": {
