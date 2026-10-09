@@ -717,8 +717,10 @@ jobs:
       actions: read
       contents: read
     steps:
-      - name: Checkout code
+      - name: Checkout develop (scheduled runs come from the default branch)
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: develop
 
       - name: Assert every scheduled workflow has a recent scheduled run
         shell: bash

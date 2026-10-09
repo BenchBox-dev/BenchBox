@@ -386,6 +386,14 @@ def test_liveness_domain_runs_the_shared_script_with_read_only_actions_access() 
     assert "GITHUB_TOKEN" in str([step.get("env") for step in _steps(job)])
 
 
+def test_liveness_domain_checks_out_the_default_branch_that_scheduled_runs_come_from() -> None:
+    checkout = next(
+        step for step in _steps(_load()["jobs"]["liveness"]) if "actions/checkout@" in str(step.get("uses"))
+    )
+
+    assert checkout["with"]["ref"] == "develop"
+
+
 def test_windows_domain_runs_the_fast_tier_without_continue_on_error() -> None:
     job = _load()["jobs"]["windows"]
     text = _run_text(job)
