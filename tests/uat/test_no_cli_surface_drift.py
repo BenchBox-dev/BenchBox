@@ -98,7 +98,7 @@ ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
 }
 ALLOWED_INTERNAL_CLI_FILES = ALLOWED_INTERNAL_CLI_FILES | ALLOWED_HIDDEN_COMPAT_CLI_FILES
 ACCEPTED_CLI_SURFACE_DIGESTS = {
-    "benchbox/cli/commands/compare.py": "4a7f4c5b56d8c4d42c31ea742ef258db2fcdfd7b1def69fa3b4e77e0f6fda2b1",
+    "benchbox/cli/commands/compare.py": "270e135c13c19401ff7ddfec362cbcf1369c724202b2a1e9a4d0d42a921ce404",
 }
 FORBIDDEN_CLI_SURFACE_DECORATORS = {"argument", "command", "group", "option"}
 FORBIDDEN_CLI_SURFACE_FUNCTIONS = {
@@ -380,10 +380,11 @@ def _cli_surface_changed(
 
 
 def _cli_surface_digest(source: str, path: str) -> str:
-    return hashlib.sha256("\n".join(_cli_surface_snapshot(source, path)).encode("utf-8")).hexdigest()
+    snapshot = _cli_surface_snapshot(source, path, option_help=True)
+    return hashlib.sha256("\n".join(snapshot).encode("utf-8")).hexdigest()
 
 
-def _cli_surface_snapshot(source: str, path: str) -> tuple[str, ...]:
+def _cli_surface_snapshot(source: str, path: str, *, option_help: bool = False) -> tuple[str, ...]:
     if not source:
         return ()
 
@@ -402,7 +403,8 @@ def _cli_surface_snapshot(source: str, path: str) -> tuple[str, ...]:
         for decorator in node.decorator_list:
             name = _click_surface_decorator_name(decorator)
             if name in FORBIDDEN_CLI_SURFACE_DECORATORS:
-                surface.append(_decorator_without_help(decorator))
+                keeps_help = option_help and name in {"argument", "option"}
+                surface.append(ast.unparse(decorator) if keeps_help else _decorator_without_help(decorator))
                 if name in {"command", "group"}:
                     surface.append(f"help={_effective_help(decorator, node)!r}")
         if function_name is not None and node.name == function_name:
@@ -457,7 +459,7 @@ def _git(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
     return result
 
 
-def test_accepted_cli_surface_digest_changes_with_any_option_or_help_edit():
+def test_accepted_cli_surface_digest_changes_with_any_option_or_command_help_edit():
     source = """import click
 
 @click.command("compare")
@@ -474,3 +476,9 @@ def compare(fail_on_regression):
     assert _cli_surface_digest(source, path) == _cli_surface_digest(source + "\nX = 1\n", path)
     assert _cli_surface_digest(source, path) != _cli_surface_digest(edited_option, path)
     assert _cli_surface_digest(source, path) != _cli_surface_digest(extra_option, path)
+    assert _cli_surface_digest(source, path) != _cli_surface_digest(
+        source.replace('@click.option("--fail-on-regression")', '@click.option("--fail-on-regression", help="x")'), path
+    )
+    assert _cli_surface_digest(source, path) != _cli_surface_digest(
+        source.replace('@click.command("compare")', '@click.command("compare", help="changed")'), path
+    )
