@@ -4469,15 +4469,10 @@
       "title": "Add comment-scanner adapter or detection for programs piped to interpreters on stdin"
     },
     "comment-scanner-unresolved-runner-commands": {
-      "claim": {
-        "expires_at": "2026-10-10T13:43:18Z",
-        "generation": "275aa3aa641449d686ec79c97e563bd6",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:3a93d76fab1934bd71f35b65"
-      },
+      "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "active",
+      "status": "open",
       "title": "Decompose single-string runner arguments (ssh, watch, xargs) in comment execution scanner"
     },
     "commit-identity-canonical-skill-source-sync": {
