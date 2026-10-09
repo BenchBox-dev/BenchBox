@@ -403,3 +403,28 @@ def test_parent_ref_that_names_no_commit_is_rejected() -> None:
     head = site_inputs.must_run("git", "-C", str(site_inputs.ROOT), "rev-parse", "HEAD").strip()
     with pytest.raises(RuntimeError, match="rev-parse"):
         site_inputs.resolve_parent(head, "no-such-ref-for-site-inputs")
+
+
+def _site_inputs_jobs() -> dict:
+    import yaml
+
+    return yaml.safe_load(_site_inputs_workflow())["jobs"]
+
+
+def test_failed_bundle_build_reports_to_one_issue() -> None:
+    report = _site_inputs_jobs()["report-failure"]
+    assert report["needs"] == "build"
+    assert report["if"] == "failure()"
+    assert report["permissions"] == {"issues": "write"}
+    script = report["steps"][0]["run"]
+    assert 'gh issue list --repo "$REPO" --label site-bundle-failed --state open' in script
+    assert 'gh issue comment "$NUMBER"' in script
+    assert "gh issue create" in script
+
+
+def test_bundle_build_job_keeps_read_only_permissions() -> None:
+    import yaml
+
+    workflow = yaml.safe_load(_site_inputs_workflow())
+    assert workflow["permissions"] == {"contents": "read", "actions": "read"}
+    assert "permissions" not in _site_inputs_jobs()["build"]

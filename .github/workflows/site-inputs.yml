@@ -175,3 +175,29 @@ jobs:
             echo "Site bridge not enabled: bundle built and uploaded, dispatch skipped.";
             echo "Set the SITE_BRIDGE_ENABLED variable once the bridge App is installed.";
           } >> "$GITHUB_STEP_SUMMARY"
+
+  report-failure:
+    name: report failed bundle
+    needs: build
+    if: failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the site-bundle-failed issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          CORE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          BODY="$(printf 'The site-inputs bundle build failed for core commit %s.\n\nRun: %s\n\nThe next successful bundle on develop takes the newest good bundle as its parent, so its validator_parity range still covers this commit. Close this issue once a bundle succeeds again.\n' "$CORE_SHA" "$RUN_URL")"
+          NUMBER="$(gh issue list --repo "$REPO" --label site-bundle-failed --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$NUMBER" ]; then
+            gh issue comment "$NUMBER" --repo "$REPO" --body "$BODY"
+          else
+            gh label create site-bundle-failed --repo "$REPO" --color B60205 --description "The core site-inputs bundle build failed" --force
+            gh issue create --repo "$REPO" --title "Site-inputs bundle build failed" --label site-bundle-failed --body "$BODY"
+          fi
