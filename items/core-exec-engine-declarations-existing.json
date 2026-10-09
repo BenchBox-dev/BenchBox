@@ -3,9 +3,9 @@
     "pg-duckdb --execution-engine postgres issues `SET duckdb.force_execution = false` and records applied=postgres; default records applied=duckdb (mock-connection tests)",
     "dask-df --execution-engine distributed starts the distributed client and threads does not; the recorded receipt matches (unit tests with a local cluster stub); the default is decided and documented consistently",
     "Databricks and Velox reject explicit selection with a clear error (selectable=false) and record observed photon/standard or velox with observed_source set (mock tests)",
-    "Legacy keys (force_execution, use_distributed) warn and map to the same receipts",
-    "The parity test passes with the new declarations (same name, same class across platforms)",
-    "Docs for each platform list engines consistent with the manifest; compat-docs-check passes",
+    "Legacy keys (force_execution, use_distributed) warn and map to the same receipts, including from saved YAML configs",
+    "The parity test passes with the new declarations (same name, same class across platforms), and its docs check covers the engine tables of each platform's docs page",
+    "CHANGELOG [Unreleased] lists the new engines and deprecated keys",
     "No live cloud runs; PR merged through the normal flow"
   ],
   "context": "Decision gates:\n- G1 Start after core-exec-polars-cli-mcp-adoption (the pattern is proven on Polars first).\n- G2 If a platform's switch also changes results semantics (not only performance), stop: it is not an execution engine under ADR D1.\n- G3 If the Dask default change would alter existing users' runs, ask before changing it; otherwise only document it.\n\nVerification rubric: per-adapter unit tests with mocks; parity test; compat-docs-check; make pr-preflight.\n\nGuardrails: shared core-exec guardrails (see core-exec-d0-vocabulary-adr context).",
@@ -23,6 +23,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "75143a2bb87d4304ba98d80a650fb058",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:48:54Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "8aaed46d28004db8a4b1174b00a17bbc",
       "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
     }
   ]
