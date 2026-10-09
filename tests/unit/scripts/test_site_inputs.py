@@ -41,7 +41,7 @@ def test_member_digest_covers_single_file(tmp_path: Path) -> None:
     assert site_inputs.member_digest(target) == site_inputs.file_sha(target)
 
 
-def _bundle(tmp_path: Path, schema: int = 2, attestations: str = "pass") -> Path:
+def _bundle(tmp_path: Path, schema: int = 3, attestations: str = "pass") -> Path:
     out = tmp_path / "bundle"
     members = {
         "docs": "docs tree",
@@ -50,12 +50,13 @@ def _bundle(tmp_path: Path, schema: int = 2, attestations: str = "pass") -> Path
         "explorer/contract.json": '{"version": "6"}\n',
         "explorer/fixtures": "fixture tree",
         "explorer/parity": "parity tree",
+        "explorer/bundles": "result bundles",
         "landing/prompt-catalog.json": '{"prompts": []}\n',
         "api-public-symbols.json": '{"symbols": []}\n',
         "downloads": "download tree",
         "attestations.json": "attestation tree",
     }
-    dirs = {"docs", "explorer/fixtures", "explorer/parity", "downloads"}
+    dirs = {"docs", "explorer/fixtures", "explorer/parity", "explorer/bundles", "downloads"}
     for name, body in members.items():
         if name == "attestations.json":
             continue
@@ -464,6 +465,34 @@ def test_build_downloads_copies_each_file_at_its_repo_path(tmp_path: Path, monke
     assert (out / "pytest.ini").read_bytes() == (site_inputs.ROOT / "pytest.ini").read_bytes()
 
 
-def test_bundle_schema_two_requires_downloads() -> None:
-    assert site_inputs.SCHEMA == 2
+def test_bundle_schema_three_requires_downloads_and_result_bundles() -> None:
+    assert site_inputs.SCHEMA == 3
     assert "downloads" in site_inputs.REQUIRED_MEMBERS
+    assert "explorer/bundles" in site_inputs.REQUIRED_MEMBERS
+
+
+def _fake_explorer_publish(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, bundles: bool) -> Path:
+    out = tmp_path / "explorer"
+
+    def fake_must_run(*cmd: str, cwd: Path = site_inputs.ROOT) -> str:
+        _write(out / "results.duckdb", "duckdb-bytes")
+        if bundles:
+            _write(out / "bundles" / "r1.json", '{"run": {"id": "r1"}}\n')
+        return ""
+
+    monkeypatch.setattr(site_inputs, "must_run", fake_must_run)
+    return out
+
+
+def test_snapshot_build_keeps_the_per_result_bundles(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    out = _fake_explorer_publish(tmp_path, monkeypatch, bundles=True)
+    site_inputs.build_explorer_snapshot(out)
+    assert (out / "bundles" / "r1.json").is_file()
+
+
+def test_snapshot_build_refuses_a_build_without_per_result_bundles(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    out = _fake_explorer_publish(tmp_path, monkeypatch, bundles=False)
+    with pytest.raises(RuntimeError, match="no per-result bundles"):
+        site_inputs.build_explorer_snapshot(out)

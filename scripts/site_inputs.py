@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-SCHEMA = 2
+SCHEMA = 3
 PARENT_SOURCES = ("bundle", "dispatch", "local")
 GENERATED_QUERIES = Path("docs/benchmarks/queries")
 
@@ -57,6 +57,7 @@ REQUIRED_MEMBERS = (
     "explorer/contract.json",
     "explorer/fixtures",
     "explorer/parity",
+    "explorer/bundles",
     "landing/prompt-catalog.json",
     "api-public-symbols.json",
     "downloads",
@@ -130,8 +131,8 @@ def build_explorer_snapshot(out_explorer: Path) -> Path:
     if not db.is_file() or db.stat().st_size == 0:
         raise RuntimeError("explorer snapshot build produced no results.duckdb")
     bundles = out_explorer / "bundles"
-    if bundles.is_dir():
-        shutil.rmtree(bundles)
+    if not bundles.is_dir() or not any(bundles.glob("*.json")):
+        raise RuntimeError("explorer snapshot build produced no per-result bundles")
     return db
 
 
@@ -435,6 +436,7 @@ def cmd_build(args: argparse.Namespace) -> int:
         "explorer/contract.json": member_digest(out / "explorer/contract.json"),
         "explorer/fixtures": member_digest(out / "explorer/fixtures"),
         "explorer/parity": member_digest(out / "explorer/parity"),
+        "explorer/bundles": member_digest(out / "explorer/bundles"),
         "landing/prompt-catalog.json": member_digest(out / "landing/prompt-catalog.json"),
         "api-public-symbols.json": member_digest(out / "api-public-symbols.json"),
         "downloads": member_digest(out / "downloads"),
