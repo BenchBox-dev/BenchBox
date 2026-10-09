@@ -164,6 +164,10 @@ benchbox compare BASELINE.json CURRENT.json [OPTIONS]
 - `--fail-on-regression THRESHOLD`: Exit with code 1 if any regression exceeds threshold
   - Percentage format: `10%`, `5.5%`
   - Decimal format: `0.1`, `0.05`
+- `--min-regression-delta DURATION`: Count a query as regressed only when it exceeds the `--fail-on-regression` threshold and also slows by more than this duration. Requires `--fail-on-regression`; using it alone is a usage error (exit code 2).
+  - Milliseconds: `5ms`, `2.5ms`
+  - Seconds: `0.005s`
+  - Not set by default, so queries are judged by percentage alone. Aggregate metrics such as total time are always judged by percentage alone.
 - `--format [text|json|html]`: Output format (default: text)
 - `--output FILE`: Save comparison output to file instead of stdout
 - `--show-all-queries`: Show all query comparisons (default: only regressions/improvements)
@@ -212,6 +216,14 @@ benchbox compare baseline.json current.json --fail-on-regression 0.1
 ```
 
 The first command fails the pipeline if any query regresses by more than 10%. The second uses a stricter threshold, for critical paths. The third gives the same 10% threshold in decimal notation.
+
+Queries that run for a few milliseconds can change by more than 10% from scheduling noise alone. Add a floor so that only slowdowns larger than a fixed duration count:
+
+```bash
+benchbox compare baseline.json current.json --fail-on-regression 10% --min-regression-delta 7ms
+```
+
+A query now fails the gate only when it is more than 10% slower and more than 7 ms slower. A 10 ms query that becomes 12 ms passes. A 5 s query that becomes 5.6 s still fails.
 
 **Export Comparison Reports:**
 
@@ -316,6 +328,7 @@ benchbox compare \
 | ---- | ----------------------------------------------------------------------------- |
 | `0`  | Comparison completed successfully (no regression above threshold)             |
 | `1`  | Regression detected above `--fail-on-regression` threshold, or error occurred |
+| `2`  | Invalid option combination, such as `--min-regression-delta` without `--fail-on-regression` |
 
 ### Notes
 
