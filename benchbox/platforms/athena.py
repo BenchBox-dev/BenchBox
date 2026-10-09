@@ -363,7 +363,7 @@ class AthenaAdapter(PlatformAdapter):
         return _compact_metadata(
             {
                 "service_model": "serverless",
-                "engine": "athena",
+                "product": "athena",
                 "workgroup": config.get("workgroup"),
                 "query_timeout": config.get("query_timeout"),
                 "source": "requested" if has_compute_config else "unavailable",

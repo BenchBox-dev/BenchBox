@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Result schema 2.3 supports execution-engine receipts, query engine observations,
+  compute resource and size, selected deployment, routed gateway, and variant identity.
+  Fields are omitted until producers supply them. Legacy engine requests map on read;
+  publication drops compute resource names and hashes gateway hosts.
+
 ### Before you upgrade
+
+- Result bundles now use additive schema 2.3. Readers must accept this version.
+  Older bundles remain readable and published bundles and IDs are unchanged.
 
 - **ClickHouse tuned runs are faster, and their results are not comparable with earlier ones.**
   The tuned session settings no longer switch the join algorithm to

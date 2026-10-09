@@ -272,7 +272,7 @@ describe("local result import", () => {
     await expect(infer({ power_test: { status: "NOT_RUN" }, throughput_test: { status: "NOT_RUN" } })).resolves.toBeNull();
   });
 
-  it.each(["2.0", "2.1", "2.2"])("accepts supported schema %s", async (version) => {
+  it.each(["2.0", "2.1", "2.2", "2.3"])("accepts supported schema %s", async (version) => {
     await expect(parseLocalResultText(JSON.stringify(bundle({ version })))).resolves.toBeTruthy();
   });
 

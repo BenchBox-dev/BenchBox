@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from benchbox.core.results.execution_variant import read_execution_engine, read_platform_compute
 from benchbox.core.results.models import (
     BenchmarkResults,
     ExecutionPhases,
@@ -28,6 +29,7 @@ from benchbox.core.results.schema_policy import (
     ROW_COUNT_VALIDATION_SCHEMA_VERSION,
     is_loader_supported_result_schema,
     result_schema_version_value,
+    supports_row_count_validation,
 )
 from benchbox.validation.bundle import COMPANION_SUFFIXES
 
@@ -142,14 +144,14 @@ def _load_companion_file(main_file: Path, suffix: str) -> tuple[dict[str, Any] |
 
 def _validate_versioned_query_extensions(data: dict[str, Any]) -> None:
     version = str(result_schema_version_value(data) or "")
-    if version == ROW_COUNT_VALIDATION_SCHEMA_VERSION:
+    if supports_row_count_validation(version):
         return
 
     for index, query in enumerate(data.get("queries", [])):
         if isinstance(query, dict) and "row_count_validation" in query:
             raise ValueError(
                 f"queries[{index}].row_count_validation requires schema version "
-                f"{ROW_COUNT_VALIDATION_SCHEMA_VERSION}, got {version!r}"
+                f"{ROW_COUNT_VALIDATION_SCHEMA_VERSION} or later, got {version!r}"
             )
 
 
@@ -216,7 +218,7 @@ def reconstruct_benchmark_results(
         execution_environment=execution_environment,
         platform_deployment=platform_section.get("deployment"),
         platform_cloud=platform_section.get("cloud"),
-        platform_compute=platform_section.get("compute"),
+        platform_compute=read_platform_compute(platform_section),
         platform_storage=platform_section.get("storage"),
         platform_raw_config=platform_section.get("raw_config"),
         platform_raw_metadata=platform_section.get("raw_metadata"),
@@ -246,6 +248,7 @@ def reconstruct_benchmark_results(
         data_archive_hash=benchmark_section.get("data_archive_hash"),
         funding=provenance_section.get("funding"),
         result_source=provenance_section.get("source"),
+        execution_engine=read_execution_engine(data),
     )
 
 
@@ -321,6 +324,9 @@ def _extract_platform_info(platform_section: dict[str, Any]) -> dict[str, Any]:
     }
     if platform_section.get("config"):
         info.update(platform_section["config"])
+    for key in ("execution_engine", "gateway"):
+        if isinstance(platform_section.get(key), dict):
+            info[key] = platform_section[key]
     return info
 
 

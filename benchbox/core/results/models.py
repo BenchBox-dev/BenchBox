@@ -154,6 +154,7 @@ class QueryExecution:
     result_digest: str | None = None
     test_type: str | None = None
     error_type: str | None = None
+    execution_engine: str | None = None
 
     def __init__(
         self,
@@ -178,6 +179,7 @@ class QueryExecution:
         result_digest: str | None = None,
         test_type: str | None = None,
         error_type: str | None = None,
+        execution_engine: str | None = None,
         *,
         execution_time_seconds: float | None = None,
     ) -> None:
@@ -218,6 +220,7 @@ class QueryExecution:
         self.result_digest = result_digest
         self.test_type = test_type
         self.error_type = error_type
+        self.execution_engine = execution_engine
 
     @property
     def execution_time_seconds(self) -> float | None:
@@ -431,6 +434,7 @@ class BenchmarkResults:
     data_archive_hash: str | None = None
     funding: str | None = None
     result_source: str | None = None
+    execution_engine: dict[str, Any] | None = None
 
     @property
     def benchmark_id(self) -> str:

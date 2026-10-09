@@ -23,6 +23,10 @@ public_drop_keys:
 - path
 - sourceroot
 - credentialfile
+- computeresource
+public_drop_child_keys:
+  compute:
+  - resource
 identifier_keys:
   account: account
   accountid: account
@@ -85,6 +89,7 @@ identifier_keys:
 endpoint_keys:
 - apiendpoint
 - endpoint
+- gatewayhost
 - host
 - hostname
 - server
