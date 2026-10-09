@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import time
 from pathlib import Path
 from unittest.mock import patch
@@ -124,6 +125,11 @@ class TestParquetConversionIsAtomic:
         assert target.read_bytes() == previous
         assert _temp_files(tmp_path) == []
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Windows cannot replace a file that is memory-mapped; the POSIX guarantee that a mapped reader "
+        "survives a rewrite does not exist",
+    )
     def test_memory_mapped_reader_survives_a_rewrite(self, tmp_path: Path) -> None:
         source = tmp_path / "src.tbl"
         _write_source(source, 200)
@@ -229,6 +235,7 @@ def test_fsync_opens_file_with_platform_required_access(tmp_path: Path, platform
     with (
         patch("benchbox.core.dataframe.data_loader.sys.platform", platform),
         patch("benchbox.core.dataframe.data_loader.os.open", wraps=os.open) as opening,
+        patch("benchbox.core.dataframe.data_loader.os.fsync"),
     ):
         _fsync_path(target)
     opening.assert_called_once_with(target, flags)

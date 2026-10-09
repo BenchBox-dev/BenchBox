@@ -22,6 +22,7 @@ jobs:
       test (${{ matrix.os }}, ${{ matrix.python-version }})${{
       matrix.os == 'windows-latest' && ' (quarantine #2568)' || '' }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
     continue-on-error: ${{ matrix.os == 'windows-latest' }}
     strategy:
       fail-fast: false

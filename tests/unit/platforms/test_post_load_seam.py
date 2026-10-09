@@ -392,6 +392,7 @@ class TestCaughtMaintenanceErrorsFailThePhase:
 
         assert databricks_adapter.build_post_load_maintenance_phase().status == "FAILED"
 
+    @pytest.mark.usefixtures("chdb_probe_satisfied")
     def test_clickhouse_optimize_error(self):
         from benchbox.platforms.clickhouse_local import ClickHouseLocalAdapter
 
@@ -432,6 +433,7 @@ class TestClickHouseOptionIsDeclared:
 
 
 class TestClickHouseOptionReachesTheAdapter:
+    @pytest.mark.usefixtures("chdb_probe_satisfied")
     @pytest.mark.parametrize("adapter_name", ["ClickHouseLocalAdapter", "ClickHouseServerAdapter"])
     def test_from_config_carries_optimize_after_load(self, adapter_name):
         import importlib
@@ -458,6 +460,7 @@ class TestClickHouseOptionReachesTheAdapter:
         assert enabled._optimize_after_load_enabled() is True
         assert default._optimize_after_load_enabled() is False
 
+    @pytest.mark.usefixtures("chdb_probe_satisfied")
     @pytest.mark.parametrize("adapter_name", ["ClickHouseLocalAdapter", "ClickHouseCloudAdapter"])
     def test_optimize_after_load_does_nothing_when_tuning_is_off(self, adapter_name):
         import importlib

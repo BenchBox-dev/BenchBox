@@ -118,6 +118,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_corpus_trust_boundary.py` | product-safety | Corpus trust boundary |
 | `test_docker_integration_workflow.py` | product-safety | Container integration |
 | `test_nightly_t3_workflow.py` | product-safety | Nightly T3 domain coverage |
+| `test_nightly_legacy_test_job.py` | product-safety | Legacy nightly matrix timeout bound and Windows legs |
 | `test_oracle_review_workflow.py` | product-safety | The required check name, triggers, read-only token and script invocation of the oracle-review check |
 | `test_oracle_review_shadow_workflow.py` | product-safety | Shadow review triggers, guards, per-job secret scoping, sequential reviewer slots and App-only posting |
 | `test_t2_partition_workflow.py` | product-safety | Complete medium selection, correctness gate conservation, and binary framing placement |

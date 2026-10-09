@@ -527,7 +527,7 @@ def test_binary_defect_forces_regeneration_on_reuse_check(generator_binaries, tm
     from benchbox.core.runner.runner import _validate_manifest_if_present
     from benchbox.core.schemas import BenchmarkConfig
 
-    (tmp_path / "customer.tbl").write_text("1|a\n")
+    (tmp_path / "customer.tbl").write_bytes(b"1|a\n")
 
     def _write(**extra: object) -> None:
         manifest = {

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -8,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from tests.utilities.paths import REPO_ROOT
+from tests.utilities.posix_shell import run_posix_shell, skip_without_posix_shell
 
 pytestmark = [
     pytest.mark.unit,
@@ -25,6 +27,19 @@ AGENT_IDENTITY = {
     "GIT_AUTHOR_NAME": "Claude",
     "GIT_AUTHOR_EMAIL": "noreply@anthropic.com",
 }
+
+
+def _run_script(script: Path, *, cwd: Path, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    skip_without_posix_shell()
+    return run_posix_shell(
+        f"sh {shlex.quote(script.as_posix())}",
+        cwd=cwd,
+        env=env,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+    )
 
 
 def _configured_write_hook() -> dict[str, object]:
@@ -77,14 +92,7 @@ def _run_preflight(*, primary_clone: Path, allow: bool = False) -> subprocess.Co
         env.pop("BENCHBOX_ALLOW_MAIN_CLONE_WRITE", None)
         env.pop("ALLOW_MAIN_CLONE_WRITE", None)
 
-    return subprocess.run(
-        ["sh", str(SCRIPT)],
-        cwd=REPO_ROOT,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    return _run_script(SCRIPT, cwd=REPO_ROOT, env=env)
 
 
 def test_preflight_rejects_primary_clone_without_override() -> None:
@@ -116,8 +124,8 @@ def test_preflight_allows_non_primary_worktree(tmp_path: Path) -> None:
     )
 
     try:
-        result = subprocess.run(
-            ["sh", str(SCRIPT.resolve())],
+        result = _run_script(
+            SCRIPT.resolve(),
             cwd=linked,
             env={
                 **os.environ,
@@ -125,9 +133,6 @@ def test_preflight_allows_non_primary_worktree(tmp_path: Path) -> None:
                 "BENCHBOX_AGENT_PRIMARY_CLONE": str(primary),
                 "GIT_CONFIG_NOSYSTEM": "1",
             },
-            capture_output=True,
-            text=True,
-            check=False,
         )
     finally:
         subprocess.run(["git", "worktree", "remove", "--force", str(linked)], cwd=primary, check=True)
@@ -257,14 +262,7 @@ def _run_in_clone(
         env.pop("BENCHBOX_EPHEMERAL_CLONE", None)
     env.update(extra_env or {})
 
-    return subprocess.run(
-        ["sh", str(SCRIPT.resolve())],
-        cwd=repo,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    return _run_script(SCRIPT.resolve(), cwd=repo, env=env)
 
 
 def test_preflight_still_refuses_an_undeclared_plain_clone(tmp_path: Path) -> None:
@@ -557,7 +555,7 @@ def test_worktree_removal_hook_isolation(tmp_path: Path) -> None:
     )
     assert commit_res.returncode == 0, commit_res.stdout + commit_res.stderr
     assert record.exists()
-    assert str(wt2.resolve()) in record.read_text(encoding="utf-8")
+    assert wt2.name in record.read_text(encoding="utf-8")
 
 
 def test_agent_identity_lists_match_the_instruction_audit() -> None:

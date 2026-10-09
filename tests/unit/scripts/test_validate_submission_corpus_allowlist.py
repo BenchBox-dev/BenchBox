@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import stat
+import sys
 
 import pytest
 
@@ -92,6 +93,7 @@ def test_rejects_symlink(tmp_path, monkeypatch) -> None:
     assert any("symlinks are not allowed" in reason for reason in _rejects(["results-data/bundles/link.json"]))
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no POSIX executable bit")
 def test_rejects_executable_json(tmp_path, monkeypatch) -> None:
     bundles = tmp_path / "results-data" / "bundles"
     bundles.mkdir(parents=True)

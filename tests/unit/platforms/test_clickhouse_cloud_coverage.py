@@ -5,6 +5,7 @@ import importlib.util
 import logging
 import os
 import re
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -628,6 +629,10 @@ def test_load_data_via_s3_glob_tokens_differ_between_loads(tmp_path: Path) -> No
     assert globs[0] != globs[1], "each load must ingest through its own unique prefix"
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Windows file names cannot contain '*', which this test needs to exercise glob-metacharacter handling",
+)
 def test_load_data_via_s3_falls_back_per_file_on_glob_syntax(tmp_path: Path) -> None:
 
     adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")

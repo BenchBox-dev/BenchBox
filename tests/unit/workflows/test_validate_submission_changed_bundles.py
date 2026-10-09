@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -514,6 +515,7 @@ def test_deleted_non_ascii_primary_requires_deleting_companion(tmp_path: Path) -
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         env={**os.environ, "BASE_SHA": base_sha},
     )
 
@@ -521,6 +523,10 @@ def test_deleted_non_ascii_primary_requires_deleting_companion(tmp_path: Path) -
     assert "café.manifest.json" in result.stdout
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="a backslash is a path separator on Windows, so a file named foo\\bar.json cannot be created",
+)
 def test_deleted_backslash_primary_requires_deleting_companion(tmp_path: Path) -> None:
     _git(tmp_path, "init", "--quiet")
     _git(tmp_path, "config", "user.name", "Test")

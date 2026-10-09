@@ -19,6 +19,13 @@ ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "scripts" / "make_timing.py"
 SHELL_SHIM = ROOT / "scripts" / "make_timing_shell.sh"
 INVENTORY_SCRIPT = ROOT / "make" / "check_makefile_inventory.py"
+CONCURRENT_APPEND_SKIP = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason=(
+        "atomic O_APPEND whole-line writes and a 200-character cwd are POSIX behaviours; "
+        "Windows emulates append non-atomically and limits cwd to MAX_PATH"
+    ),
+)
 RECORD_FIELDS = {
     "schema",
     "target",
@@ -145,11 +152,13 @@ def test_switch_disables_recording_but_still_runs_the_command(tmp_path: Path, va
 
 def test_default_location_is_in_the_benchbox_home_directory(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
     monkeypatch.delenv("BENCHBOX_MAKE_TIMINGS_FILE", raising=False)
 
     assert make_timing.timings_path() == tmp_path / ".benchbox" / "make-timings.jsonl"
 
 
+@CONCURRENT_APPEND_SKIP
 def test_concurrent_runs_append_whole_lines(tmp_path: Path) -> None:
     timings_file = tmp_path / "timings.jsonl"
     environment = _clean_environment(timings_file)
@@ -172,6 +181,7 @@ def test_concurrent_runs_append_whole_lines(tmp_path: Path) -> None:
     assert {record["target"] for record in records} == {"target-0", "target-1", "target-2"}
 
 
+@CONCURRENT_APPEND_SKIP
 def test_concurrent_appends_of_large_records_do_not_interleave(tmp_path: Path) -> None:
     timings_file = tmp_path / "timings.jsonl"
     environment = _clean_environment(timings_file)

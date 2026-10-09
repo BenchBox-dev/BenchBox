@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 
 from benchbox.utils.iceberg_layout import (
@@ -71,6 +73,10 @@ def test_resolve_returns_none_without_metadata_files(tmp_path):
     assert resolve_iceberg_metadata_file(table) is None
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="pyiceberg PyArrowFileIO cannot open file:///C:/ table locations on Windows (WinError 123)",
+)
 def test_relocate_rewrites_graph_for_new_location(tmp_path):
 
     pytest.importorskip("pyiceberg", reason="relocation needs pyiceberg")

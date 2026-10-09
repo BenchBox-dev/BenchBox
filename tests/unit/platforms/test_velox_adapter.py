@@ -294,6 +294,23 @@ class TestVeloxTableFormatConf:
         with pytest.raises(ValueError, match="not found"):
             VeloxAdapter(table_format="iceberg", lakehouse_jars=str(tmp_path / "missing.jar"))._get_spark_conf()
 
+    @pytest.mark.parametrize(
+        ("jar", "is_local"),
+        [
+            ("/opt/jars/delta.jar", True),
+            ("relative/delta.jar", True),
+            ("C:\\jars\\delta.jar", True),
+            ("d:/jars/delta.jar", True),
+            ("io.delta:delta-spark_2.12:3.2.0", False),
+            ("s3://bucket/delta.jar", False),
+            ("https://repo.example/delta.jar", False),
+        ],
+    )
+    def test_only_filesystem_paths_are_checked_for_existence(self, jar, is_local):
+        from benchbox.platforms.velox import _is_local_jar_path
+
+        assert _is_local_jar_path(jar) is is_local
+
     def test_parquet_needs_no_jars(self, mock_pyspark):
         from benchbox.platforms.velox import VeloxAdapter
 

@@ -947,6 +947,9 @@ class TestReleaseInfrastructure:
         assert "pr-open" not in preflight
         assert "pr-arm-auto-merge" not in preflight
 
+    @pytest.mark.skipif(
+        sys.platform == "win32", reason="the fake make is a POSIX shebang script and PATH is colon-joined"
+    )
     def test_pre_push_hook_runs_the_targeted_preflight(self, tmp_path: Path):
         config = yaml.safe_load((REPO_ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8"))
         hooks = [

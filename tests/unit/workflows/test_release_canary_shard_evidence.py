@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from tests.utilities.posix_shell import posix_shell, skip_without_posix_shell
+from tests.utilities.posix_shell import posix_shell, run_posix_shell, skip_without_posix_shell
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -29,14 +29,9 @@ def _steps() -> dict[str, dict]:
 
 
 def _shell_has_mapfile() -> bool:
-    shell = posix_shell()
-    if shell is None:
+    if posix_shell() is None:
         return False
-    probe = subprocess.run(
-        [shell, "--noprofile", "--norc", "-c", 'mapfile -t probe <<< "a b c"'],
-        capture_output=True,
-        text=True,
-    )
+    probe = run_posix_shell('mapfile -t probe <<< "a b c"', capture_output=True, text=True, encoding="utf-8")
     return probe.returncode == 0
 
 
@@ -66,15 +61,8 @@ def _shard_prelude() -> str:
 
 
 def _run_under_errexit(script: str, *, cwd: Path, env: dict[str, str]) -> subprocess.CompletedProcess:
-    shell = posix_shell()
-    assert shell is not None, "a real POSIX shell is required to execute workflow blocks"
-    return subprocess.run(
-        [shell, "--noprofile", "--norc", "-e", "-c", script],
-        cwd=cwd,
-        env=env,
-        capture_output=True,
-        text=True,
-    )
+    assert posix_shell() is not None, "a real POSIX shell is required to execute workflow blocks"
+    return run_posix_shell("set -e\n" + script, cwd=cwd, env=env, capture_output=True, text=True, encoding="utf-8")
 
 
 def _stub_uv(write_report: bool) -> str:
@@ -95,7 +83,9 @@ def _shard_workspace(tmp_path: Path, *, node_ids: list[str], stamps: dict[str, s
     workspace = tmp_path / "workspace"
     artifacts = workspace / "release-canary-artifacts"
     artifacts.mkdir(parents=True)
-    (artifacts / "shard-0-nodeids.txt").write_text("\n".join(node_ids) + ("\n" if node_ids else ""), encoding="utf-8")
+    (artifacts / "shard-0-nodeids.txt").write_text(
+        "\n".join(node_ids) + ("\n" if node_ids else ""), encoding="utf-8", newline="\n"
+    )
     (workspace / "gh_output.txt").touch()
     for name, value in (stamps or {}).items():
         (workspace / name).write_text(value, encoding="utf-8")
@@ -390,7 +380,7 @@ def test_the_real_setup_stamp_step_survives_errexit_without_a_kernel_file(
     assert stamp_file.is_file(), "the stamp file must exist so the summary can degrade gracefully"
     stamp = stamp_file.read_text(encoding="utf-8").strip()
 
-    if Path("/proc/uptime").is_file():
+    if run_posix_shell("[ -r /proc/uptime ]", check=False, capture_output=True).returncode == 0:
         assert stamp, "/proc/uptime is readable, so a real stamp must be recorded"
         value = float(stamp)
         assert value > 0.0, "seconds since boot must be positive"

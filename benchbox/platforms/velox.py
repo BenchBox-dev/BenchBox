@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -55,6 +56,15 @@ _TABLE_FORMAT_SPARK_CONF: dict[str, dict[str, str]] = {
         "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.hudi.catalog.HoodieCatalog",
     },
 }
+
+
+_WINDOWS_DRIVE_PATH = re.compile(r"^[A-Za-z]:[\\/]")
+
+
+def _is_local_jar_path(jar: str) -> bool:
+    if "://" in jar:
+        return False
+    return bool(_WINDOWS_DRIVE_PATH.match(jar)) or ":" not in jar
 
 
 class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter):
@@ -161,7 +171,7 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
                 "lakehouse_jars is unset, so ensure the server classpath provides them."
             )
             return []
-        missing = [jar for jar in self.lakehouse_jars if "://" not in jar and ":" not in jar and not Path(jar).exists()]
+        missing = [jar for jar in self.lakehouse_jars if _is_local_jar_path(jar) and not Path(jar).exists()]
         if missing and self.deployment == "local":
             raise ValueError(
                 f"lakehouse_jars not found: {', '.join(missing)}. "

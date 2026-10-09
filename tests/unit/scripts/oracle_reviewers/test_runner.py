@@ -19,6 +19,10 @@ from _project.scripts.oracle_reviewers.commands import Invocation
 from _project.scripts.oracle_reviewers.policy import Policy
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
+skip_on_windows = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="fake reviewer CLIs are POSIX shebang scripts, PATH is colon-joined, and runner.execute uses os.killpg",
+)
 
 NOW = datetime(2026, 10, 5, 12, 0, tzinfo=UTC)
 VERDICT = {
@@ -118,6 +122,7 @@ def _command(text: str, output: str = "", exit_code: int = 0) -> dict:
 DEFECT = {"severity": "High", "file": "a.txt", "line": 1, "end_line": None, "title": "Wrong", "detail": "d"}
 
 
+@skip_on_windows
 def test_clean_verdict_is_recorded(policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     workspace, head = _workspace(tmp_path)
     _fake_muse(tmp_path, monkeypatch, f"print({json.dumps(json.dumps(VERDICT))})")
@@ -126,6 +131,7 @@ def test_clean_verdict_is_recorded(policy: Policy, tmp_path: Path, monkeypatch: 
     assert outcome.verdict == {**VERDICT, "defect_count": 0}
 
 
+@skip_on_windows
 def test_workspace_change_makes_the_reviewer_absent(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -137,6 +143,7 @@ def test_workspace_change_makes_the_reviewer_absent(
     assert "changed the workspace" in outcome.missing.detail
 
 
+@skip_on_windows
 def test_wrong_head_is_refused_before_running(policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     workspace, _ = _workspace(tmp_path)
     _fake_muse(tmp_path, monkeypatch, "raise SystemExit('must not run')")
@@ -144,6 +151,7 @@ def test_wrong_head_is_refused_before_running(policy: Policy, tmp_path: Path, mo
     assert outcome.missing is not None and "not at the reviewed head" in outcome.missing.detail
 
 
+@skip_on_windows
 def test_truncated_or_empty_brief_is_absent(policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     workspace, head = _workspace(tmp_path)
     _fake_muse(tmp_path, monkeypatch, "raise SystemExit('must not run')")
@@ -151,6 +159,7 @@ def test_truncated_or_empty_brief_is_absent(policy: Policy, tmp_path: Path, monk
     assert outcome.missing is not None and outcome.missing.kind == absence.INVALID
 
 
+@skip_on_windows
 def test_missing_cli_is_an_error_absence(policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     workspace, head = _workspace(tmp_path)
     monkeypatch.setenv("PATH", "/usr/bin:/bin")
@@ -158,6 +167,7 @@ def test_missing_cli_is_an_error_absence(policy: Policy, tmp_path: Path, monkeyp
     assert outcome.missing is not None and outcome.missing.kind == absence.ERROR
 
 
+@skip_on_windows
 def test_prose_output_is_invalid(policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     workspace, head = _workspace(tmp_path)
     _fake_muse(tmp_path, monkeypatch, "print('Looks good to me!')")
@@ -165,6 +175,7 @@ def test_prose_output_is_invalid(policy: Policy, tmp_path: Path, monkeypatch: py
     assert outcome.missing is not None and outcome.missing.kind == absence.INVALID
 
 
+@skip_on_windows
 def test_diagnostic_is_sanitized(policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     workspace, head = _workspace(tmp_path)
     _fake_muse(tmp_path, monkeypatch, "sys.stderr.write('token sk-ant-oat01-' + 'A' * 40 + '\\n')\nsys.exit(3)")
@@ -173,6 +184,7 @@ def test_diagnostic_is_sanitized(policy: Policy, tmp_path: Path, monkeypatch: py
     assert "AAAAAAAAAA" not in outcome.diagnostic and "[redacted]" in outcome.diagnostic
 
 
+@skip_on_windows
 def test_diagnostic_is_an_excerpt_not_the_raw_output(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -184,6 +196,7 @@ def test_diagnostic_is_an_excerpt_not_the_raw_output(
     assert outcome.diagnostic == "fatal: quota"
 
 
+@skip_on_windows
 def test_execute_kills_on_timeout(tmp_path: Path) -> None:
     invocation = Invocation((sys.executable, "-c", "import time; time.sleep(30)"), tmp_path, None)
     result = runner.execute(invocation, 1)
@@ -298,6 +311,7 @@ def _capture_prompt_body(tmp_path: Path) -> str:
     return f"open('{tmp_path}/prompt.txt', 'w').write(sys.argv[-1])\nprint({json.dumps(json.dumps(VERDICT))})"
 
 
+@skip_on_windows
 def test_a_scoped_review_gives_the_reviewer_a_readable_full_diff(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -314,6 +328,7 @@ def test_a_scoped_review_gives_the_reviewer_a_readable_full_diff(
     assert artifact["verdict"]["summary"] == VERDICT["summary"]
 
 
+@skip_on_windows
 def test_a_full_review_stages_no_diff(policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     workspace, head = _workspace(tmp_path)
     plan_path = _plan_dir(policy, tmp_path, head, "full", "Intro.\n", "diff --git a/a.txt b/a.txt\n+whole\n")
@@ -323,6 +338,7 @@ def test_a_full_review_stages_no_diff(policy: Policy, tmp_path: Path, monkeypatc
     assert (tmp_path / "prompt.txt").read_text(encoding="utf-8") == "Intro.\n"
 
 
+@skip_on_windows
 def test_a_scoped_review_without_a_diff_drops_the_diff_line(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -333,6 +349,7 @@ def test_a_scoped_review_without_a_diff_drops_the_diff_line(
     assert (tmp_path / "prompt.txt").read_text(encoding="utf-8") == "Intro.\nFiles.\n"
 
 
+@skip_on_windows
 def test_a_reviewer_that_reports_incomplete_is_absent_with_its_reason(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -343,6 +360,7 @@ def test_a_reviewer_that_reports_incomplete_is_absent_with_its_reason(
     assert outcome.missing == absence.Absence(absence.INCOMPLETE, "could not read a.txt")
 
 
+@skip_on_windows
 @pytest.mark.parametrize(
     ("defect", "note"),
     [
@@ -369,6 +387,7 @@ def test_a_miscited_defect_is_kept_and_marked_so_the_change_still_fails(
     assert judged.decision == "SHIP_WITH_FIXES"
 
 
+@skip_on_windows
 def test_a_path_outside_the_repository_is_rejected(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -378,6 +397,7 @@ def test_a_path_outside_the_repository_is_rejected(
     assert outcome.missing == absence.Absence(absence.INVALID, "file must be a repository-relative path")
 
 
+@skip_on_windows
 def test_a_reviewer_cannot_supply_its_own_defect_count(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -387,6 +407,7 @@ def test_a_reviewer_cannot_supply_its_own_defect_count(
     assert outcome.missing == absence.Absence(absence.INVALID, "defect_count is set by the oracle, not the reviewer")
 
 
+@skip_on_windows
 def test_a_defect_citing_a_real_line_is_recorded(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -397,6 +418,7 @@ def test_a_defect_citing_a_real_line_is_recorded(
     assert [item["file"] for item in outcome.verdict["defects"]] == ["a.txt"]
 
 
+@skip_on_windows
 def test_a_file_list_ship_must_examine_every_required_file(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -419,6 +441,7 @@ def test_a_file_list_ship_must_examine_every_required_file(
     assert inline.missing is None
 
 
+@skip_on_windows
 def test_absolute_examined_paths_inside_the_workspace_count(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -428,6 +451,7 @@ def test_absolute_examined_paths_inside_the_workspace_count(
     assert outcome.missing is None
 
 
+@skip_on_windows
 @pytest.mark.parametrize(
     ("reads", "brief_mode", "accepted"),
     [
@@ -458,6 +482,7 @@ def test_claude_must_read_every_required_file_on_a_file_list_brief(
         assert "trace shows no" in outcome.missing.detail
 
 
+@skip_on_windows
 def test_a_codex_ship_without_any_read_command_is_a_hollow_review(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -470,6 +495,7 @@ def test_a_codex_ship_without_any_read_command_is_a_hollow_review(
     assert outcome.missing.detail == "the reviewer found no defects but its trace shows no successful file read"
 
 
+@skip_on_windows
 @pytest.mark.parametrize(
     ("event", "accepted"),
     [
@@ -491,6 +517,7 @@ def test_a_codex_file_list_review_needs_a_successful_read_of_each_required_file(
     assert (outcome.missing is None) is accepted
 
 
+@skip_on_windows
 def test_codex_quota_reported_in_the_event_stream_is_quota(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -503,6 +530,7 @@ def test_codex_quota_reported_in_the_event_stream_is_quota(
     assert outcome.missing.reset_at == NOW + timedelta(hours=2)
 
 
+@skip_on_windows
 def test_the_review_fills_the_read_rule_for_the_reviewers_harness(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -513,6 +541,7 @@ def test_the_review_fills_the_read_rule_for_the_reviewers_harness(
     assert (tmp_path / "prompt.txt").read_text(encoding="utf-8") == f"Rules: {READ_RULES['muse']}\n"
 
 
+@skip_on_windows
 def test_a_file_list_review_stages_the_whole_diff(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -532,6 +561,7 @@ def test_a_file_list_review_stages_the_whole_diff(
     assert artifact["outcome"] == "verdict"
 
 
+@skip_on_windows
 @pytest.mark.parametrize("reviewer", ["sol", "sonnet", "muse"])
 def test_a_do_not_ship_is_never_discarded_for_missing_read_evidence(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reviewer: str
@@ -549,6 +579,7 @@ def test_a_do_not_ship_is_never_discarded_for_missing_read_evidence(
     assert outcome.verdict["decision"] == "DO_NOT_SHIP"
 
 
+@skip_on_windows
 def test_a_follow_up_missing_a_prior_status_is_recorded_for_the_judge(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -560,6 +591,7 @@ def test_a_follow_up_missing_a_prior_status_is_recorded_for_the_judge(
     assert [item["id"] for item in outcome.verdict["prior_defects"]] == ["D1"]
 
 
+@skip_on_windows
 @pytest.mark.parametrize(
     ("body", "changed"),
     [

@@ -102,7 +102,7 @@ def explorer_build(
         skipped_note = f" ({stats.skipped} skipped)" if stats.skipped else ""
         console.print(
             f"[green]Done.[/green] Processed {stats.processed} result(s){skipped_note} "
-            f"across {stats.cohorts} cohort(s) → {stats.output_dir}"
+            f"across {stats.cohorts} cohort(s) into {stats.output_dir}"
         )
     except Exception as exc:
         console.print(f"[red]Pipeline failed: {exc}[/red]")
