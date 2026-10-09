@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Owner records one of the three gate decisions with its rationale",
+    "If the aggregate gate changes, both nightly-v2 and perf-smoke use the approved option and the verification run is recorded",
+    "Issue #2778 and t3-perf-baseline-refresh are updated with the decision and live verification"
+  ],
+  "context": "Created from the nightly-red handoff section 0.4. No gate change is authorized without the owner's decision.",
+  "description": "The refreshed EPYC 7763 baseline still produced a +10.47% aggregate result in nightly-v2 run 37991400931 while every per-query regression stayed within the 7 ms floor. The owner must decide whether to raise the aggregate threshold to 15%, add a separate aggregate tolerance, or retain the current 10% gate.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/issues/2778"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:8d0fa0e2ef22aacc5284a44c",
+      "at": "2026-10-09T21:27:44Z",
+      "client": "omp-coding-agent",
+      "op": "create",
+      "op_id": "b38b7e2232d04d11b88306e6be42dd42",
+      "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
+    }
+  ]
+}

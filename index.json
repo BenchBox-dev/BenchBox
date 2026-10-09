@@ -21132,6 +21132,13 @@
       "status": "done",
       "title": "Review moved vendor prices and commit refreshed pricing evidence so t3:drift can pass"
     },
+    "t3-perf-aggregate-gate-tolerance-decision-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Decide aggregate tolerance for the nightly DuckDB performance gate"
+    },
     "t3-perf-baseline-refresh-20261008": {
       "claim": null,
       "needs": [],
