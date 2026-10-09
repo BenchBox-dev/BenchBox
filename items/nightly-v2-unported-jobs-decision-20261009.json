@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Each listed job has a recorded disposition (covered by, ported to, or dropped because) in the dlv2-70 parity table.",
+    "Every job marked for porting is ported or has its own item in dlv2-70's needs."
+  ],
+  "context": "Found in the 2026-10-09 tracker review. Related: cross-surface-mutation-sensitivity-not-enforced-20261009, nightly-v2-throughput-uat-port-20261009, ruleset-drift-check-home-20261009.",
+  "description": "dlv2-70 requires job-level parity for each deleted workflow, but only liveness, Windows unit tests, throughput-uat and ruleset drift have port items. These nightly.yml jobs have no nightly-v2 equivalent and no item: duckdb-preview, slow-tier-observation (the only place the full cross-surface mutation-sensitivity tests run), sqlglot-generator, pyspark-tests, check-test-patterns, integration-smoke (including the Windows leg), integration-table-formats, postgres-integration, test-package, security, parity, green-unmerged-sweep, and the Windows Python 3.11 test leg. website-audit is deleted by site-split-50.\n\nFor each job, record either the nightly-v2 (or ci.yml/trunk.yml) job that now covers it, a port, or a dated reason to drop it.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:18:59Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "12637148755b45fa934956be2ebd8c0f",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}
