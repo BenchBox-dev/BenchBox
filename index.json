@@ -3916,17 +3916,12 @@
       "title": "Remove comments and docstrings from MCP tools, resources and prompts"
     },
     "comment-cleanup-metadata-primitives": {
-      "claim": {
-        "expires_at": "2026-10-10T00:24:15Z",
-        "generation": "1004589a6194421fb556166cb5bd1d33",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from Metadata primitives modules"
     },
     "comment-cleanup-microsoft-cloud": {
