@@ -558,3 +558,27 @@ def test_a_follow_up_missing_a_prior_status_is_recorded_for_the_judge(
     outcome = _review(policy, tmp_path, workspace, head)
     assert outcome.missing is None and outcome.verdict is not None
     assert [item["id"] for item in outcome.verdict["prior_defects"]] == ["D1"]
+
+
+@pytest.mark.parametrize(
+    ("body", "changed"),
+    [
+        ("open(sys.argv[0].rsplit('/bin/', 1)[0] + '/workspace/.oracle-pull-request.diff', 'a').write('+x\\n')", True),
+        ("", False),
+    ],
+    ids=["rewritten", "untouched"],
+)
+def test_a_reviewer_that_rewrites_the_staged_diff_is_invalid(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, body: str, changed: bool
+) -> None:
+    workspace, head = _workspace(tmp_path)
+    source = tmp_path / "diff.patch"
+    source.write_text("diff --git a/a.txt b/a.txt\n+whole\n", encoding="utf-8")
+    staged = runner.stage_pull_request_diff(source, workspace)
+    assert staged is not None
+    _fake_muse(tmp_path, monkeypatch, f"{body}\nprint({json.dumps(json.dumps(VERDICT))})")
+    outcome = _review(policy, tmp_path, workspace, head)
+    if changed:
+        assert outcome.missing == absence.Absence(absence.INVALID, "the reviewer changed the staged pull request diff")
+    else:
+        assert outcome.missing is None

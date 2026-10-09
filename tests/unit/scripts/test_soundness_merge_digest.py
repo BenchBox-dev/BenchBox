@@ -126,12 +126,12 @@ def test_a_thumbs_up_from_anyone_else_is_not_a_signal():
 
 
 def test_a_posted_external_review_after_the_last_content_commit_is_a_signal():
-    pull = evidence(comments=(digest.Comment("dev", "Reviewer: Agy\n\nNo findings.", AFTER),))
+    pull = evidence(comments=(digest.Comment("joeharris76", "Reviewer: Agy\n\nNo findings.", AFTER, "User"),))
     assert digest.review_signals(pull) == ("external-review:agy",)
 
 
 def test_a_posted_review_from_before_the_last_content_commit_is_not_a_signal():
-    pull = evidence(comments=(digest.Comment("dev", "Reviewer: codex", BEFORE),))
+    pull = evidence(comments=(digest.Comment("joeharris76", "Reviewer: codex", BEFORE, "User"),))
     assert digest.review_signals(pull) == ()
 
 
@@ -145,13 +145,26 @@ def test_a_posted_review_from_before_the_last_content_commit_is_not_a_signal():
     ],
 )
 def test_common_review_headings_are_recognised(body):
-    pull = evidence(comments=(digest.Comment("dev", body, AFTER),))
+    pull = evidence(comments=(digest.Comment("joeharris76", body, AFTER, "User"),))
     assert len(digest.review_signals(pull)) == 1
 
 
 def test_a_comment_naming_an_unapproved_reviewer_is_not_a_signal():
-    pull = evidence(comments=(digest.Comment("dev", "Reviewer: my own judgement", AFTER),))
+    pull = evidence(comments=(digest.Comment("joeharris76", "Reviewer: my own judgement", AFTER, "User"),))
     assert digest.review_signals(pull) == ()
+
+
+@pytest.mark.parametrize(
+    "comment",
+    [
+        digest.Comment("dev", "Reviewer: codex", AFTER, "User"),
+        digest.Comment("joeharris76", "Reviewer: codex", AFTER, "Bot"),
+        digest.Comment("joeharris76", "Reviewer: codex", AFTER),
+    ],
+    ids=["other-author", "bot-account", "no-type"],
+)
+def test_an_external_review_counts_only_from_a_listed_attester(comment):
+    assert digest.review_signals(evidence(comments=(comment,))) == ()
 
 
 def standin(sha, login="joeharris76", at=AFTER, prefix="", user_type="User", updated_at=None):
