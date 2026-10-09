@@ -3656,17 +3656,12 @@
       "title": "Remove comments and docstrings from shared DataFrame platform support"
     },
     "comment-cleanup-datafusion-typing": {
-      "claim": {
-        "expires_at": "2026-10-10T00:14:58Z",
-        "generation": "cf9dcba88db441dbbe465120b03dbcc9",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Resolve the deferred DataFusion filter typing boundary"
     },
     "comment-cleanup-datavault": {
