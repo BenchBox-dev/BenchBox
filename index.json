@@ -5050,6 +5050,18 @@
       "status": "open",
       "title": "Update the committed Polars version-matrix methodology to name the core execution-engine setting"
     },
+    "core-exec-remove-deprecated-aliases": {
+      "claim": null,
+      "needs": [
+        "core-exec-polars-cli-mcp-adoption",
+        "core-exec-deployment-selection-recorded",
+        "core-exec-compute-resource-unification",
+        "core-exec-engine-declarations-existing"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Remove the deprecated execution-variant aliases after the deprecation window"
+    },
     "core-exec-result-schema-2-3": {
       "claim": null,
       "needs": [
