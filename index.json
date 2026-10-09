@@ -24243,7 +24243,7 @@
     "unattributed-update-branch-commits-block-merge-20261008": {
       "claim": null,
       "needs": [],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "An automatic branch update adds an unattributed commit that leaves the pull request BLOCKED"
     },

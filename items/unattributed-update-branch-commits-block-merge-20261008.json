@@ -1,10 +1,11 @@
 {
   "acceptance": [
-    "The source of the automatic update-branch on #2769 is identified (workflow, app or setting)",
-    "Either that source no longer updates pull request branches, or its commits are attributed so they do not need extra approval",
-    "docs/operations/repo-admin-settings.md records the rule and the recovery"
+    "Met: the source of the update-branch on #2769 is identified (GitHub's Update branch action under the owner's credentials; commit 1e08adaa1)",
+    "A documented rule: never use Update branch or `gh pr update-branch`; rebase locally and push. An optional guard in PR tooling (for example a warning in the pr scripts when the head's newest commit has committer web-flow) may be added",
+    "docs/operations/repo-admin-settings.md records the rule and the recovery (rebuild the merge as an author-made commit, or rebase locally and push)"
   ],
-  "description": "On #2769 a merge of develop was pushed at 14:02 UTC as commit 1e08adaa1 (committer web-flow, timeline actor \"GitHub\") right after a close/reopen. All required checks then passed and no thread was open, but the pull request stayed BLOCKED. The develop ruleset sets require_extra_approval_for_unattributed_changes, and the author cannot approve their own pull request. Rebuilding the same tree as an author-made merge commit unblocked it. Nobody knows what performed the update, and the update also invalidated a head-specific stand-in.",
+  "context": "2026-10-09 tracker review: priority lowered from medium to low. Criterion 1 is met: 1e08adaa1 (author Joe Harris, committer web-flow, verified) is GitHub's update-branch action under the owner's credentials. It did not recur in the last 60 develop PRs. Criterion 2 is now a documented rule with an optional tooling guard, since there is no automatic updater to switch off. The docs criterion is kept.",
+  "description": "On #2769 a merge of develop was pushed at 14:02 UTC as commit 1e08adaa1 (author Joe Harris, committer GitHub web-flow, timeline actor \"GitHub\", verified) right after a close/reopen. All required checks then passed and no thread was open, but the pull request stayed BLOCKED. The develop ruleset sets require_extra_approval_for_unattributed_changes, and the author cannot approve their own pull request. Rebuilding the same tree as an author-made merge commit unblocked it. The update also invalidated a head-specific stand-in.\n\nSource identified: the commit is GitHub's \"Update branch\" action run under the owner's credentials, not an unknown workflow or app. It has not recurred in the last 60 develop PRs. The remaining risk is someone using the button or `gh pr update-branch` again.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/pull/2769"
   ],
@@ -15,6 +16,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "f4727f6bcf70455083bf69f887006434",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:34:26Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "605711faf1d546b0b95b76090576e804",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
