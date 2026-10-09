@@ -1,9 +1,10 @@
 {
   "acceptance": [
-    "The merged change of #2761 (47ee38575) gets a real review with the hardened reviewer (verdict v2 with read evidence) or a recorded human review",
+    "The nine soundness-path files changed in 47ee38575 get a real review with the hardened reviewer (verdict v2 with read evidence) or a recorded human review",
     "Any Critical or High defect found is fixed in a follow-up pull request"
   ],
-  "description": "The shadow oracle recorded \"success\" on #2761's final head 433b9a470 from a Codex review that read no files (file-list brief, summary saying it could not review). The hollow-review scan on 2026-10-08 flagged it, and the handoff required a re-review before the cut-over. The pull request was merged into develop (47ee38575) before that re-review ran, so its soundness-path changes never had a real oracle review.",
+  "context": "2026-10-09 tracker review: corrected the final head (c8e7f2017, not 433b9a470) and the merge route (stand-in with a 293-character comment and no review text). The review is scoped to the nine soundness files so it is a bounded job.",
+  "description": "The shadow oracle recorded \"success\" on #2761's final head c8e7f2017 from a Codex review that read no files (file-list brief, summary saying it could not review). The pull request merged into develop as 47ee38575 on a stand-in comment of 293 characters with no review text. The hollow-review scan on 2026-10-08 flagged it, and the handoff required a re-review before the cut-over, but the merge came first. Its soundness-path changes therefore never had a real oracle review.\n\nScope of the review: the nine soundness-path files changed in 47ee38575 (+224/-61):\n- five files under _project/scripts/explorer_pipeline/ (models.py, pipeline.py, ranking.py, transformer.py, duckdb_builder.py);\n- publication/ledger-seed.json;\n- scripts/generate_corpus_inventory.py;\n- scripts/publication/check_explorer_compat.py;\n- _project/scripts/results_explorer_snapshot_invariants.py.\nThe other files in the commit (corpus bundles, tests, docs, results-explorer sources) are outside the soundness list and need no oracle review.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/pull/2761"
   ],
@@ -14,6 +15,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "a4d1d1e25a6447b2a771a8b60a510778",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:31:19Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "ceaf40a018c542e297a044fb2a80692f",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
