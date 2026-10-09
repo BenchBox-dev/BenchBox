@@ -2005,10 +2005,15 @@
       "title": "Fix (not just pin) calculate_checksum's separator/dtype collisions with an escaped, type-tagged rendering plus same-change digest regen"
     },
     "canary-chdb-leak-source-20261009": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T16:49:46Z",
+        "generation": "d57893312b614b62aaf499089f2cc43e",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92"
+      },
       "needs": [],
       "priority": "critical",
-      "status": "open",
+      "status": "active",
       "title": "Eliminate chdb module-global leak at its source"
     },
     "canary-chdb-stub-leak-20261008": {
