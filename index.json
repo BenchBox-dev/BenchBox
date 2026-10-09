@@ -19550,12 +19550,17 @@
       "title": "Open a site-bundle-failed issue when the core site-inputs bundle build fails"
     },
     "site-split-12-bundle-downloads": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T04:18:00Z",
+        "generation": "5b2ad0476c534dec936ca99cd7267095",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de"
+      },
       "needs": [
         "site-split-10-core-site-inputs"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Carry the core files that docs link to outside docs/ in the site-inputs bundle (schema 2)"
     },
     "site-split-20-seed-site-repo": {
