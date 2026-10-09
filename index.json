@@ -24752,6 +24752,13 @@
       "status": "done",
       "title": "Keep PR-followups mock-runner tests independent of installed Codex"
     },
+    "windows-session-lock-holder-readable-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Lock a byte past the holder text so the session-isolation lock is readable on Windows"
+    },
     "windows-snowflake-stage-path-object-separators": {
       "claim": null,
       "needs": [],
