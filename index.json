@@ -4385,12 +4385,17 @@
       "title": "Migrate Windows lint suppressions and clean its source reader"
     },
     "comment-cleanup-write-primitives": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T01:10:29Z",
+        "generation": "eb945bbc22e84b3daaad298b3143501a",
+        "renewals": 0,
+        "worker": "mcp:antigravity-worker-2"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from Write primitives modules"
     },
     "comment-policy-digest-and-base-exception-catch22-20261008": {
