@@ -4436,10 +4436,15 @@
       "title": "Concurrent comment-policy runs keep the shared host above the quiet-machine threshold for timed benchmarks"
     },
     "comment-policy-pinned-notice-drift-guard": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T15:34:11Z",
+        "generation": "1e8a14762cba4f60809361bbd4c706cf",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:3a93d76fab1934bd71f35b65"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Guard that whole-file pinned notices update their digest pin when modified on a branch"
     },
     "comment-policy-ratchet-wheel-upgrade": {
