@@ -3806,12 +3806,17 @@
       "title": "Verify complete comment removal and enable strict whole-project enforcement"
     },
     "comment-cleanup-flightdata": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:19:42Z",
+        "generation": "be2cff6558624d90bc23522a55fb5496",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from FlightData modules"
     },
     "comment-cleanup-gcp-cloud": {
