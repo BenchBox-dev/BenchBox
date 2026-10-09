@@ -1,7 +1,7 @@
 {
   "acceptance": [
-    "The checklist and both adding-*-platform guides describe the reserved words and the execution_engines declaration with a worked example taken from polars-df",
-    "The scaffold helper output includes the capability stubs and passes the parity test unmodified (test added)",
+    "The checklist and both adding-*-platform guides describe the reserved words and alias rule and the execution_engines declaration with a worked example taken from polars-df",
+    "The scaffold helper output includes the execution_engines capability stub and a resolve_execution_engine receipt, and passes the parity test unmodified (test added); compute and gateway stubs are added by their own items when those capabilities exist",
     "compat-docs-check passes; PR merged through the normal flow"
   ],
   "context": "Decision gate: start after core-exec-polars-cli-mcp-adoption so the worked example is real code. Guardrails: shared core-exec guardrails (see core-exec-d0-vocabulary-adr context).",
@@ -18,6 +18,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "497db09a17774b56807718fb612254cd",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:48:40Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "f6b3e8762231412fa7befad5d77c44bf",
       "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
     }
   ]
