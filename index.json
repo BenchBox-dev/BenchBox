@@ -3404,17 +3404,12 @@
       "title": "Close the comment-policy checker's Medium and Low review follow-ups"
     },
     "comment-cleanup-ai-primitives": {
-      "claim": {
-        "expires_at": "2026-10-10T00:05:02Z",
-        "generation": "6459aa8ff46b4a37a713388f3d62f218",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from AI primitives modules"
     },
     "comment-cleanup-amplab": {
