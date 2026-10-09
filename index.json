@@ -4093,12 +4093,17 @@
       "title": "Define comment-removal scope, provenance, ownership and exception policy"
     },
     "comment-cleanup-security-credentials": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:34:48Z",
+        "generation": "d33828c82f274540825740f9b03e5f30",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from security and credential services"
     },
     "comment-cleanup-shared-infrastructure": {
