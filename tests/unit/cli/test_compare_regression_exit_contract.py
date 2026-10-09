@@ -318,3 +318,23 @@ class TestMinRegressionDeltaCommand:
             )
 
         assert run_file_comparison.call_args.kwargs["min_regression_delta"] == "5ms"
+
+    def test_interactive_platform_comparison_rejects_the_floor(self):
+        from benchbox.cli.commands import compare as compare_module
+
+        with (
+            patch.object(compare_module.Prompt, "ask", return_value="1"),
+            patch.object(compare_module, "_interactive_platform_comparison") as platform_comparison,
+            pytest.raises(compare_module.click.UsageError, match="result file comparison"),
+        ):
+            compare_module._run_interactive_wizard(
+                output_format="text",
+                output_file=None,
+                generate_charts=False,
+                theme="light",
+                fail_on_regression="10%",
+                show_all_queries=False,
+                min_regression_delta="5ms",
+            )
+
+        platform_comparison.assert_not_called()

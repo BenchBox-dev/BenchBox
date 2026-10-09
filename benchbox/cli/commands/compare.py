@@ -464,6 +464,8 @@ def _run_interactive_wizard(
     )
 
     if mode_choice == "1":
+        if min_regression_delta is not None:
+            raise click.UsageError("--min-regression-delta applies to result file comparison, not platform runs")
         _interactive_platform_comparison(
             output_format=output_format,
             output_file=output_file,
