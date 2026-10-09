@@ -4481,7 +4481,7 @@
       "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "dropped",
       "title": "Support adding legitimate comment exceptions in PRs without base branch circular dependency"
     },
     "comment-scanner-mdx-jsx-support": {
