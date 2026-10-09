@@ -4952,6 +4952,16 @@
       "status": "open",
       "title": "Add the core execution-engine module and manifest capability, with a vocabulary parity test"
     },
+    "core-exec-polars-cli-mcp-adoption": {
+      "claim": null,
+      "needs": [
+        "core-exec-framework-manifest",
+        "core-exec-result-schema-2-3"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Replace the Polars engine option with the core --execution-engine setting across CLI, MCP, config and the Polars adapters"
+    },
     "core-exec-result-schema-2-3": {
       "claim": null,
       "needs": [
