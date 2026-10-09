@@ -7686,10 +7686,15 @@
       "title": "Rewrite architecture.md and structure.md to match current codebase"
     },
     "docs-test-pinned-internal-jargon": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:52:54Z",
+        "generation": "3d327ef35dfb45a3b713fa4c90f8df11",
+        "renewals": 0,
+        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:a9f51c620a99fea6b166f0af"
+      },
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Remove internal jargon that tests pin on published reference pages"
     },
     "docs-tests-readme-pytest-config": {
