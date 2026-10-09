@@ -1,0 +1,35 @@
+{
+  "acceptance": [
+    "For each platform listed in the description, --platform-option compute_resource=X (and the native alias) parses and reaches the adapter's native connection parameter; a mock-based unit test per platform proves it",
+    "compute_size is accepted where the platform has a size concept and rejected elsewhere with an error listing allowed keys",
+    "Result bundles carry platform.compute.resource_kind and size readable, and resource handled per ADR D7; legacy warehouse*/cluster* fields are still populated",
+    "Anonymizer tests cover the newly handled identifier keys (cluster_identifier, service_id, service_name, spark_pool, lakehouse_id) and pass the publication fixed-point gates",
+    "Athena no longer emits an `engine` field; Athena Spark runtime_version reaches start_session (mock test) and engine_version is a deprecated alias",
+    "Every compute example in docs/ parses against the registry (enforced by the docs check from platform-option-docs-unregistered-keys or an equivalent test added here)",
+    "The parity test grandfather list no longer contains `warehouse`; no live cloud calls in tests",
+    "Merged as one PR per platform family if over about 600 lines (warehouse family, Spark-cloud family, ClickHouse/Firebolt/Quanton)"
+  ],
+  "context": "Decision gates:\n- G1 Start after core-exec-result-schema-2-3.\n- G2 If a native key also carries a non-compute meaning (connection endpoint, database, directory), stop and decide with the user; do not alias it.\n- G3 If aliasing changes the default compute object a user's existing credentials select (e.g. Snowflake COMPUTE_WH default), stop: defaults must not change silently.\n- G4 No live cloud runs. Mock every vendor API.\n\nVerification rubric: per-platform mock tests; anonymizer and publication gates; compat-docs-check; the docs-parse check; make pr-preflight.\n\nGuardrails: shared core-exec guardrails (see core-exec-d0-vocabulary-adr context). Credentials never in tests, logs or tracker fields.",
+  "description": "About twelve names select a named, billable compute object, and most cannot be passed as --platform-option even though docs advertise them: Snowflake/snowpark-connect warehouse and warehouse_size; Databend warehouse; Databricks http_path/warehouse_id (SQL) and cluster_id (DataFrame); Firebolt engine_name and engine_size/compute_size; Athena and Athena Spark workgroup (+ DPU sizes); Redshift workgroup_name/cluster_identifier; Dataproc cluster_name; Synapse Spark spark_pool_name; EMR Serverless application_id; ClickHouse Cloud service_id/service_name and compute_size; Quanton cluster_size; Glue worker_type/number_of_workers.\n\nWork:\n1. Manifest capability `compute` {resource_kind (warehouse|engine|workgroup|cluster|pool|application|service), native_resource_keys, native_size_keys} per ADR D2.\n2. Register compute_resource and compute_size only on declaring platforms, through a core helper (not the CLI layer), with the native keys as PlatformOptionSpec aliases normalized to the core key (benchbox/core/hooks/platform_hooks.py:29-46). Credentials and env vars stay valid fallbacks. Adapters read the canonical keys.\n3. Results: platform.compute.{resource, resource_kind, size}; keep populating the legacy warehouse*/cluster* fields of PlatformComputeMetadata (core/results/environment.py:230-248, platforms/base/runtime_metadata.py:320-340) through 2.x.\n4. Anonymization per ADR D7 and adr-published-identifier-field-set (also close the gaps where cluster_identifier, service_id, service_name, spark_pool and lakehouse_id are neither hashed nor dropped today).\n5. Rename Athena's literal platform_compute.engine=\"athena\" field per ADR D7; rename the Athena Spark `engine_version` option to `runtime_version` and make it actually reach start_session (today it is recorded but never sent).\n6. Fabric DW `warehouse` (a database there) handled per ADR D11.\n7. MCP: compute_resource is not an MCP parameter (record it under rejected alternatives in the contract doc).\n8. Docs: every compute example uses the canonical keys and parses (coordinate with platform-option-docs-unregistered-keys, which owns table_format/shuffle/spark_config examples). Add the compute section to the new-platform checklist. Remove `warehouse` from the grandfather list.",
+  "links": [
+    "benchbox/core/hooks/platform_hooks.py",
+    "benchbox/cli/platform_defaults.py",
+    "benchbox/core/results/environment.py",
+    "benchbox/platforms/base/runtime_metadata.py",
+    "benchbox/platforms/firebolt.py",
+    "benchbox/platforms/snowflake.py",
+    "benchbox/platforms/athena.py",
+    "item:platform-option-docs-unregistered-keys",
+    "docs/development/adr/adr-published-identifier-field-set.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:35:10Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "4a6d14979ce44190868b8b5638195c07",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
+    }
+  ]
+}

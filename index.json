@@ -4936,6 +4936,15 @@
       "status": "done",
       "title": "Copyright and License Declaration Updates ✅ COMPLETED"
     },
+    "core-exec-compute-resource-unification": {
+      "claim": null,
+      "needs": [
+        "core-exec-result-schema-2-3"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Unify named compute resources under core compute_resource and compute_size settings with native keys as aliases"
+    },
     "core-exec-d0-vocabulary-adr": {
       "claim": null,
       "needs": [],
