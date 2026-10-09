@@ -1,11 +1,12 @@
 {
   "acceptance": [
-    "Owner records one of the three gate decisions with its rationale",
-    "If the aggregate gate changes, both nightly-v2 and perf-smoke use the approved option and the verification run is recorded",
-    "Issue #2778 and t3-perf-baseline-refresh are updated with the decision and live verification"
+    "The owner records one of the options (a) to (f) with its rationale on issue #2778",
+    "nightly-v2 and perf-smoke (on pull requests to release) use the approved option",
+    "t3:perf passes in a nightly-v2 verification dispatch after the change",
+    "docs/development/perf-smoke.md no longer says the workflow runs per PR, and its advice to re-run once matches the decision"
   ],
-  "context": "Created from the nightly-red handoff section 0.4. No gate change is authorized without the owner's decision.",
-  "description": "The refreshed EPYC 7763 baseline still produced a +10.47% aggregate result in nightly-v2 run 37991400931 while every per-query regression stayed within the 7 ms floor. The owner must decide whether to raise the aggregate threshold to 15%, add a separate aggregate tolerance, or retain the current 10% gate.",
+  "context": "Created from the nightly-red handoff section 0.4. No gate change is authorized without the owner's decision.\n\n2026-10-09 tracker review: replaced the three-option list with options (a) to (f) and added the evidence. The earlier acceptance that referred to t3-perf-baseline-refresh was replaced by \"t3:perf passes in a nightly-v2 verification dispatch\" (moved from that item, which is being closed). New acceptance: fix the \"Per-PR\" title and the re-run-once advice in docs/development/perf-smoke.md to match the decision.",
+  "description": "Owner decision needed: how should the nightly DuckDB performance gate judge the aggregate metrics (Total Execution Time and Average Query Time), given that the 10% aggregate check fails on host noise? Options:\n(a) Keep 10%. t3:perf stays red most nights.\n(b) Raise the aggregate threshold to 15%. Simple, but the same-class spread is wide enough that it would still fail on bad nights.\n(c) Add an absolute floor to the aggregate check: fail only when the aggregate is both more than 10% slower and more than N ms slower, with N taken from the same-class spread (about 65 ms). Needs a change in benchbox/cli/commands/compare.py, because --min-regression-delta applies to per-query checks only (compare.py:284: \"Aggregate metrics are judged by percentage alone\").\n(d) Make aggregates report-only and keep the per-query gate.\n(e) Judge against rolling same-runner-class history, or require two consecutive red nights before failing.\n(f) Increase the signal (more iterations or a larger scale factor), or gate run wall time instead.\nRecommendation: (c) or (e).\n\nEvidence:\n- The aggregate is the sum of the same 66 per-query timings (22 queries x 3 iterations, about 8 ms each) that the per-query check already judges. It adds no independent signal.\n- In run 37991400931 all 22 queries slowed together (+2.7% to +45.8%) on the baseline's own runner class (AMD EPYC 7763). That pattern is host noise, not a code regression.\n- Same-class aggregate totals so far: 539.8, 542.9, 546.4, 548.9, 586.1 and 604.7 ms. One night in six already exceeds 10% over the lowest.\n- The gate does not measure orchestration overhead: run.total_duration_ms is not compared.\n- perf-smoke.yml runs only on pull requests to the release branch (perf-smoke.yml:3-5), so the \"Per-PR\" title and wording in docs/development/perf-smoke.md are wrong.\n- t3:perf failed in 11 of the last 12 nightly-v2 runs.\n\nContext: the refreshed EPYC 7763 baseline still produced a +10.47% aggregate result in nightly-v2 run 37991400931 while every per-query regression stayed within the 7 ms floor.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2778"
   ],
@@ -17,6 +18,14 @@
       "op": "create",
       "op_id": "b38b7e2232d04d11b88306e6be42dd42",
       "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:30:33Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "a0162119bef54864b4c771e8d3591d63",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
