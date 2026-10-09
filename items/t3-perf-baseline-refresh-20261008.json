@@ -4,7 +4,7 @@
     "Replaying every retained result against the new baseline with the nightly gate options (including the delta floor) passes, except any run that carries a real slowdown, which is named",
     "The t3:perf job passes in the verification dispatch of nightly-v2 on develop after this item and the delta-floor item have merged"
   ],
-  "context": "PR #2834 is merged. Live nightly-v2 run 37991400931 on develop head 52d0c0db0 has t3:perf failed only on the aggregate >10% check: 604.7 ms versus 547 ms (+10.47%); per-query delta-floor checks passed. Section 0.4 requires the owner to choose whether to raise the aggregate threshold to 15%, add a separate aggregate tolerance, or retain 10%. No gate change made. Next action: owner decides; then run the remaining nightly-v2 verification and finish this item only on accepted evidence.",
+  "context": "PR #2834 is merged. Live nightly-v2 run 37991400931 on develop head 52d0c0db0 has t3:perf failed only on the aggregate >10% check: 604.7 ms versus 547 ms (+10.47%); per-query delta-floor checks passed. Section 0.4 requires the owner to choose whether to raise the aggregate threshold to 15%, add a separate aggregate tolerance, or retain 10%. No gate change made. Next action: owner decides; then run the remaining nightly-v2 verification and finish this item only on accepted evidence.\n\nClosed 2026-10-09 (tracker review against develop 34de720b8): PR #2834 (cba4b74d7) rebuilt _project/baselines/perf_smoke_duckdb_tpch_001.json from five AMD EPYC 7763 nightly results. The sources are recorded in perf_smoke_duckdb_tpch_001.sources.json and the method in docs/development/perf-smoke.md. The PR's replay shows all nine retained results pass `benchbox compare --fail-on-regression 10% --min-regression-delta 7ms`, and a synthetic 2.2x slower query fails. Acceptance 3 (t3:perf passes) moved to t3-perf-aggregate-gate-tolerance-decision-20261009, which owns the aggregate-tolerance owner decision.",
   "description": "_project/baselines/perf_smoke_duckdb_tpch_001.json is a local macOS run from 2026-04-13 (DuckDB 1.5.1, 3 iterations, total query time 686 ms) with whole-millisecond per-query values, yet both the nightly T3 perf job and the per-PR Performance Smoke job compare GitHub-runner results to it. Rebuild it as per-query medians over at least five retained t3-perf-result artifacts from scheduled nightly-v2 runs on develop (4-CPU x86_64 runner), keeping the existing result schema, and record the source run ids and method next to the file. Update the refresh procedure in docs/development/perf-smoke.md, which currently says to copy a single run. A single-run refresh would just move the noise problem.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2778"
@@ -41,6 +41,14 @@
       "generation": "84d66aaa1df442cdbf447f266ff5cbb0",
       "op": "take",
       "op_id": "98d0d8522f8e48c7af4e47febef23362",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:27:03Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "633135de192e4d8bbb913ce5690c1823",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
