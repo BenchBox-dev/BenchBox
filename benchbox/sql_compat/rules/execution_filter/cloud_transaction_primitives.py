@@ -43,7 +43,7 @@ for _platform, _skips in (
                 support_level=SupportLevel.SKIPPED_QUERY,
                 failure_mode=FailureMode.UNSUPPORTED_FEATURE,
                 payload=SkipQueryPayload(
-                    reason=f"{_reason} Evidence: live {_platform} probe on 2026-09-26.",
+                    reason=_reason,
                     query_id=_query_id,
                 ),
                 reason=_reason,

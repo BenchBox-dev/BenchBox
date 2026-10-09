@@ -52,8 +52,7 @@ for _qid in ("Q1", "Q2", "Q3", "Q4", "Q5", "Q6"):
             payload=SkipQueryPayload(
                 reason=(
                     "LakeSail/Sail rejects DuckDB array_cosine_similarity/array_distance and the Spark "
-                    "higher-order array lambda fallback; targeted UAT on 2026-05-13 failed with "
-                    "'unknown function: array_cosine_similarity' and then 'lambda function'."
+                    "higher-order array lambda fallback."
                 ),
                 query_id=_qid,
             ),

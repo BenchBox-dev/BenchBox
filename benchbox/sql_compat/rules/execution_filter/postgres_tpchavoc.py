@@ -26,10 +26,7 @@ for _platform in _POSTGRES_TPCHAVOC_PLATFORMS:
                 support_level=SupportLevel.SKIPPED_QUERY,
                 failure_mode=FailureMode.UNSUPPORTED_FEATURE,
                 payload=SkipQueryPayload(
-                    reason=(
-                        f"{_reason} Evidence: 2026-05-13 enabled-platform UAT reported this stable "
-                        "TPC-Havoc variant failure on PostgreSQL-family SQL execution."
-                    ),
+                    reason=_reason,
                     query_id=_query_id,
                 ),
                 reason=_reason,

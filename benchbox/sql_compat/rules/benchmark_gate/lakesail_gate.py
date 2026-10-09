@@ -15,8 +15,7 @@ REGISTRY.register(
             reason=(
                 "AI primitives is an LLM/tooling benchmark, not a SQL engine workload. "
                 "LakeSail/Sail schema creation fails before load because AIPrimitivesBenchmark "
-                "does not provide get_create_tables_sql; targeted UAT on 2026-05-12 failed with "
-                "AttributeError before any query execution."
+                "does not provide get_create_tables_sql."
             )
         ),
         reason=("AI primitives requires LLM/tool execution APIs and has no SQL schema contract for LakeSail/Sail."),
@@ -36,8 +35,7 @@ REGISTRY.register(
             reason=(
                 "Transaction primitives requires DBAPI-style transactional execution with BEGIN, COMMIT, ROLLBACK, "
                 "SAVEPOINT, and isolation-level statements. LakeSail/Sail SQL mode exposes a Spark Connect "
-                "SparkSession, and the 2026-05-13 focused UAT run failed every operation at the operation-executor "
-                "boundary with `Invalid connection type: SparkSession` before any transaction semantics could run."
+                "SparkSession, which fails at the operation-executor boundary with `Invalid connection type: SparkSession`."
             )
         ),
         reason=(
@@ -59,9 +57,8 @@ REGISTRY.register(
         payload=BlockBenchmarkPayload(
             reason=(
                 "Metadata primitives relies on INFORMATION_SCHEMA-style catalog tables such as schemata, tables, "
-                "columns, views, and table_constraints. The 2026-05-13 focused LakeSail UAT run created the test "
-                "schema but every metadata query failed with `Table not found` for those catalog relations, proving "
-                "current Sail does not expose the metadata contract this benchmark measures."
+                "columns, views, and table_constraints. LakeSail/Sail does not expose those catalog relations, failing "
+                "metadata queries with `Table not found`."
             )
         ),
         reason="LakeSail/Sail does not expose the INFORMATION_SCHEMA catalog contract required by metadata_primitives.",
@@ -81,8 +78,8 @@ REGISTRY.register(
             reason=(
                 "Write primitives currently executes through the SQL operation executor, which requires an "
                 "`execute()`/`fetchall()` connection contract and row-level DML/DDL operation semantics. "
-                "LakeSail/Sail SQL mode supplies a Spark Connect SparkSession; the 2026-05-13 focused UAT run "
-                "loaded the schema but failed all operations with `Invalid connection type: SparkSession`."
+                "LakeSail/Sail SQL mode supplies a Spark Connect SparkSession, which fails operations with "
+                "`Invalid connection type: SparkSession`."
             )
         ),
         reason=(
@@ -103,10 +100,7 @@ REGISTRY.register(
         payload=BlockBenchmarkPayload(
             reason=(
                 "LakeSail/Sail has no native vector-distance functions for the vector_search benchmark, and "
-                "the Spark SQL lambda fallback expressions are rejected by Sail. The 2026-05-14 full UAT gate "
-                "loaded 10,100 vector_search rows, but executed zero queries because all six query_source "
-                "variants were compatibility-skipped; this must be accounted as a benchmark-level capability "
-                "block rather than a zero-query pass."
+                "the Spark SQL lambda fallback expressions are rejected by Sail."
             )
         ),
         reason=(

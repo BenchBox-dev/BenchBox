@@ -31,7 +31,7 @@ for _query_id, _reason in DATABRICKS_TRANSACTION_PRIMITIVES_OPERATION_SKIPS.item
             support_level=SupportLevel.SKIPPED_QUERY,
             failure_mode=FailureMode.UNSUPPORTED_FEATURE,
             payload=SkipQueryPayload(
-                reason=f"{_reason} Evidence: live Databricks SQL warehouse probe on 2026-09-26.",
+                reason=_reason,
                 query_id=_query_id,
             ),
             reason=_reason,

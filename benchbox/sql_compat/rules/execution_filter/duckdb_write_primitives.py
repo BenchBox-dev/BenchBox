@@ -50,10 +50,7 @@ def _register_merge_into_skips() -> None:
                 support_level=SupportLevel.SKIPPED_QUERY,
                 failure_mode=FailureMode.UNSUPPORTED_FEATURE,
                 payload=SkipQueryPayload(
-                    reason=(
-                        f"{DUCKDB_WRITE_PRIMITIVES_MERGE_SKIP_REASON} "
-                        "Evidence: DuckDB 1.3.2 local execution verification on 2026-06-30."
-                    ),
+                    reason=DUCKDB_WRITE_PRIMITIVES_MERGE_SKIP_REASON,
                     query_id=op_id,
                 ),
                 reason=DUCKDB_WRITE_PRIMITIVES_MERGE_SKIP_REASON,
