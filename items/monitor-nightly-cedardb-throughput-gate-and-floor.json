@@ -4,7 +4,7 @@
     "Throughput@Size floor calculates rolling median from retained annotations without falling back to observe-only or false alerting",
     "Results artifact is uploaded and verified"
   ],
-  "context": "Post-merge verification for PR #2757.",
+  "context": "Post-merge verification for PR #2757.\n\n2026-10-09 tracker review: acceptance 1 and 3 were met by scheduled run 37928417334. Acceptance 2 was reworded to the 5-sample threshold. Acceptance 4 is new, from dispatch 37967682464. The throughput UAT job also has to move to nightly-v2 before dlv2-70 deletes nightly.yml; that is tracked by nightly-v2-throughput-uat-port-20261009, and the floor's history lookup in nightly.yml (about line 755) must follow it.",
   "description": "PR #2757 unquarantined the CedarDB throughput UAT cell (removed continue-on-error) and activated the per-runner-class rolling median floor. PR #2757 was merged after 2 green nightly cells with owner waiver. The first official gating nightly run will be 2026-10-09 (or next scheduled run). Monitor this run to ensure the unquarantined CedarDB cell, statement timeouts, and numeric floor evaluate cleanly in production without false-positive ejection.",
   "sessions": [
     {
@@ -14,6 +14,14 @@
       "op": "create",
       "op_id": "3106dedaeb2546adb0bf719f16c1d902",
       "session_id": "414237a6e56140ed97e26a248092ab35"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:28:45Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "f72fede4c89f4adea3edff2de1667853",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
