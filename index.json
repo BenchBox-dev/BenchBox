@@ -14024,6 +14024,15 @@
       "status": "open",
       "title": "Oracle patch hashes drop hunk positions, so moving an edit can carry an earlier decision"
     },
+    "oracle-post-guard-reread-retry-20261009": {
+      "claim": null,
+      "needs": [
+        "oracle-followup-read-bypass-out-of-scope-defect-20261009"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "The oracle's pre-post guard posts after a single failed re-read of the review list"
+    },
     "oracle-protocol-test-gaps-20261009": {
       "claim": null,
       "needs": [],
