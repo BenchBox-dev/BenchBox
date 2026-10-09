@@ -24766,15 +24766,10 @@
       "title": "Prevent shared-clone identity contamination with worktree-scoped identity at claim time"
     },
     "worktree-typescript-module-resolution": {
-      "claim": {
-        "expires_at": "2026-10-10T13:31:29Z",
-        "generation": "4cb7018273e14eadba79db33b58c69c6",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:3a93d76fab1934bd71f35b65"
-      },
+      "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "active",
+      "status": "open",
       "title": "Resolve TypeScript and node_modules discovery in linked worktrees for JS comment syntax tests"
     },
     "wrapper-update-verb-capability-declaration-handoff": {
