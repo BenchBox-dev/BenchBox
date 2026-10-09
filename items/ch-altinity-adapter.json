@@ -1,5 +1,11 @@
 {
+  "context": "Core execution-variant guardrails (added 2026-10-09; ADR docs/development/adr/adr-core-execution-variants.md, plan item core-exec-execution-variants):\n- Do not register bare generic option keys (engine, mode, backend, runtime, executor, warehouse); the vocabulary parity test from core-exec-framework-manifest fails on them.\n- Deployment (managed) is declared through the manifest deployment_modes capability and selected with --platform altinity:<mode>, never a per-platform mode/deployment key.\n- The Altinity cluster or service is a named compute resource: select it through the core compute_resource (and compute_size, if the API exposes a size) per core-exec-compute-resource-unification; vendor spellings are aliases only. If that item has not landed when this one starts, stop and ask whether to wait or to add a native key that will become an alias.\n- Follow the execution-variant section of docs/development/new-platform-acceptance-checklist.md (core-exec-new-platform-checklist).",
   "description": "Add end-to-end BenchBox support for Altinity Cloud as a native platform (not a gateway). Altinity exposes its own ClickHouse clusters on standard native TCP :9440 and HTTPS :8443 endpoints; results live under a new `altinity` key, so there is no same-key baseline contamination risk.\n\nDeliver one coherent platform addition: manifest registration (key `altinity`, platform_family clickhouse, inherits_from clickhouse, experimental, next contiguous registration order at implementation time, clickhouse-connect driver package and extra), AltinityAdapter(ClickHouseAdapter) forcing a managed deployment mode, host/password/user config with ALTINITY_* env fallback, credential redaction, S3/GCS staging options only if the spike shows they work, SQL-compat exemption or reuse per spike findings, mock-only unit tests, docs/platforms/altinity.md with an Altinity Shield hop-latency note, and SF 0.01 TPC-H parity UAT against the trial cluster.\n\nDECISION GATE: proceeds only after ch-altinity-spike records a go (zero SQL-compat rewrites needed, both transports confirmed).\n\nGuardrails: manifest authority respected (no parallel registries); lazy optional imports; compat-docs-check green; no credentials in git; target 7-10 durable files per the new-platform acceptance checklist.",
+  "links": [
+    "docs/development/new-platform-acceptance-checklist.md",
+    "item:core-exec-execution-variants",
+    "item:core-exec-compute-resource-unification"
+  ],
   "sessions": [
     {
       "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
@@ -16,6 +22,14 @@
       "op": "update",
       "op_id": "7cecc24a96ad4e93b40bbcf4e7b4a1b6",
       "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:38:18Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "9627aa5dd7954c52b49c90220494f40a",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
     }
   ]
 }
