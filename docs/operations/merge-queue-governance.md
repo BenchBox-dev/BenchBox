@@ -92,7 +92,7 @@ If a trunk failure is traced to a pull request that was green on an older base m
 
 - the `benchbox-oracle` app's latest review of the last content commit, or of a merge that only refreshed the base after it, submitted after any retarget, when that review reports success;
 - a stand-in approval of the merged head, posted after any retarget and after the oracle's latest review of that head;
-- for older merges, the Codex connector's submitted review of the last content commit, or of a merge that only refreshed the base after it, or its thumbs-up reaction, or
+- for merges before the cut-over (2026-10-09 00:16 UTC), the Codex connector's submitted review of the last content commit, or of a merge that only refreshed the base after it, or its thumbs-up reaction, or
 - an external review posted as a PR comment that names its reviewer (`Reviewer: codex`, `muse` or `agy`).
 
 The reaction and the comment must come after the last content commit and before the merge. The digest dates that commit by when GitHub first ran this pull request's workflows for it, because commit dates are set by the author. When that commit has no run (for example it was pushed with `[skip ci]`, or its runs expired), the digest uses the first run of a later commit, and when there is none, the merge time. Each fallback makes the date later, so it can report a gap that was not one and cannot hide a real gap. A review submitted after the merge, or still pending, does not count.

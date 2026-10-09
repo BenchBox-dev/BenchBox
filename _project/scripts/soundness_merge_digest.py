@@ -43,6 +43,7 @@ EXTERNAL_REVIEW_PATTERN = re.compile(
     r"(?im)^[ \t]*(?:[-*+][ \t]+)?(?:\**(?:external[ \t]+)?reviewer\**[ \t]*:\**|soundness[ \t]+review:)[ \t]*(?:external[ \t]+)?(codex|muse|agy)\b"
 )
 CONNECTOR_LOGINS = frozenset({"chatgpt-codex-connector", "chatgpt-codex-connector[bot]"})
+CONNECTOR_CUTOFF = "2026-10-09T00:16:30Z"
 THREAD_PAGE = 100
 MAX_PULL_COMMITS = 250
 PULL_EVENTS = frozenset({"pull_request", "pull_request_target"})
@@ -172,7 +173,8 @@ def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
         return cutoff <= at <= evidence.merged_at
 
     signals: list[str] = []
-    if any(
+    connector_era = evidence.merged_at < CONNECTOR_CUTOFF
+    if connector_era and any(
         r.login in CONNECTOR_LOGINS
         and r.commit_sha in evidence.content_shas
         and r.state != "PENDING"
@@ -182,7 +184,9 @@ def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
         signals.append("connector-review")
     if _oracle_success(evidence):
         signals.append("oracle-review")
-    if any(r.login in CONNECTOR_LOGINS and r.content == "+1" and in_window(r.created_at) for r in evidence.reactions):
+    if connector_era and any(
+        r.login in CONNECTOR_LOGINS and r.content == "+1" and in_window(r.created_at) for r in evidence.reactions
+    ):
         signals.append("connector-approval")
     head_verdict = _latest_oracle_review(evidence, {evidence.commits[-1].sha}) if evidence.commits else None
     standin_after = max(evidence.base_changed_at, head_verdict.submitted_at if head_verdict else "")

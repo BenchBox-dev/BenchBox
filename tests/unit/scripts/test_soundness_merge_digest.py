@@ -1015,3 +1015,9 @@ def test_a_standin_must_follow_the_latest_oracle_verdict_on_the_merged_head():
     assert digest.review_signals(evidence(reviews=(failure,), comments=(early,))) == ()
     late = standin(HEAD, at=AFTER_REFRESH)
     assert digest.review_signals(evidence(reviews=(failure,), comments=(late,))) == ("stand-in",)
+
+
+def test_connector_signals_count_only_for_merges_before_the_cut_over():
+    signals = {"reviews": (review(CONNECTOR, HEAD),), "reactions": (digest.Reaction(CONNECTOR, "+1", AFTER),)}
+    assert digest.review_signals(evidence(merged_at="2026-10-09T02:00:00Z", **signals)) == ()
+    assert digest.review_signals(evidence(**signals)) == ("connector-review", "connector-approval")

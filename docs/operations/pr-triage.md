@@ -122,8 +122,8 @@ a PR's mergeability — both only alert.
   `make pr-landing-withdraw PR=<n> HEAD=<sha>`, then add the label. The
   evidence transaction also refuses for soundness paths.
   Soundness-path PRs require `oracle-review` on the current head and resolved
-  threads. After any push or refresh, rerun CI and obtain the connector's
-  review or thumbs-up (or the stand-in approval) on that head before arming.
+  threads. After any push or refresh, rerun CI and wait for the oracle's
+  result on that head (or the stand-in approval) before arming.
   Withdraw readiness before editing an armed PR.
 
   To rerun `oracle-review`, first read the current PR:
