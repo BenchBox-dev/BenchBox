@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from benchbox.core.tuning import applied_ledger
 from benchbox.core.tuning.applied_ledger import (
     EXECUTED,
     FAILED,
+    LEDGER_PHASES,
     NOOP,
     PHASE_DDL,
     PHASE_POST_LOAD,
@@ -23,6 +26,36 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 ROOT = Path(__file__).resolve().parents[4]
 ADAPTER_PATH = ROOT / "benchbox" / "platforms" / "base" / "adapter.py"
+
+PHASE_POSITIONAL_INDEX = {"record": 1, "recording_connection": 2}
+FORWARDED_PHASE_NAMES = frozenset({"phase", "_phase"})
+LEDGER_PRODUCER_MARKERS = frozenset(
+    {
+        "AppliedTuningLedger",
+        "recording_connection",
+        "_applied_tuning_ledger",
+        "_applied_layout_operations",
+        "_skipped_layout_operations",
+        "_record_layout_operation",
+    }
+)
+CLOSED_SET_PHASE_CONSTANTS = frozenset(
+    name
+    for name, value in vars(applied_ledger).items()
+    if name.startswith("PHASE_") and isinstance(value, str) and value in LEDGER_PHASES
+)
+EXPECTED_PHASE_PRODUCERS = frozenset(
+    {
+        "benchbox/core/tuning/applied_ledger.py",
+        "benchbox/platforms/base/adapter.py",
+        "benchbox/platforms/base/sorted_ingestion.py",
+        "benchbox/platforms/base/tuning_trust.py",
+        "benchbox/platforms/clickhouse/workload.py",
+        "benchbox/platforms/databricks/adapter.py",
+        "benchbox/platforms/duckdb.py",
+        "benchbox/platforms/starrocks/workload.py",
+    }
+)
 
 
 @pytest.mark.parametrize(
@@ -218,13 +251,163 @@ def test_hudi_skips_yield_dropped_intents_and_non_failed_status() -> None:
     assert ledger.overall_status(tuning_enabled=True, has_config=True) == NOOP
 
 
-def test_no_ledger_phase_literal_outside_closed_set() -> None:
-    stray: list[str] = []
-    for path in (ROOT / "benchbox").rglob("*.py"):
-        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            if 'phase="pre_load"' in line or "phase='pre_load'" in line or 'phase="manual"' in line:
-                stray.append(f"{path.relative_to(ROOT)}:{lineno}")
+def _phase_expression_sites(tree: ast.AST) -> list[ast.expr]:
+    sites: list[ast.expr] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            sites.extend(keyword.value for keyword in node.keywords if keyword.arg == "phase")
+            callee = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", None)
+            positional_index = PHASE_POSITIONAL_INDEX.get(callee)
+            if positional_index is not None and len(node.args) > positional_index:
+                sites.append(node.args[positional_index])
+        elif isinstance(node, ast.Dict):
+            sites.extend(
+                value
+                for key, value in zip(node.keys, node.values, strict=True)
+                if isinstance(key, ast.Constant) and key.value == "phase"
+            )
+        elif isinstance(node, ast.arguments):
+            positional = node.posonlyargs + node.args
+            sites.extend(
+                default
+                for arg, default in zip(positional[len(positional) - len(node.defaults) :], node.defaults, strict=True)
+                if arg.arg == "phase"
+            )
+            sites.extend(
+                default
+                for arg, default in zip(node.kwonlyargs, node.kw_defaults, strict=True)
+                if arg.arg == "phase" and default is not None
+            )
+        elif isinstance(node, (ast.Assign, ast.AnnAssign)) and node.value is not None:
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            if any(isinstance(t, ast.Name) and t.id.startswith("PHASE_") for t in targets):
+                sites.extend(node.value.values if isinstance(node.value, ast.Dict) else [node.value])
+    return sites
+
+
+def _is_ledger_record_call(node: ast.AST) -> bool:
+    if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "record"):
+        return False
+    receiver = node.func.value
+    receiver_name = receiver.attr if isinstance(receiver, ast.Attribute) else getattr(receiver, "id", "")
+    return "ledger" in receiver_name.lower()
+
+
+def _is_ledger_producer_module(tree: ast.AST, relative_path: str) -> bool:
+    if relative_path.endswith("core/tuning/applied_ledger.py"):
+        return True
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and (node.module or "").endswith("applied_ledger"):
+            if any(alias.name in LEDGER_PRODUCER_MARKERS or alias.name.startswith("PHASE_") for alias in node.names):
+                return True
+        if isinstance(node, ast.Name) and node.id in LEDGER_PRODUCER_MARKERS:
+            return True
+        if isinstance(node, ast.Attribute) and node.attr in LEDGER_PRODUCER_MARKERS:
+            return True
+        if _is_ledger_record_call(node):
+            return True
+    return False
+
+
+def _phase_expression_leaves(expression: ast.expr) -> list[ast.expr]:
+    if isinstance(expression, ast.BoolOp):
+        return [leaf for value in expression.values for leaf in _phase_expression_leaves(value)]
+    if isinstance(expression, ast.IfExp):
+        return _phase_expression_leaves(expression.body) + _phase_expression_leaves(expression.orelse)
+    return [expression]
+
+
+def _is_member_or_forwarded_phase(leaf: ast.expr) -> bool:
+    if isinstance(leaf, ast.Constant):
+        return isinstance(leaf.value, str) and leaf.value in LEDGER_PHASES
+    if isinstance(leaf, ast.Name):
+        return leaf.id in CLOSED_SET_PHASE_CONSTANTS or leaf.id in FORWARDED_PHASE_NAMES
+    if isinstance(leaf, ast.Attribute):
+        return leaf.attr in CLOSED_SET_PHASE_CONSTANTS or leaf.attr in FORWARDED_PHASE_NAMES
+    if isinstance(leaf, ast.Call):
+        callee = leaf.func.attr if isinstance(leaf.func, ast.Attribute) else getattr(leaf.func, "id", None)
+        if callee == "normalize_ledger_phase":
+            return True
+        first = leaf.args[0] if leaf.args else None
+        return callee == "get" and isinstance(first, ast.Constant) and first.value == "phase"
+    return False
+
+
+def _phase_violations(source: str, relative_path: str) -> tuple[bool, int, list[str]]:
+    tree = ast.parse(source)
+    if not _is_ledger_producer_module(tree, relative_path):
+        return False, 0, []
+    sites = _phase_expression_sites(tree)
+    violations = [
+        f"{relative_path}:{expression.lineno}: {ast.unparse(expression)}"
+        for expression in sites
+        for leaf in _phase_expression_leaves(expression)
+        if not _is_member_or_forwarded_phase(leaf)
+    ]
+    return True, len(sites), violations
+
+
+def _scan_in_tree_phase_producers() -> dict[str, tuple[int, list[str]]]:
+    scanned: dict[str, tuple[int, list[str]]] = {}
+    for path in sorted((ROOT / "benchbox").rglob("*.py")):
+        relative = path.relative_to(ROOT).as_posix()
+        is_producer, site_count, violations = _phase_violations(path.read_text(encoding="utf-8"), relative)
+        if is_producer:
+            scanned[relative] = (site_count, violations)
+    return scanned
+
+
+def test_every_in_tree_ledger_phase_producer_uses_a_closed_set_member() -> None:
+    scanned = _scan_in_tree_phase_producers()
+    producers_with_sites = {path for path, (site_count, _) in scanned.items() if site_count}
+    assert producers_with_sites >= EXPECTED_PHASE_PRODUCERS
+    assert [violation for _, violations in scanned.values() for violation in violations] == []
+
+
+def test_no_module_emits_a_retired_phase_alias() -> None:
+    retired = frozenset(applied_ledger.PHASE_ALIASES) | {"manual"}
+    stray = [
+        f"{path.relative_to(ROOT).as_posix()}:{site.lineno}: {site.value}"
+        for path in sorted((ROOT / "benchbox").rglob("*.py"))
+        for site in _phase_expression_sites(ast.parse(path.read_text(encoding="utf-8")))
+        if isinstance(site, ast.Constant) and site.value in retired
+    ]
     assert stray == []
+
+
+@pytest.mark.parametrize(
+    "snippet",
+    [
+        'ledger.record("SELECT 1", "pre_load")',
+        'ledger.record("SELECT 1", phase="manual")',
+        'self.ledger.record("SELECT 1", "pre_load")',
+        'recording_connection(conn, ledger, "maintenance")',
+        'op = {"phase": "pre_load", "status": "applied"}',
+        'def produce(phase="schema"):\n    return phase',
+        'PHASE_EXTRA = "pre_load"',
+        'self._record_layout_operation(mechanism="x", phase=compute_phase())',
+    ],
+)
+def test_phase_producer_scan_flags_values_outside_closed_set(snippet: str) -> None:
+    source = "from benchbox.core.tuning.applied_ledger import PHASE_DDL\n" + snippet + "\n"
+    is_producer, _, violations = _phase_violations(source, "benchbox/synthetic.py")
+    assert is_producer
+    assert violations
+
+
+def test_phase_producer_scan_accepts_closed_set_members_and_forwarding() -> None:
+    source = (
+        "from benchbox.core.tuning.applied_ledger import PHASE_DDL, PHASE_SESSION\n"
+        'ledger.record("SELECT 1", PHASE_DDL)\n'
+        'ledger.record("SELECT 1", phase="post_load")\n'
+        "recording_connection(conn, ledger, PHASE_SESSION)\n"
+        'op = {"phase": op.get("phase") or PHASE_DDL}\n'
+        "def forward(phase):\n    return record(phase=phase)\n"
+    )
+    is_producer, site_count, violations = _phase_violations(source, "benchbox/synthetic.py")
+    assert is_producer
+    assert site_count == 5
+    assert violations == []
 
 
 def test_run_enhanced_benchmark_routes_trust_through_tuning_trust() -> None:

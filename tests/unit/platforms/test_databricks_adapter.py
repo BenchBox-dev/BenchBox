@@ -9,6 +9,8 @@ from unittest.mock import Mock, call, patch
 
 import pytest
 
+from benchbox.core.tuning.applied_ledger import FAILED, AppliedTuningLedger
+from benchbox.core.tuning.interface import TableTuning, TuningColumn
 from benchbox.platforms.base.data_loading import DataSource
 from benchbox.platforms.base.validation import SchemaValidator, TuningValidator, ValidationResult
 from benchbox.platforms.databricks import DatabricksAdapter
@@ -2504,3 +2506,48 @@ class TestFromConfigEdgeCases:
                 }
             )
         assert adapter.schema == "benchbox"
+
+
+class TestHudiSkipsFoldIntoLedger:
+    def _make_hudi_adapter(self):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            adapter = DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="tok",
+                table_format="hudi",
+                enable_delta_optimization=True,
+            )
+        adapter._applied_tuning_ledger = AppliedTuningLedger()
+        adapter.tuning_enabled = True
+        return adapter
+
+    def test_hudi_skips_recorded_by_adapter_fold_into_dropped_intents(self):
+        adapter = self._make_hudi_adapter()
+        connection = Mock()
+        cursor = Mock()
+        cursor.fetchall.return_value = [["Provider", "hudi", None]]
+        connection.cursor.return_value = cursor
+        table_tuning = TableTuning(
+            table_name="lineitem",
+            clustering=[TuningColumn(name="l_orderkey", type="BIGINT", order=1)],
+        )
+
+        adapter.apply_table_tunings(table_tuning, connection)
+        adapter.optimize_table(connection, "lineitem")
+        adapter.vacuum_table(connection, "lineitem")
+
+        executed = [str(c.args[0]) for c in cursor.execute.call_args_list]
+        assert executed == ["DESCRIBE EXTENDED lineitem"]
+        recorded = adapter._skipped_layout_operations
+        assert {op["mechanism"] for op in recorded} >= {"z_order", "optimize", "vacuum"}
+        assert all(op["status"] == "skipped" and "error_message" not in op for op in recorded)
+        assert adapter._applied_layout_operations == []
+
+        adapter._fold_layout_operations_into_ledger()
+
+        ledger = adapter._applied_tuning_ledger
+        assert ledger.statements == []
+        assert len(ledger.dropped) == len(recorded)
+        assert all(dropped.reason.startswith("skipped:") for dropped in ledger.dropped)
+        assert ledger.overall_status(tuning_enabled=True, has_config=True) != FAILED
