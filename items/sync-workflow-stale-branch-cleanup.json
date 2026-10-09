@@ -1,6 +1,11 @@
 {
-  "context": "Defer the implementation until production cadence is known. The\nworkflow's draft-only design means stale PRs are visible but\nnon-blocking; cleanup is a quality-of-life improvement, not a\ncorrectness requirement.\n",
-  "description": "The `sync-results-data-to-published.yml` workflow that landed in W4 of\n`published-results-slim-down-and-corpus-mirror` opens a fresh draft PR\nnamed `auto/results-mirror-<develop-SHA8>` for every develop push that\nchanges corpus paths. Old auto-mirror PRs and branches accumulate over\ntime — the workflow has no cleanup mechanism today.\n\nWait for the workflow to run in production for one or two months, then\ndecide what cleanup looks like based on actual cadence and PR volume.\nAs of the 2026-05-26 TODO review, live GitHub state showed the first\nmatching auto-mirror PR was opened on 2026-05-06, so the earliest\none-month review point is 2026-06-06. Keep this TODO Blocked until\nthat date, then run W0/W1 against current GitHub state before designing\ncleanup.\n",
+  "acceptance": [
+    "After a workflow run that opens a new mirror PR, at most one auto/results-mirror PR is open.",
+    "No auto/results-mirror-* branch exists without an open PR, including branches of closed, unmerged PRs.",
+    "A test covers the close-older-PRs and delete-branches logic, including a mirror PR that was closed without merging."
+  ],
+  "context": "The workflow's draft-only design means stale PRs are visible but non-blocking; cleanup is a quality-of-life improvement, not a correctness requirement.\n\n2026-10-09 tracker review: Moved from blocked to open. The production cadence is now known (89 mirror PRs since 2026-05-06), so the earlier hold until 2026-06-06 and the W0/W1 steps no longer apply, and the description was rewritten with current counts.",
+  "description": "`.github/workflows/sync-results-data-to-published.yml` opens a new draft PR named `auto/results-mirror-<develop-SHA8>` for every develop push that changes corpus paths, and nothing closes the older ones. As of 2026-10-09 there are 89 auto/results-mirror PRs: 46 merged, 36 closed and 7 open (#2746, #2747, #2770, #2777, #2780, #2782, #2837). 22 auto/results-mirror-* branches exist. The repository has delete_branch_on_merge enabled, so the leftover branches belong to closed, unmerged mirror PRs. The open PRs were last batch-closed by hand on 2026-10-06.\n\nScope: change the workflow so that\n- when it opens a new mirror PR, it closes every older open mirror PR and deletes their branches;\n- it deletes the branches of closed, unmerged mirror PRs.\n\nMerging #2837 is owned by t3-drift-corpus-mismatch-20261009 and is not part of this item.",
   "legacy": {
     "anti_patterns": [
       {
@@ -169,5 +174,15 @@
         "wid": "w2"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:24:47Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "bfea9def8cfe45d99f5531bf6888d05b",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
 }
