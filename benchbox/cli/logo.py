@@ -34,10 +34,24 @@ def logo_supported(stream: TextIO | None = None) -> bool:
     return True
 
 
-def styled_logo() -> str:
-    if not logo_supported():
+def styled_logo(stream: TextIO | None = None) -> str:
+    if not logo_supported(stream if stream is not None else sys.stdout):
         return ""
     return click.style(LOGO, fg="cyan", bold=True)
+
+
+def print_startup_logo(ctx: click.Context | None = None) -> None:
+    if ctx is not None and getattr(ctx, "resilient_parsing", False):
+        return
+    if ctx is not None and bool(ctx.params.get("quiet", False)):
+        return
+    from benchbox.utils.printing import is_quiet
+
+    if is_quiet():
+        return
+    logo = styled_logo(sys.stderr)
+    if logo:
+        click.echo(logo, err=True)
 
 
 def rich_logo() -> Text | None:

@@ -144,15 +144,6 @@ class LazyCommand(click.Command):
             self._resolved = getattr(module, self._spec.attr)
         return self._resolved
 
-    def make_context(
-        self,
-        info_name: str | None,
-        args: list[str],
-        parent: click.Context | None = None,
-        **extra: Any,
-    ) -> click.Context:
-        return self._load().make_context(info_name, args, parent=parent, **extra)
-
     def get_short_help_str(self, limit: int = 45) -> str:
         return click.Command.get_short_help_str(self, limit)
 
@@ -164,6 +155,20 @@ class LazyCommand(click.Command):
 
     def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
         return self._load().parse_args(ctx, args)
+
+    def make_context(
+        self,
+        info_name: str | None,
+        args: list[str],
+        parent: click.Context | None = None,
+        **extra: Any,
+    ) -> click.Context:
+        sub_ctx = self._load().make_context(info_name, args, parent=parent, **extra)
+        if not any(a in ("-h", "--help") or a.startswith("--help-topic") for a in args):
+            from benchbox.cli.logo import print_startup_logo
+
+            print_startup_logo(sub_ctx)
+        return sub_ctx
 
     def invoke(self, ctx: click.Context) -> Any:
         return self._load().invoke(ctx)
