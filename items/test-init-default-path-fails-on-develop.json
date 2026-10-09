@@ -3,6 +3,7 @@
     "The failure is root-caused and recorded in this item",
     "test_init_default_path passes on develop, or is corrected or removed with a stated reason"
   ],
+  "context": "Closed 2026-10-09 (tracker review against develop 34de720b8): not reproducible on develop. tests/unit/core/results/test_database.py passes under the repo's pytest.ini (53 passed alone; 1274 passed for tests/unit/core/results with -n 4). It fails only with `-o addopts=\"\"`, because session isolation starts in the _benchbox_pytest_xdist_safety plugin that the pytest.ini addopts loads (pytest.ini:11-12, tests/utilities/session_isolation.py:101-103). None of the 45 failed CI unit-test jobs since 2026-10-03 contain this test. Closed as an invocation artefact.",
   "description": "test_init_default_path fails on develop with no change applied. It was found on 2026-10-08 while verifying the Polars engine option and confirmed to fail on the base commit as well, so it is not caused by that work. The cause has not been investigated.",
   "links": [
     "tests/unit/core/results/test_database.py"
@@ -23,6 +24,14 @@
       "generation": "a02110a366644955a39f020da835f430",
       "op": "take",
       "op_id": "f468b02af0664fa199e7d9a43e6b2c15",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:35:04Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "64c01f9534204587bc6c85290467765f",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
