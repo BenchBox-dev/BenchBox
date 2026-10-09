@@ -4,6 +4,7 @@
     "A dispatched nightly-v2 run on develop shows the domain passing",
     "dlv2-70 lists this item in needs"
   ],
+  "context": "PR #2835 current head 3d902ba85d85ae855780dd8c725635934fdc04c8 contains the Windows unit domain. Current-head oracle review is SHIP; a Joe stand-in attestation was posted because the required oracle-review checker did not recognize the new verdict format. Merge and the remaining CI gates are still pending.",
   "description": "Decision recorded by nightly-windows-unit-coverage-decision-20261008: nightly-v2 keeps Windows unit coverage. Add a T3 domain that runs the fast unit tier on windows-latest with Python 3.12 only (3.11 duplicates it), with its own issue label like the other domains and no continue-on-error, and add it to the report job and the domain loop. Size the timeout from the Windows 'Run fast tests' duration in the latest legacy nightly. Do this after the Windows fixes pass, so the new domain does not start red. dlv2-70 must not delete nightly.yml until this domain has run green in a dispatched nightly-v2 run.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2568"
@@ -16,6 +17,14 @@
       "op": "create",
       "op_id": "ecd03a9afb414fcca86b74e14cd998cc",
       "session_id": "e40b1c8674df4499842f44749410458f"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:8d0fa0e2ef22aacc5284a44c",
+      "at": "2026-10-09T21:50:24Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "b8239e32f25c4f3487e6d04332b23cf3",
+      "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
     }
   ]
 }
