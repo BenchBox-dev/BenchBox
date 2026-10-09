@@ -38906,6 +38906,19 @@
       "alternative": "A literal binary path would stop the test from exercising the binary the package ships for the host.",
       "owner": "BenchBox maintainers",
       "removal": "Remove when the executable-payload adapter can resolve the bundled binary path statically."
+    },
+    {
+      "path": "benchbox/core/tpch/streams.py",
+      "symbol": "TPCHStreams._generate_stream_queries_qgen",
+      "text": "unresolved executable source: str(qgen_exe)",
+      "payload": "sha256:b5d8dcf930f26fe39448d8a43f321620e011f54372256f44906a9d11deabdd63",
+      "finding_kind": "payload-error",
+      "kind": "fixture",
+      "consumer": "benchbox/core/tpch/streams.py",
+      "necessity": "The platform-selected qgen path is resolved at runtime. This exact module-AST fixture is for the modulo-indexed invocation; the code is constrained by a reviewed argv entry and a bundled-binary integration test.",
+      "alternative": "Use a statically resolved executable path; that would stop this code from using the platform-specific qgen binary returned by the compiler.",
+      "owner": "BenchBox maintainers",
+      "removal": "Remove when the immutable-base scanner recognizes the modulo-indexed qgen argv entry."
     }
   ]
 }
