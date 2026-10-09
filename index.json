@@ -7791,10 +7791,15 @@
       "title": "Fix wrong install extras, options and stale claims in platform guides"
     },
     "docs-blog-index-broken-html-links": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T23:33:15Z",
+        "generation": "c879deea1e37434e8f685452f36286bb",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Documentation workflow fails on every develop push: three broken blog index links"
     },
     "docs-broken-internal-links-sweep-20261005": {
