@@ -3757,12 +3757,17 @@
       "title": "Remove comments and docstrings from experimental code"
     },
     "comment-cleanup-explorer-build": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:18:24Z",
+        "generation": "ab069dbe15f342ed8cae9e4177b0216f",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments from Explorer build, browser tests and configuration"
     },
     "comment-cleanup-explorer-data": {
