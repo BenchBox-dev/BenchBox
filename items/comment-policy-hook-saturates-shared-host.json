@@ -1,10 +1,11 @@
 {
   "acceptance": [
-    "The launcher of the benchbox-comment-policy-* processes is identified",
-    "Peak CPU and wall time of one comment-policy run are measured and recorded",
-    "Either the cost is reduced, for example by reusing the venv or serializing concurrent runs, or the measurement shows it is not the cause"
+    "The launcher of the benchbox-comment-policy-* processes is identified (met: pre-commit hook and make comment-policy-check, called by make lint and ci-lint).",
+    "Peak CPU and wall time of one comment-policy run are measured and recorded (met: 358 s wall, 276 s user + 44 s sys, 476 MB RSS, 5,768 files for a one-commit diff).",
+    "Per-run CPU for a one-commit diff is cut, measured with the same method and reported before and after. Either transition mode scans only the changed files when the policy and the trusted checker are unchanged, or per-blob results are cached keyed on the checker and policy digests. Findings are unchanged: a test shows that a change to a file that another file's payload depends on (cross-file payload dependency) is still detected, and that a changed policy or checker falls back to a full scan."
   ],
-  "description": "On 2026-10-08 the host load average reached 13 while four `benchbox-comment-policy-*` Python processes, each running from its own freshly created temp venv, held about 80% CPU apiece. A timed benchmark run needs a 1-minute load below 2.0 and no other process above 50% CPU, so these runs repeatedly made the machine non-quiet; load was still 4 to 6 hours later. The processes' launcher was not identified, and the share of load they account for was not measured. Find what starts them (commit hooks, pre-flight, or CI-style wrappers), whether each run must build a venv, and whether concurrent runs can be serialized or the venv reused.",
+  "context": "2026-10-09 tracker review: Priority raised from low to medium because the cost is in the default pre-commit path and in make lint. Measurements above were taken on develop with a one-commit diff. Related: comment-scanner-unresolved-runner-commands must measure its broader gate regex cost against this item.",
+  "description": "On 2026-10-08 the host load average reached 13 while four `benchbox-comment-policy-*` Python processes, each running from its own freshly created temp venv, held about 80% CPU apiece. A timed benchmark run needs a 1-minute load below 2.0 and no other process above 50% CPU, so these runs repeatedly made the machine non-quiet; load was still 4 to 6 hours later.\n\nMeasured on 2026-10-09 (acceptance 1 and 2 of the original item are met):\n- Launchers: the pre-commit hook (.pre-commit-config.yaml:9, `run_comment_policy.py --staged`) and `make comment-policy-check` (Makefile:446), which `make lint` (Makefile:410) and `ci-lint` (Makefile:613, 635) also call.\n- One transition-mode run for a one-commit diff: 358 s wall, 276 s user plus 44 s sys CPU, 476 MB peak RSS, 5,768 files scanned (host load 13-19 on 10 cores).\n- Cause: the run re-scans every completed scope at both head and base (scripts/check_comment_policy.py:395-398 and 418-423), not the venv.\n\nWhat remains is to reduce that per-run cost.",
   "sessions": [
     {
       "actor": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c",
@@ -13,6 +14,14 @@
       "op": "create",
       "op_id": "99b4c19d8aa14745bc5559255156c6ad",
       "session_id": "1f74fac6df92445cbacc470514ed2645"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:28:49Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "1f49dbe4e29743cd83cccea2255b1bf1",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
