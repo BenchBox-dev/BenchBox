@@ -4952,6 +4952,15 @@
       "status": "open",
       "title": "Add the core execution-engine module and manifest capability, with a vocabulary parity test"
     },
+    "core-exec-result-schema-2-3": {
+      "claim": null,
+      "needs": [
+        "core-exec-framework-manifest"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Record execution variants in result bundles: schema 2.3 fields, legacy mapping, and anonymizer rules"
+    },
     "corpus-65-bundles-carry-failed-queries": {
       "claim": null,
       "needs": [],

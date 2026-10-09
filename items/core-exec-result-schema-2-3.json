@@ -1,0 +1,33 @@
+{
+  "acceptance": [
+    "A bundle written by this tree reports result_schema_version 2.3 and validates; unit tests show every new field's key order and that absent producers leave the fields absent, not null-filled",
+    "Schema 2.2 bundles (fixture copies of existing results-data bundles) load without error and read as execution_engine requested=default with applied and observed unknown",
+    "Legacy mapping unit tests: platform_options.streaming=true reads as requested=streaming/resolution=legacy_option; a bundle carrying platform.config.engine_requested=in-memory reads as requested=in-memory",
+    "derive_variant_label has unit tests for platform only, +engine, ~deployment, @gateway and combinations, matching ADR D8 exactly",
+    "Anonymizer tests: execution_engine values stay readable inside config and platform blocks; compute_resource follows the ADR D7 decision; the existing Firebolt engine/enginename hashing and the publication fixed-point gates still pass",
+    "Results-data and Explorer compatibility gates pass: results-data validation (results-data/validate_corpus.py) and scripts/publication/check_explorer_compat.py, or the documented schema-bump procedure is followed and named in the PR",
+    "PR merged through the normal flow; production diff about 300 lines or less excluding tests, or the split was agreed"
+  ],
+  "context": "Decision gates:\n- G1 Start only after core-exec-framework-manifest is done.\n- G2 If the version bump requires re-deriving results-data/ or changes any published byte of existing corpus bundles, stop and get user approval; the change must be additive.\n- G3 If the anonymizer decision in ADR D7 cannot be implemented without weakening the fixed-point or privacy gates, stop and amend the ADR.\n\nVerification rubric: unit tests for schema, loader, builder and anonymizer; make pr-preflight fast lane; the results-data check target used by CI; a polars-df tpch SF 0.01 run's bundle inspected for result_schema_version 2.3 and the absence of producer-less fields.\n\nGuardrails: shared core-exec guardrails (see core-exec-d0-vocabulary-adr context). Never edit results-data/ bundles by hand.",
+  "description": "Add the result-bundle fields the ADR defines so every later item has somewhere to record requested, applied and observed values, and so old bundles map onto the new fields.\n\nWork:\n1. Schema 2.3 (additive): CURRENT_SCHEMA_VERSION and KNOWN_SCHEMA_V2_VERSIONS in benchbox/core/results/schema_policy.py; key order in core/results/schema_specs.yaml for config.execution_engine, platform.execution_engine, queries[].execution_engine, platform.compute.{resource, resource_kind, size}, platform.gateway, platform.deployment.{selected, selected_class} (fields stay absent until a producer fills them).\n2. Builder plumbing: RunConfigInput carries execution_engine (core/results/builder.py); platform.execution_engine is taken from the adapter's get_platform_info()[\"execution_engine\"] receipt (core/results/schema.py _build_platform_section).\n3. platform.variant (unused today, core/results/schema.py:215,469) is filled from one core function derive_variant_label(platform, deployment, requested_engine, gateway) defined per ADR D8.\n4. Legacy mapping in the loader: a 2.2 bundle reads as requested=default with applied/observed unknown; platform_options.streaming=true maps to requested=streaming with resolution=legacy_option; platform.config.engine_requested (the Polars matrix bundles) maps to requested with resolution=explicit.\n5. Anonymizer (anonymization_specs.yaml, anonymization.py) per ADR D7: core vocabulary keys stay readable; compute_resource follows the D7 decision (drop or hash); gateway host goes with endpoint keys. Keep the Polars `engine` exemption until core-exec-polars-cli-mcp-adoption removes the option.\n6. docs/reference/result-formats.md version table and field reference.",
+  "links": [
+    "benchbox/core/results/schema_policy.py",
+    "benchbox/core/results/schema_specs.yaml",
+    "benchbox/core/results/schema.py",
+    "benchbox/core/results/builder.py",
+    "benchbox/core/results/anonymization_specs.yaml",
+    "benchbox/core/results/anonymization.py",
+    "docs/reference/result-formats.md",
+    "docs/development/adr/adr-published-identifier-field-set.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:32:29Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "cd5e430cdee04392aa8a9f6753b23f9a",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
+    }
+  ]
+}
