@@ -17551,6 +17551,13 @@
       "status": "done",
       "title": "Replace Q16-Q22 result-replay variants with deeper hand-written structural rewrites"
     },
+    "repo-admin-settings-actions-pr-permission-doc-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Correct the repo-admin doc: workflows depend on GitHub Actions being allowed to create pull requests"
+    },
     "repo-personal-identifiers-cleanup": {
       "claim": null,
       "needs": [],
