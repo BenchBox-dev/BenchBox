@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "make site-inputs writes downloads/ with every file the current docs link to outside docs/ (count recorded; the site converter's download list is a subset)",
+    "manifest schema 2; verify requires the downloads member",
+    "Oracle review cleared; first site-inputs.yml run after merge green"
+  ],
+  "context": "Owner decision D-U (2026-10-09, in chat, decision dialog): the bundle carries these files (keeps the /docs/_downloads/ URLs unchanged and keeps the site build to repo plus bundle), rather than linking to GitHub or fetching from GitHub at build time. Found while making the site build from the bundle (site-split-22): the build stopped in publishLegacyFiles on the first missing download.",
+  "description": "Small core PR (soundness path: scripts/site_inputs.py).\n\nThe docs link to 183 tracked core files outside docs/ (99 TPC-DS .tpl templates, 61 .py, 22 .sql, 1 .ini; about 0.9 MB). The site publishes each at /docs/_downloads/<md5>/<name>. The bundle lists them in repo-files.json but carries no contents, so the site build cannot publish them.\n\n1. In `scripts/site_inputs.py`, add a `downloads/` member: every tracked file outside docs/ that a Markdown link target in a tracked `docs/**/*.md` file resolves to (inline links, reference definitions and autolinks; fragments and queries stripped; schemes and site-absolute paths skipped; .md and .rst excluded). Copy each to `downloads/<repo-relative path>`.\n2. Bump the bundle schema to 2: `downloads` joins the required member set, and `cmd_verify` checks it.\n3. Tests for the link scan (relative, reference-style, fragment, outside vs inside docs, untracked target ignored) and for verify.\n4. The site adds schema 2 to its supported set and keeps schema 1 (N and N-1). Core lands first.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de",
+      "at": "2026-10-09T03:05:16Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "65a7fdf903c34d10b20749abafb06809",
+      "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
+    }
+  ]
+}
