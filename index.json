@@ -14315,7 +14315,7 @@
       "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "dropped",
       "title": "pull_request_target state trust has a retarget timing race"
     },
     "oracle-read-evidence-tightening-20261008": {
