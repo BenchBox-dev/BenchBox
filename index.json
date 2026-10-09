@@ -14008,6 +14008,13 @@
       "status": "done",
       "title": "Check the first muse oracle attempt on muse-spark-1.3-contributor"
     },
+    "oracle-muse-installer-floating-channel-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Replace the muse installer hash pin, which protects only the bootstrap, with an honest floating install that cannot change mid-run"
+    },
     "oracle-oversize-pr-pending-loop-20261009": {
       "claim": null,
       "needs": [
