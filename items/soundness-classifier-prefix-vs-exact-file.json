@@ -1,5 +1,5 @@
 {
-  "context": "Batch 2026-09-27: implemented in worktree BenchBox.wt-soundness-classifier, branch fix/soundness-classifier-prefix-vs-exact-file, commit d59a511d5, PR 2417 (BLOCKED pending CI). 91/91 mirror tests pass, ruff clean, self-reviewed per code rubric with no Critical/Required findings. Finding: the item's measured case (anonymization.py.bak) no longer reproduces; the live defect class was unpinned prefix/sibling shapes plus the override-glob duality, now structurally guarded. Soundness-path PR: owner review + manual merge required, auto-merge withheld.",
+  "context": "Batch 2026-09-27: implemented in worktree BenchBox.wt-soundness-classifier, branch fix/soundness-classifier-prefix-vs-exact-file, commit d59a511d5, PR 2417 (BLOCKED pending CI). 91/91 mirror tests pass, ruff clean, self-reviewed per code rubric with no Critical/Required findings. Finding: the item's measured case (anonymization.py.bak) no longer reproduces; the live defect class was unpinned prefix/sibling shapes plus the override-glob duality, now structurally guarded. Soundness-path PR: owner review + manual merge required, auto-merge withheld.\n\nClosed 2026-10-09 (tracker review against develop 34de720b8): PR #2417 (88541c177) is merged. _project/scripts/soundness_paths.py builds prefixes only from rules of kind \"prefix\", rejects prefixes without a trailing \"/\", and matches exact files by equality. tests/unit/scripts/test_soundness_paths.py pins anonymization.py.bak as not gated. Running the classifier on develop gives anonymization.py.bak False, scripts/pr_arm.py.orig False and anonymization.py True.",
   "description": "is_soundness_path uses normalized.startswith(SOUNDNESS_PREFIXES), so an entry naming a single file also matches any path that merely starts with it. Measured: is_soundness_path returns True for benchbox/core/results/anonymization.py.bak. The failure mode is over-gating, which is fail-safe, so this is low priority. What it does break is the 1:1 mirror with .github/CODEOWNERS that #1529 claims, since CODEOWNERS matches the exact path and the classifier does not.",
   "legacy": {
     "item_meta": {
@@ -122,6 +122,14 @@
       "generation": "13a0173d957f49668285b55b8227097d",
       "op": "take",
       "op_id": "63e394dcb7d9483eb8d5705ee35bd5ae",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:33:55Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "34f5e037f4964f31a23bf8df19663a7c",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
