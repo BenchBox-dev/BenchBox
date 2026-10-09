@@ -3,7 +3,7 @@
     "Scripts containing shell pipelines feeding inline scripts to interpreters (perl, ruby, python) on stdin are scanned for comments or surfaced as coverage errors.",
     "Regression tests in tests/unit/scripts/test_comment_policy.py cover stdin pipeline sinks."
   ],
-  "context": "Implemented in worktree branch feat/comment-scanner-enhancements: pipeline inspector in scripts/comment_payloads.py (piped_stdin_entries wired into shell_command_unit, scan_source_payload seam, echo/printf literal extraction, dynamic/unmodeled fail-closed, gate regex extended, mask covers piped lines). Bash AST analysis lives in comment_payloads.py, not comment_execution.py. 19 new regression tests (4 test fns, parametrized) in tests/unit/scripts/test_comment_policy.py, all passing.",
+  "context": "Implemented in worktree branch feat/comment-scanner-enhancements: pipeline inspector in scripts/comment_payloads.py (piped_stdin_entries wired into shell_command_unit, scan_source_payload seam, echo/printf literal extraction, dynamic/unmodeled fail-closed, gate regex extended, mask covers piped lines). Bash AST analysis lives in comment_payloads.py, not comment_execution.py. 19 new regression tests (4 test fns, parametrized) in tests/unit/scripts/test_comment_policy.py, all passing.\n\n2026-10-09 tracker review: PR #2821 meets the written acceptance. Before it merges, two oracle findings must be fixed. D1: the masking at scripts/comment_syntax.py:604 blanks the whole piped line, so `echo 'pass' | python3 # explanation` loses a shell comment that is caught today. This is a regression. D2: printf escapes such as \\043 (an escaped #) are not handled. Add a regression test for each. Recommend splitting #2821 per item so this item and the runner item do not wait on the MDX work.",
   "description": "Programs piped to interpreters on stdin (e.g., printf '...' | perl, echo '...' | ruby) in shell scripts or commands currently bypass the comment scanner because stdin pipelines are unmodeled. Detect pipeline sinks terminating in script interpreters and route the piped string payload to the corresponding language scanner, or flag bare unmodeled interpreter stdin usage as a coverage error.",
   "sessions": [
     {
@@ -39,6 +39,14 @@
       "op": "release",
       "op_id": "0dc42548f31c440dbc2474c503ba4f4b",
       "session_id": "b5a8c9cf1e3044e0b29099c7c26c16c1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:30:03Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "74014120b8184e9cb1801925d26ff307",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
