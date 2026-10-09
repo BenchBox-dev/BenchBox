@@ -3,6 +3,7 @@
     "The external-review signal requires a listed reviewer or attester account",
     "A test shows a comment from another author is not counted"
   ],
+  "context": "Done in #2798 (merged 2026-10-09, 7b639aba1). review_signals counts an external-review note only from a STANDIN_ATTESTERS user account. Tests cover another author, a Bot account and an untyped account, and a mutation that drops the check fails them.",
   "description": "soundness_merge_digest.EXTERNAL_REVIEW_PATTERN matches the review text in a comment from any commenter, so anyone who can comment can make a merged soundness change look reviewed in the daily digest.",
   "sessions": [
     {
@@ -20,6 +21,14 @@
       "generation": "3bf9eda003134985ac1f790f00dba4ca",
       "op": "take",
       "op_id": "c08b4ed9c524483a8efccb3de2772186",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T03:44:13Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "8853b06ea4cf4f2dab82c92d56c4a6d8",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
