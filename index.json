@@ -4067,12 +4067,17 @@
       "title": "Remove comments and docstrings from query plan parsing and capture"
     },
     "comment-cleanup-read-primitives": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:32:46Z",
+        "generation": "bd4a37b8c15643b19c3c8702b8b85618",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from Read primitives modules"
     },
     "comment-cleanup-results": {
