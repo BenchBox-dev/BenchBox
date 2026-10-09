@@ -130,3 +130,100 @@ fallback applied three streaming-runtime settings while the console said it was
   example "basic constraints", "engine runtime defaults (streaming)" or "OLAP
   session pack". A fixed string such as "using basic constraints" is not
   allowed, because it misdescribes platforms whose fallback applies more.
+
+## Addendum (2026-10-09): what `tuned` promises
+
+Decision 2 above defines `tuned` mechanically: a curated template is applied. It
+says nothing about benefit, vendor guidance or comparability, so a template
+that runs slower than `notuning` could not be called a defect, and a
+tuned/notuning ratio could be read as a ranking of platforms. This addendum
+states the promise. It does not rename a mode or change the vocabulary.
+
+**Definition.** `tuned` is a curated template that follows each vendor's
+documented guidance for the benchmark's data size. It is applied to the whole
+workload, and every statement it applies is recorded in the result.
+
+**What `tuned` does not promise.** `tuned` is not guaranteed to be faster than
+`notuning`. Whether a template helps is a separate fact about that template,
+recorded as one of four evidence states:
+
+- `unmeasured`: no calibrated comparison with `notuning` exists for the template.
+- `measured-benefit`: a calibrated comparison shows the template faster than
+  `notuning` beyond noise, with no query failing that passes untuned.
+- `measured-neutral`: a calibrated comparison shows no difference beyond noise.
+- `measured-regression`: a calibrated comparison shows the template slower than
+  `notuning` beyond noise, or failing a query that passes untuned.
+
+Each measured state is recorded with the scale factor, the memory limit and the
+engine version of the measurement. A measurement at one scale or memory limit
+says nothing about another. The numeric thresholds that separate the measured
+states belong to the benefit rule and are stored with the measurements, not in
+this ADR.
+
+**A ratio is a diagnostic, not a ranking.** A tuned/notuning ratio describes
+how one template behaves against its own platform's baseline. It is not
+comparable across platforms, because the platforms differ in what `notuning`
+means, in which mechanisms their templates can apply, and in how much the
+baseline already does by default. Any report, chart or console summary that
+shows the ratio must say that it is a single-platform diagnostic.
+
+### Decisions
+
+**D1. Per-query settings are banned in `tuned`.** A template applies the same
+settings to every query. A statement-level setting is allowed only as a declared
+harness requirement, and all three conditions must hold:
+
+1. the query cannot complete in `notuning` at the supported memory limit
+   without it;
+2. it is applied identically in every tuning mode;
+3. it is recorded in the result.
+
+A setting that exists only to make `tuned` faster, or only to make `tuned`
+complete, is not a harness requirement. The ClickHouse TPC-H Q21 override
+introduced by the 2026-10-07 addendum to ADR-003 is the known case, and it is
+held to this test. If Q21 completes in `notuning`, the override does not
+qualify and a workload-wide change replaces it.
+
+The reasons are comparability and ledger completeness. If `tuned` may change
+settings query by query, two tuned results differ by an unbounded set of
+choices, and a per-query ratio no longer measures the template. The ledger also
+has to hold an exact record of what was applied, and a per-query exception list
+that varies by template and platform is easy to leave incomplete.
+
+*Rejected: declared per-query settings in the template.* Declaring a setting and
+recording it keeps the record complete, but it still makes tuned results
+incomparable across queries and platforms, and it lets each platform tune
+individual queries toward a better ratio.
+
+**D2. The ClickHouse merge settle runs in every mode.** After every ClickHouse
+server-mode load, in every tuning mode including `notuning`, the harness waits
+for background merges to settle before the first timed query. Each result
+records the wait. The wait is not counted as load time. chDB runs
+in local mode and does not settle. This extends the
+settle that the 2026-10-07 addendum to ADR-003 applied after tuned loads only.
+
+*Rejected: settle after tuned loads only.* Merges overlap timed queries after
+any load. Settling one mode and not the other adds merge contention to the
+baseline alone, which inflates the tuned/notuning ratio for a reason unrelated
+to the template.
+
+**D3. Label templates without benefit evidence; do not quarantine them.** A
+shipped template carries its evidence state, and a template in `unmeasured` is
+labeled as such in the console and in the result. A shipped template may not stay at
+`measured-regression`: it is adjusted and measured again.
+
+*Rejected: quarantine templates without evidence.* Quarantine would stop
+shipping `tuned` on three platforms because they lack benefit evidence, and that
+evidence cannot be produced locally. The label keeps the template available
+and makes the gap visible.
+
+### Consequences
+
+- Implementation follows in separate changes: the Q21 handling under D1, the
+  settle in every mode under D2, and the evidence label and its use in reports
+  under D3.
+- Templates for which no comparison has been run stay labeled `unmeasured` until
+  one is.
+- ADR-003 keeps its 2026-10-07 per-template table as the record of the ClickHouse
+  SF1 measurements. Where that table or the text beside it differs from D1 or D2,
+  this addendum governs.
