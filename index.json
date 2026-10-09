@@ -13720,6 +13720,13 @@
       "status": "open",
       "title": "Windows unit suite: fix backslash paths in bash scripts, path-separator assertions, and make-wrapper argument quoting"
     },
+    "nightly-windows-pr-visual-approval-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Resolve the visual approval gate blocking the nightly-v2 Windows PR"
+    },
     "nightly-windows-release-curation-skip-count": {
       "claim": null,
       "needs": [],

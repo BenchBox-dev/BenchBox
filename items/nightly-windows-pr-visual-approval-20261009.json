@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "PR #2835 visual comparison is green or the owner-controlled approval is recorded",
+    "PR #2835 merges into develop",
+    "The merge head is recorded for the dependent Windows verification"
+  ],
+  "context": "Created while closing the nightly-red handoff; no bypass or repository-setting change was attempted.",
+  "description": "PR #2835 has passing oracle and code checks, but the protected public-site visual comparison reports four changed getting-started captures at widths 390, 768, 1280 and 1600 after the base baseline was rebuilt. The changes are outside this batch's intended surface. Resolve the visual difference in the appropriate docs workflow or obtain the owner-controlled approval so the Windows and liveness changes can merge.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/pull/2835"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:8d0fa0e2ef22aacc5284a44c",
+      "at": "2026-10-09T22:28:49Z",
+      "client": "omp-coding-agent",
+      "op": "create",
+      "op_id": "08bbcd3df47a458baab501e76f5df442",
+      "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
+    }
+  ]
+}
