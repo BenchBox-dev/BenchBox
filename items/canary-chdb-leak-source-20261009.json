@@ -1,5 +1,5 @@
 {
-  "context": "Follows canary run 37933180828 (dispatched 2026-10-09 on develop head containing PRs #2809, #2810, #2811): shards 3/6 and 4/6 error at teardown with 'test leaked stub-installer state: benchbox.platforms.clickhouse._dependencies.chdb' on tests/integration/platforms/test_tpchavoc_clickhouse_equivalence.py::test_clickhouse_skip_list_wiring and ::test_skipped_variants_are_excluded_never_marked_equivalent. Root cause: import_chdb() in benchbox/platforms/clickhouse/_dependencies.py unconditionally assigns the module global chdb as a cache side effect; tests/utilities/optional_engines.py chdb_skip_reason() (lru_cached) and client/metadata call sites trigger it process-wide on Linux where chdb loads, while the PR #2810 autouse fixture only resets the global for tests inside one module and converts later tests into guard victims (baseline polluted, fixture resets to None, guard flags the change). No production code reads the _dependencies.chdb global; importlib already caches in sys.modules, so the global write is redundant.",
+  "context": "Merged as PR #2833 (squash c419dd2d1). Verification: release-canary dispatched from develop on c419dd2d1 (run 37971156121, 2026-10-09 18:08Z) finished success, 11 of 11 jobs, so shards 3 and 4 no longer report the chdb stub-installer leak. This was the second release-canary dispatch.",
   "description": "Remove the redundant _dependencies.chdb global write in import_chdb() so importing chdb no longer mutates adapter-module state process-wide; keep the exported name bound (None) and the cwd-restore behavior covered by tests/unit/platforms/test_clickhouse_chdb_import.py; drop the now-redundant per-module restore fixture in test_tpchavoc_clickhouse_equivalence.py only if the guard stays green without it; keep the isolation-suite negative control proving the guard still flags a directly written attribute. Verify with the focused equivalence/isolation tests (fake chdb on macOS), ruff check/format, and a second release-canary dispatch (last of the 2-run budget) showing no chdb guard errors.",
   "sessions": [
     {
@@ -46,6 +46,14 @@
       "generation": "d57893312b614b62aaf499089f2cc43e",
       "op": "take",
       "op_id": "0326fecb7bef4e5c889638633cfe95ea",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-09T21:07:35Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "9644a3cd76784662a53532b5431416c8",
       "session_id": "e40b1c8674df4499842f44749410458f"
     }
   ]
