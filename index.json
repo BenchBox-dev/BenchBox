@@ -19570,17 +19570,12 @@
       "title": "Seed BenchBox-dev/benchbox-site from core with filtered, Python-free history and protect main"
     },
     "site-split-21-site-bootstrap-ci": {
-      "claim": {
-        "expires_at": "2026-10-10T04:46:53Z",
-        "generation": "7816462e43b14649ba516a1397ea42f1",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de"
-      },
+      "claim": null,
       "needs": [
         "site-split-20-seed-site-repo"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Bootstrap the site repo: settings, agent instructions, Node hooks, CI and nightly probes"
     },
     "site-split-22-build-from-bundle": {
