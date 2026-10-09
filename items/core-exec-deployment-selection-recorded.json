@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "A run with --platform firebolt:core (and one platform per alias family) writes platform.deployment.selected and selected_class matching the manifest",
+    "Each listed legacy key still works, warns once, and resolves to the same manifest mode; a test per platform",
+    "lakesail local vs distributed is selectable through the manifest selector and actually changes the adapter mode (today sail_mode is ignored)",
+    "The parity test's grandfather list no longer contains `mode` or `deployment`; the ADR's list is updated in the same PR if it changes",
+    "Platform docs and the new-platform checklist describe deployment selection only through the manifest selector; compat-docs-check passes",
+    "PR merged through the normal flow; split per platform family if over about 600 lines"
+  ],
+  "context": "Decision gates:\n- G1 Start after core-exec-result-schema-2-3.\n- G2 If a legacy key's values do not map one-to-one onto manifest modes (for example ducklake's four values, or a key that mixes deployment with storage), stop and decide the mapping with the user before coding.\n- G3 No live cloud runs; mock the cloud paths.\n\nVerification rubric: unit tests per alias family; make platform-manifest-check; compat-docs-check; make pr-preflight.\n\nGuardrails: shared core-exec guardrails (see core-exec-d0-vocabulary-adr context).",
+  "description": "Deployment is already a core concept (manifest deployment_modes with local/self-hosted/managed classes, selected with --platform name:deployment, platforms/adapter_factory.py:104-122), but results never record which mode was selected (platform.deployment.deployment_type is guessed from endpoints in platforms/base/runtime_metadata.py:358-389), and several platforms carry their own duplicate keys.\n\nWork:\n1. Record platform.deployment.selected (manifest mode name) and selected_class from the factory's resolution.\n2. Duplicate keys become deprecated aliases of the selector, with a warning: velox `deployment` (local|remote), lakesail `sail_mode` (local|distributed; currently unregistered and ignored), influxdb `mode` (core|cloud), clickhouse `deployment_mode` and its alias `mode`, firebolt `deployment_mode`/`firebolt_mode`, ducklake `deployment_mode`, pg-duckdb `deployment_mode` (self-hosted|motherduck). Declare any missing modes in the manifest first.\n3. Remove the resulting keys from the bare-word grandfather list (ADR D11) and add the deployment section to docs/development/new-platform-acceptance-checklist.md.\n4. Docs for each affected platform show --platform name:mode.",
+  "links": [
+    "benchbox/platforms/adapter_factory.py",
+    "benchbox/core/platform_manifest.py",
+    "benchbox/platforms/base/runtime_metadata.py",
+    "benchbox/cli/platform_defaults.py",
+    "docs/development/new-platform-acceptance-checklist.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:34:36Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "7488b3c319bd4fe78a75518552f64040",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
+    }
+  ]
+}
