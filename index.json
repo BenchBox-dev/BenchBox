@@ -3479,17 +3479,12 @@
       "title": "Remove comments and docstrings from ClickBench modules"
     },
     "comment-cleanup-clickhouse-family": {
-      "claim": {
-        "expires_at": "2026-10-10T00:07:59Z",
-        "generation": "eeebab45d6754134b6bb328157b1355e",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from ClickHouse adapters"
     },
     "comment-cleanup-coffeeshop": {
