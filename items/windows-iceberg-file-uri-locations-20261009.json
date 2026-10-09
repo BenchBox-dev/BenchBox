@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "The converter's Windows behaviour is decided and covered by a test or documented as unsupported",
+    "The three Windows skips are removed or each keeps a reason that names the decision"
+  ],
+  "context": "Found by triage of the 2026-10-08 Windows 3.12 log; interim Windows skips added in the nightly-windows-teardown-and-singles change.",
+  "description": "pyiceberg's PyArrowFileIO cannot open file:///C:/... table locations on Windows (WinError 123 'Failed querying information for path /C:/...'). Tests that build real Iceberg tables with location=table_dir.as_uri() fail on windows-latest: tests/unit/platforms/test_bigquery_adapter.py test_prepare_iceberg_uris_points_at_metadata_file, tests/unit/platforms/test_redshift_adapter.py test_external_table_mode_registers_iceberg_in_glue, tests/unit/utils/test_iceberg_layout.py test_relocate_rewrites_graph_for_new_location (a PermissionError on cat.db is a teardown cascade from the open SQLite catalog). The product has probable exposure: benchbox/core/dataframe or format_converters/iceberg_converter.py (about line 122) also passes as_uri() as the location. Decide Windows location handling for the converter, the test helpers and relocate_iceberg_table; a plain str(path) location may work but would change POSIX metadata unless gated on win32, so it needs a Windows run. The three tests are Windows-skipped with this reason until then.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/issues/2568"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-09T15:04:31Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "afb81b4ba4074c1c9036daf60e060b6f",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    }
+  ]
+}

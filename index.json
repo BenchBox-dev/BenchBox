@@ -24622,6 +24622,13 @@
       "status": "done",
       "title": "Windows Nightly: test unreadable-file propagation without chmod semantics"
     },
+    "windows-iceberg-file-uri-locations-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Decide how Iceberg table locations are written on Windows (file:///C:/ is not openable)"
+    },
     "windows-iceberg-vacuum-local-paths-20261009": {
       "claim": null,
       "needs": [],
