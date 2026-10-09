@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Measured queue time versus run time for oracle and CI runs over at least one working day, with the concurrency limit identified",
+    "A recommendation with expected effect (for example, minutes saved per PR)",
+    "Approved changes filed as their own items"
+  ],
+  "context": "Observed throughout the 2026-10-09 oracle follow-up batch; queue counts from the Actions API (status=queued/in_progress) at 14:30, 15:36 and 17:50 UTC.",
+  "description": "On 2026-10-09 the repository's Actions queue held about 20 queued runs while only 1 to 3 were in progress. Oracle runs waited for runners at each job (plan, select, attempt, post):\n- shadow run 37941584716 for #2820 was queued at 14:05 UTC and posted at about 15:10;\n- shadow run 37961549758 for #2831 waited about 2.5 hours;\n- the canary #2826 run 37961215694 was queued at 16:43 and posted at 18:04.\nA full oracle round takes a few minutes of runner time, so almost all of the wait was queueing. Each oracle run is several sequential jobs, which multiplies queue time, and CI on every PR competes for the same runners.\n\nInvestigate:\n- the account's concurrent-job limit and usage (plan, minutes, other repositories);\n- which workflows dominate the queue;\n- whether oracle jobs can run on fewer, larger jobs or a dedicated or self-hosted runner;\n- whether CI fan-out on each push can be reduced.\nReport numbers before proposing a change.\n\nGuardrails. Investigation first; any workflow change that touches the oracle is very-high tier and goes through the normal oracle PR flow. Do not weaken required checks to save time.",
+  "links": [
+    ".github/workflows/oracle-verdict.yml",
+    ".github/workflows/ci.yml"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T21:10:00Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "0302bea33f5242f8af737aa39fea8ada",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}

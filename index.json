@@ -28,6 +28,13 @@
       "status": "done",
       "title": "Enhance Metadata Primitives with Access Control (ACL) Performance Testing"
     },
+    "actions-runner-queue-oracle-latency-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "GitHub Actions runs queue for one to three hours, so each oracle review and merge waits far longer than the review itself"
+    },
     "adapt-benchbox-to-textcharts-neutral-defaults": {
       "claim": null,
       "needs": [],
