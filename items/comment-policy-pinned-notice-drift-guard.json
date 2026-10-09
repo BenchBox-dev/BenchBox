@@ -2,7 +2,7 @@
   "acceptance": [
     "A test or CI step verifies that modifying a file with a pinned notice requires updating the SHA/digest in quality/comment-cleanup-scope.json."
   ],
-  "context": "Uncovered during comment-policy checker review followups (follow-up item 5). PR #2622 previously changed _sources/tpc-h/PATCHES.md without updating the pin digest in quality/comment-cleanup-scope.json.",
+  "context": "Slice 2 implemented in worktree ../BenchBox.wt-drift-guards, branch feat/policy-and-dependency-drift-guards, commit 9a25578a3d7727d8c6394bd3fbe8501f1664502a, PR https://github.com/BenchBox-dev/BenchBox/pull/2829 to develop (OPEN, MERGEABLE). Guard: scripts/check_comment_cleanup_scope.py --check-drift emits SCOPE008 when a pinned notice file changes without a pin update; wired into make comment-policy-check and new make check-comment-scope. Tests: 5 new cases in tests/unit/scripts/test_comment_cleanup_scope.py. Finish after squash-merge.",
   "description": "A whole-file pinned notice in quality/comment-cleanup-scope.json (such as _sources/tpc-h/PATCHES.md) is verified against its recorded digest in the comment-policy validator, but there is no guard preventing changes to the pinned file from landing without an accompanying pin update in the scope manifest. Add a pre-commit or CI guard asserting that any branch touching a whole-file pinned notice updates the corresponding digest pin in quality/comment-cleanup-scope.json.",
   "sessions": [
     {
@@ -20,6 +20,14 @@
       "generation": "1e8a14762cba4f60809361bbd4c706cf",
       "op": "take",
       "op_id": "a8d626e3a7e44f48a20aa07b1e695c4c",
+      "session_id": "b5a8c9cf1e3044e0b29099c7c26c16c1"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:3a93d76fab1934bd71f35b65",
+      "at": "2026-10-09T16:19:57Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "9598e4199c9a4d238437fbf3a247226a",
       "session_id": "b5a8c9cf1e3044e0b29099c7c26c16c1"
     }
   ]
