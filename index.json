@@ -19766,7 +19766,9 @@
     },
     "siriusdb-adapter": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "core-exec-polars-cli-mcp-adoption"
+      ],
       "priority": "low",
       "status": "open",
       "title": "Add SiriusDB (GPU-Native SQL Engine) Platform Adapter"

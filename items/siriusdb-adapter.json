@@ -1,5 +1,10 @@
 {
-  "context": "SCOPE CORRECTION 2026-09-27 (tracker-corpus-repair sweep): the do_not_modify rule on benchbox/core/runner.py is inert, that file does not exist, it is shadowed by the benchbox/core/runner/ package directory. Intended protection is benchbox/core/runner/. Scope rules are create-time-only and cannot be edited; on any re-create, deny benchbox/core/runner/ instead.",
+  "acceptance": [
+    "GPU and CPU-fallback execution are declared in the manifest execution_engines capability (classes gpu and standard, or as the ADR names them) and selected with --execution-engine; no platform-specific engine/gpu/mode option is registered",
+    "Each run records an ExecutionEngineReceipt; when SiriusDB falls back to CPU, observed reports the fallback (per query where detectable, run-level mixed otherwise) with observed_source set",
+    "The vocabulary parity test passes with the new declarations"
+  ],
+  "context": "SCOPE CORRECTION 2026-09-27 (tracker-corpus-repair sweep): the do_not_modify rule on benchbox/core/runner.py is inert, that file does not exist, it is shadowed by the benchbox/core/runner/ package directory. Intended protection is benchbox/core/runner/. Scope rules are create-time-only and cannot be edited; on any re-create, deny benchbox/core/runner/ instead.\n\nCore execution-variant guardrails (added 2026-10-09; ADR docs/development/adr/adr-core-execution-variants.md, plan item core-exec-execution-variants): SiriusDB's GPU-vs-CPU choice is an execution engine under ADR D1; it must use the core execution_engine setting and manifest declaration, so this item now needs core-exec-polars-cli-mcp-adoption. Do not register bare generic option keys. Follow the execution-variant section of docs/development/new-platform-acceptance-checklist.md.",
   "description": "Add support for SiriusDB, a GPU-native SQL engine that accelerates analytical queries\nby offloading execution to graphics processors via DuckDB integration.\n\nSiriusDB is notable for:\n- 10x faster than DuckDB, 60x faster than ClickHouse at same hardware cost\n- Integrates with DuckDB via Substrait query format\n- Built on NVIDIA CUDA-X libraries (cuDF)\n- Plug-and-play with CPU fallback when GPU unavailable\n- Ideal for TPC benchmark acceleration\n\nReference: https://www.sirius-db.com, https://github.com/sirius-db/sirius\n",
   "legacy": {
     "anti_patterns": [
@@ -303,6 +308,14 @@
       "op": "update",
       "op_id": "d2a11111996648a0847b2b4a1f218203",
       "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:39:33Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "ea9bb544049346dd979c6cc6cbb7c1c6",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
     }
   ]
 }
