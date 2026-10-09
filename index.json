@@ -14342,7 +14342,7 @@
       "needs": [],
       "priority": "high",
       "status": "open",
-      "title": "Failed oracle-review runs from review events stay on the head and block merge after a stand-in"
+      "title": "A failing oracle-review run from before the oracle's review stays on the head and blocks merge until rerun by hand"
     },
     "oracle-review-thread-reply-run-churn-20261008": {
       "claim": null,
