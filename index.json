@@ -4168,12 +4168,17 @@
       "title": "Remove comments and docstrings from QuestDB and InfluxDB"
     },
     "comment-cleanup-tpcdi-generation": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:39:25Z",
+        "generation": "9136e794dd8f4993944760b051d12c0f",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from TPC-DI generation"
     },
     "comment-cleanup-tpcdi-runtime": {
