@@ -4,7 +4,7 @@
     "No new secret or App is required",
     "Oracle review cleared"
   ],
-  "context": "Owner decision D-T (2026-10-08, in chat): a separate small core PR after the site-inputs corrections merge and before the seed, not part of that PR's final round. Found while diagnosing develop run 37694648015 (7ee64f98c), which failed validator_parity and opened no issue; the next run moved past it silently.",
+  "context": "Owner decision D-T (2026-10-08, in chat): a separate small core PR after the site-inputs corrections merge and before the seed, not part of that PR's final round. Found while diagnosing develop run 37694648015 (7ee64f98c), which failed validator_parity and opened no issue; the next run moved past it silently.\n2026-10-09 00:15Z: PR #2795 opened (branch feat/site-bundle-failure-alert, head dd768241c, worktree /Users/joe/Developer/BenchBox.wt-site-bundle-alert). Separate report-failure job with issues: write only. Needs shadow review, then owner stand-in (soundness path), then pr-arm.",
   "description": "Small core PR, after the site-inputs bundle changes are on develop and before the site repo is seeded.\n\nToday a failed `site-inputs.yml` run on develop raises no alert. Neither the develop workflow nor the corrected one has an issue step. The plan opens a `site-bundle-failed` issue only from the site deploy plane, for a dispatch that arrived. A core build failure never dispatches, so the only signal is a red workflow run.\n\n1. Add a final step to `.github/workflows/site-inputs.yml` with `if: failure()`.\n2. Using `github.token` with `issues: write`, open one issue labelled `site-bundle-failed`, or comment on the open one. Include the core SHA, the run URL and the failed attestation names.\n3. Close nothing automatically; the next green run may comment that the chain recovered.\n4. The workflow is a soundness path, so the PR needs oracle review. It needs no GitHub App.",
   "links": [
     ".github/workflows/site-inputs.yml"
@@ -16,6 +16,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "3b5b7313b0484728895801b13b704882",
+      "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de",
+      "at": "2026-10-09T00:13:30Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "32c79ba00cec49fcaad4e9a022a6476f",
       "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
     }
   ]
