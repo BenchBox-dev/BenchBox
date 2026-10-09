@@ -580,7 +580,7 @@ def test_a_do_not_ship_is_never_discarded_for_missing_read_evidence(
 
 
 @skip_on_windows
-def test_a_follow_up_missing_a_prior_status_is_recorded_for_the_judge(
+def test_a_prior_defect_status_is_kept_in_the_recorded_verdict(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workspace, head = _workspace(tmp_path)

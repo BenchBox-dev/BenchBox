@@ -631,3 +631,21 @@ def test_a_text_data_file_is_tracked_like_code(monkeypatch: pytest.MonkeyPatch, 
     changed = TWO_FILE_DIFF + section.replace("+b", "+c")
     _, values, plan = _plan(monkeypatch, tmp_path, _fake(_review(record), files=files, diff=changed))
     assert values["decision"] == "review" and plan["protocol"]["changed"] == [data]
+
+
+def test_an_oversize_head_is_not_retried_until_a_new_push(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    oversize = State(7, HEAD, "pending", datetime.now(UTC) - timedelta(hours=3), pending_cause="oversize")
+    comment = {"action": "created", "issue": {"number": 7, "pull_request": {}}, "comment": {"body": "/oracle-review"}}
+    _, values, plan = _plan(
+        monkeypatch, tmp_path, FakeGitHub(_pull(), SOUNDNESS, oversize), event_name="issue_comment", event=comment
+    )
+    assert values["decision"] == "skip" and "pending for oversize" in plan["decision_reason"]
+    fake = FakeGitHub(_pull(), SOUNDNESS, oversize)
+    fake.install(monkeypatch)
+    _env(monkeypatch, tmp_path, "schedule", {}, "refs/heads/develop")
+    assert cli.main(["sweep", "--policy", str(POLICY_PATH)]) == 0
+    assert fake.dispatched == []
+    pushed = tmp_path / "pushed"
+    pushed.mkdir()
+    _, values, plan = _plan(monkeypatch, pushed, FakeGitHub(_pull(), SOUNDNESS, oversize))
+    assert values["decision"] == "review" and plan["brief_mode"] == "inline"

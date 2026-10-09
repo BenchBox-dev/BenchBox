@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -393,3 +394,35 @@ def test_review_threads_raises_on_graphql_errors(monkeypatch: pytest.MonkeyPatch
 def _thread(resolved: bool, path: str, author: str | None, body: str) -> dict[str, Any]:
     comment = {"author": {"__typename": "Bot", "login": author} if author else None, "body": body}
     return {"isResolved": resolved, "path": path, "comments": {"nodes": [comment]}}
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the fake gh is a POSIX shebang script and PATH is colon-joined")
+def test_oracle_reviews_reads_every_page_through_gh_api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    pages = [
+        [{"id": index, "user": {"login": "benchbox-oracle[bot]", "type": "Bot"}, "body": f"r{index}"} for index in part]
+        for part in (range(100), range(100, 151))
+    ]
+    argv_log = tmp_path / "argv.json"
+    script = tmp_path / "bin" / "gh"
+    script.parent.mkdir()
+    script.write_text(
+        f"#!{sys.executable}\n"
+        "import json, sys\n"
+        f"pages = {pages!r}\n"
+        f"open({str(argv_log)!r}, 'w').write(json.dumps(sys.argv[1:]))\n"
+        "args = sys.argv[1:]\n"
+        "if '--paginate' in args and '--slurp' in args:\n"
+        "    print(json.dumps(pages))\n"
+        "elif '--paginate' in args:\n"
+        "    print(''.join(json.dumps(page) for page in pages))\n"
+        "else:\n"
+        "    print(json.dumps(pages[0]))\n",
+        encoding="utf-8",
+    )
+    script.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{script.parent}:/usr/bin:/bin")
+    reviews = github.oracle_reviews(REPO, PR)
+    assert [review["id"] for review in reviews] == list(range(151))
+    assert reviews[150]["login"] == "benchbox-oracle[bot]" and reviews[150]["body"] == "r150"
+    argv = json.loads(argv_log.read_text(encoding="utf-8"))
+    assert argv[0] == "api" and argv[-1] == f"repos/{REPO}/pulls/{PR}/reviews?per_page=100"

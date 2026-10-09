@@ -85,8 +85,11 @@ cycle and round, the kind of round, the decision, the head, the base branch,
 the reviewer, the tier, the strike count, the open defects with their ids, and
 a hash of each changed file's patch (an 8-hex path hash and a 16-hex patch hash;
 a marker over 4 KB keeps only the aggregate digest, which is computed from the
-full-length patch hashes). `plan` reads every review
-from the App's Bot account, page by page, and ignores dismissed reviews and
+full-length patch hashes). The per-file map fits for about 200 changed files
+when 10 defects are open, and about 210 when none are. Without the map, every
+file counts as changed, so a larger pull request gets a follow-up on every
+file after each push instead of one on the files that changed. `plan` reads
+every review from the App's Bot account, page by page, and ignores dismissed reviews and
 reviews without a marker. A review with more than one marker, or a marker that
 does not decode, holds the result pending, as does a review list that cannot be
 read. Pending results write no marker.
@@ -136,6 +139,10 @@ works on a refused pull request.
 
 Before it posts, the `post` job reads the review list again and posts nothing
 if the head already has a marker, so two runs for one head cannot both post.
+It tries the read three times, about two seconds apart. If every try fails, it
+posts anyway and says in the job summary that the post was not confirmed: the
+retry state is already uploaded by then, so skipping would leave the head
+recorded as decided with no review.
 
 Before posting, `post` drops any finding that matches an open review thread
 from this App, by file and normalized title, unless the new finding is more
@@ -239,11 +246,19 @@ of their own.
 A rerun on the same head needs a previous run in which every attempted
 reviewer was absent. A run that stayed pending because its artifacts failed
 validation, or because a selected reviewer never reported, is not rerun on the
-same head; push a new head instead. Comment, dispatch and scheduled reruns share a daily budget per pull
-request (`retry.daily_budget`), with backoff that starts at one hour and
-doubles. The retry state is the `oracle-review-shadow-state-<number>` artifact
-of the latest run of this workflow whose commit is on `develop`; artifacts from
-any other workflow or branch are ignored.
+same head; push a new head instead. Comment, dispatch and scheduled reruns
+share a daily budget per pull request (`retry.daily_budget`), with backoff that
+starts at one hour and doubles. The retry state is the
+`oracle-review-shadow-state-<number>` artifact of the latest run of this
+workflow whose commit is on `develop`; artifacts from any other workflow or
+branch are ignored.
+
+A pull request whose brief exceeds the size cap even without the diff, because
+it changes so many files that the file list alone is too long, cannot be
+reviewed: every reviewer is skipped and the result is pending with the cause
+`oversize`. Its review says the change is too large for the oracle and that the
+ways forward are to split the pull request or ask the owner for a stand-in. The
+same head is not retried; a new push plans again.
 
 ## Calibration
 
