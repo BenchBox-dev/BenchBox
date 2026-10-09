@@ -14018,7 +14018,7 @@
       "needs": [],
       "priority": "low",
       "status": "open",
-      "title": "Two merged oracle PR descriptions state behaviour the merged code does not have"
+      "title": "Three merged oracle PRs have a description or title that misstates the change"
     },
     "oracle-muse-contributor-model-first-attempt-20261008": {
       "claim": null,
