@@ -280,12 +280,18 @@ attribution:
 - `join_algorithm=grace_hash` in the tuned session pack, on the unpartitioned
   baseline layout, raised the geometric mean 2.2× and ran Q3 and Q5 out of
   memory. The other pack settings were within noise (1.03× to 1.06×).
-- A partition adds no pruning beyond the sort key: rows read per query were
-  identical for sorted layouts with and without partitioning (Q6 0.15×, Q14
-  0.05×, Q15 0.04×), and a finer partition was never faster than a coarser one.
-- Sorting by ship and order date alone ran at 0.79× the baseline geometric mean
-  (21% faster). Its slowest queries were Q3 (1.49×) and Q5 (1.44×), because
-  `lineitem` is no longer ordered by order key.
+- At SF1, a partition adds no pruning beyond the sort key: rows read per query
+  were identical for sorted layouts with and without partitioning (Q6 0.15×,
+  Q14 0.05×, Q15 0.04×), and a finer partition was never faster than a coarser
+  one.
+- Across the 21 queries that run on the 5.25 GiB envelope (Q21 is excluded
+  because it fails there without its statement-level `hash` override, described
+  below), sorting by ship and order date alone ran at 0.79× the baseline
+  geometric mean (21% faster). The slowest queries were Q3, Q5 and Q18. Q3 read
+  0.54× the rows of the baseline and took 1.43× the time, Q5 read 0.84× and took
+  1.49×, and Q10 read 0.42× and took 1.00× (medians of seven rounds). Q3 and Q5
+  read fewer rows and still ran slower. Q18 read 2.15× the rows and took 1.77×
+  the time. The cause of the Q3, Q5 and Q18 slowdowns is unproven.
 - After a partitioned load, 81 to 86 background merges overlapped the timed
   queries and each query read about 200 parts instead of the settled 84.
 
@@ -295,8 +301,9 @@ attribution:
   ClickHouse session pack.
 - Remove partitioning from the ClickHouse TPC-H tuned template and its packaged
   mirror, keeping the date sort keys. Scale-tiered partitioning was not built:
-  a partition has no pruning benefit at any scale for these tables, so there is
-  no tier to select.
+  at SF1, on ClickHouse 25.8 and the 5.25 GiB envelope, a partition adds no
+  pruning benefit for these tables, so there is no tier to select. Larger
+  scales are unmeasured.
 - Run TPC-H Q21 with a statement-level `join_algorithm = 'hash'` on tuned
   server runs. With the date-first sort key its default parallel hash join
   peaks above the 5.25 GiB envelope and fails; the single hash join peaks at
@@ -304,24 +311,76 @@ attribution:
   mean 1.23× and Q13 4.2×, so it is limited to the one query that needs it.
 - Wait for background merges to settle after a tuned server-mode load, so the first
   timed query does not compete with merges. The wait is bounded and is not
-  counted as load time.
+  counted as load time. The wait runs only after tuned server loads, not after
+  `notuning` loads. A `notuning` cell may therefore time queries while merges
+  still run, which favours the tuned cell. The comparisons below carry this
+  asymmetry until the wait is recorded for every mode.
 - A test rejects any ClickHouse tuned template that partitions a table on the
   column that already leads its sort key.
 
 The measurements are SF1 only. Larger scales were not run: SF100 does not fit
 the 16 GB measurement host, and SF10 needs more memory than the 5.25 GiB
-envelope used here. The absence of a large-scale partitioning benefit is argued
-from the pruning result above, which does not depend on scale, and is not
-measured there. SF10 and larger remain unmeasured.
+envelope used here. The partitioning conclusion holds for SF1, ClickHouse 25.8
+and the 5.25 GiB envelope. It is not shown for SF10 and larger, which remain
+unmeasured; a layout study at those scales is follow-up work. Partitioning also
+changes part counts, merges and parallelism, and these depend on scale.
+Server results here ran in a Linux VM under Apple `container`, not under Linux
+Docker.
 
-**Per-template decisions.** A tuned template is kept when its geometric mean
-beats `notuning` beyond noise, no query fails that passes untuned, and every
-query more than 1.5× slower than untuned is named here. For SSB and TPC-DS the
-rule is relaxed to a geometric mean no worse than `notuning` within about 10%
-and no added failing query.
+**Per-template decisions.** These decisions are provisional and rest on SF1
+only. The SSB and TPC-DS decisions rest on a single sequential CLI cell per
+mode, not on repeated, shuffled rounds. A tuned template is kept when its
+geometric mean beats `notuning` beyond noise, no query fails that passes
+untuned, and every query more than 1.5× slower than untuned is named here. For
+SSB and TPC-DS the rule is relaxed to a geometric mean no worse than
+`notuning` within about 10% and no added failing query. That threshold was set after the SSB and TPC-DS
+numbers were seen. The decisions stay provisional until a benefit rule fixed
+before measurement replaces it.
 
 | Template | Decision | Evidence (SF1, ClickHouse 25.8, 5.25 GiB) |
 |---|---|---|
-| TPC-H | Adjust: partitioning dropped, date sort keys kept | Sort-only layout ran at 0.79× the `notuning` geometric mean. Slower queries: Q18 (1.4× to 2.7×), Q3 (about 1.5×), Q5 (1.4× to 1.5×), because `lineitem` is sorted by ship date instead of order key. |
+| TPC-H | Adjust: partitioning dropped, date sort keys kept | Sort-only layout ran at 0.79× the `notuning` geometric mean over 21 queries, excluding Q21, which fails at the 5.25 GiB envelope without its hash override. Slower queries (median of seven rounds): Q3 1.43×, Q5 1.49×, Q18 1.77×. The cause is unproven. |
 | SSB | Keep | Fresh server, three cells, no failures: geometric mean 109.8 ms `notuning`, 61.2 ms tuned (0.56×), 64.1 ms tuned with `optimize_after_load`. Host load average stayed at or below 8.3. |
-| TPC-DS | Keep, unchanged | Geometric mean 80.9 ms `notuning`, 84.1 ms tuned, 76.4 ms tuned with `optimize_after_load`. The same three queries fail in every cell. |
+| TPC-DS | Keep, unchanged | Geometric mean 80.9 ms `notuning`, 84.1 ms tuned, 76.4 ms tuned with `optimize_after_load`. Q10 is the only failing query. It fails its warm-up and all three measured iterations in all three cells with "memory limit exceeded ... maximum: 4.67 GiB". The summary count of three failures is those three iterations of one query. |
+
+### Correction (2026-10-09)
+
+Several claims in the 2026-10-07 addendum went beyond what its measurements
+show. The addendum is amended in place above. This section quotes each
+superseded sentence so the original claim stays traceable.
+
+- "a partition has no pruning benefit at any scale for these tables, so there is
+  no tier to select." Only SF1 was measured. The conclusion now names SF1,
+  ClickHouse 25.8 and the 5.25 GiB envelope, and lists SF10 and larger as
+  unmeasured. The earlier sentence "The absence of a large-scale partitioning
+  benefit is argued from the pruning result above, which does not depend on
+  scale" is withdrawn: part counts, merges and parallelism change with scale,
+  so the pruning result alone does not settle larger scales.
+- "Its slowest queries were Q3 (1.49×) and Q5 (1.44×), because `lineitem` is no
+  longer ordered by order key." and, in the TPC-H table row, "because
+  `lineitem` is sorted by ship date instead of order key." The study does not
+  show a cause. In the seven-round study, Q3 read 0.54× the rows and took 1.43×
+  the time, Q5 read 0.84× and took 1.49×, and Q10 read 0.42× and took 1.00×.
+  The cause is unproven. The superseded 1.49× and 1.44× were best-of-seven
+  times. The ratios now quoted are medians of seven rounds. The statistic
+  matters: the Q5 ratio is 1.10× as a geometric mean of the rounds and 1.49× as
+  a median, so the size of the slowdown is itself uncertain.
+- "ran at 0.79× the baseline geometric mean (21% faster)". The figure is a
+  geometric mean over 21 queries. Q21 is excluded because it fails at the
+  5.25 GiB envelope without its per-query hash override. The sentence now says
+  so. The figure is the geometric mean of each query's seven-round geometric
+  mean; the median-based figure for the same data is 0.78×.
+- "The same three queries fail in every cell." One query fails: Q10. The three
+  measured iterations and the warm-up all fail with a memory limit of 4.67 GiB,
+  in all three cells. The count of three in the result summaries is those three
+  iterations.
+- "For SSB and TPC-DS the rule is relaxed to a geometric mean no worse than
+  `notuning` within about 10% and no added failing query." The threshold was
+  chosen after the numbers were seen, and the Keep decisions rest on single
+  sequential CLI cells at SF1. They are now marked provisional and SF1-only.
+
+The merge-settle wait runs only after tuned server loads, so `notuning` cells
+may time queries while merges still run. This favours the tuned cell and is now
+stated in the decision. The cause of the Q3, Q5 and Q18 slowdowns and the size
+of any effect at larger scales remain open. No decision changed: the template
+contents, the session pack contents and the Q21 override stay as decided.
