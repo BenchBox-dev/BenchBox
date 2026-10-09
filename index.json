@@ -3906,18 +3906,13 @@
       "title": "Remove comments and docstrings from MCP infrastructure"
     },
     "comment-cleanup-mcp-interaction": {
-      "claim": {
-        "expires_at": "2026-10-10T00:27:31Z",
-        "generation": "6c7cc70859da41318f5d85cc47867979",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget",
         "comment-cleanup-mcp-infrastructure"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from MCP tools, resources and prompts"
     },
     "comment-cleanup-metadata-primitives": {
