@@ -3683,12 +3683,17 @@
       "title": "Remove comments and docstrings from Doris, Databend and StarRocks"
     },
     "comment-cleanup-documentation-samples": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:16:38Z",
+        "generation": "18b8424f38d54ec485af9dcf8e6abe61",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments from executable documentation samples"
     },
     "comment-cleanup-duckdb-family": {
