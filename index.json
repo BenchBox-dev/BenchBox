@@ -15208,7 +15208,7 @@
         "skill-integrity-ci-lane-live-validation",
         "todo-db-runtime-schema3-batch-capability"
       ],
-      "priority": "high",
+      "priority": "medium",
       "status": "open",
       "title": "Verify the complete PR process against incident replays and live operating targets"
     },
