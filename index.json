@@ -7477,7 +7477,11 @@
       "claim": null,
       "needs": [
         "dlv2-00-decisions-adr",
-        "dlv2-13-durations-budget-quarantine"
+        "dlv2-13-durations-budget-quarantine",
+        "t3-perf-aggregate-gate-tolerance-decision-20261009",
+        "t3-drift-dispatch-verify-20261008",
+        "t3-durations-refresh-failure-20261009",
+        "ci-docker-hub-unauthenticated-pulls-20261009"
       ],
       "priority": "high",
       "status": "open",
