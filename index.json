@@ -7653,10 +7653,15 @@
       "title": "docs linkcheck turns transient external-site timeouts into a red CI job"
     },
     "docs-move-internal-to-internal-root": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T12:19:42Z",
+        "generation": "7bb84d81e4a746dabc52b3b09630a246",
+        "renewals": 0,
+        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:a9f51c620a99fea6b166f0af"
+      },
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Move excluded maintainer docs into docs/internal/"
     },
     "docs-phase-ddl-optimize-wording": {
