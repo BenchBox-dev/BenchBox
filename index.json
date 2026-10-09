@@ -4376,12 +4376,17 @@
       "title": "Remove comments and docstrings from visualization and ASCII charts"
     },
     "comment-cleanup-windows-consumer": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T01:09:53Z",
+        "generation": "14a3fa30b9404a1cb360a458ad013da5",
+        "renewals": 0,
+        "worker": "mcp:antigravity-worker-2"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Migrate Windows lint suppressions and clean its source reader"
     },
     "comment-cleanup-write-primitives": {
