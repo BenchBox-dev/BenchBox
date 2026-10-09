@@ -23230,7 +23230,7 @@
         "tuning-sort-evidence-attested-20261001",
         "tuning-constraint-corroboration-20261001"
       ],
-      "priority": "critical",
+      "priority": "high",
       "status": "open",
       "title": "Positive liveness CI gate: real-CLI tuned runs must reach applied_verified on DuckDB and ClickHouse"
     },
