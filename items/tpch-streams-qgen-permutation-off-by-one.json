@@ -1,6 +1,7 @@
 {
   "acceptance": [
-    "Either the unused qgen stream generator is removed with its tests, or both paths select the same permutation for a given stream id, shown by a test that fails before the change.",
+    "The qgen command selects PERMUTATION_MATRIX[stream_id % 41], verified for stream ids 0, 1, 2, and 41.",
+    "A test using the bundled qgen binary verifies the first emitted query for streams 0, 1, and 2 matches PERMUTATION_MATRIX; skip with a stated reason only when bundled qgen or templates are unavailable.",
     "Stream numbering stays 1..S as decided for the throughput batch.",
     "make comment-policy-check passes."
   ],
@@ -22,6 +23,14 @@
       "generation": "8bc706b5dd7f48a0bf3e0f28cb2d994f",
       "op": "take",
       "op_id": "ef4e1cdbf98c4174bee7500c6d462389",
+      "session_id": "024527ae77c1405f86cdbdf1079f6e14"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396",
+      "at": "2026-10-09T21:16:31Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "e18ca69b9e324e4e99bbc8169e2b7484",
       "session_id": "024527ae77c1405f86cdbdf1079f6e14"
     }
   ]
