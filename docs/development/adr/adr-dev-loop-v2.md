@@ -143,6 +143,14 @@ review requirement is unchanged except for the stand-in review above.
 A new push or refresh changes the head and needs fresh CI and a fresh connector review
 or stand-in approval before re-arming. No PR-body attestation satisfies or is required by the check.
 
+Amended 2026-10-09: the self-hosted oracle replaced the Codex connector as the review
+signal. The required `oracle-review` check now passes only on the `benchbox-oracle` App's
+success review of the current head, or the stand-in approval, with no unresolved App
+review thread. The connector is no longer accepted and its App is uninstalled; the digest
+still counts connector reviews for merges before the cut-over (2026-10-09 00:16 UTC), so
+its history stays accurate. Wherever this section says "connector review", read "oracle
+review". See [`docs/operations/oracle-review-v2.md`](../../operations/oracle-review-v2.md).
+
 ### D5: Retain agent write tooling, retire PR-loop scripts
 
 Agent workspace safety tooling is retained:

@@ -214,7 +214,7 @@ def _dispatch(
 
 @pytest.mark.parametrize(
     "message",
-    ["oracle-review: not a soundness path change", f"oracle-review: pass (Codex connector review of {HEAD})"],
+    ["oracle-review: not a soundness path change", f"oracle-review: pass (oracle review of {HEAD})"],
 )
 def test_dispatch_checks_current_head_around_every_checker_success(tmp_path: Path, message: str) -> None:
     result, outputs = _dispatch(tmp_path, [_pull(), _pull(), _pull()], checker_message=message)

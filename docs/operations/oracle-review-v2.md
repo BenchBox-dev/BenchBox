@@ -9,8 +9,9 @@
 requests with agent CLIs and posts a non-required `oracle-review-shadow` status
 through the owner's GitHub App. The required `oracle-review` check reads that
 App's pull request reviews (see Cut-over). The policy lives in
-`.github/oracle-reviewers.yml`; the decision record is
-`_project/decisions/oracle-review-v2-shadow-2026-10-05.md`.
+`.github/oracle-reviewers.yml`. The decision records are
+`_project/decisions/oracle-review-v2-shadow-2026-10-05.md` and, for verdicts,
+evidence and review rounds, `_project/decisions/oracle-review-protocol-2026-10-08.md`.
 
 ## Setup
 
@@ -257,9 +258,6 @@ These checks must pass before the cut-over that makes the context required.
   removed; raw output is never uploaded. Add the messages to the `CALIBRATED_*_PATTERNS` tables in
   `_project/scripts/oracle_reviewers/absence.py`; until then they count as
   errors, which never pass.
-
-During the shadow period, compare each `oracle-review-shadow` result with the
-review the pull request actually received.
 
 ## Cut-over
 
