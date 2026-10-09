@@ -7598,7 +7598,8 @@
     "dlv2-53-retire-legacy-release-path": {
       "claim": null,
       "needs": [
-        "dlv2-52-release-rehearsal-and-first-release"
+        "dlv2-52-release-rehearsal-and-first-release",
+        "ruleset-drift-check-home-20261009"
       ],
       "priority": "high",
       "status": "open",
