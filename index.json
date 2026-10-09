@@ -6770,13 +6770,18 @@
       "title": "Promote nyctaxi and tsbs_devops to enforced CI gates"
     },
     "df-parity-promote-tpc-family": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T23:31:06Z",
+        "generation": "2efa72a78bf14693bd94088420e058d3",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
+      },
       "needs": [
         "df-parity-staged-builders-small",
         "df-parity-staged-tpch-tpcds"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Promote tpch_skew, tpch, tpcds-subset to enforced gates"
     },
     "df-parity-read-primitives-counts": {
