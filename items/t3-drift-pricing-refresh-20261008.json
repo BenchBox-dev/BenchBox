@@ -4,7 +4,7 @@
     "Refreshed evidence and tables are committed together in one change",
     "The pricing-data-drift-check workflow passes on develop after the change"
   ],
-  "context": "Evidence: nightly-v2 run 37339234759 (2026-10-05) failed steps 'Submission validator drift' and 'Pricing data drift'; its corpus step reported 'No develop-ahead corpus drift', so corpus lag was not the cause. An earlier analysis blamed published-results lagging develop; the logs do not support that.\n\nHANDOFF NOTE (session claude-code, 2026-10-09): the premise \"vendor prices moved\" is wrong. `make pricing-data-check` already exits 0, and a live `generate_pricing_data.py --refresh` on develop reports no upstream drift once the generator bug is fixed. Real causes: (1) 2026-10-05: Azure added one surcharged feature meter per non-US region (Eventstream Custom Connector Capacity Usage CU, 0.2574 vs 0.22 in westeurope), tripping the 'Fabric CU meters disagree' check; (2) 2026-10-08: Azure Retail Prices rate limiting (about 10 requests/min) exceeded the 120 s HTTP retry budget on a Synapse canadacentral GET; transient. Fix for (1) is committed on branch fix/pricing-refresh-robustness in worktree ../BenchBox.wt-pricing-refresh (pins evidence match_meter to 'Data Warehouse Capacity Usage CU'; PR to be opened by the claude-code session). Do NOT reimplement; no price changes need committing.",
+  "context": "Evidence: nightly-v2 run 37339234759 (2026-10-05) failed steps 'Submission validator drift' and 'Pricing data drift'; its corpus step reported 'No develop-ahead corpus drift', so corpus lag was not the cause. An earlier analysis blamed published-results lagging develop; the logs do not support that.\n\nNOTE (session claude-code, 2026-10-09): the premise \"vendor prices moved\" was wrong. `make pricing-data-check` already exits 0, and a live `generate_pricing_data.py --refresh` with the Fabric selector fixed reports no upstream drift. Causes: (1) 2026-10-05: Azure added one surcharged feature meter per non-US region (Eventstream Custom Connector Capacity Usage CU, 0.2574 vs 0.22 in westeurope), tripping the 'Fabric CU meters disagree' check; PR #2811 fixes it. (2) 2026-10-08: Azure Retail Prices rate limiting (about 10 requests/min) exceeded the 120 s HTTP retry budget on a Synapse canadacentral GET; transient, not fixed. If the verification dispatch hits it again, re-dispatch once before treating it as a defect. The Fabric selector excludes meters by name; a pinned-meter approach (evidence match_meter 'Data Warehouse Capacity Usage CU', checked live in all five tier regions) is more robust to the next surcharged meter and is an option for follow-up. No price changes need committing.",
   "description": "The nightly T3 drift job failed on 2026-10-05 in two steps: submission validator drift and pricing data drift. The validator drift has since cleared (the submission-validator-drift-check push run on 2026-10-08 succeeded). Pricing drift has not: the pricing-data-drift-check push run on 2026-10-08 00:20Z failed with exit code 2, which the workflow reports as upstream vendor prices having moved. Dispatching the drift job again without fixing this will fail the same way. A person must review the price changes before committing them; the workflow says to confirm the new list prices, then run `make pricing-data` and commit the refreshed evidence and tables together.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2471"
@@ -51,6 +51,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "db6c0f8724904e2d96b4af5f845c915f",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-09T12:41:19Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "0abe2e7cfe8a4bc990f53d406c9645f6",
       "session_id": "e40b1c8674df4499842f44749410458f"
     }
   ]
