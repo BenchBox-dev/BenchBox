@@ -13410,7 +13410,7 @@
       "needs": [],
       "priority": "medium-high",
       "status": "open",
-      "title": "Find why scheduled-workflow-liveness reports stale runs, harden its lookup, then lift the quarantine"
+      "title": "Find why scheduled-workflow-liveness reports stale runs and harden its lookup"
     },
     "nightly-macos-dataframe-insufficient-memory-flake": {
       "claim": null,
