@@ -3572,9 +3572,9 @@
     },
     "comment-cleanup-cost": {
       "claim": {
-        "expires_at": "2026-10-10T00:55:49Z",
-        "generation": "5335ea6bbd4e4f0e98260be84bb06d7b",
-        "renewals": 0,
+        "expires_at": "2026-10-10T00:57:11Z",
+        "generation": "36937a8aba1d45ff81fd79f99a544136",
+        "renewals": 1,
         "worker": "mcp:antigravity-worker-2"
       },
       "needs": [
