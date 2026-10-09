@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "nightly-v2 has a throughput domain that runs the DuckDB and CedarDB cells and posts the same commit status as throughput-uat-signal.",
+    "The floor-history lookup reads the new workflow's scheduled runs (or imports the nightly.yml samples), shown by a dispatched run reporting the same sample count as the last nightly.yml run.",
+    "A workflow test pins the domain and its history lookup."
+  ],
+  "context": "Found in the 2026-10-09 tracker review. Related: monitor-nightly-cedardb-throughput-gate-and-floor (watches the gate in nightly.yml today), dlv2-70-retire-scheduled-workflows (must wait for this port).",
+  "description": "nightly.yml runs throughput-uat (nightly.yml:707) and throughput-uat-signal (:804). Since #2757 the CedarDB cell gates the nightly, and the Throughput@Size floor learns from scheduled nightly.yml history (`--workflow nightly.yml ... --event schedule`, nightly.yml:755; minimum samples per runner class in tests/uat/throughput.py:203-212). nightly-v2.yml has no throughput, UAT or CedarDB job, and dlv2-70 deletes nightly.yml. Without a port, the throughput gate and its floor disappear when nightly.yml is retired.\n\nPort both jobs into a nightly-v2 domain. Move the floor-history lookup to the new workflow's runs and artifact names, or carry the existing samples over, so the floor does not reset to 0 of 5.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:18:48Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "e426f25a21c444429290b8e1fef62fbb",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}

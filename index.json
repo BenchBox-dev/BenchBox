@@ -13688,6 +13688,13 @@
       "status": "blocked",
       "title": "Port the scheduled-workflow-liveness check to nightly-v2 before nightly.yml is retired"
     },
+    "nightly-v2-throughput-uat-port-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Port the throughput-uat jobs (DuckDB and CedarDB cells, floor history, commit status) from nightly.yml to nightly-v2"
+    },
     "nightly-v2-windows-unit-leg-20261009": {
       "claim": null,
       "needs": [
