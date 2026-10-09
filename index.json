@@ -4186,17 +4186,12 @@
       "title": "Remove comments and docstrings from TPC-DI runtime and ETL"
     },
     "comment-cleanup-tpcds-dataframe": {
-      "claim": {
-        "expires_at": "2026-10-10T00:40:38Z",
-        "generation": "751c710c557d46bcb61d1f5bbf2cb8c8",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from TPC-DS DataFrame queries"
     },
     "comment-cleanup-tpcds-generation": {
