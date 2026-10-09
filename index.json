@@ -20812,15 +20812,10 @@
       "title": "Refresh the DuckDB TPC-H SF=0.01 perf baseline from retained CI-runner results"
     },
     "t3-perf-compare-delta-floor-20261008": {
-      "claim": {
-        "expires_at": "2026-10-10T11:56:43Z",
-        "generation": "6a559c34592b49da9749b60e36597bbb",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "open",
       "title": "Add an absolute-delta floor to benchbox compare --fail-on-regression so sub-15ms queries stop tripping the perf gate"
     },
     "table-format-integration-ci-coverage": {
