@@ -3815,12 +3815,17 @@
       "title": "Remove comments and docstrings from FlightData modules"
     },
     "comment-cleanup-gcp-cloud": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:20:14Z",
+        "generation": "10763b4f27ba4270bd040d71a764b9bd",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from BigQuery and GCP support"
     },
     "comment-cleanup-generators": {
