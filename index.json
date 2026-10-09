@@ -24926,9 +24926,9 @@
     "windows-pytest-xdist-teardown-hang-20261009": {
       "claim": null,
       "needs": [],
-      "priority": "medium",
+      "priority": "medium-high",
       "status": "open",
-      "title": "Windows Python 3.11 fast-test job hangs at xdist teardown and runs to the 6 hour limit"
+      "title": "Windows fast-test run stalls at about 90-95% on Python 3.11 and 3.12"
     },
     "windows-session-lock-holder-readable-20261009": {
       "claim": null,

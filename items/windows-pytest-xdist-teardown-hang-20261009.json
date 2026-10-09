@@ -1,10 +1,10 @@
 {
   "acceptance": [
-    "Windows 3.11 'Run fast tests' finishes (pass or fail) in a dispatched nightly.yml run instead of hanging",
-    "The cause of the GIL fatal error at xdist teardown is recorded"
+    "The stalling test or fixture is identified, with the evidence recorded, and fixed or skipped on Windows with a stated reason",
+    "The Windows fast tier (Python 3.11 and 3.12) completes, pass or fail, in 3 consecutive runs without a stall"
   ],
-  "context": "Found while checking why 3.11 was cancelled on 2026-10-08. Run 37001178603 (2026-10-02) had a completed Windows 3.11 job, so the hang is intermittent.",
-  "description": "In nightly.yml run 37776283388 (2026-10-08), job 'test (windows-latest, 3.11)' ran 360.97 minutes and was cancelled. The test job has no timeout-minutes, so the 360 minute default applied. The log shows 'Fatal Python error: PyEval_SaveThread ... GIL' at 18:23:48Z during pytest-xdist teardown (execnet termkill), after which pytest hung until the job limit; no 'exceeded the maximum execution time' text is logged, so the timeout is the likely but not confirmed canceller. The 3.12 job finishes in 39 minutes. This item is for the hang itself: find whether the fatal error comes from a test, an xdist/execnet version, or a Python 3.11 build on the runner, and fix or pin it. The nightly-windows-teardown-and-singles change only bounds the job with a timeout so a hang fails in about an hour.",
+  "context": "Found while checking why 3.11 was cancelled on 2026-10-08. Run 37001178603 (2026-10-02) had a completed Windows 3.11 job, so the hang is intermittent.\n\n2026-10-09 tracker review: retitled and re-scoped. The stall is mid-run at 90-95%, not at teardown; the PyEval_SaveThread fatal error is a side effect of cancellation. The hang list above covers runs 2026-10-03 to 2026-10-09. This item is a need of nightly-v2-windows-unit-leg-20261009. The criterion is not tied to nightly.yml or to Python 3.11, because the new nightly-v2 Windows domain runs Python 3.12 only.",
+  "description": "The Windows fast-test run stalls part-way through. Progress stops mid-run at 90-95% and nothing prints until the job is cancelled. The earlier reading of this as an xdist teardown hang was wrong. The 'Fatal Python error: PyEval_SaveThread ... GIL' message comes from xdist (execnet termkill) tearing workers down during cancellation, so it is a side effect and not the cause.\n\nEvidence:\n- Python 3.11 hung in every nightly.yml run since 2026-10-05: 37301643110, 37462397762, 37619200963, 37776283388, 37928417334, 37967682464.\n- Python 3.12 hung on 2026-10-03 (37117386123) and 2026-10-07 (37619200963); other 3.12 runs finished (47.7 minutes with coverage in 37967682464).\n- --timeout=120 (nightly.yml:71) never fired, so the stalled test is not stuck inside a test that pytest-timeout can interrupt, or the stall is in a fixture, collection or worker-communication step.\n- The 90-minute job timeout (#2825) now bounds the stall, so it fails in 90 minutes and not 6 hours.\n\nLead: enable faulthandler_timeout in the pytest configuration, or run with verbose per-worker output (for example -v with --dist loadfile or -n 0 on a subset), so the stuck test or fixture appears in the log before cancellation. Then fix it, or skip it on Windows with a reason.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2568"
   ],
@@ -16,6 +16,14 @@
       "op": "create",
       "op_id": "b6b59c7d84ab402583f47c09a294d170",
       "session_id": "e40b1c8674df4499842f44749410458f"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:25:01Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "f30f05164baf487390ce2a83ebe1c44c",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
