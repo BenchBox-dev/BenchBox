@@ -7682,9 +7682,9 @@
     },
     "docs-test-pinned-internal-jargon": {
       "claim": {
-        "expires_at": "2026-10-10T00:52:54Z",
-        "generation": "3d327ef35dfb45a3b713fa4c90f8df11",
-        "renewals": 0,
+        "expires_at": "2026-10-10T12:18:39Z",
+        "generation": "af1b023d7800402493c2f9a1f6c2b3e4",
+        "renewals": 1,
         "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:a9f51c620a99fea6b166f0af"
       },
       "needs": [],
