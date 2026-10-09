@@ -3562,17 +3562,12 @@
       "title": "Remove comments and docstrings from execution, throughput and lifecycle code"
     },
     "comment-cleanup-core-registries": {
-      "claim": {
-        "expires_at": "2026-10-10T00:12:08Z",
-        "generation": "6e881a6d798d49a5929f2d293b9db99b",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from benchmark and platform registries"
     },
     "comment-cleanup-cost": {
