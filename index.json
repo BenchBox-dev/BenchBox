@@ -4205,10 +4205,10 @@
     },
     "comment-cleanup-tpcds-obt": {
       "claim": {
-        "expires_at": "2026-10-10T00:42:18Z",
-        "generation": "dd6d085fb53c4dd7860f6adad2e93da5",
+        "expires_at": "2026-10-10T00:52:11Z",
+        "generation": "04176d4c0397418aa884bec53e8fecf3",
         "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
+        "worker": "mcp:antigravity-worker-2"
       },
       "needs": [
         "comment-cleanup-pilot-budget"

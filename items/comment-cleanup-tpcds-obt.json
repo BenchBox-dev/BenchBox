@@ -27,6 +27,16 @@
       "op": "take",
       "op_id": "384b7e3528574638a2972caaf2e05afd",
       "session_id": "comment-cleanup-closeout-batch"
+    },
+    {
+      "actor": "mcp:antigravity-worker-2",
+      "at": "2026-10-09T00:52:11Z",
+      "displaced": "mcp:antigravity-closeout",
+      "generation": "04176d4c0397418aa884bec53e8fecf3",
+      "op": "takeover",
+      "op_id": "58bd93eb181244659695620a3f8682a9",
+      "reason": "session interrupted by timeout",
+      "session_id": "final-22-closeout"
     }
   ]
 }
