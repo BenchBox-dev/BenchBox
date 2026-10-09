@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Core bundle schema 3 carries explorer/bundles/ (count recorded) and verifies",
+    "The site build publishes results/data/bundles/ byte-identical to the bundle",
+    "Oracle review cleared; site ci green"
+  ],
+  "context": "Owner decision D-V (2026-10-09, in chat, decision dialog): the bundle carries these files, like D-U for downloads, rather than dropping the Explorer's download links. Found by the first shadow-parity comparison (site-split-25): core preview run 37889141746 vs site deploy run 37890208410, same core 0d5f01e91; 413 files under results/data/bundles/ only in core; 17 MB raw, about 0.46 MB compressed.",
+  "description": "Small core PR (soundness path: scripts/site_inputs.py), then a small site change.\n\nThe live site serves 413 per-result JSON files at /results/data/bundles/<id>.json, and the Explorer links to them from each run's receipt (bundle_download_url). explorer_publish writes them, but site_inputs.py deletes them after building the snapshot, so a site built from the bundle has no files behind those links.\n\n1. Core: keep explorer/bundles/ from explorer_publish as a required bundle member; bump the schema to 3; verify checks the member; tests.\n2. Site: support schemas 2 and 3 (N and N-1); stage explorer/bundles/ into explorer/public/data/bundles/ before the Explorer build; a built-site test checks the published files match the bundle.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de",
+      "at": "2026-10-09T11:11:05Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "cfaa6a3c76ca476a9a7fa0b3e3efd0bf",
+      "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
+    }
+  ]
+}

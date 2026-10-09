@@ -19565,6 +19565,15 @@
       "status": "done",
       "title": "Carry the core files that docs link to outside docs/ in the site-inputs bundle (schema 2)"
     },
+    "site-split-13-bundle-result-json": {
+      "claim": null,
+      "needs": [
+        "site-split-12-bundle-downloads"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Carry the per-result JSON files in the site-inputs bundle (schema 3)"
+    },
     "site-split-20-seed-site-repo": {
       "claim": null,
       "needs": [
