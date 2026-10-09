@@ -21136,7 +21136,7 @@
       "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "blocked",
       "title": "Refresh the DuckDB TPC-H SF=0.01 perf baseline from retained CI-runner results"
     },
     "t3-perf-compare-delta-floor-20261008": {
