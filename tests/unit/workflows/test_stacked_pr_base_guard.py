@@ -7,6 +7,8 @@ from typing import Any
 import pytest
 import yaml
 
+from tests.utilities.posix_shell import run_posix_shell, skip_without_posix_shell
+
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -88,36 +90,36 @@ def test_stacked_pr_base_guard_feeds_the_tooling_result() -> None:
     )
 
 
-def _run_guard(tmp_path: Path, base_ref: str, *, draft: bool) -> subprocess.CompletedProcess[str]:
+def _run_guard(base_ref: str, *, draft: bool) -> subprocess.CompletedProcess[str]:
     step = next(s for s in _job()["steps"] if s.get("name") == STEP_NAME)
     env = step.get("env", {})
     assert env.get("BASE_REF") == "${{ github.base_ref }}"
     assert env.get("IS_DRAFT") == "${{ github.event.pull_request.draft }}"
-    script = tmp_path / "base-guard.sh"
-    script.write_text(step["run"], encoding="utf-8")
-    return subprocess.run(
-        ["bash", str(script)],
+    skip_without_posix_shell()
+    return run_posix_shell(
+        step["run"],
         env={"PATH": "/usr/bin:/bin", "BASE_REF": base_ref, "IS_DRAFT": "true" if draft else "false"},
         capture_output=True,
         text=True,
+        encoding="utf-8",
         check=False,
     )
 
 
 @pytest.mark.parametrize("draft", [True, False])
 @pytest.mark.parametrize("base", sorted(INTEGRATION_BRANCHES))
-def test_stacked_pr_base_guard_passes_integration_bases(tmp_path: Path, base: str, draft: bool) -> None:
-    assert _run_guard(tmp_path, base, draft=draft).returncode == 0
+def test_stacked_pr_base_guard_passes_integration_bases(base: str, draft: bool) -> None:
+    assert _run_guard(base, draft=draft).returncode == 0
 
 
-def test_stacked_pr_base_guard_passes_a_draft_on_a_feature_base(tmp_path: Path) -> None:
-    result = _run_guard(tmp_path, "fix/parent-branch", draft=True)
+def test_stacked_pr_base_guard_passes_a_draft_on_a_feature_base() -> None:
+    result = _run_guard("fix/parent-branch", draft=True)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "::error::" not in result.stdout
 
 
-def test_stacked_pr_base_guard_fails_a_ready_pr_on_a_feature_base(tmp_path: Path) -> None:
-    result = _run_guard(tmp_path, "fix/parent-branch", draft=False)
+def test_stacked_pr_base_guard_fails_a_ready_pr_on_a_feature_base() -> None:
+    result = _run_guard("fix/parent-branch", draft=False)
     assert result.returncode != 0
     assert "::error::" in result.stdout
     assert "fix/parent-branch" in result.stdout

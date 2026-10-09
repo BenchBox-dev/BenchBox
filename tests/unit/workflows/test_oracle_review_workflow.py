@@ -10,6 +10,8 @@ from typing import Any
 import pytest
 import yaml
 
+from tests.utilities.posix_shell import run_posix_shell, skip_without_posix_shell
+
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -185,9 +187,8 @@ def _environment(tmp_path: Path, pulls: list[Any], checker_exit: int, checker_me
 
 
 def _run_step(tmp_path: Path, step: dict[str, Any], env: dict[str, str]) -> subprocess.CompletedProcess[str]:
-    script = Path(tmp_path).resolve() / "workflow-step.sh"
-    script.write_text(step["run"], encoding="utf-8")
-    return subprocess.run(["bash", str(script)], env=env, text=True, capture_output=True, timeout=10)
+    skip_without_posix_shell()
+    return run_posix_shell(step["run"], env=env, text=True, encoding="utf-8", capture_output=True, timeout=10)
 
 
 def _dispatch(

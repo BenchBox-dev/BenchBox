@@ -18,6 +18,8 @@ from path_filter_decision import (
     write_github_output,
 )
 
+from tests.utilities.posix_shell import run_posix_shell, skip_without_posix_shell
+
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
@@ -604,8 +606,7 @@ def test_visual_inputs_classify_website_as_a_render_input(tmp_path: Path, change
     _git(repo, "commit", "-m", "change", "-q")
     head = _git(repo, "rev-parse", "HEAD").strip()
 
-    classifier = tmp_path / "classify.sh"
-    classifier.write_text(_ci_jobs()["visual-inputs"]["steps"][1]["run"], encoding="utf-8")
+    classifier = _ci_jobs()["visual-inputs"]["steps"][1]["run"]
     output = tmp_path / "github-output"
     env = {
         **os.environ,
@@ -614,9 +615,10 @@ def test_visual_inputs_classify_website_as_a_render_input(tmp_path: Path, change
         "RECOVERY_SOURCE_SHA": "",
         "CURRENT_SHA": head,
         "CURRENT_REF": "refs/pull/1/merge",
-        "GITHUB_OUTPUT": str(output),
+        "GITHUB_OUTPUT": output.as_posix(),
     }
-    result = subprocess.run(["bash", str(classifier)], cwd=repo, env=env, capture_output=True, text=True)
+    skip_without_posix_shell()
+    result = run_posix_shell(classifier, cwd=repo, env=env, capture_output=True, text=True, encoding="utf-8")
 
     assert result.returncode == 0, result.stderr
     lines = dict(line.split("=", 1) for line in output.read_text(encoding="utf-8").splitlines() if "=" in line)

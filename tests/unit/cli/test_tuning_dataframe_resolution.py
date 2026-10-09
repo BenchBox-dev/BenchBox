@@ -245,7 +245,7 @@ class TestClickHouseTemplateDirectories:
     def test_every_variant_searches_the_shared_clickhouse_directory(self, platform):
         from benchbox.cli.tuning_resolver import get_tuning_template_paths
 
-        paths = [str(path) for path in get_tuning_template_paths(platform, "tpch")]
+        paths = [path.as_posix() for path in get_tuning_template_paths(platform, "tpch")]
 
         assert "examples/tunings/clickhouse/tpch_tuned.yaml" in paths
 
