@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "A pre-commit hook or make check fails if pyproject.toml dependencies are modified without matching updates to docs/development/dependency-audit-raw.md"
+  ],
+  "context": "Discovered during PR #2787 followups when pinning bashlex==0.18; make audit-raw-check failed in CI because parse_deps.py had not been run locally.",
+  "description": "Modifying dependencies in pyproject.toml requires regenerating docs/development/dependency-audit-raw.md via _project/scripts/dependency_audit/parse_deps.py. Today, this is enforced only by make audit-raw-check in CI. Add a pre-commit check or tooling guard that detects when pyproject.toml dependencies change without updating dependency-audit-raw.md, preventing push-time CI failures.",
+  "sessions": [
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:8dff0892e031f17231e04e2e",
+      "at": "2026-10-09T12:50:20Z",
+      "client": "antigravity-client",
+      "op": "create",
+      "op_id": "149f55e2d9574d00b008f29436471e78",
+      "session_id": "2c188abafba54577ab5700a7c822554e"
+    }
+  ]
+}
