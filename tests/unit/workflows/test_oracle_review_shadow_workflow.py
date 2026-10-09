@@ -314,3 +314,18 @@ def test_the_post_job_rechecks_the_review_list_before_posting() -> None:
     for name in ("Post the commit status", "Post the findings comment", "Post the findings review"):
         step = next(item for item in post["steps"] if item["name"] == name)
         assert "steps.guard.outputs.skip != 'true'" in step["if"], name
+
+
+def test_only_codex_jobs_let_the_sandbox_create_user_namespaces() -> None:
+    step_name = "Let the Codex sandbox create user namespaces"
+    codex_jobs = 0
+    for name, job in _jobs().items():
+        names = [step["name"] for step in job.get("steps", []) if "name" in step]
+        if name.startswith("attempt-") and _harness(name) == "codex":
+            codex_jobs += 1
+            step = next(step for step in job["steps"] if step.get("name") == step_name)
+            assert step["run"] == "sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0"
+            assert names.index("Install Codex") < names.index(step_name) < names.index("Run the reviewer")
+        else:
+            assert "sudo " not in _text(job), name
+    assert codex_jobs == POLICY.max_attempts
