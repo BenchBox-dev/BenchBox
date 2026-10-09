@@ -4112,17 +4112,12 @@
       "title": "Migrate shared comment consumers and enforce policy in CI and build configuration"
     },
     "comment-cleanup-site-assets": {
-      "claim": {
-        "expires_at": "2026-10-10T00:35:44Z",
-        "generation": "74da0f6d314641909773f6c0284ab672",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments from maintained site and container assets"
     },
     "comment-cleanup-spark-family": {
