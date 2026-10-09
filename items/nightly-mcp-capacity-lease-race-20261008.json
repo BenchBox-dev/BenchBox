@@ -5,7 +5,7 @@
     "The integration-smoke Windows leg shows no failed steps in the dispatched nightly.yml run on develop recorded by nightly-windows-unquarantine-20261008",
     "The leg is judged by step results, not job conclusion, because continue-on-error reports a failed job as success"
   ],
-  "context": "The quarantined leg showed 'success' on the 2026-10-08 nightly with no failed steps, which fits an intermittent failure, so one green run is not proof. The Windows leg exists only in the legacy nightly.yml, which dlv2-70 will retire.",
+  "context": "Merged as PR #2813 (2026-10-09). Local verification: 50/50 consecutive passes of test_benchmark_capacity_tool_is_tenant_scoped on macOS, whole test_durable_jobs.py passes. The timer-granularity cause is likely but not proven. The Windows integration-smoke leg result is NOT yet verified; it is recorded under nightly-windows-unquarantine-20261008 from step results of a dispatched nightly.yml run.",
   "description": "tests/integration/mcp/test_durable_jobs.py:444 sets lease_seconds=0.05, calls fence.recover_expired() once to record an observation, sleeps 0.06 s with anyio, and calls it again expecting state 'unknown'. DurableJobRepository.claim_expired (benchbox/mcp/jobs.py:639) treats a lease as expired only when mono_time() has advanced by at least lease_seconds since that first observation. A 10 ms margin sits inside the coarse timer granularity of the Windows runner, so the second call can run too early and the job still reads 'running'. The cause is likely, not proven. Replace the single sleep with a loop that keeps the first recover_expired call (it records the observation), then calls recover_expired every 10 ms until the job is 'unknown' or a 5 s deadline measured with benchbox.utils.clock.mono_time passes, failing with the last observed state. Do not use a fixed count of short sleeps as the bound. Removing the Windows quarantine is handled by nightly-windows-unquarantine-20261008, after a dispatched run on develop shows this leg passing.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2569"
@@ -52,6 +52,14 @@
       "generation": "ded06aeec3c246e395099ef2ca5ad4fb",
       "op": "take",
       "op_id": "3d1b06302a734528a645217dd31b35b1",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-09T13:43:32Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "5f651d759be745b39111bcee6e774e91",
       "session_id": "e40b1c8674df4499842f44749410458f"
     }
   ]
