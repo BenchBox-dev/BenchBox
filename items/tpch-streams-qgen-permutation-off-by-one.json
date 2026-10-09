@@ -5,7 +5,7 @@
     "Stream numbering stays 1..S as decided for the throughput batch.",
     "make comment-policy-check passes."
   ],
-  "context": "Evidence at develop d2deb280e. Dead code today; no runtime impact.",
+  "context": "Evidence at develop d2deb280e. Dead code today; no runtime impact. Implemented modulo alignment, bundled-qgen first-query checks, and stream-ID coverage. Focused unit/policy tests: 681 passed, 1 skipped. PR preflight: changed-file Ruff/format and 105 tests passed. Full fast suite, comment-policy check, and docs gate are running; soundness-path check is true. PR not opened yet.",
   "description": "benchbox/core/tpch/streams.py:234 passes `-p stream_id + 1` to qgen, while the Python permutation path indexes PERMUTATION_MATRIX[stream_id] (streams.py:202). The two paths disagree on which permutation a stream uses. _generate_stream_queries_qgen (line 204) is dead code today, so nothing is wrong at runtime, but it would produce the wrong ordering if wired in. Decide whether to delete the dead method or align the indexing, and prove the choice with a test.",
   "sessions": [
     {
@@ -31,6 +31,14 @@
       "client": "omp-coding-agent",
       "op": "update",
       "op_id": "e18ca69b9e324e4e99bbc8169e2b7484",
+      "session_id": "024527ae77c1405f86cdbdf1079f6e14"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396",
+      "at": "2026-10-09T21:36:21Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "e6ee8dc3e7e34b4a94247ba4961d28dc",
       "session_id": "024527ae77c1405f86cdbdf1079f6e14"
     }
   ]
