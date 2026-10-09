@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "ruleset_drift_check.py runs on a schedule from a workflow that dlv2-53 and dlv2-70 keep.",
+    "A workflow test fails if no kept workflow runs ruleset_drift_check.py."
+  ],
+  "context": "Found in the 2026-10-09 tracker review. Note for site-split-52: ruleset_drift_check.py APPROVED_MERGE_QUEUE_CONTEXTS (lines 308-316) still lists `landing`.",
+  "description": "scripts/ruleset_drift_check.py runs only in nightly.yml (ruleset-drift job, nightly.yml:885-907), release-canary.yml (:336) and validate-release-pr.yml (:140). dlv2-70 deletes nightly.yml and dlv2-53 deletes the other two, after which nothing checks the live rulesets against the recorded ones (ADR D7). dlv2-80 and dlv2-83 assume the check still runs.\n\nMove the check into a scheduled job that survives both retirements (for example a nightly-v2 domain) before either deletion lands.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:18:54Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "7c2892a22546425fae3e5562bc73ecaf",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}
