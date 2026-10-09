@@ -42,6 +42,7 @@ class TPCDSQueryManager:
         scale_factor: float = 1.0,
         stream_id: Optional[int] = None,
         dialect: str = "netezza",
+        variant: Optional[str] = None,
     ) -> str:
         self._ensure_available()
 
@@ -49,6 +50,11 @@ class TPCDSQueryManager:
             raise TypeError(f"query_id must be an integer, got {type(query_id).__name__}")
         if not (1 <= query_id <= 99):
             raise ValueError(f"Query ID must be 1-99, got {query_id}")
+
+        if variant is not None and not isinstance(variant, str):
+            raise TypeError(f"variant must be a string or None, got {type(variant).__name__}")
+        if variant not in (None, "a", "b", "c", "d"):
+            raise ValueError(f"Unknown query variant: {variant!r}")
 
         if scale_factor is not None:
             if not isinstance(scale_factor, (int, float)):
@@ -62,8 +68,9 @@ class TPCDSQueryManager:
         if stream_id is not None and not isinstance(stream_id, int):
             raise TypeError(f"stream_id must be an integer, got {type(stream_id).__name__}")
 
+        query_ref: Union[int, str] = f"{query_id}{variant}" if variant else query_id
         return self.dsqgen.generate(
-            query_id,
+            query_ref,
             seed=seed,
             scale_factor=scale_factor,
             stream_id=stream_id,

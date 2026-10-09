@@ -677,12 +677,9 @@ class TestGenerateSingleStreamSqlShape:
             assert query.sql == f"SELECT 14 AS q_{variant}"
             assert self._rows(query.sql) == [(14,)]
 
-    def test_generation_failure_placeholder_executes(self):
-        stream = self._generate(_RaisingQueryManager())
+    def test_generation_failure_propagates(self):
+        stream_manager = TPCDSStreamManager(_RaisingQueryManager())
+        config = QueryStreamConfig(1, [14], PermutationMode.SEQUENTIAL)
 
-        assert [query.variant for query in stream] == ["a", "b"]
-        for query in stream:
-            lines = query.sql.split("\n")
-            assert lines[0].startswith("-- Query")
-            assert lines[1] == "SELECT 1 AS placeholder_query;"
-            assert self._rows(query.sql) == [(1,)]
+        with pytest.raises(RuntimeError, match="generation failed"):
+            stream_manager._generate_single_stream(config)
