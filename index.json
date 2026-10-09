@@ -2101,7 +2101,7 @@
       ],
       "priority": "high",
       "status": "open",
-      "title": "Watch the canary-impact shadow job for 14 days, then decide whether to make it a required merge check"
+      "title": "Watch the canary-impact shadow job for 14 days, then decide whether to make it required"
     },
     "canary-impact-06-required-gate": {
       "claim": null,
