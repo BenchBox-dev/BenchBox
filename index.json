@@ -13967,10 +13967,15 @@
       "title": "Make the oracle coverage map disclose oracle STRENGTH and SCALE, not just existence"
     },
     "oracle-followup-read-bypass-out-of-scope-defect-20261009": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T13:35:13Z",
+        "generation": "0e7c98daee0a474c9997883a4ec6e0b1",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "A file-list follow-up can ship without reading the changed files by listing one defect in an unchanged file"
     },
     "oracle-followup-sequence-verification-20261009": {
