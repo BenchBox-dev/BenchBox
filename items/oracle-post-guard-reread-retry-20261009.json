@@ -6,7 +6,7 @@
     "Mutation check: removing the retry makes a test fail",
     "Merged through the normal PR flow with an oracle success review of the merged head"
   ],
-  "context": "Found by the muse adversarial review of the oracle protocol completion audit on 2026-10-09; accepted in part. The observation (fail-open on an unreadable list) is real; muse's fix (fail closed) is rejected for the stuck-state reason above, confirmed from the post job's step order on develop e7eb5ce7e (\"Upload the retry state\" precedes \"Skip a result this head already has\").",
+  "context": "Found by the muse adversarial review of the oracle protocol completion audit on 2026-10-09; accepted in part. The observation (fail-open on an unreadable list) is real; muse's fix (fail closed) is rejected for the stuck-state reason above, confirmed from the post job's step order on develop e7eb5ce7e (\"Upload the retry state\" precedes \"Skip a result this head already has\"). If the oracle cannot pass this PR, fix Critical/High findings, reply to the rest, and ask the owner for a stand-in naming the exact head SHA; never post one yourself. Three DO NOT SHIP decisions on one PR mean opening a new PR.",
   "description": "Problem. `cli.command_guard` re-reads the review list just before posting so a head that already has a decision is not decided twice. On any error it substitutes an empty history and posts (`found = protocol.History()`), so one transient GitHub API error can produce a duplicate decision on the same head, with duplicate inline threads. Runs for one PR share a concurrency group with `cancel-in-progress: true`, so this needs a race plus an API error, and the risk is low.\n\nRequired change. Retry the re-read a small fixed number of times (3) with a short pause before falling back to posting, and write one job-summary line saying the guard posted without confirming. Keep the fail-open fallback.\n\nRejected alternative (record it in the PR body). Failing closed (skip posting when the list is unreadable) was proposed by the reviewer and rejected: the post job uploads the retry state before the guard runs, so skipping would leave the head recorded as decided with no review posted, and `retry.decide_rerun` would then refuse every later event on that head until a new push.\n\nGuardrails.\n- Never weaken the required `oracle-review` check.\n- Very-high tier; verify after merge.\n- Worktree via `make worktree-create` and `make agent-write-preflight`; identity Joe Harris <joeharris76@gmail.com>; explicit staging; no comments or docstrings; `make comment-policy-check`.\n- May ship in one PR with oracle-oversize-pr-pending-loop-20261009, oracle-protocol-test-gaps-20261009 and oracle-marker-patch-map-file-limit-20261009.\n\nDecision gate. If the implementer wants to fail closed instead, the state upload order must change first; stop and ask the owner before doing that.",
   "links": [
     "_project/scripts/oracle_reviewers/cli.py",
@@ -20,6 +20,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "42fa64dd4e09449095470e759372bbdd",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T13:19:04Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "a7fd5c1e727e40c48e4f71e8246c3877",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
