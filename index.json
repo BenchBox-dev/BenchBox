@@ -14288,6 +14288,13 @@
       "status": "open",
       "title": "oracle-review starts a run for every review-thread reply"
     },
+    "oracle-reviewer-checkout-has-no-base-commit-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Oracle reviewers check out only the head commit, so they cannot see the base and often say the base commit was unavailable"
+    },
     "oracle-runner-integrity-lows-20261008": {
       "claim": null,
       "needs": [],

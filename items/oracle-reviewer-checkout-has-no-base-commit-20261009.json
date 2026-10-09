@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Reviewer jobs can resolve the base SHA in the workspace (shown on a canary or develop run)",
+    "The workspace-clean check and read-evidence tests still pass",
+    "Merged through the normal PR flow with an oracle success review"
+  ],
+  "context": "Found by the hollow-review scan in the closing verification of the oracle follow-up batch, 2026-10-09: the reviews flagged for \"unavailable\" wording all read the head and the diff and were not hollow, but all lacked the base commit.",
+  "description": "Each reviewer job checks out the PR head with `fetch-depth: 1` (.github/workflows/oracle-verdict.yml, \"Check out the pull request head for reading only\"). Reviewers then report that the base commit was unavailable locally and fall back to the staged diff. This was seen in success reviews on #2825 (01999a976), #2826 (6cd077c3e), #2844 (5e4896cea) and #2848 (934b8e81b) on 2026-10-09. They cannot run `git diff <base>..HEAD`, `git show <base>:<path>` or `git blame` against the base, which limits how well they can judge a change in context. The staged diff covers the patch itself.\n\nInvestigate fetching the base commit as well (for example `fetch-depth: 0` limited to the base SHA, or a second shallow fetch of `base_sha`) without breaking:\n- the runner's workspace-clean integrity check;\n- the read-evidence rules (`git show`, `git diff` and `git blame` already count as reads);\n- the credential-free, read-only checkout.\n\nGuardrails. The checkout stays read-only and credential-free; no PR code runs. Very-high tier (workflow); normal oracle PR flow.",
+  "links": [
+    ".github/workflows/oracle-verdict.yml",
+    "_project/scripts/oracle_reviewers/runner.py",
+    "_project/scripts/oracle_reviewers/evidence.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T21:09:54Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "0985b4a0e87c4dffbf7280b49f3f7587",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}
