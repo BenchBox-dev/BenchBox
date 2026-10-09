@@ -15526,7 +15526,7 @@
         "pvm-d1-publication-scope-decision"
       ],
       "priority": "medium",
-      "status": "blocked",
+      "status": "open",
       "title": "Publish the Polars matrix results in the scope the user chose"
     },
     "pvm-s6b-polars-2-blog-draft": {
