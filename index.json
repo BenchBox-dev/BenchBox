@@ -7728,7 +7728,7 @@
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],
-      "priority": "high",
+      "priority": "medium",
       "status": "open",
       "title": "Deferral: TPC-H correctness gate value-digest mismatch on darwin-arm64 (Q2, Q10, Q15)"
     },
