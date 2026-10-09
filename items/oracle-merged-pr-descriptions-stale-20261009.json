@@ -5,7 +5,7 @@
     "`gh pr view 2758 --json title` shows a descriptive title",
     "A diff of each body before and after shows only the intended sentence changed (diffs kept in the scratchpad, summary in this item's context)"
   ],
-  "context": "Found in the completion audit of the oracle replacement on 2026-10-09. The #2797 mismatch was found while preparing the external review; the owner authorized all three edits the same day. Independent of the code items; can run at any time.",
+  "context": "Done 2026-10-09 with `gh pr edit`. #2797: the follow-up-sweep bullet now says the default is `benchbox-oracle[bot]` only, and gives the Bot-type reason. #2784: the 300-file sentence is replaced with the measured limit, about 200 files with 10 open defects (about 210 with none); above that only the digest is kept and follow-ups become full reviews. #2758 is retitled \"feat(oracle): make the oracle the required soundness reviewer\". Before/after diffs show only the named sentence changed, apart from one trailing blank line that gh adds when applying a body file. The diffs are in the session scratchpad under pr-edits/.",
   "description": "PR descriptions are the durable record readers search later. Three merged oracle PRs are wrong:\n- #2797's description says the follow-up sweep defaults `DEFAULT_REVIEW_AUTHORS` to `benchbox-oracle[bot]` and `benchbox-oracle`. Its second commit (881873c51, \"trust only the oracle Bot account as a default review author\") changed that: develop has only `benchbox-oracle[bot]`, and _graphql_login adds `[bot]` only when GitHub reports a Bot account, so a human account named benchbox-oracle is not trusted. The same description says the four muse install steps check a pinned SHA-256; that stays true until oracle-muse-installer-floating-channel-20261009 merges, and needs no edit.\n- #2784's test plan says \"A 300-file marker fits with its patch map; a 1000-file one keeps only the digest.\" Measured on develop: the map is kept only up to about 200 files (210 with no open defects).\n- #2758's title is \"feat/oracle review cutover\" (squash commit 96c26ad3c), which reads as a branch name. The commit title on develop cannot change; the PR title can.\n\nAuthorization (owner, 2026-10-09): edit these three merged PRs.\n\nRequired edits.\n- #2797: replace the follow-up-sweep bullet with the Bot-only default and the reason.\n- #2784: replace the 300-file sentence with the measured limit (about 200 files with 10 open defects; above it only the digest is kept and follow-ups become full reviews).\n- #2758: retitle to a plain description of the change, for example \"feat(oracle): make the oracle the required soundness reviewer\".\n\nGuardrails.\n- Edit only the named sentence or title; leave every other part of each body byte for byte. Fetch the body with `gh pr view <n> --json body -q .body` into the scratchpad, edit that file, and apply with `gh pr edit <n> --body-file <file>`; diff before and after.\n- No session or process wording in the new text (no \"audit\", \"handoff\", \"follow-up item\" ids); write for a reader who never saw the session.\n- No attribution lines.\n\nDecision gate. None remaining; the owner authorized the edits on 2026-10-09.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/pull/2797",
@@ -44,6 +44,14 @@
       "generation": "fe507c49afe24e09a36619aab652c099",
       "op": "take",
       "op_id": "65ef27868a1d4695aeb056e35031a145",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T13:34:22Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "1b9e204aaae14067816f15c7301957fc",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
