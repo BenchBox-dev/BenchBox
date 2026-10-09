@@ -5639,6 +5639,13 @@
       "status": "done",
       "title": "Mutation-sensitivity harness: build cells at each gate's own scale and cover H2O-DB (make the existing drift guard pass)"
     },
+    "cross-surface-mutation-sensitivity-not-enforced-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Enforce the cross-surface mutation-sensitivity tests for every gate, not only h2odb"
+    },
     "cross-surface-oracle-remediation": {
       "claim": null,
       "needs": [],

@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Every gate in GATES has its mutation-sensitivity test run in a lane whose failure is reported (blocking or issue-opening).",
+    "A workflow test fails if a GATES entry's mutation test is not run by that lane."
+  ],
+  "context": "Found in the 2026-10-09 tracker review while verifying df-parity-promote-tpc-family and df-parity-promote-nyctaxi-tsbs.",
+  "description": "PR CI runs tests/integration/test_cross_surface_mutation_sensitivity.py with `-k h2odb` only (ci.yml:766-770). The parametrized tests for nyctaxi, tsbs_devops, tpch, tpch_skew and tpcds run only in nightly.yml slow-tier-observation, which is observe-only (continue-on-error, nightly.yml:95) and is deleted by dlv2-70. The mutation targets and the drift guard exist, but nothing enforces that each gate still detects its mutation.\n\nRun the full parametrized set in a blocking lane (trunk.yml or a nightly-v2 domain that opens an issue), within its runtime budget.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:19:19Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "9965a24e7c3842b7a6dc761b724518e7",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}
