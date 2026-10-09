@@ -10883,6 +10883,13 @@
       "status": "done",
       "title": "Record that the identity remediation instruction is external, and inoculate agents against following it"
     },
+    "heavy-tier-merge-group-dead-code-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Remove the dead merge_group branch from heavy_tier_needed.py and its tests and docs"
+    },
     "holistic-review-followup-metadata-truth": {
       "claim": null,
       "needs": [],

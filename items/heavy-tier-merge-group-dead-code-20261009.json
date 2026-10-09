@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "heavy_tier_needed.py has no merge_group branch and its tests cover only pull_request behaviour.",
+    "tests/README.md no longer describes merge_group heavy-tier runs."
+  ],
+  "context": "Found in the 2026-10-09 tracker review (replaces the residue of the dropped ci-dedupe-07-heavy-tier-rollback-watch).",
+  "description": "No workflow receives merge_group since #2582, but scripts/heavy_tier_needed.py:16 and :139-140 still branch on it, tests/unit/scripts/test_heavy_tier_needed.py tests that branch, and tests/README.md:196-197 describes it. heavy_tier_needed.py is on the soundness path list (.github/soundness-paths.txt:16), so the change needs the oracle review.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:19:30Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "b1950864bca14526a90daa3016d5ca71",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}
