@@ -24085,7 +24085,7 @@
       "claim": null,
       "needs": [],
       "priority": "medium-high",
-      "status": "blocked",
+      "status": "dropped",
       "title": "Commit first UAT release-gate evidence before the second release (trusted-base activation)"
     },
     "uat-report-regen-prune-accounting": {
