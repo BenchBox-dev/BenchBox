@@ -4,6 +4,7 @@
     "continue-on-error and the quarantine suffix are removed from those legs, with workflow tests updated",
     "Issues #2568, #2569 and #2570 are closed with run evidence, or each leg that stayed quarantined has its own tracker item"
   ],
+  "context": "Run 37967682464 proves only that scheduled-workflow-liveness and Windows integration-smoke steps passed; the Windows test legs remain quarantined, with 38 Windows 3.12 failures and a 3.11 timeout. Follow-up nightly-windows-verification-run-20261009 owns the next develop-headed evidence before any quarantine removal PR or issue closure.",
   "description": "Three legs of .github/workflows/nightly.yml are non-blocking: the Windows 'test' legs (#2568), the Windows integration-smoke leg (#2569) and scheduled-workflow-liveness (#2570). After the fixes for all three have merged, dispatch nightly.yml on develop and judge each leg by step results, not job conclusion, because continue-on-error reports a failed job as success. For every leg whose steps all pass, remove continue-on-error and the quarantine suffix from its name, update any workflow tests that assert them, and close its issue with a comment linking the run and the fix. A leg that still fails keeps its quarantine and gets a tracker item with the failing step. Skip the Windows 'test' legs if the coverage decision retires them.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2568",
@@ -26,6 +27,14 @@
       "op": "update",
       "op_id": "97c2d7f7d2f347eb859381d34e759da6",
       "session_id": "e40b1c8674df4499842f44749410458f"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:8d0fa0e2ef22aacc5284a44c",
+      "at": "2026-10-09T22:30:16Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "533bd79d47cd4584b1bfca6e15551afa",
+      "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
     }
   ]
 }

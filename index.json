@@ -13772,7 +13772,7 @@
         "nightly-liveness-diagnose-harden-20261008"
       ],
       "priority": "medium-high",
-      "status": "open",
+      "status": "blocked",
       "title": "Remove the three quarantines from nightly.yml after a dispatched run on develop shows each leg passing"
     },
     "nightly-windows-utf8-reads-20261008": {
