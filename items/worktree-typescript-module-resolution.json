@@ -2,7 +2,7 @@
   "acceptance": [
     "node tests/unit/scripts/test_comment_syntax_js.cjs runs successfully in any linked worktree without requiring manual COMMENT_POLICY_TYPESCRIPT environment configuration when node_modules is installed in the primary clone."
   ],
-  "context": "Observed while running test_comment_syntax_js.cjs in linked worktrees. Linked worktrees do not share node_modules by default.",
+  "context": "Implemented in worktree branch feat/comment-scanner-enhancements (/Users/joe/Developer/BenchBox.wt-scanner-enhancements): 3-step TS resolution in scripts/comment_syntax_js.cjs (env, local node_modules, git-common-dir fallback), resolve_typescript_dir helper in scripts/comment_syntax.py, skip-check uses helper, 3 new unit tests. node --test 19/19 green in fresh worktree without env vars.",
   "description": "Running node tests/unit/scripts/test_comment_syntax_js.cjs in a linked worktree fails with MODULE_NOT_FOUND for typescript unless COMMENT_POLICY_TYPESCRIPT is explicitly exported to point at the primary clone's results-explorer/node_modules. Update scripts/comment_syntax_js.cjs to fall back to the primary git repository root's results-explorer/node_modules when run in a linked worktree, or provide a worktree-init helper that symlinks or resolves node_modules.",
   "sessions": [
     {
@@ -20,6 +20,14 @@
       "generation": "4cb7018273e14eadba79db33b58c69c6",
       "op": "take",
       "op_id": "0a421fe946e34db1903cb25a62872e00",
+      "session_id": "b5a8c9cf1e3044e0b29099c7c26c16c1"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:3a93d76fab1934bd71f35b65",
+      "at": "2026-10-09T13:42:27Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "1db688e635a84e319bb8420726355bb3",
       "session_id": "b5a8c9cf1e3044e0b29099c7c26c16c1"
     }
   ]
