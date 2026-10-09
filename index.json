@@ -13754,15 +13754,10 @@
       "title": "Nightly's three Windows jobs stay red: MCP durable jobs never complete, plus two failures not diagnosable from a log"
     },
     "nightly-windows-path-quoting-20261008": {
-      "claim": {
-        "expires_at": "2026-10-10T23:23:26Z",
-        "generation": "e7c10252cb694ca999477a97cd14fdee",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Windows unit suite: fix backslash paths in bash scripts, path-separator assertions, and make-wrapper argument quoting"
     },
     "nightly-windows-pr-visual-approval-20261009": {
