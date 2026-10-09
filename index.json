@@ -19962,12 +19962,17 @@
       "title": "Add the advisory visual-regression job to site CI against the deployed artifact"
     },
     "site-split-30-rehearsal": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T16:26:36Z",
+        "generation": "44bb883e1d474c3293ec0d10af899523",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de"
+      },
       "needs": [
         "site-split-25-shadow-parity"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Rehearse real deploys, rollback and the failure path from the site repo on next.benchbox.dev"
     },
     "site-split-40-production-cutover": {
