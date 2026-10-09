@@ -6,7 +6,7 @@
     "No page outside docs/publish-allowlist.txt, or listed in docs/publish-exclusions.txt, is published",
     "site-split-26 replay pass completed before this item starts (core range recorded)"
   ],
-  "context": "muse AR-20 (accepted in part): the allowlist is enumerated in a file. Dispatching core site-deploy in preview mode is allowed; mode=deploy is not. If a match cannot be reached after two fix attempts, record the diff and ask the owner.\n2026-10-08: acceptance gained the publish-list check (core #2763, #2768) and the D-Q seeded-path replay (site-split-26).",
+  "context": "muse AR-20 (accepted in part): the allowlist is enumerated in a file. Dispatching core site-deploy in preview mode is allowed; mode=deploy is not. If a match cannot be reached after two fix attempts, record the diff and ask the owner.\n2026-10-08: acceptance gained the publish-list check (core #2763, #2768) and the D-Q seeded-path replay (site-split-26).\n2026-10-09: comparison tool is site scripts/shadow-compare.mjs (npm run shadow:compare; site PR #9) in place of tree-digest.ts: it normalizes hashed asset names, Astro scoped classes and island uids, and inflates objects.inv. Owner D-W: JS bundler drift is allowlisted; HTML, CSS and data stay strict. Snapshot compared with core scripts/publication/compare_db_digest.py compare. SITE_BRIDGE_ENABLED is not set (bridge App is owner pre-work); bundles are fetched by run id instead.\nReplay before start: site-split-26 pass 2 empty through befa8c326; pass 3 empty through c745420bb.\nComparison 1 of 3 (2026-10-09 14:20Z): PASS. Core d04474aef. Bundle site-inputs run 37939543419, sha256:c339ccd9727d0c56b2dee91efbb013d0463edbf03f9682b78a4de2b830f37bb0. Core preview site-deploy run 37940126973 (resolved trunk_sha d04474aef, release v0.4.2, renderer astro). Site main dbc24a5, local build, SITE_ORIGIN/SITE_HOST unset. shadow-compare: 6500 matched, 43 allowed, 0 unexplained. results.duckdb digest-equivalent (03684c63aa3cf4067a86216f593bc5f282f3ee5b509f90d3934423dcc42b183d). results/data/bundles byte-identical (413). Publish lists: 3502 docs pages (incl. /docs/dev), 63 development/operations pages all allowlisted, no excluded path published. No production change.",
   "description": "This item produces evidence in the tracker. Fix any mismatch in a small site PR; it may be stacked.\n\n1. Set the core repo variable SITE_BRIDGE_ENABLED=true, so every certified bundle dispatches to the site.\n2. For each certified bundle, compare the site build with a core `site-deploy.yml` preview (`-f mode=preview`) at the same core_sha. Use tree-digest.ts for the comparison.\n3. Allowed differences live in `inventory/shadow-allowlist.json`, each with a reason. Only these are allowed:\n   - the edit-link and GitHub source-link URL rewrites from site-split-22;\n   - the receipt file;\n   - files that embed those.\n   Fix anything else.\n\nCore site-deploy stays the production writer throughout. SITE_DEPLOY_TARGET stays unset in the site repo.",
   "sessions": [
     {
@@ -31,6 +31,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "f27170354d844ba99ccabbe30a397c0f",
+      "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de",
+      "at": "2026-10-09T14:17:18Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "ac2386075c8d43c298feefdec13d9a18",
       "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
     }
   ]
