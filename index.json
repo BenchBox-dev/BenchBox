@@ -13892,6 +13892,13 @@
       "status": "open",
       "title": "agy cannot read files as a headless oracle reviewer"
     },
+    "oracle-codex-sandbox-bwrap-ci-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Codex reviewers cannot run read commands in CI: the read-only sandbox fails to start bubblewrap"
+    },
     "oracle-coverage-independence-disclosure": {
       "claim": null,
       "needs": [],
