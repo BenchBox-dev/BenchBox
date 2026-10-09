@@ -115,7 +115,7 @@ def test_canonical_hosted_contract_does_not_equate_merge_with_live() -> None:
     assert "Visibility is orthogonal to archive acceptance" in text
     assert "All six visibility states apply" in text
     assert "All five visibility states apply" not in text
-    assert "Accepted source bytes remain preserved during the A0 freeze" in text
+    assert "Accepted source bytes remain preserved during withdrawal" in text
     assert "Accepted-but-not-live results must not be described as already published" in text
     assert '"acceptance_status": "<pending|validated|accepted|rejected>"' in _text(HOSTED_CONTRACT)
     assert '"promotion_status": "<not_requested|promotion_pending|live|promotion_failed>"' in _text(HOSTED_CONTRACT)

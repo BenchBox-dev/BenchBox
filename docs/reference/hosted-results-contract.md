@@ -449,7 +449,7 @@ only the specific field value is hidden.
 | Accepted source bundle | Retained indefinitely by default. No automatic expiry. |
 | `pending` / `validated` | Retained for 90 days from submission date, then purged if not promoted. |
 | `rejected` | Retained for 30 days from rejection date, then purged. |
-| `withdrawn` presentation | For a previously public result, its tombstone is retained indefinitely. For a never-public private result, no public tombstone exists. Non-sensitive audit evidence is retained indefinitely. Accepted source bytes remain preserved during the A0 freeze. |
+| `withdrawn` presentation | For a previously public result, its tombstone is retained indefinitely. For a never-public private result, no public tombstone exists. Non-sensitive audit evidence is retained indefinitely. Accepted source bytes remain preserved during withdrawal. |
 
 The accepted archive is retained independently of public presentation. Submitters may
 request withdrawal at any time (see Section 4.4); withdrawal does not silently rewrite
