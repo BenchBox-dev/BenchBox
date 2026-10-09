@@ -3498,12 +3498,17 @@
       "title": "Remove comments and docstrings from CoffeeShop modules"
     },
     "comment-cleanup-compilation": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:08:24Z",
+        "generation": "54c7d29399234506bd2e6a8e72956eb6",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove prose from first-party compilation scripts and framing tools"
     },
     "comment-cleanup-contracts-gate": {
