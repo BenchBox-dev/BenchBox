@@ -3739,12 +3739,17 @@
       "title": "Register retained directives and notices in the comment checker policy"
     },
     "comment-cleanup-expected-wrapper": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:17:33Z",
+        "generation": "e37bdc66d0a648499f4b48d7d204f877",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove or justify the unused expected-results delegation wrapper"
     },
     "comment-cleanup-experimental": {
