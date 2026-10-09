@@ -3995,12 +3995,17 @@
       "title": "Remove comments and docstrings from base SQL adapter support"
     },
     "comment-cleanup-platform-registry": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:28:41Z",
+        "generation": "b4ce712d74534aecb1c0ab45dfb45b93",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from adapter registration and shared cloud support"
     },
     "comment-cleanup-postgresql-family": {
