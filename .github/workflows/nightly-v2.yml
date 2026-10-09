@@ -843,7 +843,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       NEEDS_JSON: ${{ toJSON(needs) }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      DOC_URL: ${{ github.server_url }}/${{ github.repository }}/blob/develop/docs/operations/nightly-t3.md
+      DOC_URL: ${{ github.server_url }}/${{ github.repository }}/blob/develop/docs/internal/nightly-t3.md
     steps:
       - name: Open, update, or close one issue per domain
         shell: bash

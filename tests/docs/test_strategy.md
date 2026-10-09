@@ -172,7 +172,7 @@ tests/
 
 - Put useful test purposes, scenario requirements, and fixture provenance in this
   guide or the [test suite guide](../README.md), following the
-  [comment policy](../../docs/development/comment-policy.md).
+  [comment policy](../../docs/internal/comment-policy.md).
 - Express test behavior through names, setup, and assertions; retained source
   notices and consumed directives require exact policy registrations.
 - Test data generation must be documented for reproducibility

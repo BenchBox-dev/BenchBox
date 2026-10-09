@@ -277,7 +277,7 @@ def test_repo_files_lists_every_tracked_path_with_kinds(tmp_path: Path) -> None:
     by_path = {entry["path"]: entry["kind"] for entry in payload["files"]}
     assert by_path["scripts/check_decision_records.py"] == "file"
     assert by_path["scripts"] == "tree"
-    assert by_path["docs/development/adr/adr-site-repo-split.md"] == "file"
+    assert by_path["docs/internal/adr/adr-site-repo-split.md"] == "file"
 
 
 def _captured_attestations(

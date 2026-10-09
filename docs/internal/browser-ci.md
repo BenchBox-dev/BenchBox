@@ -2,11 +2,11 @@
 
 **Audience:** Maintainers watching the `explorer-e2e` job in `.github/workflows/ci.yml`
 and anyone triaging a red or nightly browser-lane check on a PR.
-**Companion docs:** [`docs/development/browser-test-architecture.md`](../development/browser-test-architecture.md)
+**Companion docs:** [`docs/internal/browser-test-architecture.md`](browser-test-architecture.md)
 (why the suite is shaped this way) and
 [`docs/development/results-explorer-browser-testing.md`](../development/results-explorer-browser-testing.md)
 (how to run the suite locally, what's covered, how to add tests).
-**Admin wiring:** [`docs/operations/repo-admin-settings.md`](repo-admin-settings.md)
+**Admin wiring:** [`docs/internal/repo-admin-settings.md`](repo-admin-settings.md)
 (develop ruleset required checks).
 
 ## Merge-gate decision

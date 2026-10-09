@@ -209,7 +209,7 @@ The soundness gate, as operated:
   either hold as stranded. Nothing disarms an already-armed PR when the label
   is added later: disable auto-merge (`gh pr merge <n> --disable-auto`) or run
   `make pr-landing-withdraw PR=<n> HEAD=<sha>`, then add the label. See
-  `docs/operations/pr-triage.md` "Durable auto-merge holds".
+  `docs/internal/pr-triage.md` "Durable auto-merge holds".
 - `make pr-arm` refuses drafts, non-develop bases, durable holds, requested
   changes, unresolved threads, unpublished work and a remote head that differs
   from local HEAD. It enables squash auto-merge for the exact reviewed head;
@@ -512,7 +512,7 @@ advisory_suites: stress, live_integration, live cloud credentials
 ```
 
 Long-running UAT is an advisory campaign. Release readiness requires the
-blocking release canary; see `docs/operations/release-guide.md` "UAT matrix
+blocking release canary; see `docs/internal/release-guide.md` "UAT matrix
 campaign evidence (advisory)" for the optional UAT report.
 
 `validate-release-pr.yml` keeps the required context name `validate-base`, but
@@ -646,7 +646,7 @@ The `incident:develop-red` and `incident:develop-red-revert-conflict` labels
 were created on demand by the retired post-merge auto-revert job. No workflow
 creates or reads them now. Any that still exist on the repository are legacy
 and are scheduled for deletion in the dev-loop v2 cleanup
-(`docs/development/adr/adr-dev-loop-v2.md`).
+(`docs/internal/adr/adr-dev-loop-v2.md`).
 
 Verify:
 
@@ -657,7 +657,7 @@ gh label list --search incident
 ## Re-applying after a transfer or restore
 
 The 2026-08-21 cutover to org `BenchBox-dev` is documented in
-`docs/operations/github-org-transfer.md` (gates G0–G7b, Pages
+`docs/internal/github-org-transfer.md` (gates G0–G7b, Pages
 serving-only vs publish, exclusive Pages domain lock: do not click
 org Verify before G4, org `protected_domain` verification after G4,
 environment `deployment-branch` policies, `RULESET_DRIFT_TOKEN`

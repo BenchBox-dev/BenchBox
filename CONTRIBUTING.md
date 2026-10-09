@@ -47,7 +47,7 @@ This document provides guidelines and instructions for contributing.
 
 ## Branches & PR gate
 
-`develop` is the long-lived development branch and the repository's default branch; **all changes land via PR**. `release` is release-only (handled by the version-branch flow — see `docs/operations/release-guide.md`). PRs target `develop` and squash-merge with linear history.
+`develop` is the long-lived development branch and the repository's default branch; **all changes land via PR**. `release` is release-only (handled by the version-branch flow — see `docs/internal/release-guide.md`). PRs target `develop` and squash-merge with linear history.
 
 Required CI on `develop` reports six unit results (`core`, `explorer`, `results-data`, `docs`, `landing`, `tooling`) from `.github/workflows/ci.yml`, plus `oracle-review`, which passes on a result-affecting PR only when the `benchbox-oracle` app's latest review of its current head reports success (or a listed attester has posted the stand-in approval for that head) and the oracle's threads are resolved. `.github/ci-units.yml` and `.github/path-filters.yml` classify each PR: content-only PRs run content validation and skip Python fast tests, while code, infra, workflow, tooling, and unknown paths run the lint/type + Ubuntu 3.12 fast-test checks. Soundness-path review applies even when the author uses the owner's account; once a finished branch is armed, auto-merge lands it when required checks are green and all review threads are resolved.
 
@@ -262,7 +262,7 @@ Please update documentation when adding or modifying features. We use Sphinx for
 
 External contributions land via PR against `develop` (squash-merge). Releases
 are cut by maintainers via the version-branch flow documented in
-[`docs/operations/release-guide.md`](docs/operations/release-guide.md):
+[`docs/internal/release-guide.md`](docs/internal/release-guide.md):
 
 1. `make release-cut VERSION=X.Y.Z` from a clean linked worktree whose HEAD is
    the freshly fetched `origin/develop` commit. It cuts `vX.Y.Z` with a

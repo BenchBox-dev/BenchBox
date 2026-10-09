@@ -53,7 +53,7 @@ mechanized campaign-report items below, and writes the combined evidence file
 to `_project/release-evidence/uat-gate-summary.json`. Exit 0 means the
 campaign report is complete. The report may be reviewed or committed as
 historical evidence; `scripts/release_readiness_check.py` does not require it
-for `validate-base` (see `docs/operations/release-guide.md`).
+for `validate-base` (see `docs/internal/release-guide.md`).
 
 `cross_scale_coverage_min_pairs` in each config is the report-phase teeth: a
 breach forces a non-zero report exit, so a partial or regressed sweep cannot

@@ -56,7 +56,7 @@ majors; the site supports N and N-1 for one release; core lands first.
   this change cuts over repositories, not renderers); D14 overlaps
   comment-cleanup items with `astro-site-*` items (those items are folded by
   the tracker reconciliation).
-- `docs/development/adr/adr-independent-publication-authorities.md`:
+- `docs/internal/adr/adr-independent-publication-authorities.md`:
   superseded by this ADR for the site and deploy control-plane scope. Its
   corpus authority statements stay normative until the publication retirement
   re-homes them; that change applies the superseded marker.

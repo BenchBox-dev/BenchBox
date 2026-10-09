@@ -187,7 +187,7 @@ emergency takedown abuse or delay.
 | `adr-published-results-slim-corpus-branch.md` | Extended: slim archive ownership remains; the separate develop-side corpus-membership promotion is superseded by manifest-pinned default inclusion plus orthogonal presentation policy. |
 | `_project/decisions/single-repo-migration.md` | Extended: its current release-driven preview describes the legacy implementation, not proof of future publication authority or live state. |
 | `_project/decisions/independent-publication-a0-freeze-2026-08-31.md` | Reused: desired, built, deployed, and observed remain separate; A0 freezes destructive migration until its gates pass. |
-| `docs/operations/results-phase-2-runbook.md` | Extended: accepted archive and takedown operations follow this authority model. |
+| `docs/internal/results-phase-2-runbook.md` | Extended: accepted archive and takedown operations follow this authority model. |
 | `adr-public-result-id-permanence.md` | Clarified: public serving creates the external link contract; the A0 observed baseline protects existing routes and later receipts identify subsequent generations. |
 | `docs/reference/hosted-results-contract.md` | Extended: acceptance, promotion, liveness, visibility, and withdrawal are orthogonal; a merge never directly means live. |
 | `docs/reference/threat-model.md` | Extended: Phase 3 adds hosted-service threats without replacing the cross-phase publication threat model or one-maintainer approval rule. |

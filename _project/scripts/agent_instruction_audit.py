@@ -120,7 +120,7 @@ AGENT_WRITE_ANCHORS = {
 }
 AGENT_COMMENT_POLICY_ANCHORS = {
     "COMMENT-POLICY-001": (
-        "docs/development/comment-policy.md",
+        "docs/internal/comment-policy.md",
         "no explanatory comments or docstrings",
         "make comment-policy-check",
         "resolve every finding while enforcement is advisory",
@@ -132,8 +132,8 @@ HANDBACK_TEXT = (
     ".claude/commands/*.md",
     "docs/agent/*.md",
     "docs/development/development.md",
-    "docs/operations/pr-triage.md",
-    "docs/operations/repo-admin-settings.md",
+    "docs/internal/pr-triage.md",
+    "docs/internal/repo-admin-settings.md",
     "Makefile",
     "make/help.mk",
 )

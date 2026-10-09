@@ -126,5 +126,5 @@ jobs:
           echo "Triage steps:"
           echo "  1. Download 'diff-artifact-${{ matrix.comparison }}.json'"
           echo "  2. Identify the divergent query_id(s)"
-          echo "  3. See docs/development/result-validation-triage.md for next steps"
+          echo "  3. See docs/internal/result-validation-triage.md for next steps"
           exit 1

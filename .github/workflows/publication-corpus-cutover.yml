@@ -401,7 +401,7 @@ jobs:
             "promotion_gate": {
               "signal": "promotion_failed",
               "freeze_signal_emitted": true,
-              "mechanism": "Emitting this promotion_failed receipt is the freeze signal per docs/operations/independent-publication-contract.md step 8; the prior live generation is retained untouched.",
+              "mechanism": "Emitting this promotion_failed receipt is the freeze signal per docs/internal/independent-publication-contract.md step 8; the prior live generation is retained untouched.",
               "scope_note": "This workflow holds contents:read only and never deploys to Pages, so production was not mutated. Restoration here means the known-good deployment was rebuilt byte-for-byte and verified, ready to re-serve."
             }
           }

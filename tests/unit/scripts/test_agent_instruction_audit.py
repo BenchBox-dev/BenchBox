@@ -183,7 +183,7 @@ def test_project_write_closeout_exception_drift_fails(tmp_path: Path, phrase: st
 @pytest.mark.parametrize(
     "phrase",
     [
-        "docs/development/comment-policy.md",
+        "docs/internal/comment-policy.md",
         "no explanatory comments or docstrings",
         "make comment-policy-check",
         "resolve every finding while enforcement is advisory",
@@ -290,7 +290,7 @@ def test_handback_guard_allows_safety_wording_and_separate_list_items(tmp_path: 
 
 @pytest.mark.parametrize(
     "relative",
-    ["Makefile", "make/help.mk", "docs/operations/pr-triage.md", "docs/operations/repo-admin-settings.md"],
+    ["Makefile", "make/help.mk", "docs/internal/pr-triage.md", "docs/internal/repo-admin-settings.md"],
 )
 def test_handback_guard_covers_the_scripts_and_docs_that_print_guidance(tmp_path: Path, relative: str) -> None:
     project = _candidate(tmp_path)

@@ -1,9 +1,9 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ADR = ROOT / "docs/development/adr/adr-independent-publication-authorities.md"
-THREAT_MODEL = ROOT / "docs/development/independent-publication-threat-model.md"
-OPERATIONS = ROOT / "docs/operations/independent-publication-contract.md"
+ADR = ROOT / "docs/internal/adr/adr-independent-publication-authorities.md"
+THREAT_MODEL = ROOT / "docs/internal/independent-publication-threat-model.md"
+OPERATIONS = ROOT / "docs/internal/independent-publication-contract.md"
 HOSTED_CONTRACT = ROOT / "docs/reference/hosted-results-contract.md"
 HOSTED_PLANNING = ROOT / "docs/internal/hosted-results-planning.md"
 PHASE3_THREAT_MODEL = ROOT / "docs/reference/threat-model.md"

@@ -11,5 +11,5 @@ of the BenchBox CLI surface in PR #418.
   existing `make test-*` / pytest collection paths and avoids accidentally
   shipping test files.
 
-See `docs/development/adr/adr-explorer-cli-surface.md` for the decision that
+See `docs/internal/adr/adr-explorer-cli-surface.md` for the decision that
 relocated the publisher.

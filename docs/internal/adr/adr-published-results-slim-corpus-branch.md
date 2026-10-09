@@ -16,7 +16,7 @@ with this ADR update.
 ## Context
 
 `published-results` is the long-lived branch the Phase 2 contributor flow
-targets (see [`docs/operations/results-phase-2-runbook.md`](../../operations/results-phase-2-runbook.md)).
+targets (see [`docs/internal/results-phase-2-runbook.md`](../results-phase-2-runbook.md)).
 The runbook and `docs/contributing-results.md` both tell external
 submitters to open PRs against it. The submission validator workflow
 (`.github/workflows/validate-submission.yml`) is wired to fire only on
@@ -322,7 +322,7 @@ Re-review this ADR when:
 
 - Parent TODO: `_project/DONE/main/published-results-slim-down-and-corpus-mirror.yaml` (completed)
 - Originating handoff: `_project/handoffs/results-explorer-uat-corpus-integration-20260503.md`
-- Runbook: `docs/operations/results-phase-2-runbook.md`
+- Runbook: `docs/internal/results-phase-2-runbook.md`
 - Contributor guide: `docs/contributing-results.md`
 - Submission validator: `scripts/validate_submission.py`
 - Inventory generator: `scripts/generate_corpus_inventory.py`

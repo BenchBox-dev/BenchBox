@@ -52,14 +52,14 @@ side had already closed out.
   review, check whether develop's own tip is already red for the same
   reason; a pre-existing develop-side failure is not the PR's fault.
   Full wiring and lane status:
-  [`docs/operations/browser-ci.md`](browser-ci.md) (merge-gate decision).
+  [`docs/internal/browser-ci.md`](browser-ci.md) (merge-gate decision).
   Historical tracker id `chromium-blocking-suite-not-in-required-checks`
   described the pre-ruleset state and is no longer accurate.
 - Firefox `@smoke` runs nightly and has been green in recent history — a red
   Firefox run is worth investigating as a real signal, not waved off as
   routine flake.
 - WebKit failures are **not** dismissible as flake. See
-  `docs/operations/browser-ci.md` for current lane status and the
+  `docs/internal/browser-ci.md` for current lane status and the
   triage rule in force there.
 
 ## `mergeable_state` semantics

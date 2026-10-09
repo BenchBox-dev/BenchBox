@@ -114,11 +114,11 @@ Confirm this inventory still names the primary covered workflow and at least
 one other develop-push subject:
 
 ```bash
-test -f docs/operations/develop-push-drop-inventory.md
-rg -q "docs.yml" docs/operations/develop-push-drop-inventory.md
+test -f docs/internal/develop-push-drop-inventory.md
+rg -q "docs.yml" docs/internal/develop-push-drop-inventory.md
 rg -q "sync-results-data-to-published|submission-validator-drift-check" \
-  docs/operations/develop-push-drop-inventory.md
-rg -q "push-drop|push gaps" docs/operations/develop-post-merge-gaps.md
+  docs/internal/develop-push-drop-inventory.md
+rg -q "push-drop|push gaps" docs/internal/develop-post-merge-gaps.md
 ```
 
 Re-enumerate develop-push workflows (must match the table's subject set):
