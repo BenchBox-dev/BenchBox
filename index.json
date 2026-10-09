@@ -4205,9 +4205,9 @@
     },
     "comment-cleanup-tpcds-obt": {
       "claim": {
-        "expires_at": "2026-10-10T00:52:11Z",
-        "generation": "04176d4c0397418aa884bec53e8fecf3",
-        "renewals": 0,
+        "expires_at": "2026-10-10T00:52:59Z",
+        "generation": "701c7b4f5e4140988079d4f6209f5d8f",
+        "renewals": 1,
         "worker": "mcp:antigravity-worker-2"
       },
       "needs": [
