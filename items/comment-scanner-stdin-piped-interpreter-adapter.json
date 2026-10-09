@@ -3,7 +3,7 @@
     "Scripts containing shell pipelines feeding inline scripts to interpreters (perl, ruby, python) on stdin are scanned for comments or surfaced as coverage errors.",
     "Regression tests in tests/unit/scripts/test_comment_policy.py cover stdin pipeline sinks."
   ],
-  "context": "Follow-up item 2 from comment-checker-review-followups. Currently listed as a known gap in docs/development/comment-policy.md.",
+  "context": "Implemented in worktree branch feat/comment-scanner-enhancements: pipeline inspector in scripts/comment_payloads.py (piped_stdin_entries wired into shell_command_unit, scan_source_payload seam, echo/printf literal extraction, dynamic/unmodeled fail-closed, gate regex extended, mask covers piped lines). Bash AST analysis lives in comment_payloads.py, not comment_execution.py. 19 new regression tests (4 test fns, parametrized) in tests/unit/scripts/test_comment_policy.py, all passing.",
   "description": "Programs piped to interpreters on stdin (e.g., printf '...' | perl, echo '...' | ruby) in shell scripts or commands currently bypass the comment scanner because stdin pipelines are unmodeled. Detect pipeline sinks terminating in script interpreters and route the piped string payload to the corresponding language scanner, or flag bare unmodeled interpreter stdin usage as a coverage error.",
   "sessions": [
     {
@@ -21,6 +21,14 @@
       "generation": "31fccc59ba7044b6979e90d4ef4b89bf",
       "op": "take",
       "op_id": "82080cfd198346a48773cacab7879d82",
+      "session_id": "b5a8c9cf1e3044e0b29099c7c26c16c1"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:3a93d76fab1934bd71f35b65",
+      "at": "2026-10-09T13:43:02Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "320d93c8c1ff4eaf8affca798a27742b",
       "session_id": "b5a8c9cf1e3044e0b29099c7c26c16c1"
     }
   ]
