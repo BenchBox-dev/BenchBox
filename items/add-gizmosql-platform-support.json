@@ -23,7 +23,7 @@
     "The SQL compatibility inventory includes GizmoSQL under the DuckDB dialect or records an explicit exemption. Do not add an empty rewrite rule when no GizmoSQL-specific DDL rewrite is needed.",
     "Generated platform and compatibility documentation is refreshed through repository generators. `make platform-manifest`, `make platform-manifest-check`, `make compat-docs`, `make compat-docs-check`, focused unit tests, the designated live GizmoSQL target, self-review, and `make pr-preflight` pass before publication."
   ],
-  "context": "Validated on 2026-09-26 with GizmoSQL Core 1.39.0, adbc-driver-gizmosql 2.0.13, PyArrow 24.0.0, and DuckDB 1.5.5 on macOS arm64. A real managed local server loaded BenchBox-generated TPC-H SF 0.01 data with canonical counts and executed all 22 DuckDB-dialect queries. A separate exploratory run executed all 99 TPC-DS queries against server-generated data, so the implementation must still prove BenchBox TPC-DS file loading and result parity. The current public CLI reports GizmoSQL as unknown and dry-run falls back after adapter initialization fails. The initial support boundary is GizmoSQL Core 1.37+ with the DuckDB backend through client-side ADBC loading. Persistent remote state, shared session settings, client-observed timing, binary provisioning, and credential redaction are part of the acceptance contract. SQLite, Enterprise-only controls, Docker/LTS certification, and server-visible file loading are intentionally outside the requested outcome.",
+  "context": "Validated on 2026-09-26 with GizmoSQL Core 1.39.0, adbc-driver-gizmosql 2.0.13, PyArrow 24.0.0, and DuckDB 1.5.5 on macOS arm64. A real managed local server loaded BenchBox-generated TPC-H SF 0.01 data with canonical counts and executed all 22 DuckDB-dialect queries. A separate exploratory run executed all 99 TPC-DS queries against server-generated data, so the implementation must still prove BenchBox TPC-DS file loading and result parity. The current public CLI reports GizmoSQL as unknown and dry-run falls back after adapter initialization fails. The initial support boundary is GizmoSQL Core 1.37+ with the DuckDB backend through client-side ADBC loading. Persistent remote state, shared session settings, client-observed timing, binary provisioning, and credential redaction are part of the acceptance contract. SQLite, Enterprise-only controls, Docker/LTS certification, and server-visible file loading are intentionally outside the requested outcome.\n\nCore execution-variant guardrails (added 2026-10-09; ADR docs/development/adr/adr-core-execution-variants.md, plan item core-exec-execution-variants):\n- Do not register bare generic option keys (engine, mode, backend, runtime, executor, warehouse); the vocabulary parity test fails on them. In particular, do not add a `backend` option for DuckDB vs SQLite.\n- The DuckDB backend is the only supported one; record it in platform metadata. If SQLite support is added later, model it as a manifest-declared execution engine (ADR D3), not a platform option.\n- Deployment (local managed server vs remote) goes through manifest deployment_modes.\n- Follow the execution-variant section of docs/development/new-platform-acceptance-checklist.md.",
   "description": "Add end-to-end BenchBox support for GizmoSQL Core using its DuckDB backend and official ADBC driver. Deliver one coherent platform addition covering manifest registration, secure remote connections, persistent and shared-server safety, idempotent client-side loading, independent throughput streams, result parity, deterministic local live testing, public CLI behavior, and documentation.",
   "sessions": [
     {
@@ -49,6 +49,14 @@
       "op": "update",
       "op_id": "f60d90ea416e42c5946aff6cc7a550b3",
       "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:39:16Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "417038061d414967bb50f49c296dedb0",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
     }
   ]
 }
