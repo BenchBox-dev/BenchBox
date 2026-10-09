@@ -7652,11 +7652,10 @@
     "dlv2-80-github-cleanup": {
       "claim": null,
       "needs": [
-        "dlv2-f3-flip-window",
         "dlv2-53-retire-legacy-release-path",
         "dlv2-70-retire-scheduled-workflows",
-        "dlv2-01-baseline-and-backups",
-        "dlv2-62-publication-cutover-and-retirement"
+        "dlv2-42-retire-dev-loop-scripts-tests",
+        "site-split-54-publication-github-cleanup"
       ],
       "priority": "medium",
       "status": "open",
