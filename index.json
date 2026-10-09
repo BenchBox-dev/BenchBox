@@ -4452,9 +4452,9 @@
     "comment-policy-pinned-notice-drift-guard": {
       "claim": null,
       "needs": [],
-      "priority": "medium",
+      "priority": "medium-high",
       "status": "open",
-      "title": "Guard that whole-file pinned notices update their digest pin when modified on a branch"
+      "title": "Required CI must reject LICENSE/COPYRIGHT.md notice drift that would break later PRs"
     },
     "comment-policy-ratchet-wheel-upgrade": {
       "claim": null,

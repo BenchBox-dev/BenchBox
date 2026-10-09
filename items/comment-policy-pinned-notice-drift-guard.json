@@ -1,9 +1,11 @@
 {
   "acceptance": [
-    "A test or CI step verifies that modifying a file with a pinned notice requires updating the SHA/digest in quality/comment-cleanup-scope.json."
+    "The required comment-policy gate (the one CI runs, scripts/run_comment_policy.py) fails a PR that changes the blob of a non-external pinned notice (LICENSE or COPYRIGHT.md) without updating its pin in quality/comment-cleanup-scope.json. A test covers this case.",
+    "The same gate passes a PR that changes such a notice and updates its pin in the same PR. A test covers this case.",
+    "The change does not break tests/unit/test_make_timing.py::test_timed_targets_are_prerequisite_free_single_command_recipes or tests/unit/test_ledger_coverage.py::test_ledger_lists_every_pre_commit_hook."
   ],
-  "context": "Slice 2 implemented in worktree ../BenchBox.wt-drift-guards, branch feat/policy-and-dependency-drift-guards, commit 9a25578a3d7727d8c6394bd3fbe8501f1664502a, PR https://github.com/BenchBox-dev/BenchBox/pull/2829 to develop (OPEN, MERGEABLE). Guard: scripts/check_comment_cleanup_scope.py --check-drift emits SCOPE008 when a pinned notice file changes without a pin update; wired into make comment-policy-check and new make check-comment-scope. Tests: 5 new cases in tests/unit/scripts/test_comment_cleanup_scope.py. Finish after squash-merge.",
-  "description": "A whole-file pinned notice in quality/comment-cleanup-scope.json (such as _sources/tpc-h/PATCHES.md) is verified against its recorded digest in the comment-policy validator, but there is no guard preventing changes to the pinned file from landing without an accompanying pin update in the scope manifest. Add a pre-commit or CI guard asserting that any branch touching a whole-file pinned notice updates the corresponding digest pin in quality/comment-cleanup-scope.json.",
+  "context": "Slice 2 implemented in worktree ../BenchBox.wt-drift-guards, branch feat/policy-and-dependency-drift-guards, commit 9a25578a3d7727d8c6394bd3fbe8501f1664502a, PR https://github.com/BenchBox-dev/BenchBox/pull/2829 to develop (OPEN, MERGEABLE). Guard: scripts/check_comment_cleanup_scope.py --check-drift emits SCOPE008 when a pinned notice file changes without a pin update; wired into make comment-policy-check and new make check-comment-scope. Tests: 5 new cases in tests/unit/scripts/test_comment_cleanup_scope.py. Finish after squash-merge.\n\n2026-10-09 tracker review: Premise corrected: external notices already fail closed in the required gate, so the _sources/tpc-h/PATCHES.md example was removed from the description. The real gap is LICENSE and COPYRIGHT.md. PR #2829 does not meet the acceptance (SCOPE008 runs only in Make targets, breaks the two tests named above, and its message for external notices cannot pass), so do not finish this item on its merge alone. Extra #2829 scope is tracked as dependency-audit-raw-drift-guard.",
+  "description": "quality/comment-cleanup-scope.json pins 19 whole-file notices by blob digest. 17 of them (the EULA, NOTICE and PATCHES files under external selectors) already fail closed in the required comment-policy gate (scripts/check_comment_policy.py:222 raises \"protected external notice blob changed\").\n\nThe gap is the two non-external pins, LICENSE and COPYRIGHT.md. A PR that edits COPYRIGHT.md without updating its pin passes transition mode. Once it is on the base, every later run fails with \"notice COPYRIGHT.md blob digest does not match immutable base\" (scripts/check_comment_cleanup_scope.py:358), so one unguarded edit breaks every following PR.\n\nAdd a check to the required comment-policy gate that fails a PR which changes a non-external pinned notice without updating its pin in the same PR.\n\nPR #2829 does not meet this. Its SCOPE008 check runs only in Make targets, not in required CI. It breaks two existing tests: tests/unit/test_make_timing.py::test_timed_targets_are_prerequisite_free_single_command_recipes and tests/unit/test_ledger_coverage.py::test_ledger_lists_every_pre_commit_hook. Its message for external notices cannot pass, because external pins are read from the base (see comment-policy-digest-and-base-exception-catch22-20261008).",
   "sessions": [
     {
       "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:8dff0892e031f17231e04e2e",
@@ -38,6 +40,14 @@
       "op": "release",
       "op_id": "1c5e8d55dfa34ac9a5d3574086df4971",
       "session_id": "b5a8c9cf1e3044e0b29099c7c26c16c1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:28:07Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "d53d84ed7ef243f99c6d2cd3428775d0",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
