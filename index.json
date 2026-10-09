@@ -7621,7 +7621,7 @@
         "dlv2-f3-flip-window"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "dropped",
       "title": "Retire docs.yml once site-deploy owns every public route"
     },
     "dlv2-62-publication-cutover-and-retirement": {
