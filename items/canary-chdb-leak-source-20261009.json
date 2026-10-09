@@ -29,6 +29,15 @@
       "op_id": "06de0a85c9154e659888640af26d0e57",
       "reason": "The owner directed that this session be the sole agent on the nightly-red-issues batch and take over the muse (tbh) session's items. The tbh session last wrote to this item at 2026-10-09T14:30:44Z and opened no PR for it.",
       "session_id": "e40b1c8674df4499842f44749410458f"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-09T16:47:49Z",
+      "client": "claude-code",
+      "generation": "66e1bcdc89704ed69e6f54d162f876a4",
+      "op": "release",
+      "op_id": "b425e5b55a7941589230474f39a181f4",
+      "session_id": "e40b1c8674df4499842f44749410458f"
     }
   ]
 }
