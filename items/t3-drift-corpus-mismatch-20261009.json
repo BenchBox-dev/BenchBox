@@ -1,11 +1,11 @@
 {
   "acceptance": [
-    "The completed drift log identifies the corpus mismatch and its cause",
-    "The corpus is reconciled or the remaining owner action is recorded on issue #2471",
+    "The completed drift log identifies the corpus mismatch and its cause; met (seven unmerged mirror PRs, published-results tip 2f9298eb3)",
+    "The owner merges PR #2837 and closes PRs #2746, #2747, #2770, #2777, #2780 and #2782 as superseded",
     "A later live drift verification passes or records the accepted exception"
   ],
-  "context": "Created from nightly-red handoff verification of run 37991400931; no second dispatch is authorized until the failure is understood.",
-  "description": "Nightly-v2 run 37991400931 on develop reported a failure in the corpus drift check while the drift gate also ran pricing, validator and baseline checks. Inspect the completed run log after the workflow closes, identify the expected and observed corpus revisions, and reconcile the published corpus before the drift issue is closed.",
+  "context": "Created from nightly-red handoff verification of run 37991400931; no second dispatch is authorized until the failure is understood.\n\n2026-10-09 tracker review: cause found (see description); acceptance 1 is met and acceptance 2 was rewritten from \"reconcile the corpus\" to the specific merge and close. The need on t3-drift-dispatch-verify-20261008 was removed because that item now needs this one (it was a cycle). The live drift verification is done by t3-drift-dispatch-verify-20261008 after #2837 merges.",
+  "description": "Nightly-v2 run 37991400931 on develop reported a failure in the corpus drift check (the pricing, validator, privacy and cross-surface baseline checks passed). The corpus check found that the published-results branch is 25 paths behind develop.\n\nCause: published-results lags because seven draft corpus-mirror PRs are unmerged: #2746, #2747, #2770, #2777, #2780, #2782 and #2837. The published-results tip is 2f9298eb3. PR #2837 was built from that tip, carries develop@c569f453, covers all 25 paths, and its corpus-mirror/validate-bundles check passed. The six older PRs are superseded by #2837.\n\nRemaining work is owner action: merge #2837 and close the six older mirror PRs as superseded. Optional follow-up: make the drift error message point at the open auto/results-mirror-* PRs, so the next reader finds the cause without a log hunt.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2471"
   ],
@@ -17,6 +17,14 @@
       "op": "create",
       "op_id": "ab2523e4343f4399b8038cfcf5d701fa",
       "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:29:58Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "5fff0db4e87a49acbbc200c88cf69ffa",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }

@@ -21211,9 +21211,7 @@
     },
     "t3-drift-corpus-mismatch-20261009": {
       "claim": null,
-      "needs": [
-        "t3-drift-dispatch-verify-20261008"
-      ],
+      "needs": [],
       "priority": "high",
       "status": "open",
       "title": "Investigate corpus drift reported by nightly-v2 verification"
