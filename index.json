@@ -7600,10 +7600,15 @@
       "title": "Fix broken examples in user guides and tutorials"
     },
     "docs-accuracy-platforms": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T14:27:21Z",
+        "generation": "fb909e01d85b4c84b6f9800c6046eb44",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:21221f7d4aecb309187b0c3f"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Fix wrong install extras, options and stale claims in platform guides"
     },
     "docs-blog-index-broken-html-links": {
