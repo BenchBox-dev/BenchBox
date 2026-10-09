@@ -1,4 +1,5 @@
 {
+  "context": "2026-10-09 tracker review: Dropped. The premise, that validate-base hard-blocks a release PR when _project/release-evidence/uat-gate-summary.json is missing, ended with #1927, which made UAT advisory. Three releases (v0.4.0, v0.4.1, v0.4.2) have shipped since without that file.",
   "description": "The UAT release gate (#1162) is wired and fail-closed but DORMANT for one more release by the trusted-base model: origin/release still runs the pre-UAT readiness script. The NEXT release (N) runs the old gate and ships the new script to release; the gate ACTIVATES at release N+1. There is no committed _project/release-evidence/uat-gate-summary.json on develop today, so before the SECOND release from now an operator must run the 3-stage release-gate sweep, run make uat-gate-check STAGE1=.. STAGE2=.. STAGE3=.., and commit the resulting uat-gate-summary.json (green verdict, clean tree, source SHA an ancestor of the release head, <=21 days old) to develop. Otherwise validate-base (a required, no-bypass check on release) hard-blocks the N+1 release PR. Verified fail-closed end-to-end in the batch final validation.\n\nSTAGE 1 ATTEMPT 2026-08-24: release-gate-01-native-dataframe dry-run passed, then the actual run on PR #1867 head e70f2ff59 was capped at 7200s after 166 cell records while processing sqlite SF1. No completed matrix_summary.tsv, validator rollup, or stage report was produced; this is incomplete evidence and cannot advance the gate. Run root: /Users/joe/Developer/benchmark_runs/logs/uat_20260824_081349. Command log: /tmp/uat-release-gate-stage1-20260824.log.\n\nCURRENT 2026-08-24: merged request-only smoke exposed the LakeSail endpoint-option registration defect; PR #1875 fixes it. Do not treat the managed release-gate chain as runnable until #1875 merges and a host sustains ClickHouse's measured 5.25 GiB request.",
   "legacy": {
     "deferrals": [
@@ -103,5 +104,15 @@
         "wid": "w3"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:27:18Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "df5fa39e6ab041a7b5cee1f7c6000de2",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
 }
