@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "A develop-headed nightly.yml run is recorded",
+    "Windows 3.11 and 3.12 step results are read once",
+    "The remaining batch items and issues #2568, #2569 and #2570 are updated from those results"
+  ],
+  "context": "Created while closing the nightly-red handoff; dispatch remains authorized by the handoff but is blocked until the shared PR merges.",
+  "description": "After PR #2835 merges, dispatch the authorized nightly.yml run from develop, read the Windows 3.11 and 3.12 jobs by step result, and use the evidence to finish the UTF-8, path, teardown, Windows unit-domain and unquarantine decisions.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/pull/2835",
+    "https://github.com/BenchBox-dev/BenchBox/issues/2568",
+    "https://github.com/BenchBox-dev/BenchBox/issues/2569",
+    "https://github.com/BenchBox-dev/BenchBox/issues/2570"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:8d0fa0e2ef22aacc5284a44c",
+      "at": "2026-10-09T22:29:03Z",
+      "client": "omp-coding-agent",
+      "op": "create",
+      "op_id": "41b7b5a1bc4f4a2fa802437e9a8bbe37",
+      "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
+    }
+  ]
+}

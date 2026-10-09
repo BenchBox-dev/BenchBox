@@ -13782,6 +13782,15 @@
       "status": "open",
       "title": "Windows unit suite: read repository text files as UTF-8 in tests and workflow-reading helpers"
     },
+    "nightly-windows-verification-run-20261009": {
+      "claim": null,
+      "needs": [
+        "nightly-windows-pr-visual-approval-20261009"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Dispatch and read the post-fix Windows nightly verification"
+    },
     "nightly-windows-worktree-claim-path-assertions": {
       "claim": null,
       "needs": [],
