@@ -4213,17 +4213,12 @@
       "title": "Remove comments and docstrings from TPC-DS OBT modules"
     },
     "comment-cleanup-tpcds-runtime": {
-      "claim": {
-        "expires_at": "2026-10-10T00:59:19Z",
-        "generation": "daeecdcb85d9467fa28bd7ebb7c65f97",
-        "renewals": 0,
-        "worker": "mcp:antigravity-worker-2"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from TPC-DS runtime and benchmark phases"
     },
     "comment-cleanup-tpcds-stream-decision": {
