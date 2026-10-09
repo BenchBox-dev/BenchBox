@@ -3961,12 +3961,17 @@
       "title": "Remove comments and docstrings from NYC Taxi modules"
     },
     "comment-cleanup-operational-tooling": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:27:57Z",
+        "generation": "b43a8919756e46cea000b98d65fa1769",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments from operational and quality scripts"
     },
     "comment-cleanup-pilot-budget": {
