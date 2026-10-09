@@ -73,6 +73,19 @@ def test_get_query_validates_inputs_and_calls_generate():
     assert ("generate", 1, 42, 10.0, 2, "ansi") in mgr.dsqgen.calls
 
 
+def test_get_query_forwards_variant_to_dsqgen():
+    mgr = make_manager_with_fake()
+
+    sql = mgr.get_query(14, seed=1, scale_factor=2.0, stream_id=3, dialect="ansi", variant="a")
+    assert "SQL 14a" in sql
+    assert ("generate", "14a", 1, 2.0, 3, "ansi") in mgr.dsqgen.calls
+
+    with pytest.raises(ValueError):
+        mgr.get_query(14, variant="z")
+    with pytest.raises(TypeError):
+        mgr.get_query(14, variant=1)
+
+
 def test_get_all_queries_skips_failures_and_collects():
     mgr = make_manager_with_fake()
 

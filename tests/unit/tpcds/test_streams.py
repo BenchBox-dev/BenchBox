@@ -6,6 +6,7 @@
 # Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import random
+import sqlite3
 from unittest.mock import Mock, patch
 
 import pytest
@@ -623,3 +624,62 @@ class TestBackwardsCompatibility:
 
         assert isinstance(streams, TPCDSStreamManager)
         assert isinstance(runner, TPCDSStreamManager)
+
+
+class _NoVariantQueryManager:
+    def __init__(self, body: str = "SELECT 42 AS v") -> None:
+        self._body = body
+
+    def get_query(self, query_id, seed=None):
+        return self._body
+
+
+class _VariantQueryManager:
+    def get_query(self, query_id, seed=None, variant=None):
+        return f"SELECT {query_id} AS q_{variant}"
+
+
+class _RaisingQueryManager:
+    def get_query(self, query_id, seed=None):
+        raise RuntimeError("boom")
+
+
+class TestGenerateSingleStreamSqlShape:
+    @staticmethod
+    def _rows(sql: str):
+        connection = sqlite3.connect(":memory:")
+        try:
+            return connection.execute(sql).fetchall()
+        finally:
+            connection.close()
+
+    @staticmethod
+    def _generate(manager, query_id: int = 14):
+        stream_manager = TPCDSStreamManager(manager)
+        config = QueryStreamConfig(1, [query_id], PermutationMode.SEQUENTIAL)
+        return stream_manager._generate_single_stream(config)
+
+    def test_variant_fallback_executes_query_body(self):
+        stream = self._generate(_NoVariantQueryManager())
+
+        assert [query.variant for query in stream] == ["a", "b"]
+        for query in stream:
+            lines = query.sql.split("\n")
+            assert lines[0].startswith("-- Query")
+            assert lines[1] == "SELECT 42 AS v"
+            assert self._rows(query.sql) == [(42,)]
+
+    def test_variant_query_manager_executes_variant_body(self):
+        stream = self._generate(_VariantQueryManager())
+
+        assert [query.variant for query in stream] == ["a", "b"]
+        for variant, query in zip(["a", "b"], stream):
+            assert query.sql == f"SELECT 14 AS q_{variant}"
+            assert self._rows(query.sql) == [(14,)]
+
+    def test_generation_failure_propagates(self):
+        stream_manager = TPCDSStreamManager(_RaisingQueryManager())
+        config = QueryStreamConfig(1, [14], PermutationMode.SEQUENTIAL)
+
+        with pytest.raises(RuntimeError, match="generation failed"):
+            stream_manager._generate_single_stream(config)
