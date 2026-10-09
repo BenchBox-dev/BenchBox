@@ -1,14 +1,16 @@
 {
   "acceptance": [
-    "A test shows a held plan posts a pending status and no decision",
-    "A test drives github.oracle_reviews through the paging call with more than one page",
+    "A test shows a held plan finalizes to a pending status with no decision and no protocol marker",
+    "A test drives github.oracle_reviews through the real paging call (a fake `gh api` returning more than one page) and asserts every review is returned",
     "A test with more than 5 out-of-scope defects shows exactly 5 listed and the rest summarised",
     "A test forces a long status description and asserts it is cut to 140 characters",
     "The misnamed runner test is renamed or made to omit a status",
-    "Each new test fails when the rule it covers is disabled"
+    "Gap 6 is either covered or its omission is recorded with the reason",
+    "Each new test fails under a one-off mutation of its rule; the PR body lists them",
+    "Merged through the normal PR flow with an oracle success review of the merged head"
   ],
   "context": "Found in the completion audit of the oracle protocol on 2026-10-09. The marker size boundary is tracked separately in oracle-marker-patch-map-file-limit-20261009.",
-  "description": "A behaviour-by-behaviour audit of the oracle protocol tests on develop e7eb5ce7e found every named behaviour implemented and most covered, with these gaps:\n1. A malformed or repeated marker makes the plan return `hold` (tested), but the finalize step that turns `hold` into a pending status (cli.py around line 449) is not: test_attempts.py::test_cli_finalize_fixed_decisions covers only `success` and `fork`.\n2. test_cli_plan.py::test_more_than_a_hundred_reviews_are_all_read replaces github.oracle_reviews with a fake that returns 151 reviews, so nothing tests that the real call pages (`get_paginated`, `--paginate --slurp` in github.py).\n3. The cap of 5 on defects listed as \"not counted\" (outside the changed files) is not tested; the only test uses one such defect.\n4. No test forces a status description over 140 characters through report._clip.\n5. test_runner.py::test_a_follow_up_missing_a_prior_status_is_recorded_for_the_judge passes a status through and never omits one; its name overstates it (the real coverage is test_rounds.py::test_a_prior_defect_with_no_status_stays_open).\n6. The #2769 replay uses synthetic prior statuses and checks the planner and judge, not the posted review bodies.",
+  "description": "A behaviour-by-behaviour audit of the oracle protocol tests on develop e7eb5ce7e found every named behaviour implemented and most covered, with these gaps:\n1. A malformed or repeated marker makes the plan return `hold` (tested), but the finalize step that turns `hold` into a pending status (`cli.command_finalize`) is not: test_attempts.py::test_cli_finalize_fixed_decisions covers only `success` and `fork`.\n2. test_cli_plan.py::test_more_than_a_hundred_reviews_are_all_read replaces github.oracle_reviews with a fake that returns 151 reviews, so nothing tests that the real call pages (`get_paginated`, `--paginate --slurp` in github.py).\n3. The cap of 5 on defects listed as \"not counted\" (protocol.NOT_COUNTED_LIMIT) is not tested; the only test uses one such defect.\n4. No test forces a status description over 140 characters through report._clip.\n5. test_runner.py::test_a_follow_up_missing_a_prior_status_is_recorded_for_the_judge passes a status through and never omits one; its name overstates it (the real coverage is test_rounds.py::test_a_prior_defect_with_no_status_stays_open).\n6. The #2769 replay uses synthetic prior statuses and checks the planner and judge, not the posted review bodies.\n\nThe marker size boundary is tracked separately in oracle-marker-patch-map-file-limit-20261009.\n\nGuardrails.\n- Tests only: no behaviour change in _project/scripts/. If a new test exposes a real defect, stop, file it as its own item, and mark the test `xfail(strict=True)` with the item id only if the owner agrees.\n- Every new test must be able to fail: check each with a one-off mutation of the rule it covers and list the mutations in the PR body. No test may assert only that code runs.\n- Worktree via `make worktree-create` and `make agent-write-preflight`; identity Joe Harris <joeharris76@gmail.com>; explicit staging; no comments or docstrings; `make comment-policy-check`.\n- May ship in one PR with oracle-oversize-pr-pending-loop-20261009, oracle-post-guard-reread-retry-20261009 and oracle-marker-patch-map-file-limit-20261009.\n\nDecision gate. Gap 6 (replay of posted bodies) is optional: do it only if it fits without a new fixture format; otherwise record in this item why it was left.",
   "links": [
     "tests/unit/scripts/oracle_reviewers/test_cli_plan.py",
     "tests/unit/scripts/oracle_reviewers/test_attempts.py",
@@ -22,6 +24,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "1d1b5946accf4438a7f497cc552bde9e",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T13:15:12Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "be78a955a8d9461482b23d0aed5597c6",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]

@@ -14044,7 +14044,9 @@
     },
     "oracle-protocol-test-gaps-20261009": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "oracle-followup-read-bypass-out-of-scope-defect-20261009"
+      ],
       "priority": "low",
       "status": "open",
       "title": "Oracle protocol behaviours with partial tests: hold at finalize, review-list paging, not-counted cap, status truncation"
