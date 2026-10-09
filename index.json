@@ -3665,12 +3665,17 @@
       "title": "Resolve the deferred DataFusion filter typing boundary"
     },
     "comment-cleanup-datavault": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:15:09Z",
+        "generation": "88dcd32ab0594eefb5b85415d299dd8f",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from Data Vault modules"
     },
     "comment-cleanup-distributed-engines": {
