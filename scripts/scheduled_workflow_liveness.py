@@ -86,10 +86,6 @@ def newest_first(runs: Iterable[dict]) -> list[dict]:
     return [run for _, run in sorted(usable, key=lambda pair: pair[0], reverse=True)]
 
 
-def created_lower_bound(now: datetime, window_days: int) -> str:
-    return (now - timedelta(days=window_days + 1)).strftime("%Y-%m-%d")
-
-
 def describe_run(run: dict) -> str:
     return (
         f"id={run.get('id')} created_at={run.get('created_at')} run_started_at={run.get('run_started_at')} "
@@ -145,12 +141,16 @@ def check_workflows(
     for name, crons in workflows:
         window_days = cadence_window_days(crons)
         runs = fetch_runs(name, now - timedelta(days=window_days + 1))
+        history = None
         if not runs:
-            runs = fetch_history(name)
+            history = fetch_history(name)
+            runs = history
         registered_at = fetch_registration(name) if not runs else None
         verdict = assess(name, runs, window_days=window_days, now=now, registered_at=registered_at)
-        if not verdict.alive and not verdict.recent_runs:
-            verdict = replace(verdict, recent_runs=tuple(newest_first(runs)[:RECENT_RUNS_SHOWN]))
+        if not verdict.alive:
+            if history is None:
+                history = fetch_history(name)
+            verdict = replace(verdict, recent_runs=tuple(newest_first(history)[:RECENT_RUNS_SHOWN]))
         verdicts.append(verdict)
     return verdicts
 

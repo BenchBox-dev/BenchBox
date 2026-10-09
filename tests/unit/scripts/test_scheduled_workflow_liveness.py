@@ -121,8 +121,18 @@ def test_a_workflow_with_no_runs_outside_its_grace_is_dead(registered_at: dateti
     assert "no scheduled runs at all" in verdict.message
 
 
-def test_the_created_filter_reaches_one_day_past_the_window() -> None:
-    assert liveness.created_lower_bound(NOW, 3) == "2026-10-05"
+def test_the_bounded_query_reaches_one_day_past_the_cadence_window() -> None:
+    requested_since: dict[str, datetime] = {}
+
+    liveness.check_workflows(
+        [("daily.yml", ["0 6 * * *"]), ("weekly.yml", ["0 6 * * 1"])],
+        lambda name, since: requested_since.setdefault(name, since) and [_run(1, timedelta(hours=1))],
+        lambda name: None,
+        lambda name: [],
+        NOW,
+    )
+
+    assert requested_since == {"daily.yml": NOW - timedelta(days=4), "weekly.yml": NOW - timedelta(days=10)}
 
 
 def test_history_is_fetched_only_when_the_bounded_query_finds_nothing() -> None:
@@ -140,6 +150,22 @@ def test_history_is_fetched_only_when_the_bounded_query_finds_nothing() -> None:
     assert history_requests == ["quiet.yml"]
     assert [verdict.alive for verdict in verdicts] == [True, False]
     assert [run["id"] for run in verdicts[1].recent_runs] == [7, 8]
+
+
+def test_a_flagged_workflow_lists_ten_runs_even_when_the_bounded_page_has_fewer() -> None:
+    bounded = [_run(1, timedelta(days=3, hours=12))]
+    history = [_run(index, timedelta(days=3, hours=12 + index)) for index in range(1, 14)]
+
+    verdicts = liveness.check_workflows(
+        [("daily.yml", ["0 6 * * *"])],
+        lambda name, since: bounded,
+        lambda name: None,
+        lambda name: history,
+        NOW,
+    )
+
+    assert not verdicts[0].alive
+    assert [run["id"] for run in verdicts[0].recent_runs] == list(range(1, 11))
 
 
 def test_a_workflow_with_old_history_gets_no_grace_even_if_its_file_was_edited_recently() -> None:
