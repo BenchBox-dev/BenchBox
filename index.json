@@ -4240,12 +4240,17 @@
       "title": "Remove comments and docstrings from TPC-H benchmark modules"
     },
     "comment-cleanup-tpch-skew": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T01:00:08Z",
+        "generation": "fe085d529c8a465ab3d6bda7f66cac03",
+        "renewals": 0,
+        "worker": "mcp:antigravity-worker-2"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from skewed TPC-H modules"
     },
     "comment-cleanup-tpchavoc-dataframe": {
