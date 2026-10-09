@@ -6,7 +6,7 @@
     "The summary contains the Parquet-read disclosure, the no-cross-engine-claims statement, the correctness-evidence scope statement, the collect-policy statement, the did-not-complete and resource-policy-exceeded lists, and the rejected-cell list",
     "Any cell whose rounds spread unusually (max/min > 1.25) is flagged as noisy, not rerun"
   ],
-  "context": "2026-10-08 BLOCKED: needs pvm-s4 run data; chain starts at pvm-s0b merging (PR #2781, waiting on the Codex connector review; owner: Codex connector / repository owner).",
+  "context": "Analysis done locally: ~/Developer/benchmark_runs/polars-version-matrix-analysis-20261009/{polars-version-matrix-analysis.json, polars-version-matrix-comparisons.csv, polars-version-matrix-findings.md}. Analyzer (scripts/analyze_polars_version_matrix.py at ecd08a9f0, qualification sha da8ea047...): 40 cells, 31 qualified, 42 comparisons, 20 candidate movers (cell totals). Headline: 2.0.0 A vs 1.44.2 A tpch -42.3%, ssb -38.3%, clickbench -49.8% (tpcds not comparable: 1.44.2 A stopped by host-safety limit in all rounds); 2.0.0 B vs 1.44.2 A tpch -3.5%, ssb +12.2%, clickbench -5.9%; setup C 2.0.0 vs 1.44.2 -13.8% to -49.0%. Not reported: 9 cells (tpcds A 1.31.0/1.35.2/1.40.1/1.44.2, tpcds B 2.0.0, tpcds C 1.31.0 crash, tpcds C 1.40.1, tpch A 1.31.0 and 1.40.1 narrow swap failures). No spill in any run, so 2.0.0 completing TPC-DS A is not spilling. Reported not fixed: (1) no per-query movers or plans, polars-df has no plan-capture path and the analyzer is cell-level; (2) pre-run load 3.9-39.8 reflects the previous cell (gate applied once at start); (3) 1.31.0 C tpcds crash (exit 138/139) not in qualification; (4) tpch borderline swap DNCs. Frozen-rule deviations: none.",
   "description": "Turn the run into findings that hold up to scrutiny.\n\nWork:\n- Run the analyzer on the manifest.\n- Headline comparisons, in this order: 2.0.0 setup A vs 1.44.2 (what users get by default); 2.0.0 setup B vs 1.44.2 (same in-memory engine, isolating engine improvements from the default change); setup C across versions (streaming vs streaming).\n- Long-run trend: the oldest admitted version through 2.0.0, per setup.\n- List candidate movers by the non-overlap plus 10% rule, with the number of comparisons, and capture query plans for the five largest candidate movers per benchmark (benchbox plan capture or get_query_plan) to explain them.\n- Report every did-not-complete and resource-policy-exceeded cell, including any cell where 2.0 out-of-core spilling completes and 1.x does not.\n\nGuardrails:\n- State in the analysis that Polars timings include reading Parquet in each run, and that DuckDB matrix timings read a pre-loaded database. Make no speed comparison against DuckDB.\n- State the correctness evidence precisely (D0 C2): value-level agreement was checked per version and setup at SF 0.1 (cross-surface gates); at the measured scale only per-query row counts against DuckDB SQL were checked. Make no claim of value-level correctness at SF10.\n- State that the recorded engine is the requested collect policy; streaming fallback and intermediate materialization were not observed (D0 C10).\n- Report the min–max alongside every median; movers are \"candidate movers\", never \"significant\".\n- Correctness: every reported cell passed the pvm-s3b evidence rule; any rejected cell is listed with its reason. Full-suite outcomes are reported; any common-query subset is named with membership.\n- Claims reference analysis output values, not memory. Rule deviations discovered now are reported, not fixed (handoff D3).",
   "sessions": [
     {
@@ -56,6 +56,14 @@
       "generation": "26178837d31b4cde9f8dbb4fb3d45cf0",
       "op": "take",
       "op_id": "4ace966b184c4367b2bc25c54719364a",
+      "session_id": "1f74fac6df92445cbacc470514ed2645"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c",
+      "at": "2026-10-09T11:22:30Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "c5a9d83732b84dc8b1d7a3851e73e2bc",
       "session_id": "1f74fac6df92445cbacc470514ed2645"
     }
   ]
