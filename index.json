@@ -15828,10 +15828,10 @@
     },
     "pvm-s6-publish-polars-results": {
       "claim": {
-        "expires_at": "2026-10-10T11:22:50Z",
-        "generation": "c1860ac431aa4ef3b9b6d4aced1d0a03",
+        "expires_at": "2026-10-10T16:31:03Z",
+        "generation": "b8fc903bfd0242f6b9b92aa3aa668d1b",
         "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c"
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3"
       },
       "needs": [
         "pvm-s5-analyze-polars-matrix",

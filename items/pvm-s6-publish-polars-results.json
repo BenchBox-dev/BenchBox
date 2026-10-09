@@ -63,6 +63,17 @@
       "op": "update",
       "op_id": "4e76fc7061c14f35966da38d805f4b67",
       "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T16:31:03Z",
+      "client": "claude-code",
+      "displaced": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c",
+      "generation": "b8fc903bfd0242f6b9b92aa3aa668d1b",
+      "op": "takeover",
+      "op_id": "cf48fa1dda2a4870be72131aa50290c7",
+      "reason": "Holder is this conversation's previous todo-db server instance; it restarted under a new identity and cannot resume. PR #2804 is merged and acceptance verified; taking over only to finish.",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
     }
   ]
 }
