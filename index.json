@@ -7633,11 +7633,12 @@
       "claim": null,
       "needs": [
         "dlv2-60-publication-integration",
-        "dlv2-f3-flip-window"
+        "dlv2-f3-flip-window",
+        "site-split-54-publication-github-cleanup"
       ],
       "priority": "high",
       "status": "open",
-      "title": "Cut benchbox.dev over to site-deploy and retire the publication control plane"
+      "title": "Superseded by site-split-40/51/54: Cut benchbox.dev over to site-deploy and retire the publication control plane"
     },
     "dlv2-70-retire-scheduled-workflows": {
       "claim": null,
