@@ -3674,17 +3674,12 @@
       "title": "Remove comments and docstrings from Data Vault modules"
     },
     "comment-cleanup-distributed-engines": {
-      "claim": {
-        "expires_at": "2026-10-10T00:15:54Z",
-        "generation": "a26b61cfc5204ddbb45b08a6723012d9",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from Doris, Databend and StarRocks"
     },
     "comment-cleanup-documentation-samples": {
