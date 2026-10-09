@@ -13472,15 +13472,10 @@
       "title": "Make the macOS throughput cooperative-cancel test deterministic"
     },
     "nightly-mcp-capacity-lease-race-20261008": {
-      "claim": {
-        "expires_at": "2026-10-10T13:40:31Z",
-        "generation": "ded06aeec3c246e395099ef2ca5ad4fb",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Make test_benchmark_capacity_tool_is_tenant_scoped wait for lease expiry instead of a fixed 60 ms sleep"
     },
     "nightly-py310-dataframe-options-mock-target": {
