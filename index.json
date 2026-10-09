@@ -14208,12 +14208,17 @@
       "title": "Oracle patch hashes drop hunk positions, so moving an edit can carry an earlier decision"
     },
     "oracle-post-guard-reread-retry-20261009": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T19:42:11Z",
+        "generation": "147f1c29d6794ddea0577600f7a3daf8",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
+      },
       "needs": [
         "oracle-followup-read-bypass-out-of-scope-defect-20261009"
       ],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "The oracle's pre-post guard posts after a single failed re-read of the review list"
     },
     "oracle-protocol-test-gaps-20261009": {
