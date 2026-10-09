@@ -14217,17 +14217,12 @@
       "title": "The oracle's pre-post guard posts after a single failed re-read of the review list"
     },
     "oracle-protocol-test-gaps-20261009": {
-      "claim": {
-        "expires_at": "2026-10-10T19:42:41Z",
-        "generation": "05fce7b3630b4f968103590c63047292",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
-      },
+      "claim": null,
       "needs": [
         "oracle-followup-read-bypass-out-of-scope-defect-20261009"
       ],
       "priority": "low",
-      "status": "active",
+      "status": "done",
       "title": "Oracle protocol behaviours with partial tests: hold at finalize, review-list paging, not-counted cap, status truncation"
     },
     "oracle-pull-request-target-retarget-race-20261008": {
