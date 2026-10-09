@@ -1,12 +1,13 @@
 {
   "acceptance": [
-    "nightly-v2 has a liveness domain using the hardened lookup, or a written reason it is not needed",
-    "dlv2-70 lists this item as a condition for deleting nightly.yml"
+    "nightly-v2 has a t3:liveness domain that runs scripts/scheduled_workflow_liveness.py, merged to develop (in #2835 or a split-out PR), or a written reason it is not needed",
+    "A nightly-v2 verification dispatch on develop shows t3:liveness green with the script's evidence listing in the log"
   ],
-  "context": "PR #2835 current head has oracle SHIP and both stale oracle-review checks pass. Documentation recovery run 37996877154 built the base visual baseline, but the PR comparison reports four changed getting-started captures. Follow-up nightly-windows-pr-visual-approval-20261009 owns the owner-controlled visual resolution; nightly-v2 verification follows merge.",
-  "description": "nightly-v2.yml has no equivalent of the scheduled-workflow-liveness job. dlv2-70 deletes nightly.yml, which would remove the only check that a scheduled workflow has stopped firing. Port the hardened check into nightly-v2 as its own domain (with its own issue label, as the other domains have), or record why it is no longer needed. Do not copy the current per_page=1 query across.",
+  "context": "PR #2835 current head has oracle SHIP and both stale oracle-review checks pass. Documentation recovery run 37996877154 built the base visual baseline, but the PR comparison reports four changed getting-started captures. Follow-up nightly-windows-pr-visual-approval-20261009 owns the owner-controlled visual resolution; nightly-v2 verification follows merge.\n\n2026-10-09 tracker review: PR #2835 adds the t3:liveness domain together with the Windows domain; the visual-approval hold above applies to the whole PR, so splitting liveness out lets it land first. The shared script (merged in #2815) replaced the per_page=1 query, so the earlier \"do not copy per_page=1\" warning no longer applies. The liveness check runs in both nightly.yml and nightly-v2.yml until dlv2-70 removes nightly.yml; issue #2570 tracks the nightly.yml job. The criterion that dlv2-70 lists this item is already met and was removed.",
+  "description": "nightly-v2.yml has no equivalent of the scheduled-workflow-liveness job. dlv2-70 deletes nightly.yml, which would remove the only check that a scheduled workflow has stopped firing. Port the check into nightly-v2 as its own domain (t3:liveness, with its own issue label, as the other domains have), or record why it is no longer needed. The domain runs the shared script scripts/scheduled_workflow_liveness.py, which replaced the old per_page=1 query and prints the newest ten scheduled runs of any workflow it flags.\n\nPR #2835 adds this domain (job `liveness`, runs the script with read-only actions access). The same PR also adds the Windows unit-test domain. Recommendation: split the liveness domain out of #2835 into its own PR so it is not held by the Windows domain, whose tests still stall (see nightly-v2-windows-unit-leg-20261009).\n\nUntil dlv2-70 deletes nightly.yml, the liveness check runs in both workflows (nightly.yml and nightly-v2.yml). Issue #2570 tracks the nightly.yml job; the nightly-v2 job opens its own t3:liveness issue when it fails.",
   "links": [
-    "https://github.com/BenchBox-dev/BenchBox/issues/2570"
+    "https://github.com/BenchBox-dev/BenchBox/issues/2570",
+    "https://github.com/BenchBox-dev/BenchBox/pull/2835"
   ],
   "sessions": [
     {
@@ -32,6 +33,14 @@
       "op": "update",
       "op_id": "35b3c7c011de4de59e25d557bb0c7fc1",
       "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:22:27Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "37298d09c6ad4aee8ec0bcfc15dd2ab6",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
