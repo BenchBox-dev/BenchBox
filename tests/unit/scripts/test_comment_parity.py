@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 import comment_parity as parity
@@ -271,6 +272,9 @@ def test_cli_rejects_added_and_deleted_files_and_unverified_languages(
     assert "1 skipped" in capsys.readouterr().out
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="Windows has no executable permission bit and git sets core.fileMode=false"
+)
 def test_cli_rejects_a_file_mode_change_in_the_worktree_and_in_a_commit(
     repo: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

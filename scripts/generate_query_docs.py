@@ -365,7 +365,7 @@ def render_all(benchmarks: set[str] | None = None) -> dict[str, str]:
 def _on_disk(root: Path) -> dict[str, str]:
     if not root.exists():
         return {}
-    return {str(path.relative_to(root)): path.read_text(encoding="utf-8") for path in root.rglob("*.md")}
+    return {path.relative_to(root).as_posix(): path.read_text(encoding="utf-8") for path in root.rglob("*.md")}
 
 
 def check_tree(rendered: dict[str, str], root: Path) -> int:

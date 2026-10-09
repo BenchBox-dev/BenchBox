@@ -23,7 +23,7 @@ class RecordingClient:
 
 
 @pytest.fixture
-def adapter():
+def adapter(chdb_probe_satisfied):
     with patch("benchbox.platforms.clickhouse.adapter.check_platform_dependencies", return_value=(True, [])):
         yield ClickHouseLocalAdapter()
 

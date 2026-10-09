@@ -225,12 +225,12 @@ def test_missing_interpreter_exits_2(fake_env: Path, capsys: pytest.CaptureFixtu
 
 
 def test_relative_python_is_made_absolute(fake_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    link = fake_env / "py"
+    link = fake_env / "pyexe_link"
     link.symlink_to(sys.executable)
     monkeypatch.chdir(fake_env)
 
-    assert tool.resolve_python("py") == str(link)
-    assert tool.resolve_python("./py") == str(link)
+    assert tool.resolve_python("pyexe_link") == str(link)
+    assert tool.resolve_python("./pyexe_link") == str(link)
 
 
 def test_symbols_are_probed_in_separate_processes(fake_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:

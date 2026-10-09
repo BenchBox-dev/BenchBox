@@ -30,7 +30,8 @@ def _load():
 trunk_revert = _load()
 
 
-WORKTREE = "/work/BenchBox.wt-revert-12"
+CURRENT_WORKTREE = "/work/BenchBox.wt-current"
+WORKTREE = str(Path(CURRENT_WORKTREE).parent / "BenchBox.wt-revert-12")
 
 
 class FakeRun:
@@ -55,7 +56,7 @@ class FakeRun:
         if cmd[:4] == ["git", "remote", "get-url", "--push"]:
             return 0, self.origin
         if cmd[:3] == ["git", "rev-parse", "--show-toplevel"]:
-            return 0, "/work/BenchBox.wt-current\n"
+            return 0, f"{CURRENT_WORKTREE}\n"
         if cmd[:3] == ["gh", "pr", "create"] and "gh pr create" not in self.fail:
             return 0, "https://github.com/BenchBox-dev/BenchBox/pull/99\n"
         for prefix, code in self.fail.items():

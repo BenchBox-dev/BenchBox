@@ -24,13 +24,14 @@ def _init_repo(root: Path) -> None:
     _run(["git", "init", "-b", "main"], cwd=root)
     _run(["git", "config", "user.email", "mirror@example.com"], cwd=root)
     _run(["git", "config", "user.name", "Mirror Test"], cwd=root)
+    _run(["git", "config", "core.autocrlf", "false"], cwd=root)
 
 
 def _commit_files(root: Path, files: dict[str, str], message: str) -> str:
     for rel, content in files.items():
         path = root / rel
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
+        path.write_bytes(content.encode("utf-8"))
         _run(["git", "add", rel], cwd=root)
     _run(["git", "commit", "--allow-empty", "-m", message], cwd=root)
     return _run(["git", "rev-parse", "HEAD"], cwd=root)

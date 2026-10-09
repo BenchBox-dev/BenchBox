@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import stat
+import sys
 from pathlib import Path
 
 import pytest
@@ -63,6 +64,7 @@ def test_brief_that_cannot_fit_is_oversize() -> None:
     assert brief.text == ""
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no POSIX permission bits; chmod cannot set 0o600")
 def test_brief_file_is_private(tmp_path: Path) -> None:
     path = tmp_path / "plan" / "brief.md"
     write_private(path, "secret brief")

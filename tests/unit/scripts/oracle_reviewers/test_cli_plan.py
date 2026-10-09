@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import stat
+import sys
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -141,7 +142,8 @@ def test_soundness_pr_plans_a_review_with_a_private_brief(monkeypatch: pytest.Mo
     assert [item["name"] for item in plan["chain"]] == ["sonnet", "sol", "luna", "muse", "agy"]
     assert plan["brief_mode"] == "inline"
     brief = tmp_path / "plan" / "brief.md"
-    assert stat.S_IMODE(brief.stat().st_mode) == 0o600
+    if sys.platform != "win32":
+        assert stat.S_IMODE(brief.stat().st_mode) == 0o600
     assert HEAD in brief.read_text(encoding="utf-8")
     assert plan["max_defects"] == 10
     assert plan["evidence_files"] == ["benchbox/core/equivalence/checker.py"]

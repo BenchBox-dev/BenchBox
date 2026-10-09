@@ -77,7 +77,7 @@ def tpch_benchmark(tmp_path):
 
 
 @pytest.fixture
-def clickhouse_factory():
+def clickhouse_factory(chdb_probe_satisfied):
     with patch("benchbox.platforms.clickhouse.adapter.check_platform_dependencies", return_value=(True, [])):
         yield lambda cls, kwargs: cls(**kwargs)
 

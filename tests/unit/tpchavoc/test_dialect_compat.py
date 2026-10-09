@@ -168,16 +168,16 @@ def test_datafusion_empty_group_rules_cover_both_variants():
 
 
 @pytest.mark.parametrize(
-    ("adapter", "query_ids", "required_fragments", "forbidden_fragment"),
+    ("adapter_cls", "query_ids", "required_fragments", "forbidden_fragment"),
     [
         (
-            DataFusionAdapter(),
+            DataFusionAdapter,
             ["6_v2", "14_v2"],
             [" HAVING "],
             "GROUP BY ()",
         ),
         (
-            ClickHouseLocalAdapter(),
+            ClickHouseLocalAdapter,
             ["1_v6", "12_v7"],
             ["sumOrNullIf(", "countIf("],
             " FILTER(",
@@ -185,11 +185,13 @@ def test_datafusion_empty_group_rules_cover_both_variants():
     ],
 )
 def test_dry_run_uses_production_dialect_rewrites_and_query_subset(
-    adapter,
+    chdb_probe_satisfied,
+    adapter_cls,
     query_ids: list[str],
     required_fragments: list[str],
     forbidden_fragment: str,
 ):
+    adapter = adapter_cls()
     benchmark = TPCHavocBenchmark(scale_factor=0.01)
     config = BenchmarkConfig(
         name="tpchavoc",

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import stat
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -97,6 +98,10 @@ def test_write_file_is_atomic_when_replace_fails(monkeypatch, tmp_path):
     assert not list(tmp_path.glob(".result.json.*.tmp"))
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Windows exposes only the read-only attribute, so POSIX permission bits cannot be set or observed",
+)
 def test_write_file_preserves_existing_permissions(tmp_path):
     destination = tmp_path / "result.json"
     destination.write_text("old\n", encoding="utf-8")

@@ -164,7 +164,7 @@ def corpus_permit_rejections(changed_paths) -> list[str]:
             continue
         parts = tuple(part for part in Path(path).parts if part)
 
-        if Path(path).is_absolute():
+        if path.startswith("/") or Path(path).is_absolute():
             rejections.append(f"{raw}: absolute paths are not allowed")
             continue
         if any(part == ".." for part in parts):

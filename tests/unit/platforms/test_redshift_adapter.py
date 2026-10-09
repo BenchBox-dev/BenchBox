@@ -3,6 +3,7 @@
 # Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import json
+import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, call, patch
@@ -978,6 +979,10 @@ class TestRedshiftAdapter:
         execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
         assert any("TABLE PROPERTIES ('table_type'='DELTA')" in call for call in execute_calls)
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="pyiceberg PyArrowFileIO cannot open file:///C:/ table locations on Windows (WinError 123)",
+    )
     def test_external_table_mode_registers_iceberg_in_glue(self):
         try:
             adapter = RedshiftAdapter(

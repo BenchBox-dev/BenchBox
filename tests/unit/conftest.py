@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import importlib.machinery
+import importlib.util
 import logging
 import os
 import sys as _sys
@@ -58,7 +60,26 @@ def _unit_home(_hermetic_state, tmp_path_factory: pytest.TempPathFactory, monkey
     home = tmp_path_factory.mktemp("unit-home")
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("USERPROFILE", str(home))
+    if _sys.platform == "win32":
+        roaming = home / "AppData" / "Roaming"
+        local = home / "AppData" / "Local"
+        roaming.mkdir(parents=True)
+        local.mkdir(parents=True)
+        monkeypatch.setenv("APPDATA", str(roaming))
+        monkeypatch.setenv("LOCALAPPDATA", str(local))
     return home
+
+
+@pytest.fixture
+def chdb_probe_satisfied(monkeypatch):
+    real_find_spec = importlib.util.find_spec
+
+    def _find_spec(name, *args, **kwargs):
+        if name == "chdb":
+            return importlib.machinery.ModuleSpec("chdb", loader=None)
+        return real_find_spec(name, *args, **kwargs)
+
+    monkeypatch.setattr(importlib.util, "find_spec", _find_spec)
 
 
 @pytest.fixture(autouse=True)

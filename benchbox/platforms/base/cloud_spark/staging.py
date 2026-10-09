@@ -720,7 +720,7 @@ class LocalStaging(CloudSparkStaging):
         prefix_path = self._base_path / remote_prefix
         if not prefix_path.exists():
             return []
-        return [str(p.relative_to(self._base_path)) for p in prefix_path.rglob("*") if p.is_file()]
+        return [p.relative_to(self._base_path).as_posix() for p in prefix_path.rglob("*") if p.is_file()]
 
     def delete_path(self, remote_path: str, recursive: bool = False) -> None:
         import shutil

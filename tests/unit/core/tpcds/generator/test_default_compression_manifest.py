@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -38,11 +39,11 @@ ROWS = 7
 
 def _flag(name):
     args = sys.argv[1:]
-    key = "-" + name
-    if key in args:
-        idx = args.index(key)
-        if idx + 1 < len(args):
-            return args[idx + 1]
+    for key in ("-" + name, "/" + name):
+        if key in args:
+            idx = args.index(key)
+            if idx + 1 < len(args):
+                return args[idx + 1]
     return None
 
 
@@ -77,6 +78,10 @@ def fake_dsdgen(tmp_path: Path) -> Path:
     script = tmp_path / "fake_dsdgen.py"
     script.write_text(FAKE_DSDGEN, encoding="utf-8")
     os.chmod(script, 0o755)
+    if sys.platform == "win32":
+        launcher = tmp_path / "fake_dsdgen.cmd"
+        launcher.write_text(f'@"{sys.executable}" "{script}" %*\r\n', encoding="utf-8")
+        return launcher
     return script
 
 

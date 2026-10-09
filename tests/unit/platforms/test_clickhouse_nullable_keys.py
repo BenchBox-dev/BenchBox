@@ -66,6 +66,7 @@ def test_untuned_nullable_columns_never_raise() -> None:
     assert "Nullable(INTEGER)" in rendered
 
 
+@pytest.mark.usefixtures("chdb_probe_satisfied")
 def test_registry_tunings_reject_nullable_keys_on_the_real_tpcds_schema(tmp_path) -> None:
     from benchbox.core.tpcds.benchmark.runner import TPCDSBenchmark
     from benchbox.core.tpcds.schema.registry import get_tunings
