@@ -4961,6 +4961,15 @@
       "status": "open",
       "title": "Record the selected deployment mode in results and fold per-platform deployment keys into the manifest selector"
     },
+    "core-exec-engine-declarations-existing": {
+      "claim": null,
+      "needs": [
+        "core-exec-polars-cli-mcp-adoption"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Declare execution engines for existing platforms that already have engine variants (pg_duckdb, Dask, Databricks, Velox)"
+    },
     "core-exec-explorer-variant-identity": {
       "claim": null,
       "needs": [
