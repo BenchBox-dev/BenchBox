@@ -7561,8 +7561,7 @@
     "dlv2-44-precommit-trim": {
       "claim": null,
       "needs": [
-        "dlv2-16-split-timing-policy",
-        "dlv2-43-makefile-agent-instructions-lockstep"
+        "dlv2-16-split-timing-policy"
       ],
       "priority": "medium",
       "status": "open",
