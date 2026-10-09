@@ -3775,12 +3775,17 @@
       "title": "Remove comments from Explorer data and state modules"
     },
     "comment-cleanup-explorer-ui": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:19:23Z",
+        "generation": "116512416665426ea6f1fd9e0b5e2bae",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments from Explorer pages and components"
     },
     "comment-cleanup-external-ownership": {
