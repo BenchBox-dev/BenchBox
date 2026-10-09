@@ -7658,6 +7658,13 @@
       "status": "open",
       "title": "Clean up obsolete GitHub branches, labels, and secrets"
     },
+    "dlv2-80a-github-cleanup-queue-era": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Delete queue-era branches, develop-red labels and unused todo-db secrets"
+    },
     "dlv2-81-config-cleanup": {
       "claim": null,
       "needs": [
