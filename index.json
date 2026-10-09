@@ -3601,12 +3601,17 @@
       "title": "Remove comments from remaining cross-module unit tests"
     },
     "comment-cleanup-data-fetch-organization": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:13:23Z",
+        "generation": "8a8de1b721ec47229c2ef30773df7ce3",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from data acquisition and organization"
     },
     "comment-cleanup-dataframe-adapters": {
