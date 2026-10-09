@@ -20,3 +20,4 @@
 - [ADR: Prove FlightData Source Months Before Reusing a Corpus](adr-flightdata-month-source-policy.md)
 - [ADR: Preserve Read-Primitives Capabilities Across Cloud Dialects](adr-read-primitives-cloud-variants.md)
 - [ADR: Drop unread identifier fields from the published corpus](adr-published-identifier-field-set.md)
+- [ADR: Core Execution-Variant Settings — Execution Engine, Compute, Deployment and Gateway](adr-core-execution-variants.md)

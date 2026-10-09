@@ -20,6 +20,7 @@ development/adr/adr-clickhouse-server-containerization.md
 development/adr/adr-client-link-locality-disclosure.md
 development/adr/adr-concurrency-outcome-and-ownership-contract.md
 development/adr/adr-concurrency-public-api-reconciliation.md
+development/adr/adr-core-execution-variants.md
 development/adr/adr-corpus-validation-admission-policy.md
 development/adr/adr-cross-benchmark-power-throughput-scores.md
 development/adr/adr-ducklake-maturity-and-publishability.md
