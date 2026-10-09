@@ -14868,10 +14868,12 @@
     },
     "polars-maintenance-collect-bypasses-engine-option": {
       "claim": null,
-      "needs": [],
-      "priority": "low",
+      "needs": [
+        "core-exec-polars-cli-mcp-adoption"
+      ],
+      "priority": "medium",
       "status": "open",
-      "title": "Polars maintenance and write-primitive operations call collect() directly and ignore the engine option"
+      "title": "Polars maintenance and write-primitive operations call collect() directly and ignore the requested execution engine"
     },
     "polars-platform-adapter": {
       "claim": null,
