@@ -299,7 +299,7 @@ TimescaleDB extends PostgreSQL with time-series capabilities and supports both s
 Connect to a self-hosted TimescaleDB server.
 
 ```bash
-uv add psycopg2-binary
+uv add benchbox --extra postgresql
 
 benchbox run --platform timescaledb --benchmark tpch --scale 0.1 \
     --platform-option host=localhost \

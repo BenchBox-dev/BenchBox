@@ -59,35 +59,34 @@ print(f"InfluxDB support available: {INFLUXDB_AVAILABLE}")
 ```bash
 benchbox run --platform influxdb \
   --benchmark tsbs-devops \
-  --influxdb-host us-east-1-1.aws.cloud2.influxdata.com \
-  --influxdb-token $INFLUXDB_TOKEN \
-  --influxdb-org my-org \
-  --influxdb-database benchmarks \
-  --influxdb-mode cloud
+  --platform-option host=us-east-1-1.aws.cloud2.influxdata.com \
+  --platform-option token=$INFLUXDB_TOKEN \
+  --platform-option org=my-org \
+  --platform-option database=benchmarks \
+  --platform-option mode=cloud
 
 benchbox run --platform influxdb \
   --benchmark tsbs-devops \
-  --influxdb-host localhost \
-  --influxdb-port 8086 \
-  --influxdb-token $INFLUXDB_TOKEN \
-  --influxdb-database benchmarks \
-  --influxdb-mode core \
-  --influxdb-ssl false
+  --platform-option host=localhost \
+  --platform-option port=8086 \
+  --platform-option token=$INFLUXDB_TOKEN \
+  --platform-option database=benchmarks \
+  --platform-option mode=core
 ```
 
-The first command targets InfluxDB Cloud. The second targets a local InfluxDB Core server.
+The first command targets InfluxDB Cloud. The second targets a local InfluxDB Core server. All options are passed as `--platform-option KEY=VALUE`.
 
 ### CLI Arguments
 
-| Argument | Default | Description |
-|----------|---------|-------------|
-| `--influxdb-host` | `localhost` | InfluxDB server hostname |
-| `--influxdb-port` | `8086` | Server port |
-| `--influxdb-token` | - | Authentication token (or set `INFLUXDB_TOKEN` env var) |
-| `--influxdb-org` | - | Organization name |
-| `--influxdb-database` | `benchbox` | Database (bucket) name |
-| `--influxdb-mode` | `cloud` | Deployment mode: `core` or `cloud` |
-| `--influxdb-ssl` | `true` | Use SSL/TLS connection |
+| Option key | Default | Description |
+|------------|---------|-------------|
+| `host` | `localhost` | InfluxDB server hostname |
+| `port` | `8086` | Server port |
+| `token` | - | Authentication token (or set `INFLUXDB_TOKEN` env var) |
+| `org` | - | Organization name |
+| `database` | `benchbox` | Database (bucket) name |
+| `mode` | `cloud` | Deployment mode: `core` or `cloud` |
+| `ssl` | `true` | Use SSL/TLS connection. The CLI passes option values as strings, so disabling SSL from the CLI is not supported; use the Python API with `ssl=False` for plaintext local servers (see below) |
 
 ### Python API
 

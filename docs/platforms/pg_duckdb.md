@@ -76,10 +76,10 @@ and are not verified as supported.
 
 ### Python Dependencies
 
-pg_duckdb uses the same Python driver as PostgreSQL:
+pg_duckdb uses the same Python driver as PostgreSQL (`psycopg` 3):
 
 ```bash
-uv add psycopg2-binary
+uv add benchbox --extra postgresql
 ```
 
 ### Server Requirements
@@ -155,7 +155,7 @@ pg_duckdb accelerates queries by routing them through DuckDB's vectorized execut
 | Storage | PostgreSQL heap | DuckDB columnar | PostgreSQL heap |
 | Execution | DuckDB vectorized | DuckDB vectorized | PostgreSQL row-based |
 | SQL dialect | PostgreSQL | DuckDB | PostgreSQL |
-| Data loading | COPY (psycopg2) | Direct file read | COPY (psycopg2) |
+| Data loading | COPY (psycopg 3) | Direct file read | COPY (psycopg 3) |
 | Compression | No (heap tables) | Yes (columnar) | No (heap tables) |
 | Best for | Adding analytics to existing PG | Standalone analytics | Transactional + basic analytics |
 

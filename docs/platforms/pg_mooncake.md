@@ -38,10 +38,10 @@ benchbox run --platform pg-mooncake --benchmark tpch --scale 1.0 \
 
 ### Python Dependencies
 
-pg_mooncake uses the same Python driver as PostgreSQL:
+pg_mooncake uses the same Python driver as PostgreSQL (`psycopg` 3):
 
 ```bash
-uv add psycopg2-binary
+uv add benchbox --extra postgresql
 ```
 
 ### Server Requirements

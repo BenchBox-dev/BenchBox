@@ -16,15 +16,13 @@ PostgreSQL is a powerful open-source relational database that serves as an excel
 
 ## Installation
 
-PostgreSQL support requires the `psycopg2` driver:
+PostgreSQL support requires the `psycopg` 3 driver (the `postgresql` extra):
 
 ```bash
-pip install psycopg2-binary
-
-pip install psycopg2
+pip install "benchbox[postgresql]"
 ```
 
-The first command installs the binary package. The second uses a system `psycopg2` build, which is recommended for production.
+This installs `psycopg[binary]`. For a standalone install without BenchBox extras, use `pip install "psycopg[binary]"`.
 
 ## Configuration
 
@@ -63,19 +61,19 @@ benchbox run --platform postgresql --benchmark tpch --scale 1.0 \
 | `work_mem` | 256MB | Working memory for sorts/hashes |
 | `statement_timeout` | (unset) | Per-statement timeout in milliseconds; `0` disables |
 | `enable_timescale` | false | Enable TimescaleDB features |
-| `driver_version` | (latest) | Pin the psycopg2-binary package version (e.g. `2.9.11`) |
+| `driver_version` | (latest) | Pin the psycopg package version (e.g. `3.1.0`) |
 | `driver_auto_install` | false | Auto-install the requested driver version via uv if missing |
 
-### Testing a Specific psycopg2 Version
+### Testing a Specific psycopg Version
 
 ```bash
 benchbox run --platform postgresql --benchmark tpch \
-  --platform-option driver_version=2.9.11 \
+  --platform-option driver_version=3.1.0 \
   --platform-option driver_auto_install=true \
   --platform-option host=localhost
 ```
 
-The driver package for PostgreSQL is `psycopg2-binary`.
+The driver package for PostgreSQL is `psycopg[binary]`.
 
 See {ref}`driver-version-management` for the full guide, including why `uv run` may
 revert a manually-installed version and how to work around it.

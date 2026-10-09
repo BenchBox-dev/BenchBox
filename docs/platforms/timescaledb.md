@@ -86,10 +86,10 @@ export TIMESCALE_DATABASE='tsdb'
 ## Installation
 
 ```bash
-uv add psycopg2-binary
+uv add benchbox --extra postgresql
 ```
 
-Server must have TimescaleDB 2.x extension enabled:
+The `postgresql` extra provides the `psycopg` 3 driver that TimescaleDB uses. Server must have TimescaleDB 2.x extension enabled:
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;

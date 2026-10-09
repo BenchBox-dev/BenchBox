@@ -401,12 +401,12 @@ Traditional relational databases and specialized time-series engines.
 ### Installation
 
 ```bash
-uv add psycopg2-binary
+uv add benchbox --extra postgresql
 
-uv add psycopg2-binary
-
-uv add influxdb3-python
+uv add benchbox --extra influxdb
 ```
+
+The `postgresql` extra provides the `psycopg` 3 driver; the `influxdb` extra provides `influxdb3-python`.
 
 In order, these commands install the drivers for PostgreSQL, TimescaleDB (which uses the same driver as PostgreSQL), and InfluxDB.
 
