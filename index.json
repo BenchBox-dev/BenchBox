@@ -7542,9 +7542,10 @@
       "claim": null,
       "needs": [
         "dlv2-f3-flip-window",
-        "dlv2-16-split-timing-policy"
+        "dlv2-16-split-timing-policy",
+        "dlv2-70-retire-scheduled-workflows"
       ],
-      "priority": "high",
+      "priority": "medium",
       "status": "open",
       "title": "Delete dev-loop scripts and their pure-process tests after their workflows are gone"
     },
