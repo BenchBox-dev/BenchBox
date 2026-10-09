@@ -1,11 +1,11 @@
 {
   "acceptance": [
-    "The listed encoding failures no longer appear in a Windows 3.12 'Run fast tests' log",
-    "A lint rule or test fails on new open()/read_text() calls without an encoding in the affected directories, or a written reason explains why not",
+    "The 12 UnicodeDecodeError failures in the 6 files listed above no longer appear in a Windows 3.12 'Run fast tests' log",
+    "scripts/check_windows_antipatterns.py checks tests/ and scripts/ as well as benchbox/, with a ratchet baseline (358 calls in 133 files today) that fails on any new read_text() or open() without an encoding, and a unit test covers the new roots; or a written reason explains why not",
     "Ubuntu and macOS results are unchanged"
   ],
-  "context": "The prepared branch fix/windows-utf8-text-io has the handoff's 1,778 passing local tests, but no PR was opened because shared PR #2835 must merge first. Follow-up nightly-windows-pr-visual-approval-20261009 tracks the owner-controlled visual gate; after that, open/rebase this PR and use nightly-windows-verification-run-20261009 for Windows evidence.",
-  "description": "On Windows, tests that read workflow YAML or other repository text with the default code page raise UnicodeDecodeError ('charmap' codec), and non-ASCII file names are decoded with the wrong code page. Affected files in the 2026-10-03 failure list include tests/unit/workflows/test_public_site_visual_workflow.py (8), test_t2_partition_workflow.py (4), test_nightly_t3_workflow.py (4), test_release_canary_shard_evidence.py (3), test_binary_manifest_workflow.py (2) and the test_validate_submission_* files (6, including the 'café.manifest.json' case). Start by pulling the current failing list from the latest legacy nightly (run 37776283388 or newer), because earlier Windows fixes have merged since the issue was written. Fix by passing encoding='utf-8' (and decoding subprocess output explicitly), and consider enabling ruff's unspecified-encoding rule (PLW1514) for tests so the problem cannot return.",
+  "context": "The prepared branch fix/windows-utf8-text-io has the handoff's 1,778 passing local tests, but no PR was opened because shared PR #2835 must merge first. Follow-up nightly-windows-pr-visual-approval-20261009 tracks the owner-controlled visual gate; after that, open/rebase this PR and use nightly-windows-verification-run-20261009 for Windows evidence.\n\n2026-10-09 tracker review: the earlier file list (public_site_visual, nightly_t3, release_canary, binary_manifest, validate_submission) is stale; fixes since then removed those failures. The list above comes from run 37967682464 and was checked against origin/develop (0a3c27f53) for paths and line numbers. test_pr_arm.py:245 moved here from nightly-windows-path-quoting-20261008, which is being closed. The prepared branch may predate some of these files; check it against the current list.",
+  "description": "On Windows, tests that read repository text files with the default code page raise UnicodeDecodeError ('charmap' codec), because pathlib read_text() without an encoding uses the locale encoding.\n\nCurrent failures: 12 tests in 6 files, from the Windows 3.12 fast-test step of run 37967682464:\n- tests/unit/workflows/test_t2_partition_workflow.py:15 (6 tests; workflow YAML read)\n- tests/unit/platforms/test_physical_identifier_resolution.py:172\n- tests/unit/platforms/test_physical_identifier_resolution_databricks_bigquery.py:222\n- tests/unit/platforms/test_post_load_seam.py:245\n- tests/unit/scripts/test_agent_instruction_audit.py (Makefile case of test_handback_guard_covers_the_scripts_and_docs_that_print_guidance, around line 299; the audit reads the Makefile without an encoding)\n- tests/unit/scripts/test_pr_arm.py:245 (Makefile read; moved here from nightly-windows-path-quoting-20261008)\n\nFix: pass encoding=\"utf-8\" to each read_text() and open() call that reads repository text, and decode subprocess output explicitly.\n\nPrevention: ruff PLW1514 is enabled (pyproject.toml:434) but cannot type pathlib read_text(), so it does not catch these calls. scripts/check_windows_antipatterns.py already flags read_text() without an encoding, but _DEFAULT_ROOTS = [\"benchbox\"] (line 33) limits it to the package. Extend it to tests/ and scripts/ with a ratchet: tests/ and scripts/ currently hold 358 such calls in 133 files, so a hard fail would need a baseline that may only shrink.\n\nAlternative: set PYTHONUTF8=1 in the Windows job. That is a one-line change and fixes every such read at once. The tradeoff is that it hides the defect: the tests would pass while real users on a non-UTF-8 code page still hit it, and it makes the Windows leg differ from a normal user environment.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2568"
   ],
@@ -43,6 +43,14 @@
       "op": "update",
       "op_id": "966ed393788845f98f7e441d49e3fbae",
       "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:23:39Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "3c6f7d3f2e784dcab73320f020d92337",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
