@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "A test with a few hundred changed soundness files shows the posted Tier line names at most a fixed number of paths and says how many more",
+    "The review body for that plan is under a stated size",
+    "Merged through the normal PR flow with an oracle success review"
+  ],
+  "context": "Observed 2026-10-09 on oversize canary #2847 (oracle-verdict run 37989093375).",
+  "description": "The `Tier: <tier> (<reasons>)` line in every oracle review joins `tier_reasons`, which name each changed soundness file. On oversize canary #2847 (640 files, closed unmerged) the posted review body was 128,906 characters, almost all of it this line. GitHub accepted it, but a body that size buries the decision, the note and the reviewer list, and it risks hitting GitHub's body limits on a larger PR.\n\nRequired change: cap the file list in the tier reason (for example, the first few paths and \"and N more\"), keeping the reason text, with a test on a many-file plan. The plan JSON may keep the full list. Check that the status description, already cut to 140 characters, is unaffected.\n\nGuardrails. No change to how the tier is chosen. Very-high tier (reviewer package); normal oracle PR flow.",
+  "links": [
+    "_project/scripts/oracle_reviewers/report.py",
+    "_project/scripts/oracle_reviewers/classifier.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T21:09:44Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "a87470d27d2247debf6566057dc41f6e",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}
