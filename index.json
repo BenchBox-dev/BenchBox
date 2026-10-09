@@ -6794,12 +6794,17 @@
       "title": "Close datavault wording, scope, release-posture residuals"
     },
     "df-parity-staged-builders-small": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T23:29:41Z",
+        "generation": "0c50e12c3e6746a0a7c6150c045abffe",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
+      },
       "needs": [
         "df-parity-id-mapping-builders"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Stage nyctaxi, tsbs_devops, tpch_skew cross-surface builders"
     },
     "df-parity-staged-tpch-tpcds": {
