@@ -14372,7 +14372,7 @@
       "needs": [],
       "priority": "low",
       "status": "open",
-      "title": "Oracle runner gaps: staged diff hidden from the integrity check, shared credentials, stand-in window"
+      "title": "Decide shared-credential concurrency and whether a later pending oracle review voids a stand-in"
     },
     "oracle-self-attested-file-list-reviewers-20261008": {
       "claim": null,
