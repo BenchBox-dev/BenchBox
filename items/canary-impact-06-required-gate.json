@@ -1,14 +1,24 @@
 {
   "acceptance": [
-    "ci-required-result requires the impacted canary shards for non-empty selections and fails on selector failure or missing or inconsistent output, with workflow tests for each case.",
+    "The required jobs fail trunk (or the core unit, for pull_request placement) on a failing impacted canary test, on selector failure, and on missing or inconsistent output, and pass on a recorded zero selection, with workflow tests for each case.",
     "The PR includes the pre-written revert and states the rollback trigger.",
-    "A 7-day report after landing gives blocked merges (with causes), merge-queue p50 time to merge against the prior 7 days, and any canary failures the gate missed.",
-    "The D3 decision on pull_request gating is recorded, even if the answer is merge_group only."
+    "A 7-day report after landing gives reddened trunk runs or blocked merges (with causes), trunk-run p50 wall time and release-admission delay against the prior 7 days (or PR p50 time-to-green), and any canary failures the gate missed."
   ],
-  "context": "Guardrails:\n1. Maintainer approval of this PR is required (pr.yml and ci-required-result are soundness paths); no auto-merge.\n2. The PR must include a pre-written revert: removing the jobs from the umbrella and restoring continue-on-error.\n3. Rollback trigger, fixed now and not tuned later: revert the same day if, in any rolling 7 days after landing, (a) the required job blocks 3 or more merges whose failures are later shown to be flakes or infrastructure, or (b) merge-queue p50 time to merge rises by more than 15 minutes against the 7 days before landing. Revert first, then investigate; do not add exceptions to keep the gate.\n4. A canary failure the gate did not catch after landing is a selector bug: open an item for it the same day and link it here.\n5. Workflow tests cover: non-empty selection required and failing blocks; zero selection passes; selector failure blocks; missing output blocks; whole-suite fallback required.\n6. The daily release canary stays as the full backstop; do not reduce it.",
-  "description": "Start only after D2 in canary-impact-05-shadow-watch is recorded as promote.\n\nWire the canary-impact selector and test jobs into ci-required-result so a canary regression cannot merge:\n- the umbrella requires the test shards whenever the selector reports a non-empty selection;\n- the umbrella fails if the selector job fails, or its output is missing, malformed, or inconsistent with the shard results;\n- a recorded zero selection is a pass;\n- remove the jobs' continue-on-error.\n\nNo ruleset change is needed: ci-required-result is already the required check.\n\nDECISION POINT D3 (maintainer, optional): whether to also run the selector on pull_request for earlier feedback. Default is merge_group only, matching the heavy tier; only extend it with an explicit recorded decision.",
+  "context": "Guardrails:\n1. Maintainer approval of this PR is required (trunk.yml, ci.yml and .github/ci-units.yml are soundness paths); no auto-merge.\n2. The PR must include a pre-written revert: restoring continue-on-error (trunk) or removing the jobs from the core unit (pull_request).\n3. Rollback trigger, fixed now and not tuned later: revert the same day if, in any rolling 7 days after landing, (a) the required job reddens trunk or blocks 3 or more merges whose failures are later shown to be flakes or infrastructure, or (b) trunk-run p50 wall time or release-admission delay rises by more than 15 minutes against the prior 7 days (for pull_request placement: PR p50 time-to-green rises by more than 15 minutes). Revert first, then investigate; do not add exceptions to keep the gate.\n4. A canary failure the gate did not catch after landing is a selector bug: open an item for it the same day and link it here.\n5. Workflow tests cover: non-empty selection required and failing reddens trunk or blocks; zero selection passes; selector failure fails; missing output fails; whole-suite fallback required.\n6. The daily release canary stays as the full backstop; do not reduce it.\n\n2026-10-09 tracker review: Retitled and rewritten after the merge queue was retired (2026-10-03); the old text named ci-required-result and the merge queue, which no longer exist. The old optional decision D3 (also run on pull_request) is dropped: placement is now decided once, in D1.",
+  "description": "Start only after D2 in canary-impact-05-shadow-watch is recorded as promote. Follow the placement chosen in D1 (canary-impact-03-replay-and-go-decision).\n\nTrunk placement (.github/workflows/trunk.yml): \"required\" means removing continue-on-error from the canary-impact selector and test jobs, so that:\n- a canary regression reddens trunk and triggers revert-first (make trunk-revert), the pr-open freeze, and the release-admission block;\n- the test shards are required whenever the selector reports a non-empty selection;\n- the trunk run fails if the selector job fails, or its output is missing, malformed, or inconsistent with the shard results;\n- a recorded zero selection is a pass.\n\nPull-request placement (.github/workflows/ci.yml): add the selector and test jobs to the `core` unit in .github/ci-units.yml, with the same selector-failure, missing-output and zero-selection rules. No ruleset change is needed because the six ci.yml unit checks are already required.",
   "links": [
-    ".github/workflows/pr.yml",
+    ".github/workflows/trunk.yml",
+    ".github/ci-units.yml",
     "scripts/canary_impact.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:22:14Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "640de7bc0f7a4dd7a36bd28b9b6eb70f",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
   ]
 }
