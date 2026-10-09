@@ -3553,12 +3553,17 @@
       "title": "Remove comments and docstrings from core DataFrame execution"
     },
     "comment-cleanup-core-execution": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:11:56Z",
+        "generation": "78749b7194d74442880d6bfc6340ec75",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from execution, throughput and lifecycle code"
     },
     "comment-cleanup-core-registries": {
