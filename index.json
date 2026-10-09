@@ -14093,6 +14093,13 @@
       "status": "open",
       "title": "agy cannot read files as a headless oracle reviewer"
     },
+    "oracle-checker-drop-legacy-first-line-20261023": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Stop accepting the old `### oracle-review-shadow:` first line in the required oracle check"
+    },
     "oracle-codex-sandbox-bwrap-ci-20261009": {
       "claim": null,
       "needs": [],
