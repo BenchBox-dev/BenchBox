@@ -3450,18 +3450,13 @@
       "title": "Build grammar-aware comment policy checks and safe deletion comparisons"
     },
     "comment-cleanup-cli-commands": {
-      "claim": {
-        "expires_at": "2026-10-10T00:26:44Z",
-        "generation": "cf7bc88d7a1c4533b13b2b20579a4366",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget",
         "comment-cleanup-cli-foundation"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from CLI command modules"
     },
     "comment-cleanup-cli-foundation": {
