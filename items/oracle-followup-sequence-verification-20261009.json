@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "Each of the nine sequence items is done, and each names its merged PR (or, for the description edits, the edited PRs) in its context",
+    "Hollow-review scan rerun over oracle reviews posted since the first sequence PR merged: zero success reviews whose reviewer read nothing (method: list the App's reviews with `gh api --paginate`, flag success bodies with could-not/unable/not-provided wording, read each flagged body); result and counts recorded here",
+    "Every open soundness-path pull request's `oracle-review` check is green or failing for a stated, current reason; none is blocked by the rename transition",
+    "At least one post-rename shadow run on develop shows: the new first line, the new status context, a muse attempt with its version line and no installer hash step, and the required check passing (run ids recorded)",
+    "`git grep -n oracle-review-shadow` and `git grep -i 'codex connector'` on develop match only the recorded history exceptions",
+    "`uv run -- pytest -o addopts=\"\" tests/unit/scripts/oracle_reviewers tests/unit/scripts/test_oracle_review_check.py tests/unit/scripts/test_soundness_merge_digest.py tests/unit/workflows/test_oracle_review_shadow_workflow.py tests/unit/workflows/test_oracle_review_workflow.py` passes on develop",
+    "The out-of-sequence items listed in the description are still open (or were closed by their own work), not closed by this sequence"
+  ],
+  "context": "Created on 2026-10-09 from the plan that followed the oracle protocol completion audit and the agy and muse adversarial reviews of it. Finding dispositions: both reviewers' follow-up read bypass, accepted (High item); muse's oversize retry loop, accepted; muse's fail-open post guard, accepted in part (retry, not fail-closed); muse's 'installed unpinned' docs line, re-homed to the muse installer item after the owner noted that muse releases about daily; agy's miscited-defect departure, already documented in the protocol decision record's Evidence bullet and the oracle doc, no change; agy's staged-diff reads, rebutted (by design, the diff does not show head files); agy's marker-test claim, rebutted (the 100-file test asserts the map); both reviewers' keep-the-name argument, rebutted and overruled by the owner's rename decision.",
+  "description": "Close the oracle follow-up sequence filed on 2026-10-09 with live evidence, not self-reports. Every check below is read fresh on the day of closing (EVIDENCE-FRESHNESS-001).\n\nSequence covered (all must be done): oracle-followup-read-bypass-out-of-scope-defect-20261009 (High, first), then oracle-oversize-pr-pending-loop-20261009, oracle-post-guard-reread-retry-20261009, oracle-protocol-test-gaps-20261009, oracle-marker-patch-map-file-limit-20261009 (may share one PR), oracle-muse-installer-floating-channel-20261009, connector-wording-after-oracle-cutover-20261009, then oracle-verdict-name-still-says-shadow-20261009 (last code change), and oracle-merged-pr-descriptions-stale-20261009 (independent).\n\nNot in this sequence, and must not be closed by it (each stays open with its own owner): oracle-review-stale-check-runs-block-merge-20261008 (High), oracle-swf-empty-defect-list-decision-20261008 (owner decision), oracle-read-evidence-tightening-20261008, oracle-self-attested-file-list-reviewers-20261008, oracle-patch-hash-hunk-positions-20261008, oracle-pull-request-target-retarget-race-20261008, oracle-strike-count-distinct-patches-20261008, oracle-absence-classification-lows-20261008, oracle-runner-integrity-lows-20261008, oracle-agy-reviewer-calibration-20261008, oracle-review-thread-reply-run-churn-20261008, pr-2761-hollow-success-post-merge-review-20261008, review-soundness-merge-ceremony, and the rename's old-format removal follow-up.\n\nGuardrails.\n- Read-only except for tracker updates and local capture. Any defect found becomes its own item; do not fix it here.\n- Canary pull requests and workflow dispatches against open pull requests are outward-facing: ask the owner first.\n\nDecision gate. If any check fails, leave this item open, file the defect, and report to the owner; do not close the sequence with a known failure.",
+  "links": [
+    "docs/operations/oracle-review-v2.md",
+    "_project/decisions/oracle-review-protocol-2026-10-08.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T13:17:08Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "21f79da0db074e44837691890a7f7c8b",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}
