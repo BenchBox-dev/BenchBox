@@ -6761,17 +6761,12 @@
       "title": "Record canonical JoinOrder non-blocking posture"
     },
     "df-parity-promote-nyctaxi-tsbs": {
-      "claim": {
-        "expires_at": "2026-10-10T23:31:43Z",
-        "generation": "9f1cfcea636b4ec29b5378d8b8962cca",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
-      },
+      "claim": null,
       "needs": [
         "df-parity-staged-builders-small"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Promote nyctaxi and tsbs_devops to enforced CI gates"
     },
     "df-parity-promote-tpc-family": {
