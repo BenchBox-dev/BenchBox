@@ -395,6 +395,23 @@ def test_graphql_comment_mapping_retains_thread_state() -> None:
     assert comment.thread_is_outdated is False
 
 
+@pytest.mark.parametrize(
+    ("author", "trusted"),
+    [
+        ({"__typename": "Bot", "login": "benchbox-oracle"}, True),
+        ({"__typename": "Bot", "login": "benchbox-oracle[bot]"}, True),
+        ({"__typename": "User", "login": "benchbox-oracle"}, False),
+        ({"login": "benchbox-oracle"}, False),
+    ],
+    ids=["graphql-bot", "rest-style-bot", "user-account", "no-type"],
+)
+def test_only_the_oracle_bot_account_is_a_default_review_author(author: dict, trusted: bool) -> None:
+    node = {"databaseId": 7, "body": "finding", "path": "a.py", "url": "u", "createdAt": "t", "author": author}
+    mapped = pr_review_followups._graphql_comment_to_api_shape(node, thread={"id": "PRRT_1"})
+    comment = pr_review_followups.review_comment_from_api(mapped)
+    assert (comment.user_login in pr_review_followups.DEFAULT_REVIEW_AUTHORS) is trusted
+
+
 def test_graphql_fetch_paginates_comments_inside_each_thread() -> None:
     root = {
         "databaseId": 42,
