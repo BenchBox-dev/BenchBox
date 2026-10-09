@@ -7555,7 +7555,7 @@
         "dlv2-42-retire-dev-loop-scripts-tests"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "dropped",
       "title": "Replace PR-loop Make targets with tier targets and update agent instructions in the same change"
     },
     "dlv2-44-precommit-trim": {
