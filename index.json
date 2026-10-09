@@ -4943,6 +4943,16 @@
       "status": "open",
       "title": "Gate: approve an ADR that defines BenchBox's core execution-variant vocabulary (engine, compute, deployment, gateway)"
     },
+    "core-exec-explorer-variant-identity": {
+      "claim": null,
+      "needs": [
+        "core-exec-result-schema-2-3",
+        "core-exec-polars-cli-mcp-adoption"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Make Explorer and corpus identity distinguish execution engine, deployment and gateway variants"
+    },
     "core-exec-framework-manifest": {
       "claim": null,
       "needs": [

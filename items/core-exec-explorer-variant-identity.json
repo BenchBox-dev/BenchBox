@@ -1,0 +1,32 @@
+{
+  "acceptance": [
+    "Two bundles that differ only in requested execution engine produce two variant_ids, two Explorer rows and separate ranks; a fixture test proves it",
+    "Running the pipeline over the current corpus changes no existing value except the added columns (diff of the read model before/after attached to the PR)",
+    "A gateway-routed fixture bundle is excluded from native ranking with ranking_exclusion_reason=gateway_routed",
+    "Labels and the Comparability receipt show the engine and gateway; Explorer vitest, explorer-tokens and site-parity checks pass",
+    "validate_corpus.py treats variant_id as part of identity, with SEED_CORPUS_SPEC.md and CORPUS_NOTES.md updated and the corpus depth test adjusted in the same PR",
+    "PR merged through the normal flow"
+  ],
+  "context": "Decision gates:\n- G1 Start after core-exec-result-schema-2-3 and core-exec-polars-cli-mcp-adoption.\n- G2 If any published result_id, public URL or existing rank would change for bundles that have no engine/gateway data, stop: identity for legacy bundles must equal today's (adr-public-result-id-permanence).\n- G3 If the Explorer change needs a site redeploy or touches the site repository split, stop and plan the rollout with the user.\n\nVerification rubric: pipeline unit tests, results-explorer vitest, check_explorer_compat, results-data validation, before/after read-model diff on the current corpus.\n\nGuardrails: shared core-exec guardrails (see core-exec-d0-vocabulary-adr context); never edit results-data bundles by hand.",
+  "description": "Today the Explorer and corpus identify a run by platform name, so runs that differ only by execution engine (and later by deployment or gateway) merge into one platform: platform_id is the platform name (_project/scripts/explorer_pipeline/models.py:60), the meta-leaderboard keeps each platform's best rank per cohort, corpus identity is platform name (results-data/validate_corpus.py:407-431), and the read model carries only execution_mode sql/dataframe, tuning_mode and tuning_hash.\n\nWork:\n1. Read-model columns execution_engine (requested), execution_engine_applied, gateway and variant_id, derived through the core derive_variant_label (ADR D8), in _project/scripts/explorer_pipeline/{transformer,models,duckdb_builder}.py, mirrored in results-explorer/src/types.ts; bump the read-model version per scripts/publication/check_explorer_compat.py.\n2. Cohort grouping, ranking and labels use variant_id (\"Polars (streaming)\", \"Snowflake via Greybeam\"); the Comparability receipt shows execution engine requested/applied and gateway.\n3. Gateway runs carry ranking_exclusion_reason=\"gateway_routed\" in native cohorts (ADR D9).\n4. Legacy backfill: existing corpus bundles map through the legacy reader (requested=default unless streaming=true); no re-derive of published bytes.\n5. Corpus identity in results-data/validate_corpus.py includes variant_id, with SEED_CORPUS_SPEC.md and CORPUS_NOTES.md updated in the same change.",
+  "links": [
+    "_project/scripts/explorer_pipeline/transformer.py",
+    "_project/scripts/explorer_pipeline/models.py",
+    "_project/scripts/explorer_pipeline/duckdb_builder.py",
+    "results-explorer/src/types.ts",
+    "results-explorer/src/lib/runIdentity.ts",
+    "results-data/validate_corpus.py",
+    "results-data/SEED_CORPUS_SPEC.md",
+    "scripts/publication/check_explorer_compat.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:34:14Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "7eb5d5dd1cdb4b48b96810158ed7efdc",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
+    }
+  ]
+}
