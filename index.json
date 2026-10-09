@@ -5051,8 +5051,7 @@
     "core-exec-polars-matrix-docs-refresh": {
       "claim": null,
       "needs": [
-        "core-exec-polars-cli-mcp-adoption",
-        "pvm-s6-publish-polars-results"
+        "core-exec-polars-cli-mcp-adoption"
       ],
       "priority": "medium",
       "status": "open",
