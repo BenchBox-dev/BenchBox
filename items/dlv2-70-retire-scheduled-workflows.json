@@ -1,12 +1,13 @@
 {
   "acceptance": [
-    "nightly-v2 has passed its dispatched validation plus one scheduled run; job-level parity recorded per deleted workflow",
+    "dlv2-22 is accepted and one scheduled nightly-v2 run has passed; job-level parity is recorded per deleted workflow",
+    "The ruleset drift check, the throughput-uat jobs and every other nightly.yml job without a nightly-v2 equivalent has a home or a recorded drop reason (the three port items are done)",
     "G4 sweep clean",
-    "Workflow inventory table (kept vs deleted, with owner and purpose) committed in the ledger",
+    "Workflow inventory table (kept vs deleted, with owner and purpose) committed in the ledger, with the KEEP list above shown as kept",
     "nightly-v2 runs the Windows unit domain and the liveness domain green before nightly.yml is deleted"
   ],
-  "context": "muse M11: per-domain jobs and labels retained in nightly.",
-  "description": "After nightly-v2 has >=7 green shadow nights and one release has shipped on the new path: delete nightly.yml (old), docker-integration.yml, cross-platform-validation.yml, cross-surface-baseline-autodetect.yml, pricing-data-drift-check.yml, submission-validator-drift-check.yml, corpus-drift-check.yml, and extension-smoke.yml if not already gone; rename nightly-v2.yml to nightly.yml. KEEP: validate-submission.yml, validate-submission-comment.yml, sync-results-data-to-published.yml, corpus-event-bridge.yml, corpus-reconciler.yml, seed-corpus.yml, upload-answers.yml, todo-state-validate.yml, all publication-*.yml.",
+  "context": "muse M11: per-domain jobs and labels retained in nightly.\n\n2026-10-09 tracker review: the old gate of \">=7 green shadow nights\" and \"one release has shipped on the new path\" was replaced; release timing no longer gates this item. Deleting nightly.yml would otherwise end ruleset drift checking (nightly.yml:885) and the CedarDB throughput gate (nightly.yml:707, :804) without a replacement, so those ports are now needs. nightly-v2 also lacks a Windows integration-smoke job and a Python 3.11 Windows leg; nightly-v2-unported-jobs-decision-20261009 covers deciding those. Open PR #2835 adds the nightly-v2 Windows unit and liveness domains. The KEEP list above includes workflows added since this item was written.",
+  "description": "After dlv2-22 is accepted (2-3 green dispatches) and one scheduled nightly-v2 run has passed: delete nightly.yml (old), docker-integration.yml, cross-platform-validation.yml, cross-surface-baseline-autodetect.yml, pricing-data-drift-check.yml, submission-validator-drift-check.yml, corpus-drift-check.yml, and extension-smoke.yml if not already gone; rename nightly-v2.yml to nightly.yml.\n\nBefore nightly.yml is deleted, every job in it must have a home or a recorded drop reason. The known jobs without a nightly-v2 equivalent are the ruleset drift check (nightly.yml:885, see ruleset-drift-check-home-20261009), the throughput-uat jobs (nightly.yml:707 and :804, see nightly-v2-throughput-uat-port-20261009) and the rest listed in nightly-v2-unported-jobs-decision-20261009.\n\nKEEP (do not delete): validate-submission.yml, validate-submission-comment.yml, sync-results-data-to-published.yml, corpus-event-bridge.yml, corpus-reconciler.yml, seed-corpus.yml, upload-answers.yml, todo-state-validate.yml, tpcds-official-qualification.yml, tpcds-platform-identity.yml, tpch-dbgen-intel-macos.yml, soundness-merge-digest.yml, oracle-verdict.yml, and all publication-*.yml (site-split-51 retires the publication-*.yml files, not this item).",
   "sessions": [
     {
       "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
@@ -31,6 +32,14 @@
       "op": "update",
       "op_id": "c4479db8cc3a42d6874b4b0f818256fa",
       "session_id": "e40b1c8674df4499842f44749410458f"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:22:44Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "c80994120035461fa4e74313601377bc",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
