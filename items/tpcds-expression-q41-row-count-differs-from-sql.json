@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Root cause identified and recorded",
+    "Q41 expression row counts equal the SQL reference for the streams that differ today, at a scale where the rows are non-trivial",
+    "A regression test fails on the current code and passes after the fix"
+  ],
+  "context": "Evidence: ~/Developer/benchmark_runs/polars-sf10-pilot-20261009/ (reference-row-counts.json sha256 6906fa56...; q41check/summary.txt; cells/tpcds/2.0.0-A-r*/result.json). Found during the Polars version matrix pilot; the matrix qualification file lists tpcds 1:41 as a known divergence (reference 12, observed 10) so the Polars analysis is not blocked.",
+  "description": "At SF10 on the same generated data, polars-df (expression family) returns 10 rows for TPC-DS Q41 stream 1 and 9 rows for stream 3, while DuckDB SQL returns 12 and 10. Streams 2 and every other TPC-DS query agree. The count is identical on Polars 1.31.0, 1.44.2 and 2.0.0 (default and in-memory engines), so it is not a Polars-version effect; it comes from the expression implementation or its stream parameter binding (benchbox/core/tpcds/dataframe_queries/queries.py q41_expression_impl, _q41_parameters, parameter_adapters.py). The SF0.1 cross-surface gate does not catch it. Find the cause, fix it, and add a regression that compares Q41 row counts with SQL on a bound non-default stream.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c",
+      "at": "2026-10-09T09:11:35Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "4617eb7942c44f2c87c69b1daf95129a",
+      "session_id": "1f74fac6df92445cbacc470514ed2645"
+    }
+  ]
+}
