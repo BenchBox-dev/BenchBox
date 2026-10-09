@@ -5,7 +5,7 @@
     "Stream numbering stays 1..S as decided for the throughput batch.",
     "make comment-policy-check passes."
   ],
-  "context": "Evidence at develop d2deb280e. Dead code today; no runtime impact. Implemented modulo alignment, bundled-qgen first-query checks, and stream-ID coverage. Focused qgen/scanner tests: 681 passed, 1 skipped. PR preflight (before final scanner changes): changed-file Ruff/format and 105 tests passed. Full fast suite: 36,976 passed; one unrelated oracle-review timing test failed, then passed isolated. CI docs passed. The comment-policy runner uses immutable base scanner files, so changing REVIEWED_PROCESS_ARGV in the source PR cannot authorize the new argv in that same PR. Splitting a policy-fixture PR before the code PR; fixture gate pending. Source diff is a soundness path.",
+  "context": "Implemented modulo alignment, explicit stream-ID tests for 0, 1, 2, and 41, bundled-qgen first-query checks for matrix rows 0..2, and TPC-H guide update. The comment-policy runner uses immutable base scanner files; source-level REVIEWED_PROCESS_ARGV changes cannot authorize a new argv in the same PR. Policy fixture PR is staged first with exact stream-source payload digest b5d8dcf930f26fe39448d8a43f321620e011f54372256f44906a9d11deabdd63; its comment-policy gate and preflight are running. The qgen test uses literal `qgen` on PATH to avoid an unnecessary dynamic-executable fixture. Source/code PR and fixture cleanup follow after merges. Source diff is a soundness path.",
   "description": "benchbox/core/tpch/streams.py:234 passes `-p stream_id + 1` to qgen, while the Python permutation path indexes PERMUTATION_MATRIX[stream_id] (streams.py:202). The two paths disagree on which permutation a stream uses. _generate_stream_queries_qgen (line 204) is dead code today, so nothing is wrong at runtime, but it would produce the wrong ordering if wired in. Decide whether to delete the dead method or align the indexing, and prove the choice with a test.",
   "sessions": [
     {
@@ -56,6 +56,14 @@
       "generation": "8bc706b5dd7f48a0bf3e0f28cb2d994f",
       "op": "renew",
       "op_id": "373a6e2c12fd4975bee8894cd429b20e",
+      "session_id": "024527ae77c1405f86cdbdf1079f6e14"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396",
+      "at": "2026-10-09T22:12:12Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "d16377bed6514d55b02005b9a076f371",
       "session_id": "024527ae77c1405f86cdbdf1079f6e14"
     }
   ]
