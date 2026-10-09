@@ -1,12 +1,12 @@
 {
   "acceptance": [
-    "compare gains a documented option for a minimum absolute regression delta, with unit tests for a query that exceeds both limits, one that exceeds only the percentage, and one that exceeds only the delta",
-    "The nightly-v2 perf step uses the option, and the chosen floor is justified from the per-query spread in retained t3-perf-result artifacts",
-    "A real regression (a large slowdown on a long-running query) still fails the gate in a test",
-    "docs for the perf gate describe the floor"
+    "compare gains a documented --min-regression-delta option with unit tests for a query that exceeds both limits, one that exceeds only the percentage, one that exceeds only the delta, and the usage error without --fail-on-regression",
+    "The nightly-v2 perf step and perf-smoke.yml use the option, and the chosen floor and its derivation from retained artifacts are recorded in the PR description",
+    "A large slowdown on a long-running query still fails the gate in a test",
+    "docs/development/perf-smoke.md and the compare CLI reference describe the floor"
   ],
   "context": "Failing queries differ from night to night (2026-10-05 failed on a different set than 2026-10-08), which points to noise rather than a stable slowdown. Checked at plan time: `uv run benchbox compare --help` lists only --fail-on-regression for this purpose.",
-  "description": "The nightly T3 perf gate fails on per-query percentage change alone. In run 37794806634 (2026-10-08) total time improved 20.35% and 19 of 22 queries got faster, but Q8 (9.0 to 11.6 ms, +28.9%) and Q20 (10.0 to 11.9 ms, +19.0%) failed the 10% threshold on a 2 to 3 ms change. `benchbox compare` has no option for a minimum absolute delta, so the gate cannot tell scheduling jitter from a regression at this scale. Raising the threshold to 20% is not enough: Q8 would still fail at +28.9%. Add a minimum absolute delta (for example `--min-regression-delta 5ms`) that a query must exceed, in addition to the percentage, before it counts as a regression, then use it in the nightly-v2 perf step. Choose the floor from retained runs rather than by guess.",
+  "description": "The nightly T3 perf gate and the per-PR Performance Smoke workflow (.github/workflows/perf-smoke.yml) both compare against _project/baselines/perf_smoke_duckdb_tpch_001.json with `--fail-on-regression 10%`, which judges each query by percentage change alone. In nightly run 37794806634 (2026-10-08) total time improved 20.35% and 19 of 22 queries got faster, but Q8 (9.0 to 11.6 ms, +28.9%) and Q20 (10.0 to 11.9 ms, +19.0%) failed on a 2 to 3 ms change. `benchbox compare` has no minimum absolute delta, so it cannot tell scheduling jitter from a regression at this scale. Raising the threshold to 20% is not enough: Q8 would still fail. Add `--min-regression-delta` (a duration such as 5ms or 0.005s, default none so existing callers are unchanged). A per-query comparison then counts as a regression only when it exceeds the percentage threshold and the absolute slowdown exceeds the floor; aggregate metrics stay percentage-only; using the option without --fail-on-regression is a usage error. Use it in the nightly-v2 perf step and perf-smoke.yml. Choose the floor from retained t3-perf-result artifacts: 5 ms unless their per-query run-to-run spread exceeds 4 ms, in which case 1.25 times the largest spread rounded up to whole milliseconds, capped at 15 ms. Update docs/development/perf-smoke.md and the compare CLI reference.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2778"
   ],
@@ -17,6 +17,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "71f81318de884a4eaeb33bee1ca11605",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-09T11:34:49Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "7603149a196d4c3b97eb35e21af11b4c",
       "session_id": "e40b1c8674df4499842f44749410458f"
     }
   ]
