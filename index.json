@@ -1080,15 +1080,10 @@
       "title": "Decision gate G2: add a parity harness comparing the Astro build with the Sphinx site, and require a clean result"
     },
     "astro-site-51-visual-gate-transition": {
-      "claim": {
-        "expires_at": "2026-10-10T23:34:08Z",
-        "generation": "d6144cc51afa44389aa229c5f4a659c6",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Move the required public-site visual check onto the Astro build without weakening it"
     },
     "astro-site-52-site-deploy-integration": {
