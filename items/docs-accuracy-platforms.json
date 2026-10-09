@@ -29,6 +29,17 @@
       "op": "take",
       "op_id": "f31c9ab40d124d8da245499dae6e7cfb",
       "session_id": "fa0a2086385c4c59b2f9016e2e4c8d67"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:c5daffc9eae3c5f9ce6578f7",
+      "at": "2026-10-09T17:12:59Z",
+      "client": "omp-coding-agent",
+      "displaced": "mcp:tbh:joe@joe-mac-mini.local:21221f7d4aecb309187b0c3f",
+      "generation": "f3a4781073c249eb94ca6f2a09f329ef",
+      "op": "takeover",
+      "op_id": "e90c89ee5e304b00b4ce48532919d4ec",
+      "reason": "Taking over the interrupted session 01a1210d-9423-7c91-bcdd-652ba872feca. Its exported log records PID 95729 and that process is no longer present; PR #2823 is already merged, but this claim remains live.",
+      "session_id": "f00fbcc194ab47a6a9508e7176243455"
     }
   ]
 }
