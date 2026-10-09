@@ -1,9 +1,11 @@
 {
   "acceptance": [
     "Absence.detail goes through the same redaction as excerpt()",
-    "parse_reset handles the Claude and Codex reset formats, with tests from captured messages"
+    "parse_reset handles the Claude and Codex reset formats, with tests from captured messages",
+    "A muse quota message and an agy auth message are captured from a real run and added to the calibration tables with tests, or each empty entry is recorded as accepted with the reason"
   ],
-  "description": "Two Low findings deferred on #2769. (1) The Claude auth pattern captures the rest of the error line into Absence.detail, which is published in the report without the credential and long-token redaction that excerpt() applies. (2) parse_reset understands only \"Resets in <duration>\". Claude's \"resets 7:50pm (America/New_York)\" and Codex's \"try again at Oct 9th, 2026 6:08 PM\" leave reset_at empty, so pool blocks are not kept between runs.",
+  "context": "Part (3) was named as a follow-up in the oracle replacement plan of 2026-10-07 (\"calibration tables ... still empty\"); the claude, codex and agy quota entries and the claude, codex and muse auth entries were filled since. agy is disabled (reads_files: false), so its auth entry matters only if agy is re-enabled.",
+  "description": "Two Low findings deferred on #2769, plus one gap left open by the replacement plan. (1) The Claude auth pattern captures the rest of the error line into Absence.detail, which is published in the report without the credential and long-token redaction that excerpt() applies. (2) parse_reset understands only \"Resets in <duration>\". Claude's \"resets 7:50pm (America/New_York)\" and Codex's \"try again at Oct 9th, 2026 6:08 PM\" leave reset_at empty, so pool blocks are not kept between runs. (3) In _project/scripts/oracle_reviewers/absence.py, CALIBRATED_QUOTA_PATTERNS[\"muse\"] and CALIBRATED_AUTH_PATTERNS[\"agy\"] are empty, so a muse quota error or an agy auth error is recorded as a plain error: the chain falls through, but the pool is not blocked until reset and the report does not name the cause.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/pull/2769"
   ],
@@ -14,6 +16,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "9b6bef81501646db86c31f184b4f1f6a",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T12:47:03Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "25e83114bc6d43298fb0d65763b873ce",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
