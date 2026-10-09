@@ -9,7 +9,7 @@
     "Each new test fails under a one-off mutation of its rule; the PR body lists them",
     "Merged through the normal PR flow with an oracle success review of the merged head"
   ],
-  "context": "Found in the completion audit of the oracle protocol on 2026-10-09. The marker size boundary is tracked separately in oracle-marker-patch-map-file-limit-20261009.",
+  "context": "Found in the completion audit of the oracle protocol on 2026-10-09 by a behaviour-by-behaviour test map (37 of 43 named behaviours fully covered, 6 partial, none missing, no vacuous test). The marker size boundary is tracked separately in oracle-marker-patch-map-file-limit-20261009. If the oracle cannot pass this PR, fix Critical/High findings, reply to the rest, and ask the owner for a stand-in naming the exact head SHA; never post one yourself. Three DO NOT SHIP decisions on one PR mean opening a new PR.",
   "description": "A behaviour-by-behaviour audit of the oracle protocol tests on develop e7eb5ce7e found every named behaviour implemented and most covered, with these gaps:\n1. A malformed or repeated marker makes the plan return `hold` (tested), but the finalize step that turns `hold` into a pending status (`cli.command_finalize`) is not: test_attempts.py::test_cli_finalize_fixed_decisions covers only `success` and `fork`.\n2. test_cli_plan.py::test_more_than_a_hundred_reviews_are_all_read replaces github.oracle_reviews with a fake that returns 151 reviews, so nothing tests that the real call pages (`get_paginated`, `--paginate --slurp` in github.py).\n3. The cap of 5 on defects listed as \"not counted\" (protocol.NOT_COUNTED_LIMIT) is not tested; the only test uses one such defect.\n4. No test forces a status description over 140 characters through report._clip.\n5. test_runner.py::test_a_follow_up_missing_a_prior_status_is_recorded_for_the_judge passes a status through and never omits one; its name overstates it (the real coverage is test_rounds.py::test_a_prior_defect_with_no_status_stays_open).\n6. The #2769 replay uses synthetic prior statuses and checks the planner and judge, not the posted review bodies.\n\nThe marker size boundary is tracked separately in oracle-marker-patch-map-file-limit-20261009.\n\nGuardrails.\n- Tests only: no behaviour change in _project/scripts/. If a new test exposes a real defect, stop, file it as its own item, and mark the test `xfail(strict=True)` with the item id only if the owner agrees.\n- Every new test must be able to fail: check each with a one-off mutation of the rule it covers and list the mutations in the PR body. No test may assert only that code runs.\n- Worktree via `make worktree-create` and `make agent-write-preflight`; identity Joe Harris <joeharris76@gmail.com>; explicit staging; no comments or docstrings; `make comment-policy-check`.\n- May ship in one PR with oracle-oversize-pr-pending-loop-20261009, oracle-post-guard-reread-retry-20261009 and oracle-marker-patch-map-file-limit-20261009.\n\nDecision gate. Gap 6 (replay of posted bodies) is optional: do it only if it fits without a new fixture format; otherwise record in this item why it was left.",
   "links": [
     "tests/unit/scripts/oracle_reviewers/test_cli_plan.py",
@@ -32,6 +32,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "be78a955a8d9461482b23d0aed5597c6",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T13:19:09Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "f1d303784df2411aabbd00634b718cda",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
