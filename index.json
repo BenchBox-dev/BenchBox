@@ -20223,7 +20223,7 @@
       "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "blocked",
+      "status": "dropped",
       "title": "Swap CI skill-sync verify from github-sha pin to npm version"
     },
     "skill-sync-skills-lock-invariant-check": {
