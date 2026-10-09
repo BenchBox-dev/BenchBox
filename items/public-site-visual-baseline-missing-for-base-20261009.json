@@ -1,11 +1,11 @@
 {
   "acceptance": [
-    "Root cause recorded (when the baseline is built and why it was missing for these bases)",
-    "A PR based on a commit with no baseline yet no longer reports a plain failure, or a decision to keep the failure with the reason",
+    "A PR based on a commit whose baseline is still being built no longer reports a plain failure (it waits, falls back to a site-equivalent ancestor, or reports pending), or a decision to keep the failure is recorded with the reason",
+    "Any fallback uses only site-equivalent ancestors, with a test or recorded run showing a non-equivalent ancestor is not used",
     "Any workflow change merged through the normal PR flow"
   ],
-  "context": "Documentation recovery run 37996877154 successfully built the protected baseline for base SHA d6b966b486bcd60dcbc047df232c8d2f0ca9a9a8. PR #2835 then compared against that baseline and found four changed getting-started captures at widths 390, 768, 1280 and 1600; the missing-baseline symptom is resolved, but visual approval or an in-scope docs fix remains.",
-  "description": "\"Public-site visual regression\" failed on #2831 (run 37961549887, job 113945316700) and on #2823 with \"Error: No unexpired protected public-site visual baseline is bound to base SHA 08cf03c5eb8a... or a site-equivalent ancestor\" (results-explorer/scripts/download-public-site-visual-baseline.mjs:50). Among the 10 most recently merged PRs on 2026-10-09, 2 failed this way, 6 passed and 2 skipped. The base commits were fresh develop commits whose baseline had not been built yet, likely because the job that builds it was still queued (see actions-runner-queue-oracle-latency-20261009). The check is not required, so it does not block merges, but it teaches people to ignore a red check.\n\nInvestigate how and when the baseline for a develop commit is produced, and decide one of:\n- fall back to the newest available ancestor baseline when none is bound to the base;\n- wait for the baseline;\n- report \"baseline pending\" as a neutral or skipped result instead of a failure.\n\nGuardrails. Do not weaken the visual comparison itself. Related: astro-site-51-visual-gate-transition.",
+  "context": "Documentation recovery run 37996877154 successfully built the protected baseline for base SHA d6b966b486bcd60dcbc047df232c8d2f0ca9a9a8. PR #2835 then compared against that baseline and found four changed getting-started captures at widths 390, 768, 1280 and 1600; the missing-baseline symptom is resolved, but visual approval or an in-scope docs fix remains.\n\n2026-10-09 tracker review: root cause verified and recorded in the description (acceptance 1 of the old list is met). Base 08cf03c5e's Documentation push run 37961232034 ran 16:44-18:05 UTC while visual job 113945316700 ran 17:40-17:44 UTC. The ancestor fallback rarely helps because SITE_PATHS includes all of scripts/. The wait knob exists but is not set in ci.yml:1687-1696.",
+  "description": "\"Public-site visual regression\" failed on #2831 (run 37961549887, job 113945316700) and on #2823 with \"Error: No unexpired protected public-site visual baseline is bound to base SHA 08cf03c5eb8a... or a site-equivalent ancestor\" (results-explorer/scripts/download-public-site-visual-baseline.mjs:50). Among the 10 most recently merged PRs on 2026-10-09, 2 failed this way, 6 passed and 2 skipped. The check is not required, so it does not block merges, but it teaches people to ignore a red check.\n\nRoot cause (verified): the baseline for base 08cf03c5e is built by the Documentation push run 37961232034, which ran 16:44-18:05 UTC. The failing visual job 113945316700 ran 17:40-17:44 UTC, before that baseline existed. The long Documentation run is itself partly queue delay (see actions-runner-queue-oracle-latency-20261009).\n\nThe site-equivalent-ancestor fallback (the `baseline_candidates` loop in .github/workflows/docs.yml, lines 89-94) rarely helps. It walks first-parent ancestors only while the diff to the base is empty over SITE_PATHS, and SITE_PATHS includes all of scripts/ (docs.yml:74-80), so almost any develop commit breaks equivalence. The wait knob PUBLIC_SITE_VISUAL_BASELINE_WAIT_SECONDS (download-public-site-visual-baseline.mjs:16, default 0) is not set in the job's env in ci.yml:1687-1696.\n\nOptions:\n- set PUBLIC_SITE_VISUAL_BASELINE_WAIT_SECONDS in ci.yml so the job waits for the baseline;\n- narrow SITE_PATHS (for example scripts/ to the files the site build actually reads) so the ancestor fallback finds a candidate;\n- report \"baseline pending\" as a neutral or skipped result instead of a failure.\n\nGuardrails. Do not weaken the visual comparison itself. A fallback to the \"newest available ancestor\" must stay site-equivalent (no diff over the site paths between that ancestor and the base); otherwise the comparison would be made against a different site. Related: astro-site-51-visual-gate-transition.",
   "links": [
     "results-explorer/scripts/download-public-site-visual-baseline.mjs"
   ],
@@ -25,6 +25,14 @@
       "op": "update",
       "op_id": "a6e22022c81842baabbf49d91712d30d",
       "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:34:13Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "622582cd22604e54b4359f81dbaa597f",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
