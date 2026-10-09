@@ -123,13 +123,14 @@ BenchBox also supports benchmarking DataFrame libraries using their native APIs.
 ### Quick Start with DataFrames
 
 ```bash
+uv add benchbox --extra polars
 uv run -- benchbox run --platform polars-df --benchmark tpch --scale 0.01
 
 uv add benchbox --extra pandas
 uv run -- benchbox run --platform pandas-df --benchmark tpch --scale 0.01
 ```
 
-Polars is included in the base install. Pandas requires an extra.
+Polars and pandas each require an extra (`polars` and `pandas`); neither ships in the base install.
 
 ### Compare SQL vs DataFrame
 
