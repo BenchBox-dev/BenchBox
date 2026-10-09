@@ -4,6 +4,7 @@
     "A decision on credential concurrency is recorded, or the groups are restored",
     "The stand-in window behaviour on pending reviews is decided and documented"
   ],
+  "context": "Part (1) is done in #2798 (merged 2026-10-09, 7b639aba1): the runner hashes the staged diff before and after a review and records the reviewer as invalid when it changed, with a test. Parts (2), credential concurrency, and (3), the stand-in window on pending reviews, remain open.",
   "description": "Low findings deferred on #2769: (1) stage_pull_request_diff adds .oracle-pull-request.diff to info/exclude, so the post-review `git status` integrity check cannot see a reviewer rewrite it; hash it before and after the run, or stage it outside the checkout. (2) Removing the per-credential concurrency groups lets runs for different pull requests use one reviewer credential at the same time. (3) The stand-in window ignores later pending or integrity-withheld oracle reviews.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/pull/2769"
@@ -15,6 +16,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "0abdc9b772a8420db7dd38ca43816178",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T03:43:53Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "8175eb4ae58942f389e1de6e659bbf57",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
