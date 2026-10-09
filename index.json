@@ -3986,12 +3986,17 @@
       "title": "Pilot safe deletion and approve module batch and review budgets"
     },
     "comment-cleanup-platform-base": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:28:13Z",
+        "generation": "a485a7d4cce641d1bbbb85cc6420f2d5",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from base SQL adapter support"
     },
     "comment-cleanup-platform-registry": {
