@@ -7618,7 +7618,9 @@
       "claim": null,
       "needs": [
         "dlv2-22-nightly-t3-shadow",
-        "dlv2-f3-flip-window"
+        "dlv2-f3-flip-window",
+        "nightly-v2-liveness-port-20261008",
+        "nightly-v2-windows-unit-leg-20261009"
       ],
       "priority": "medium-high",
       "status": "open",

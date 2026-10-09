@@ -2,7 +2,8 @@
   "acceptance": [
     "nightly-v2 has passed its dispatched validation plus one scheduled run; job-level parity recorded per deleted workflow",
     "G4 sweep clean",
-    "Workflow inventory table (kept vs deleted, with owner and purpose) committed in the ledger"
+    "Workflow inventory table (kept vs deleted, with owner and purpose) committed in the ledger",
+    "nightly-v2 runs the Windows unit domain and the liveness domain green before nightly.yml is deleted"
   ],
   "context": "muse M11: per-domain jobs and labels retained in nightly.",
   "description": "After nightly-v2 has >=7 green shadow nights and one release has shipped on the new path: delete nightly.yml (old), docker-integration.yml, cross-platform-validation.yml, cross-surface-baseline-autodetect.yml, pricing-data-drift-check.yml, submission-validator-drift-check.yml, corpus-drift-check.yml, and extension-smoke.yml if not already gone; rename nightly-v2.yml to nightly.yml. KEEP: validate-submission.yml, validate-submission-comment.yml, sync-results-data-to-published.yml, corpus-event-bridge.yml, corpus-reconciler.yml, seed-corpus.yml, upload-answers.yml, todo-state-validate.yml, all publication-*.yml.",
@@ -22,6 +23,14 @@
       "op": "update",
       "op_id": "35199ae78fe341fa98b39a28b3af982c",
       "session_id": "ebb0f23e7526462c929aaf5d2651ef0a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-09T15:07:55Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "c4479db8cc3a42d6874b4b0f818256fa",
+      "session_id": "e40b1c8674df4499842f44749410458f"
     }
   ]
 }
