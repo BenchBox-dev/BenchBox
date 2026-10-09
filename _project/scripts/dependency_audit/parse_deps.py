@@ -9,7 +9,7 @@ from collections import defaultdict
 
 _HERE = pathlib.Path(__file__).resolve().parent
 _ROOT = _HERE.parents[2]
-_OUT_REL = "docs/development/dependency-audit-raw.md"
+_OUT_REL = "docs/internal/dependency-audit-raw.md"
 _GENERATOR_REL = "_project/scripts/dependency_audit/parse_deps.py"
 
 

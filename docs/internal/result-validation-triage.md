@@ -3,7 +3,7 @@
 When the nightly cross-platform validation workflow fails, this runbook
 walks you from raw GitHub artifact to resolution.
 
-See also: [Cross-Platform Result Validation](result-validation.md) for
+See also: [Cross-Platform Result Validation](../development/result-validation.md) for
 background on the comparator and tolerance model.
 
 ## 1. Locate the failure
