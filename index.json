@@ -19598,17 +19598,12 @@
       "title": "Build the Node deploy plane in the site repo: resolve, gates, Pages deploy, probes, receipts, rollback"
     },
     "site-split-24-blog-drafts": {
-      "claim": {
-        "expires_at": "2026-10-10T04:47:32Z",
-        "generation": "2b3d662616174585be124f31efe6c75d",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de"
-      },
+      "claim": null,
       "needs": [
         "site-split-20-seed-site-repo"
       ],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Re-evaluate every blog draft asset and port chart rendering to a pinned external CLI call"
     },
     "site-split-25-shadow-parity": {
