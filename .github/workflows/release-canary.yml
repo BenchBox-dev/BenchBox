@@ -305,11 +305,6 @@ jobs:
       drift_exit_code: ${{ steps.drift.outputs.drift_exit_code }}
       drift_sha: ${{ steps.drift-ref.outputs.drift_sha }}
     steps:
-      # This job stays independent of the collection job on purpose: ruleset
-      # drift is config evidence worth having even on a run whose test
-      # collection failed. It therefore resolves `develop` itself and can land
-      # on a later commit than the suite, so it records its own checked SHA
-      # rather than letting the summary attribute it to the suite's commit.
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
