@@ -3460,12 +3460,17 @@
       "title": "Remove comments and docstrings from CLI command modules"
     },
     "comment-cleanup-cli-foundation": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:07:34Z",
+        "generation": "2371546ddd9e4c3da11cae30c6119094",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from CLI foundation and presentation"
     },
     "comment-cleanup-clickbench": {
