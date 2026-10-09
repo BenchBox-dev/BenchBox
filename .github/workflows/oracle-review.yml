@@ -92,7 +92,7 @@ jobs:
           if [ "$EVENT_NAME" = workflow_dispatch ]; then
             check_dispatch_head
           fi
-          python _project/scripts/oracle_review_check.py --repo "$REPO" --pr "$PR_NUMBER"
+          python _project/scripts/oracle_review_check.py --repo "$REPO" --pr "$PR_NUMBER" --signal oracle
           if [ "$EVENT_NAME" = workflow_dispatch ]; then
             check_dispatch_head
           fi

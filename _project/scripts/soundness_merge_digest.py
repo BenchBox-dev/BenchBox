@@ -141,16 +141,21 @@ class Entry:
         return tuple(reasons)
 
 
-def _oracle_success(evidence: PullEvidence) -> bool:
+def _latest_oracle_review(evidence: PullEvidence, shas: frozenset[str] | set[str]) -> Review | None:
     candidates = [
         review
         for review in evidence.reviews
         if review.login == f"{ORACLE_LOGIN}[bot]"
         and review.user_type == "Bot"
-        and review.commit_sha in evidence.content_shas
+        and review.state not in ("PENDING", "DISMISSED")
+        and review.commit_sha in shas
         and evidence.base_changed_at < review.submitted_at <= evidence.merged_at
     ]
-    latest = max(candidates, key=lambda review: review.submitted_at, default=None)
+    return max(candidates, key=lambda review: review.submitted_at, default=None)
+
+
+def _oracle_success(evidence: PullEvidence) -> bool:
+    latest = _latest_oracle_review(evidence, set(evidence.content_shas))
     verdict = _ORACLE_VERDICT.match(latest.body) if latest else None
     return (
         latest is not None
@@ -179,6 +184,8 @@ def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
         signals.append("oracle-review")
     if any(r.login in CONNECTOR_LOGINS and r.content == "+1" and in_window(r.created_at) for r in evidence.reactions):
         signals.append("connector-approval")
+    head_verdict = _latest_oracle_review(evidence, {evidence.commits[-1].sha}) if evidence.commits else None
+    standin_after = max(evidence.base_changed_at, head_verdict.submitted_at if head_verdict else "")
     for comment in evidence.comments:
         match = EXTERNAL_REVIEW_PATTERN.search(comment.body)
         if match and in_window(comment.created_at):
@@ -187,7 +194,7 @@ def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
             comment.login in STANDIN_ATTESTERS
             and comment.user_type == "User"
             and comment.updated_at in (None, comment.created_at)
-            and evidence.base_changed_at < comment.created_at <= evidence.merged_at
+            and standin_after < comment.created_at <= evidence.merged_at
             and evidence.commits[-1].sha in _attested_shas({"body": comment.body})
         ):
             signals.append("stand-in")

@@ -73,10 +73,15 @@ def test_gate_changes_are_very_high(policy: Policy, path: str) -> None:
     assert _classify(policy, _file(path, 1)).tier == "very-high"
 
 
+def test_every_gate_path_is_a_soundness_path_in_the_manifest(policy: Policy) -> None:
+    samples = [pattern.replace("*", "selection.py") for pattern in policy.classifier.gate_paths]
+    assert ".github/oracle-reviewers.yml" in samples and "_project/scripts/oracle_reviewers/selection.py" in samples
+    assert [path for path in samples if not is_soundness_path(path)] == []
+
+
 def test_gate_files_missing_from_the_manifest_are_still_in_scope(policy: Policy) -> None:
     for path in (".github/oracle-reviewers.yml", "_project/scripts/oracle_reviewers/selection.py"):
-        assert not is_soundness_path(path) or path.startswith(".github/workflows/")
-        result = _classify(policy, _file(path, 1))
+        result = classify([_file(path, 1)], (), policy, lambda _path: False)
         assert result.soundness is True
         assert result.tier == "very-high"
 

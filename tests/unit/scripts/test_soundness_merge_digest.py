@@ -1001,3 +1001,17 @@ def test_only_the_latest_oracle_verdict_after_a_retarget_counts():
     assert digest.review_signals(evidence(reviews=(failure, success), base_changed_at=AFTER)) == ()
     later_success = review(ORACLE_BOT, HEAD, AFTER, user_type="Bot", body=oracle_verdict(HEAD))
     assert digest.review_signals(evidence(reviews=(later_success,), base_changed_at=PUSHED)) == ("oracle-review",)
+
+
+def test_a_dismissed_or_pending_oracle_review_does_not_count():
+    for state in ("DISMISSED", "PENDING"):
+        dismissed = review(ORACLE_BOT, HEAD, state=state, user_type="Bot", body=oracle_verdict(HEAD))
+        assert digest.review_signals(evidence(reviews=(dismissed,))) == ()
+
+
+def test_a_standin_must_follow_the_latest_oracle_verdict_on_the_merged_head():
+    failure = review(ORACLE_BOT, HEAD, AFTER, user_type="Bot", body=oracle_verdict(HEAD, "failure"))
+    early = standin(HEAD, at=PUSHED)
+    assert digest.review_signals(evidence(reviews=(failure,), comments=(early,))) == ()
+    late = standin(HEAD, at=AFTER_REFRESH)
+    assert digest.review_signals(evidence(reviews=(failure,), comments=(late,))) == ("stand-in",)

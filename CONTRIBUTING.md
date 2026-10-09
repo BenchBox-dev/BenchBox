@@ -49,7 +49,7 @@ This document provides guidelines and instructions for contributing.
 
 `develop` is the long-lived development branch and the repository's default branch; **all changes land via PR**. `release` is release-only (handled by the version-branch flow — see `docs/operations/release-guide.md`). PRs target `develop` and squash-merge with linear history.
 
-Required CI on `develop` reports six unit results (`core`, `explorer`, `results-data`, `docs`, `landing`, `tooling`) from `.github/workflows/ci.yml`, plus `oracle-review`, which passes on a result-affecting PR only when the Codex connector app has reviewed or thumbed up its current head (or, when the connector cannot review, a listed attester has posted the stand-in approval for that head) and its threads are resolved. `.github/ci-units.yml` and `.github/path-filters.yml` classify each PR: content-only PRs run content validation and skip Python fast tests, while code, infra, workflow, tooling, and unknown paths run the lint/type + Ubuntu 3.12 fast-test checks. Soundness-path review applies even when the author uses the owner's account; once a finished branch is armed, auto-merge lands it when required checks are green and all review threads are resolved.
+Required CI on `develop` reports six unit results (`core`, `explorer`, `results-data`, `docs`, `landing`, `tooling`) from `.github/workflows/ci.yml`, plus `oracle-review`, which passes on a result-affecting PR only when the `benchbox-oracle` app's latest review of its current head reports success (or a listed attester has posted the stand-in approval for that head) and the oracle's threads are resolved. `.github/ci-units.yml` and `.github/path-filters.yml` classify each PR: content-only PRs run content validation and skip Python fast tests, while code, infra, workflow, tooling, and unknown paths run the lint/type + Ubuntu 3.12 fast-test checks. Soundness-path review applies even when the author uses the owner's account; once a finished branch is armed, auto-merge lands it when required checks are green and all review threads are resolved.
 
 ## Development Workflow
 
@@ -110,7 +110,7 @@ The canonical loop is **branch → edit → preflight → `make pr-open` → arm
    `make pr-arm` reads the live PR first, so a `no-auto-merge` label or a requested change stops it instead of
    being mistaken for a failing check; remove a hold deliberately to release it. Before editing an armed PR,
    withdraw it with the revision transaction (`make pr-landing-withdraw`, see `docs/agent/review-protocol.md`),
-   push the correction, rerun CI and obtain the connector's review or thumbs-up (or the stand-in approval) on the new head before arming:
+   push the correction, rerun CI and obtain the oracle's success review (or the stand-in approval) on the new head before arming:
    a later `--match-head-commit` cannot undo a merge of the old head.
    `make pr-ready PR=<n> HEAD=<sha>` arms an open PR through `make pr-arm`. With `EVIDENCE` or `BATCH` it runs the
    readiness evidence transaction used to deliver a prepared batch, where the evidence file must declare

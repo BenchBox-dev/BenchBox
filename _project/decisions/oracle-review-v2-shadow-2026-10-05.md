@@ -122,3 +122,10 @@ required check, retires the connector, adds the gate files to
 ID in the ruleset. Renaming the status context also needs `ORACLE_CONTEXT` in
 `_project/scripts/oracle_review_check.py` changed to match; a test enforces
 it. Findings already go to review threads from the parity period.
+
+2026-10-07: the cut-over took effect. `.github/oracle-reviewers.yml` sets
+`mode: enforce`, and `oracle-review` passes `--signal oracle`, so the check
+requires the `benchbox-oracle` App's success review of the head and no
+unresolved App thread. The connector's result is still logged on `parity:`
+lines. The connector App is uninstalled separately; the soundness-path and
+ruleset steps above remain separate changes.

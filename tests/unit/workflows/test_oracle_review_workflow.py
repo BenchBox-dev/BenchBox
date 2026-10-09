@@ -221,7 +221,15 @@ def test_dispatch_checks_current_head_around_every_checker_success(tmp_path: Pat
     assert outputs["base_sha"] == BASE
     assert json.loads(outputs["snapshot"])["headRefOid"] == HEAD
     assert (tmp_path / "gh-count").read_text() == "3"
-    assert json.loads((tmp_path / "checker-call").read_text()) == [SCRIPT, "--repo", REPO, "--pr", "7"]
+    assert json.loads((tmp_path / "checker-call").read_text()) == [
+        SCRIPT,
+        "--repo",
+        REPO,
+        "--pr",
+        "7",
+        "--signal",
+        "oracle",
+    ]
     assert message in result.stdout
 
 
@@ -326,4 +334,12 @@ def test_pull_request_events_do_not_use_dispatch_guards(tmp_path: Path) -> None:
     result = _run_step(tmp_path, check, env)
     assert result.returncode == 0, result.stderr
     assert not (tmp_path / "gh-count").exists()
-    assert json.loads((tmp_path / "checker-call").read_text()) == [SCRIPT, "--repo", REPO, "--pr", "7"]
+    assert json.loads((tmp_path / "checker-call").read_text()) == [
+        SCRIPT,
+        "--repo",
+        REPO,
+        "--pr",
+        "7",
+        "--signal",
+        "oracle",
+    ]
