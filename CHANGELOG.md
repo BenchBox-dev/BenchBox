@@ -129,6 +129,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Decision record for core execution-variant settings.** A new ADR,
+  `docs/development/adr/adr-core-execution-variants.md`, defines the
+  platform-neutral settings `execution_engine`, `compute_resource`,
+  `compute_size` and `gateway`, how results record and identify them, and how
+  existing platform-specific keys such as Polars `streaming` and Databend
+  `warehouse` become deprecated aliases. Documentation only; no behavior
+  changes yet.
 - **Curated ClickHouse tuning templates.** TPC-H, SSB, and TPC-DS ship tuned
   templates for ClickHouse, so `--tuning tuned` there applies sort keys and
   partitions instead of falling back to session settings.
