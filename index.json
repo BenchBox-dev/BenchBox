@@ -7672,15 +7672,10 @@
       "title": "Clarify Phase path and compat check wording"
     },
     "docs-reference-contract-pages-decision": {
-      "claim": {
-        "expires_at": "2026-10-10T00:49:56Z",
-        "generation": "2e1b430be245402999eb66578e7b887c",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:a9f51c620a99fea6b166f0af"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Decide whether public-contracts and hosted-results-contract stay published"
     },
     "docs-rewrite-architecture-and-structure": {
