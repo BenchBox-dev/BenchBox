@@ -15516,7 +15516,7 @@
         "pvm-s4-run-polars-matrix"
       ],
       "priority": "medium-high",
-      "status": "blocked",
+      "status": "open",
       "title": "Analyze the Polars matrix: engine-separated 2.0 vs 1.x results with disclosed limits"
     },
     "pvm-s6-publish-polars-results": {
