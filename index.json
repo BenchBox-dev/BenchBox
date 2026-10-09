@@ -13989,10 +13989,12 @@
     },
     "oracle-marker-patch-map-file-limit-20261009": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "oracle-followup-read-bypass-out-of-scope-defect-20261009"
+      ],
       "priority": "low",
       "status": "open",
-      "title": "The oracle's protocol marker keeps its per-file patch map only up to about 200 files, not 300 as #2784 claims"
+      "title": "Pin and document the oracle marker's patch-map limit of about 200 files"
     },
     "oracle-merged-pr-descriptions-stale-20261009": {
       "claim": null,

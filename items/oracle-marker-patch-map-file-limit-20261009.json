@@ -1,12 +1,13 @@
 {
   "acceptance": [
-    "A decision: raise the capacity to at least 300 files, or accept the current limit with the reason",
-    "A test pins the boundary (largest file count that keeps the map, and the next size up falls back to the digest)",
-    "docs/operations/oracle-review-v2.md states the file count above which follow-ups become full reviews",
-    "The #2784 description's 300-file claim is corrected, or a correcting comment is posted on #2784"
+    "A test asserts the patch map is kept at the largest fitting file count and dropped (digest only) one step above, for the worst-case record",
+    "The test fails if MARKER_LIMIT or the per-entry size changes enough to move the boundary (checked by a one-off mutation, noted in the PR body)",
+    "docs/operations/oracle-review-v2.md states the approximate limit and its effect on follow-ups",
+    "No change to _project/scripts/oracle_reviewers/protocol.py",
+    "Merged through the normal PR flow with an oracle success review of the merged head"
   ],
-  "context": "Found in the completion audit of the oracle protocol on 2026-10-09. Probe: encode_marker over protocol.patch_map of N synthetic paths benchbox/core/equivalence/file_NNNN.py with sha256 patch hashes.",
-  "description": "The hidden `oracle-protocol` marker is capped at 4096 bytes (protocol.MARKER_LIMIT). Above the cap, encode_marker keeps only the aggregate patch digest and drops the per-file patch map. Without the map, changed_paths treats every file as changed, so the next round after SHIP or SHIP WITH FIXES is a full review rather than one scoped to changed files. That fails safe but costs reviewer time and can count defects in files the author never touched.\n\nMeasured on develop e7eb5ce7e with a 10-defect record and 200-character titles (the test's shape): the map is kept up to 200 files, and up to 210 with no open defects. The merged #2784 description says \"A 300-file marker fits with its patch map; a 1000-file one keeps only the digest\", and the handoff asked for a 300-file test; the tests cover only 100 files (map kept) and 1000 files (digest only), so nothing pins the real boundary.\n\nOptions: shorten what each entry stores (the 8-hex path hash plus 16-hex patch hash dominate, and random hex compresses poorly), raise the cap if GitHub review bodies allow it, or accept the limit and document it.",
+  "context": "Found in the completion audit of the oracle protocol on 2026-10-09. Probe: encode_marker over protocol.patch_map of N synthetic paths benchbox/core/equivalence/file_NNNN.py with sha256 patch hashes; boundary 200 files with 10 open defects, 210 with none. Owner chose accept-and-document on 2026-10-09.",
+  "description": "Problem. The hidden `oracle-protocol` marker is capped at 4096 bytes (protocol.MARKER_LIMIT). Above the cap, encode_marker keeps only the aggregate patch digest and drops the per-file patch map. Without the map, changed_paths treats every file as changed, so the next round after SHIP or SHIP WITH FIXES is a full review rather than one scoped to changed files. That fails safe but costs reviewer time and can count defects in files the author never touched.\n\nMeasured on develop e7eb5ce7e with a 10-defect record and 200-character titles (the test's shape): the map is kept up to 200 files, and up to 210 with no open defects. The tests cover only 100 files (map kept) and 1000 files (digest only), so nothing pins the real boundary. The merged #2784 description claims 300 files; that correction is tracked in oracle-merged-pr-descriptions-stale-20261009.\n\nDecision (owner, 2026-10-09). Accept the limit and document it; do not raise the capacity.\n\nRequired change.\n- A test pins the boundary for the worst-case record (10 open defects, 200-character titles): the largest file count that keeps the map does keep it, and the next step up keeps only the digest. Compute the boundary in the test from the record shape rather than hard-coding a number that drifts.\n- docs/operations/oracle-review-v2.md states that pull requests with more than about 200 changed files (fewer when many defects are open) get full follow-up reviews instead of scoped ones, and why.\n\nOut of scope. Changing PATCH_HEX, MARKER_LIMIT, or the marker format.\n\nGuardrails.\n- Never weaken the required `oracle-review` check. No change to protocol.py behaviour.\n- Worktree via `make worktree-create` and `make agent-write-preflight`; identity Joe Harris <joeharris76@gmail.com>; explicit staging; no comments or docstrings; `make comment-policy-check`.\n- May ship in one PR with oracle-oversize-pr-pending-loop-20261009, oracle-post-guard-reread-retry-20261009 and oracle-protocol-test-gaps-20261009.\n\nDecision gate. None remaining.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/pull/2784",
     "_project/scripts/oracle_reviewers/protocol.py",
@@ -19,6 +20,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "bc625541ff1a420195b3f21c6884aff9",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T13:15:00Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "7ef28f04cf4b448db9150c8e69cec944",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
