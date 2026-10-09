@@ -192,6 +192,22 @@ def test_row_count_mismatch_fails_the_comparison() -> None:
     assert any("answers differ" in finding for finding in verdict["findings"])
 
 
+def test_unstable_answers_in_both_identical_arms_fail_calibration_once_per_query() -> None:
+    class UnstableSeam(FakeSeam):
+        def run_query(
+            self, handle: ArmHandle, connection: Any, query_id: str, sql: str, timeout_seconds: float
+        ) -> QueryOutcome:
+            outcome = super().run_query(handle, connection, query_id, sql, timeout_seconds)
+            if query_id == "2" and self.counter > 2 * len(QUERIES):
+                return replace(outcome, rows=9, checksum="sum-9")
+            return outcome
+
+    payload, _ = run(make_config(("A=notuning", "B=notuning"), calibration_arm="B"), UnstableSeam())
+    calibration = payload["results"]["calibration"]
+    assert calibration["passed"] is False
+    assert "answers differ between identical arms: ['2']" in calibration["reasons"]
+
+
 def test_check_answers_compares_rows_and_checksums() -> None:
     def execution(arm: str, query: str, rows: int, checksum: str | None, ok: bool = True) -> dict[str, Any]:
         return {

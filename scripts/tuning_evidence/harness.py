@@ -772,7 +772,10 @@ def build_results(payload: Mapping[str, Any], config: HarnessConfig) -> dict[str
         checked = stats.calibration_check(
             comparisons[config.calibration_arm],
             config.thresholds,
-            answer_mismatches=mismatched.get(config.calibration_arm, []) + mismatched.get(config.baseline, []),
+            answer_mismatches=sorted(
+                set(mismatched.get(config.calibration_arm, [])) | set(mismatched.get(config.baseline, [])),
+                key=stats.query_sort_key,
+            ),
             unsettled_arms=_unsettled(payload, pair),
             blockers=run_blockers
             + [blocker for blocker in _arm_blockers(payload, pair) if "not settled" not in blocker],
