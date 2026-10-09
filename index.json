@@ -5011,12 +5011,17 @@
       "title": "Make Explorer and corpus identity distinguish execution engine, deployment and gateway variants"
     },
     "core-exec-framework-manifest": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T20:09:36Z",
+        "generation": "7c1893dd7201468489a9c661b59f6b9f",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3"
+      },
       "needs": [
         "core-exec-d0-vocabulary-adr"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Add the core execution-engine module and manifest capability, with a vocabulary parity test"
     },
     "core-exec-gateway-capability": {
