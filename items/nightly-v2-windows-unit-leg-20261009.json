@@ -1,13 +1,17 @@
 {
   "acceptance": [
     "nightly-v2 has a Windows unit domain with a label and report wiring, covered by the nightly-v2 workflow tests",
+    "The domain timeout is sized from a no-coverage Windows 3.12 fast-tier run, with the measured duration and margin recorded in the PR",
+    "The Windows 3.12 fast tier completes without a stall in 3 consecutive runs",
+    "tests/ test_nightly_t3_workflow passes on Windows",
     "A dispatched nightly-v2 run on develop shows the domain passing",
-    "dlv2-70 lists this item in needs"
+    "Issue #2568 is closed with a link to the green t3:windows run"
   ],
-  "context": "PR #2835 contains the Windows unit domain and current-head oracle checks pass, but its visual comparison reports four changed getting-started captures. Follow-up nightly-windows-pr-visual-approval-20261009 owns the merge gate; after merge, nightly-windows-verification-run-20261009 owns the remaining nightly-v2 dispatch and acceptance evidence.",
-  "description": "Decision recorded by nightly-windows-unit-coverage-decision-20261008: nightly-v2 keeps Windows unit coverage. Add a T3 domain that runs the fast unit tier on windows-latest with Python 3.12 only (3.11 duplicates it), with its own issue label like the other domains and no continue-on-error, and add it to the report job and the domain loop. Size the timeout from the Windows 'Run fast tests' duration in the latest legacy nightly. Do this after the Windows fixes pass, so the new domain does not start red. dlv2-70 must not delete nightly.yml until this domain has run green in a dispatched nightly-v2 run.",
+  "context": "PR #2835 contains the Windows unit domain and current-head oracle checks pass, but its visual comparison reports four changed getting-started captures. Follow-up nightly-windows-pr-visual-approval-20261009 owns the merge gate; after merge, nightly-windows-verification-run-20261009 owns the remaining nightly-v2 dispatch and acceptance evidence.\n\n2026-10-09 tracker review: PR #2835 adds t3:windows (Python 3.12, 50-minute timeout, no coverage). Run 37967682464 spent 47.7 minutes in the Windows 3.12 fast-test step with coverage. Needs changed: nightly-windows-path-quoting-20261008 is being closed (its remaining test_nightly_t3_workflow work moved here); added windows-iceberg-vacuum-local-paths-20261009, windows-session-lock-holder-readable-20261009, windows-pytest-xdist-teardown-hang-20261009 and agent-write-preflight-quoted-interpreter-20261009. Closing issue #2568 moved here from nightly-windows-unquarantine-20261008. The \"dlv2-70 lists this item\" criterion is already met and was removed.",
+  "description": "Decision recorded by nightly-windows-unit-coverage-decision-20261008: nightly-v2 keeps Windows unit coverage. Add a T3 domain that runs the fast unit tier on windows-latest with Python 3.12 only (3.11 duplicates it), with its own issue label like the other domains and no continue-on-error, and add it to the report job and the domain loop. dlv2-70 must not delete nightly.yml until this domain has run green in a dispatched nightly-v2 run.\n\nPR #2835 implements the domain: t3:windows, Python 3.12, timeout 50 minutes, no coverage. The 50-minute timeout was sized from a 38-minute run. The latest Windows 3.12 fast-test step took 47.7 minutes (run 37967682464, with coverage), so 50 minutes leaves almost no margin. Re-size the timeout from a no-coverage run before merging.\n\nDo this after the Windows fixes pass, so the new domain does not start red. The Windows fast tier also stalls at 90-95% on Python 3.11 and 3.12 (windows-pytest-xdist-teardown-hang-20261009); that must be fixed first.\n\nThis item also takes over two parts of nightly-windows-path-quoting-20261008, which is being closed: the test_nightly_t3_workflow failure on Windows, and the close of issue #2568 (moved from nightly-windows-unquarantine-20261008).",
   "links": [
-    "https://github.com/BenchBox-dev/BenchBox/issues/2568"
+    "https://github.com/BenchBox-dev/BenchBox/issues/2568",
+    "https://github.com/BenchBox-dev/BenchBox/pull/2835"
   ],
   "sessions": [
     {
@@ -33,6 +37,14 @@
       "op": "update",
       "op_id": "569434305c224d989849ce658246b53f",
       "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:22:54Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "86268eba90a047ab9709624a77ae9cb2",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
