@@ -245,6 +245,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_results_explorer_snapshot_invariants.py` | product-safety |
 | `test_scan_explorer_stale_theme.py` | product-safety |
 | `test_scan_explorer_tokens.py` | product-safety |
+| `test_scheduled_workflow_liveness.py` | tooling |
 | `test_shrink_rollup.py` | pure-process |
 | `test_site_inputs.py` | product-safety | Site-inputs bundle manifest, digests and verify |
 | `test_site_inventory.py` | product-safety |

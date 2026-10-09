@@ -142,6 +142,7 @@ tests/unit/scripts/test_results_explorer_cpu_attestation_backfill.py
 tests/unit/scripts/test_results_explorer_snapshot_invariants.py
 tests/unit/scripts/test_scan_explorer_stale_theme.py
 tests/unit/scripts/test_scan_explorer_tokens.py
+tests/unit/scripts/test_scheduled_workflow_liveness.py
 tests/unit/scripts/test_shrink_rollup.py
 tests/unit/scripts/test_site_inputs.py
 tests/unit/scripts/test_site_inventory.py
