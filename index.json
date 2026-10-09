@@ -19581,7 +19581,8 @@
     "site-split-22-build-from-bundle": {
       "claim": null,
       "needs": [
-        "site-split-20-seed-site-repo"
+        "site-split-20-seed-site-repo",
+        "site-split-12-bundle-downloads"
       ],
       "priority": "high",
       "status": "open",
