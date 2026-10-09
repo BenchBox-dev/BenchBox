@@ -17338,7 +17338,9 @@
     },
     "remove-the-legacy-mode-alias-and-embedded-synonym-entirely-a": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "core-exec-deployment-selection-recorded"
+      ],
       "priority": "medium",
       "status": "open",
       "title": "Remove the legacy `mode` alias and `embedded` synonym entirely after one deprecation window"
