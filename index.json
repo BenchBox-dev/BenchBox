@@ -14014,10 +14014,15 @@
       "title": "Pin and document the oracle marker's patch-map limit of about 200 files"
     },
     "oracle-merged-pr-descriptions-stale-20261009": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T13:32:58Z",
+        "generation": "fe507c49afe24e09a36619aab652c099",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
+      },
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Three merged oracle PRs have a description or title that misstates the change"
     },
     "oracle-muse-contributor-model-first-attempt-20261008": {
