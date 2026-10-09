@@ -4,7 +4,7 @@
     "linkcheck/spellcheck/example-validation have a new home recorded in the ledger",
     "G4 sweep clean for docs.yml job names"
   ],
-  "context": "Guardrails G3, G4. site-split-01 step map (2026-10-07): this item folds into the batch as follows. docs.yml deletion and job re-homing -> site-split-50-core-site-removal (deletes docs.yml after moving example validation and codespell into ci.yml). Publication fallback ownership -> site-split-51-publication-retirement. Production-ownership evidence -> site-split-40-production-cutover. Drop only after the mapped scope has merged; the batch closeout (site-split-99) does the drop.",
+  "context": "Guardrails G3, G4. site-split-01 step map (2026-10-07): this item folds into the batch as follows. docs.yml deletion and job re-homing -> site-split-50-core-site-removal (deletes docs.yml after moving example validation and codespell into ci.yml). Publication fallback ownership -> site-split-51-publication-retirement. Production-ownership evidence -> site-split-40-production-cutover. Drop only after the mapped scope has merged; the batch closeout (site-split-99) does the drop.\n\n2026-10-09 tracker review: merged into site-split-50-core-site-removal, which now carries the docs.yml deletion, the ledger row rewrite and the visual-regression note. The Pages fallback was already removed in #2671. Dropping this item.",
   "description": "docs.yml carries a legacy release-to-Pages fallback guarded by publication ownership receipts, plus build/linkcheck/spellcheck/example-validation jobs. After dlv2-62 (site-deploy owns production) and dlv2-40 (build/visual jobs moved to ci.yml docs/landing), delete docs.yml; move linkcheck, spellcheck, and example validation into ci.yml docs (fast parts) or nightly (external linkcheck).",
   "sessions": [
     {
@@ -38,6 +38,14 @@
       "op": "update",
       "op_id": "2eb596348784412d823f3324a44f9e0b",
       "session_id": "17181812c7324e43a406f44f60eedacc"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:21:59Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "f623486eb69e471d9268983e10e56ecf",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
