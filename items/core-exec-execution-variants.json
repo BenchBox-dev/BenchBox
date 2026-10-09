@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Every needed item is done",
+    "On develop, tests/unit/core/test_execution_vocabulary_parity.py passes with an empty grandfather list, or the ADR records each remaining entry with the user's approval",
+    "End-to-end on develop: `benchbox run --platform polars-df --benchmark tpch --scale 0.01 --execution-engine streaming` and the same via MCP run_benchmark produce bundles with identical platform.execution_engine requested/applied and a distinct variant_id from a default run",
+    "grep across benchbox/, docs/ and scripts/ finds no registered or documented platform option named `engine`, `mode` or `warehouse` outside ADR-approved exceptions (command and output in this item's context)",
+    "Planned-platform items reference the new-platform checklist section and the parity test is part of the CI fast lane",
+    "A short close-out note in this item's context lists the PRs, the final schema version and any follow-ups"
+  ],
+  "context": "Decision gate: finish only after all needs are done and the final verification has been run on develop by the finisher (not inferred from item closures). Guardrails: shared core-exec guardrails (see core-exec-d0-vocabulary-adr context). The gateway adapter work (gw-* items) is a separate effort that depends on core-exec-gateway-capability; it is not required to close this umbrella.",
+  "description": "Closes the effort that replaces the Polars-only `engine` option with a platform-neutral model: one execution_engine setting with manifest-declared values, unified compute_resource/compute_size, the manifest deployment selector recorded in results, and gateway as a core capability, all recorded as requested/applied/observed and visible in result identity. Plan: /Users/joe/.claude/plans/jaunty-swimming-mountain.md; decisions: docs/development/adr/adr-core-execution-variants.md.\n\nFinal verification across the merged tree (not per item): the reserved bare-word grandfather list is empty or each remaining entry has a recorded, user-approved exception in the ADR; every registry, MCP allowlist, anonymizer and docs vocabulary agrees (parity test green); CLI and MCP reach one core validator; Explorer distinguishes variants.",
+  "links": [
+    "/Users/joe/.claude/plans/jaunty-swimming-mountain.md",
+    "docs/development/adr/adr-core-execution-variants.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:36:54Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "e0087349bd4345459b48fcada6a80aa1",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
+    }
+  ]
+}
