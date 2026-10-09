@@ -1,4 +1,5 @@
 {
+  "context": "Cross-reference added 2026-10-09: warehouse selection and sizing are becoming core settings (compute_resource / compute_size) in core-exec-compute-resource-unification (ADR docs/development/adr/adr-core-execution-variants.md). Decision (1) here must not introduce a second warehouse-sizing control through tuning; if tuning may resize the warehouse, it does so through compute_size with the explicit opt-in described above.",
   "description": "Snowpark (snowpark_connect.py) applies no tuning-derived session settings: unified platform-optimization fields are Spark/Databricks concepts with no Snowflake ALTER SESSION mapping, and warehouse_size is stored but never applied. The adapter now documents this explicitly (apply_platform_optimizations returns [] with rationale; hygiene ALTER stays out of the ledger). Open maintainer decisions: (1) Should tuning be able to resize/switch the Snowflake warehouse (USE WAREHOUSE / ALTER WAREHOUSE SET WAREHOUSE_SIZE)? That mutates shared billable infrastructure and needs an explicit opt-in mirroring modify_warehouse_settings on the SQL Snowflake adapter -- do NOT implement implicitly. (2) Is there any Snowflake session parameter worth driving from tuning configs (e.g. STATEMENT_TIMEOUT_IN_SECONDS, QUERY_TAG)? (3) Snowpark per-table tuning (clustering) parity with the SQL Snowflake adapter is also unimplemented. Any implementation must record via the shared applied_ledger PHASE_SESSION vocab so runs report honestly.",
   "sessions": [
     {
@@ -16,6 +17,14 @@
       "op": "update",
       "op_id": "a41be766925d4890a9c8c9bfcc0cb390",
       "session_id": "796d606672604f3d869b9c79926d482c"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:47:47Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "35b10575753649c1be60876a7a711163",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
     }
   ]
 }
