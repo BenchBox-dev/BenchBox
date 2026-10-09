@@ -20798,15 +20798,10 @@
       "title": "Dispatch nightly-v2 with run_drift=true and confirm all four drift checks pass"
     },
     "t3-drift-pricing-refresh-20261008": {
-      "claim": {
-        "expires_at": "2026-10-10T12:30:42Z",
-        "generation": "c575e0c1c3504a3d8dc1c86f056411e1",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:905c6dff9634822e3c6b98bd"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "open",
       "title": "Review moved vendor prices and commit refreshed pricing evidence so t3:drift can pass"
     },
     "t3-perf-baseline-refresh-20261008": {
