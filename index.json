@@ -19541,12 +19541,17 @@
       "title": "Make core produce and attest the versioned site-inputs bundle and dispatch it to the site repo"
     },
     "site-split-11-bundle-failure-alert": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T01:26:33Z",
+        "generation": "9c13ed6fd62f4bc99fac3788f062518d",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de"
+      },
       "needs": [
         "site-split-10-core-site-inputs"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Open a site-bundle-failed issue when the core site-inputs bundle build fails"
     },
     "site-split-20-seed-site-repo": {
