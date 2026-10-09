@@ -4943,7 +4943,7 @@
       "needs": [
         "core-exec-result-schema-2-3"
       ],
-      "priority": "medium",
+      "priority": "medium-high",
       "status": "open",
       "title": "Unify named compute resources under core compute_resource and compute_size settings with native keys as aliases"
     },
