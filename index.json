@@ -14392,7 +14392,7 @@
       "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "dropped",
       "title": "Decide whether SHIP_WITH_FIXES with an empty defect list should keep turning into SHIP"
     },
     "oracle-tier-reason-lists-every-file-20261009": {
