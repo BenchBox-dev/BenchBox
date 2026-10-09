@@ -13729,10 +13729,15 @@
       "title": "Fix Windows nightly: sorted-parquet writer CSV parse errors on trailing-pipe rows"
     },
     "nightly-windows-teardown-and-singles-20261008": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T15:08:35Z",
+        "generation": "af42601466cb4b858d5c1ee48dae96e5",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92"
+      },
       "needs": [],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Windows unit suite: close files before teardown and triage the remaining single failures"
     },
     "nightly-windows-trust-gate-subprocess-env": {
