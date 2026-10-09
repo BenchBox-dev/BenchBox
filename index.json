@@ -5073,10 +5073,10 @@
     },
     "core-exec-result-schema-2-3": {
       "claim": {
-        "expires_at": "2026-10-10T21:07:09Z",
-        "generation": "83cdbad7dbd84abdac5358c3f90c73ce",
+        "expires_at": "2026-10-10T21:19:13Z",
+        "generation": "8752f7c50a8447fc8a98a593d89369cb",
         "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3"
+        "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:6e8a424eda2c7006605aa48b"
       },
       "needs": [
         "core-exec-framework-manifest"

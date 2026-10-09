@@ -46,6 +46,17 @@
       "op": "take",
       "op_id": "343187f9e5ef401898fdb19ea429e2a7",
       "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:6e8a424eda2c7006605aa48b",
+      "at": "2026-10-09T21:19:13Z",
+      "client": "omp-coding-agent",
+      "displaced": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "generation": "8752f7c50a8447fc8a98a593d89369cb",
+      "op": "takeover",
+      "op_id": "09c4743b47b54578bb3febab09d022cf",
+      "reason": "User requested resumption of the handoff. Prior controller ended at its usage limit per handoff; its session cannot resume here. Preserve and complete its existing schema worktree.",
+      "session_id": "5d4da70321324b3c9a505b143813724f"
     }
   ]
 }
