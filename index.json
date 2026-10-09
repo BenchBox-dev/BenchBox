@@ -4204,17 +4204,12 @@
       "title": "Remove comments and docstrings from TPC-DS data generation and schema"
     },
     "comment-cleanup-tpcds-obt": {
-      "claim": {
-        "expires_at": "2026-10-10T00:52:59Z",
-        "generation": "701c7b4f5e4140988079d4f6209f5d8f",
-        "renewals": 1,
-        "worker": "mcp:antigravity-worker-2"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from TPC-DS OBT modules"
     },
     "comment-cleanup-tpcds-runtime": {
