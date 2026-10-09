@@ -3,7 +3,7 @@
     "The comment scanner identifies and decomposes command strings passed to recognized runners like ssh, watch, or xargs into individual commands for interpreter scanning",
     "Regression test verifies comments in single-string runner invocations are detected"
   ],
-  "context": "Documented as a known scanner gap in docs/development/comment-policy.md: commands passed to a runner such as ssh or watch as one string are not split, so an interpreter inside that string is not followed.",
+  "context": "Implemented in worktree branch feat/comment-scanner-enhancements: RUNNER_COMMANDS table (ssh:1, watch/xargs/env/sudo/nohup:0) with RUNNER_VALUE_OPTIONS and runner_command_index/runner_trailing_index in scripts/comment_payloads.py; nested_runner_entries emits inner string as bash child for full recursive scan; shell gate extended for runner words; Python side runner_string_args in scripts/comment_execution.py plus whitespace guard on nested-interpreter loop. Regression tests for ssh/watch shell+python, all passing.",
   "description": "In scripts/comment_execution.py, commands passed to execution runners such as ssh, watch, or xargs as a single quoted string argument are currently not tokenized or decomposed into subcommands. As a result, nested interpreter invocations (e.g. ssh host python -c '...') inside runner strings can bypass comment and docstring scanning. Extend the execution analyzer to split runner arguments and inspect nested scripts.",
   "sessions": [
     {
@@ -21,6 +21,14 @@
       "generation": "275aa3aa641449d686ec79c97e563bd6",
       "op": "take",
       "op_id": "15dbcf964dde46b69ee3ead820755227",
+      "session_id": "b5a8c9cf1e3044e0b29099c7c26c16c1"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:3a93d76fab1934bd71f35b65",
+      "at": "2026-10-09T13:49:46Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "437fe9d30f7840d5afafb6eac6667232",
       "session_id": "b5a8c9cf1e3044e0b29099c7c26c16c1"
     }
   ]
