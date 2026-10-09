@@ -223,6 +223,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_path_filter_decision.py` | tooling |
 | `test_preflight_targets.py` | pure-process |
 | `test_phase2_metrics.py` | pure-process |
+| `test_perf_smoke_baseline.py` | pure-process |
 | `test_post_merge_signature.py` | pure-process |
 | `test_pr_arm.py` | pure-process |
 | `test_pr_ready_make.py` | pure-process |

@@ -48,32 +48,66 @@ below is the right move.
 
 ## Refreshing the baseline
 
+The baseline is rebuilt from several CI runs, never from one run. A single
+run carries its own noise, so copying it over the baseline only moves the
+noise problem. The checked-in file is the per-query median of retained
+`t3-perf-result` artifacts from scheduled nightly runs on `develop`.
+
+Hosted runners come from several CPU models, and a night's total time can
+differ by up to 25% between them (in the first refresh: EPYC 9V74 about
+440 ms, Xeon 520 to 535 ms, EPYC 7763 540 to 590 ms). A baseline from a
+mixed pool fails the nights that land on the slower hardware, so the
+builder uses only the results from the slowest CPU model that has at least
+five of them. A slower or equal night then compares cleanly, and a faster
+night cannot fail. The cost is sensitivity: a regression smaller than the
+speed difference can pass on the fastest hardware. The floor is the one
+value still derived from all retained runs, because a night on any CPU
+model is compared with the baseline.
+
+Which source runs were used, their CPU models and totals, and the floor
+derivation are recorded next to the baseline in
+`_project/baselines/perf_smoke_duckdb_tpch_001.sources.json`.
+
 Refresh after:
 
 - An intentional perf-improving change has landed and you want to lock
   in the new floor.
-- A genuine hardware change on GH runners that shifts the noise floor
-  broadly (rare - coordinate with maintainers).
+- A runner change or a DuckDB upgrade that shifts every query broadly.
 
 Procedure:
 
 ```
-# 1. Run locally on a quiet machine (or trigger the workflow and grab
-#    the uploaded artifact from the green run on main after merge).
-uv run -- benchbox run \
-  --platform duckdb \
-  --benchmark tpch \
-  --scale 0.01 \
-  --phases power \
-  --non-interactive
+# 1. Pick at least five unexpired scheduled nightly runs (artifacts are
+#    kept for 14 days) and download each artifact into its own empty
+#    directory.
+gh run list --workflow nightly-v2.yml --event schedule --limit 15
+gh run download <run-id> -n t3-perf-result -D <empty-dir>/<run-id>
 
-# 2. Copy the produced JSON over the baseline.
-cp benchmark_runs/results/tpch_sf001_duckdb_sql_*.json \
-   _project/baselines/perf_smoke_duckdb_tpch_001.json
+# 2. Build the baseline and its sources record. Pass each result as
+#    <run-id>=<path to the tpch_sf001_duckdb_sql_*.json file>.
+uv run -- python scripts/perf_smoke_baseline.py \
+  <run-id>=<path> <run-id>=<path> ... \
+  --output _project/baselines/perf_smoke_duckdb_tpch_001.json \
+  --sources-output _project/baselines/perf_smoke_duckdb_tpch_001.sources.json
 
-# 3. Commit with a message that links the PR driving the refresh:
-#    chore(perf-smoke): refresh baseline after <PR-ref>
+# 3. Replay every source result with the gate options. Each one must pass
+#    unless it carries a real slowdown, which the pull request names.
+uv run -- benchbox compare _project/baselines/perf_smoke_duckdb_tpch_001.json \
+  <path> --fail-on-regression 10% --min-regression-delta <floor>ms
+
+# 4. Open the pull request with the skip-perf-smoke label: it replaces
+#    the file the gate compares against.
 ```
+
+The script chooses the CPU model itself and refuses to build when none has
+five results; pass `--cpu-model` to override it. It prints the largest
+per-query spread across all the sources and the floor that follows from it. If the floor changes, update
+`--min-regression-delta` in both workflows and the Noise floor section above.
+
+The aggregate check (total and average time, 10%) has no floor. Even
+against the slowest-hardware baseline, an unusually slow night can exceed
+it, so re-run the workflow once before treating a failure that no single
+query explains as a regression.
 
 ## Troubleshooting
 

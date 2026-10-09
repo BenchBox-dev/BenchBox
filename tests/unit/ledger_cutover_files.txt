@@ -118,6 +118,7 @@ tests/unit/scripts/test_migrate_clickhouse_labels.py
 tests/unit/scripts/test_mirror_partial_validation_policy.py
 tests/unit/scripts/test_oracle_review_check.py
 tests/unit/scripts/test_path_filter_decision.py
+tests/unit/scripts/test_perf_smoke_baseline.py
 tests/unit/scripts/test_phase2_metrics.py
 tests/unit/scripts/test_post_merge_signature.py
 tests/unit/scripts/test_pr_arm.py
