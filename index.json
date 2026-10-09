@@ -4049,17 +4049,12 @@
       "title": "Remove comments from publication validators and release control tooling"
     },
     "comment-cleanup-publishing": {
-      "claim": {
-        "expires_at": "2026-10-10T00:31:43Z",
-        "generation": "e08ad69d989545c3b790dd0636334561",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from publishing admission and storage"
     },
     "comment-cleanup-query-plans": {
