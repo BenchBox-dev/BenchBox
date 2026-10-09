@@ -15472,12 +15472,17 @@
       "title": "Probe candidate Polars versions for correctness and engine support, and fix the matrix version list"
     },
     "pvm-s2-sf10-memory-time-probe": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T05:59:38Z",
+        "generation": "3dc82a9757ec4f3b85f9f52d2c4e5c8d",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c"
+      },
       "needs": [
         "pvm-s1-version-correctness-probe"
       ],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Measure Polars SF10 memory, feasibility and run time on the 16 GB host, and capture reference row counts"
     },
     "pvm-s3a-generalize-matrix-tooling": {
