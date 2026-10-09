@@ -15477,7 +15477,7 @@
         "pvm-s1-version-correctness-probe"
       ],
       "priority": "medium-high",
-      "status": "blocked",
+      "status": "open",
       "title": "Measure Polars SF10 memory, feasibility and run time on the 16 GB host, and capture reference row counts"
     },
     "pvm-s3a-generalize-matrix-tooling": {
