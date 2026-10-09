@@ -396,6 +396,7 @@ def _thread(resolved: bool, path: str, author: str | None, body: str) -> dict[st
     return {"isResolved": resolved, "path": path, "comments": {"nodes": [comment]}}
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="the fake gh is a POSIX shebang script and PATH is colon-joined")
 def test_oracle_reviews_reads_every_page_through_gh_api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     pages = [
         [{"id": index, "user": {"login": "benchbox-oracle[bot]", "type": "Bot"}, "body": f"r{index}"} for index in part]
