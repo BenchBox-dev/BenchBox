@@ -14321,8 +14321,10 @@
     },
     "oracle-read-evidence-tightening-20261008": {
       "claim": null,
-      "needs": [],
-      "priority": "medium",
+      "needs": [
+        "oracle-reviewer-checkout-has-no-base-commit-20261009"
+      ],
+      "priority": "low",
       "status": "open",
       "title": "Oracle read evidence still accepts reads that show none of the head file's content"
     },
