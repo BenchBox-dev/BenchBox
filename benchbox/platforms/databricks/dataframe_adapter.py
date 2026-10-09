@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, Callable
 
-from benchbox.platforms.databricks.adapter import DatabricksAdapter
+from benchbox.platforms.databricks.adapter import DatabricksAdapter, _normalize_table_format
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.dependencies import get_package_install_message
 
@@ -53,14 +53,14 @@ class DatabricksDataFrameAdapter(DatabricksAdapter):
         self.cluster_id = config.pop("cluster_id", None)
         self.execution_mode = config.pop("execution_mode", "dataframe")
 
-        super().__init__(**config)
-
-        if getattr(self, "table_format", "delta") == "hudi":
+        if _normalize_table_format(config) == "hudi":
             raise ValueError(
                 "DatabricksDataFrameAdapter does not support table_format='hudi': "
                 "the DataFrame write path has no Hudi handling. Use the SQL adapter "
                 "for Hudi DDL, or table_format='delta' for DataFrame mode."
             )
+
+        super().__init__(**config)
 
         if self.execution_mode == "dataframe" and not DATABRICKS_CONNECT_AVAILABLE:
             reason = (
