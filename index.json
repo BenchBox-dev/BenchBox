@@ -13696,7 +13696,7 @@
         "nightly-windows-teardown-and-singles-20261008"
       ],
       "priority": "medium-high",
-      "status": "open",
+      "status": "blocked",
       "title": "Add a Windows unit-test domain to nightly-v2 so retiring nightly.yml keeps Windows coverage"
     },
     "nightly-windows-mcp-durable-fsync-followup": {
