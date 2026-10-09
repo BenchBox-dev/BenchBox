@@ -145,10 +145,12 @@ def check_workflows(
     for name, crons in workflows:
         window_days = cadence_window_days(crons)
         runs = fetch_runs(name, now - timedelta(days=window_days + 1))
+        if not runs:
+            runs = fetch_history(name)
         registered_at = fetch_registration(name) if not runs else None
         verdict = assess(name, runs, window_days=window_days, now=now, registered_at=registered_at)
         if not verdict.alive and not verdict.recent_runs:
-            verdict = replace(verdict, recent_runs=tuple(newest_first(fetch_history(name))[:RECENT_RUNS_SHOWN]))
+            verdict = replace(verdict, recent_runs=tuple(newest_first(runs)[:RECENT_RUNS_SHOWN]))
         verdicts.append(verdict)
     return verdicts
 

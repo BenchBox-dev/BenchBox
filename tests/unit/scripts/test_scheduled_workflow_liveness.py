@@ -125,21 +125,48 @@ def test_the_created_filter_reaches_one_day_past_the_window() -> None:
     assert liveness.created_lower_bound(NOW, 3) == "2026-10-05"
 
 
-def test_check_workflows_fetches_history_only_for_a_flagged_workflow() -> None:
+def test_history_is_fetched_only_when_the_bounded_query_finds_nothing() -> None:
     history_requests: list[str] = []
-    runs_by_name = {"live.yml": [_run(1, timedelta(hours=1))], "dead.yml": []}
+    runs_by_name = {"live.yml": [_run(1, timedelta(hours=1))], "quiet.yml": []}
 
     verdicts = liveness.check_workflows(
-        [("live.yml", ["0 6 * * *"]), ("dead.yml", ["0 6 * * *"])],
+        [("live.yml", ["0 6 * * *"]), ("quiet.yml", ["0 6 * * *"])],
         lambda name, since: runs_by_name[name],
         lambda name: None,
         lambda name: history_requests.append(name) or [_run(7, timedelta(days=40)), _run(8, timedelta(days=41))],
         NOW,
     )
 
+    assert history_requests == ["quiet.yml"]
     assert [verdict.alive for verdict in verdicts] == [True, False]
-    assert history_requests == ["dead.yml"]
     assert [run["id"] for run in verdicts[1].recent_runs] == [7, 8]
+
+
+def test_a_workflow_with_old_history_gets_no_grace_even_if_its_file_was_edited_recently() -> None:
+    verdicts = liveness.check_workflows(
+        [("daily.yml", ["0 6 * * *"])],
+        lambda name, since: [],
+        lambda name: NOW - timedelta(days=1),
+        lambda name: [_run(3, timedelta(days=8))],
+        NOW,
+    )
+
+    assert not verdicts[0].alive
+    assert "older than its 3-day cadence window" in verdicts[0].message
+    assert [run["id"] for run in verdicts[0].recent_runs] == [3]
+
+
+def test_a_workflow_with_no_history_at_all_still_gets_grace_when_newly_registered() -> None:
+    verdicts = liveness.check_workflows(
+        [("new.yml", ["0 6 * * 1"])],
+        lambda name, since: [],
+        lambda name: NOW - timedelta(days=1),
+        lambda name: [],
+        NOW,
+    )
+
+    assert verdicts[0].alive
+    assert "activation grace" in verdicts[0].message
 
 
 def test_report_prints_each_flagged_workflow_with_its_newest_runs() -> None:
