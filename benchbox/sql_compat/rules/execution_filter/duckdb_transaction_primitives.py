@@ -21,7 +21,7 @@ for _query_id, _reason in DUCKDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS.items():
             support_level=SupportLevel.SKIPPED_QUERY,
             failure_mode=FailureMode.UNSUPPORTED_FEATURE,
             payload=SkipQueryPayload(
-                reason=f"{_reason} Evidence: DuckDB 1.3.2 local parser verification on 2026-05-29.",
+                reason=_reason,
                 query_id=_query_id,
             ),
             reason=_reason,

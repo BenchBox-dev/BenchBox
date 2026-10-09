@@ -41,11 +41,7 @@ for _query_id, _reason in LAKESAIL_TPCHAVOC_SKIPS.items():
             support_level=SupportLevel.SKIPPED_QUERY,
             failure_mode=FailureMode.UNSUPPORTED_FEATURE,
             payload=SkipQueryPayload(
-                reason=(
-                    f"{_reason} Evidence: focused LakeSail UAT sweep "
-                    "`uat_lakesail_failing_benchmarks_20260513` reported 195/220 passing and this "
-                    "variant in the stable 25-query failure set."
-                ),
+                reason=_reason,
                 query_id=_query_id,
             ),
             reason=_reason,

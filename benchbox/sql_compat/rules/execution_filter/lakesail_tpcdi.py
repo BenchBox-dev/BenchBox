@@ -42,11 +42,7 @@ for _query_id, _reason in LAKESAIL_TPCDI_SKIPS.items():
             support_level=SupportLevel.SKIPPED_QUERY,
             failure_mode=FailureMode.UNSUPPORTED_FEATURE,
             payload=SkipQueryPayload(
-                reason=(
-                    f"{_reason} Evidence: focused LakeSail UAT sweep "
-                    "`uat_lakesail_failing_benchmarks_20260513` loaded TPC-DI and reported this query in the "
-                    "stable 26-query failure set while 12 sibling queries passed."
-                ),
+                reason=_reason,
                 query_id=_query_id,
             ),
             reason=_reason,

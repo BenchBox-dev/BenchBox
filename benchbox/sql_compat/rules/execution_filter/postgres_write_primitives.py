@@ -100,7 +100,7 @@ for _query_id, _reason in _SKIPS_BY_QUERY_ID.items():
             support_level=SupportLevel.SKIPPED_QUERY,
             failure_mode=FailureMode.UNSUPPORTED_FEATURE,
             payload=SkipQueryPayload(
-                reason=f"{_reason} Evidence: pg-duckdb targeted UAT on 2026-05-13.",
+                reason=_reason,
                 query_id=_query_id,
             ),
             reason=_reason,

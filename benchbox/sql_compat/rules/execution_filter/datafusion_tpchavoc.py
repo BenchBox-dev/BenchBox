@@ -28,11 +28,7 @@ for _query_id, _reason in DATAFUSION_TPCHAVOC_SKIPS.items():
             support_level=SupportLevel.SKIPPED_QUERY,
             failure_mode=FailureMode.UNSUPPORTED_FEATURE,
             payload=SkipQueryPayload(
-                reason=(
-                    f"{_reason} Evidence: 2026-06-15 TPC-Havoc third-engine equivalence sweep "
-                    "(`python -m benchbox.core.tpchavoc.equivalence --engine datafusion`, SF=0.1) "
-                    "reported this stable variant execution failure on DataFusion."
-                ),
+                reason=_reason,
                 query_id=_query_id,
             ),
             reason=_reason,

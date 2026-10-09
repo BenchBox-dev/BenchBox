@@ -24,7 +24,7 @@ for _query_id, _reason in TIMESCALEDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS.ite
             support_level=SupportLevel.SKIPPED_QUERY,
             failure_mode=FailureMode.UNSUPPORTED_FEATURE,
             payload=SkipQueryPayload(
-                reason=f"{_reason} Evidence: TimescaleDB targeted UAT on 2026-05-13.",
+                reason=_reason,
                 query_id=_query_id,
             ),
             reason=_reason,

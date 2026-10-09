@@ -40,11 +40,7 @@ for _platform in _CLICKHOUSE_TPCHAVOC_PLATFORMS:
                 support_level=SupportLevel.SKIPPED_QUERY,
                 failure_mode=FailureMode.UNSUPPORTED_FEATURE,
                 payload=SkipQueryPayload(
-                    reason=(
-                        f"{_reason} Evidence: 2026-06-18 TPC-Havoc fourth-engine equivalence sweep "
-                        "(`python -m benchbox.core.tpchavoc.equivalence --engine clickhouse`, SF=0.1) "
-                        "reported this stable variant execution failure on ClickHouse."
-                    ),
+                    reason=_reason,
                     query_id=_query_id,
                 ),
                 reason=_reason,
