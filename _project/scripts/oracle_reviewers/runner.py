@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import signal
@@ -57,6 +58,13 @@ def stage_pull_request_diff(source: Path, workspace: Path) -> Path | None:
     return target
 
 
+def _digest(path: Path) -> str | None:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+    except OSError:
+        return "unreadable"
+
+
 def execute(invocation: Invocation, timeout_seconds: int) -> RunResult:
     try:
         process = subprocess.Popen(
@@ -103,6 +111,7 @@ def review(
         return ReviewOutcome(None, absence.Absence(absence.ERROR, f"{reviewer.harness} is not installed"), "")
     scratch.mkdir(parents=True, exist_ok=True)
     invocation = build(reviewer, workspace, prompt, scratch)
+    staged_before = _digest(workspace / STAGED_DIFF_NAME)
     result = execute(invocation, reviewer.timeout_minutes * 60)
     output = result.stdout
     if invocation.output_file is not None:
@@ -119,6 +128,9 @@ def review(
     )
     if _git(workspace, "status", "--porcelain", "--untracked-files=all"):
         return ReviewOutcome(None, absence.Absence(absence.INVALID, "the reviewer changed the workspace"), diagnostic)
+    if _digest(workspace / STAGED_DIFF_NAME) != staged_before:
+        reason = "the reviewer changed the staged pull request diff"
+        return ReviewOutcome(None, absence.Absence(absence.INVALID, reason), diagnostic)
     if missing.absent:
         return ReviewOutcome(None, missing, diagnostic)
     try:

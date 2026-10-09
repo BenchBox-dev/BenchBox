@@ -192,7 +192,8 @@ def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
     standin_after = max(evidence.base_changed_at, head_verdict.submitted_at if head_verdict else "")
     for comment in evidence.comments:
         match = EXTERNAL_REVIEW_PATTERN.search(comment.body)
-        if match and in_window(comment.created_at):
+        attester = comment.login in STANDIN_ATTESTERS and comment.user_type == "User"
+        if match and attester and in_window(comment.created_at):
             signals.append(f"external-review:{match.group(1).lower()}")
         if (
             comment.login in STANDIN_ATTESTERS
