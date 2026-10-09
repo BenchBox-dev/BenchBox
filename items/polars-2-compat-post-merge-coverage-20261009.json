@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "polars-2-compat runs on every develop push (trunk.yml) or nightly, or on every PR touching DataFrame paths.",
+    "A workflow test pins where it runs."
+  ],
+  "context": "Found in the 2026-10-09 tracker review. Other jobs that left the queue are covered elsewhere (plan-capture-gate is fast-marked; DataFusion tests are slow-marked and run in the release canary; binary framing runs in nightly.yml:201 and on test-infrastructure PRs).",
+  "description": "polars-2-compat (ci.yml:1061-1091, added by #2771) runs only when heavy_tier_needed.py says the heavy tier is needed, which on a pull request is only for soundness or packaging changes. Since the merge queue was retired (#2582) no trunk.yml, nightly or release-canary job runs it, so a routine PR can break Polars 2 with no signal.\n\nAdd the job to trunk.yml (or a nightly-v2 domain), or run it on every PR that touches DataFrame code.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:19:14Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "b5300785c1494709b81a14c0395a2a5a",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}

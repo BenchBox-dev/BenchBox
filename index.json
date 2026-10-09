@@ -14978,6 +14978,13 @@
       "status": "done",
       "title": "Decision: should cloud-only platforms such as Snowflake and Databricks accept a ':local' selector suffix?"
     },
+    "polars-2-compat-post-merge-coverage-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Run the polars-2-compat job after merge so a routine PR cannot break Polars 2 unnoticed"
+    },
     "polars-2-lock-and-floor-decision": {
       "claim": null,
       "needs": [],
