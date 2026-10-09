@@ -4130,18 +4130,13 @@
       "title": "Remove comments and docstrings from Spark-family adapters"
     },
     "comment-cleanup-sql-compat": {
-      "claim": {
-        "expires_at": "2026-10-10T00:37:20Z",
-        "generation": "e831d25056fa4932914ba1022fc9ee28",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget",
         "comment-cleanup-generators"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from SQL compatibility rules and decisions"
     },
     "comment-cleanup-ssb": {
