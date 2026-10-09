@@ -3943,17 +3943,12 @@
       "title": "Decide fail-closed policy for missing expected query counts"
     },
     "comment-cleanup-monitoring": {
-      "claim": {
-        "expires_at": "2026-10-10T00:25:20Z",
-        "generation": "933ad5da85824b56bb1ba362f0993f37",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from monitoring and profiling"
     },
     "comment-cleanup-nyctaxi": {
