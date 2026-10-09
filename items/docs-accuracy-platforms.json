@@ -2,7 +2,7 @@
   "acceptance": [
     "Each platform page's commands and options match the code"
   ],
-  "context": "2026-10-08 owner decision: fix all findings in this effort; verify each against the code first, drop any that does not reproduce; one PR. Findings list: audit report https://claude.ai/artifact/GZbqAYm58ZmfPEsTLp4x9D (accuracy section).",
+  "context": "2026-10-08 owner decision: fix all findings in this effort; verify each against the code first, drop any that does not reproduce; one PR. Findings list: audit report https://claude.ai/artifact/GZbqAYm58ZmfPEsTLp4x9D (accuracy section).\n\nCompletion: PR #2823 merged into develop at d59f94354794a206303ff66c2004d50dbaa0a291 (head cad35f6e2e86886dc1c1920ca0cc4363f97888cb). Live PR state and CI were checked on 2026-10-09; required CI checks succeeded, oracle review succeeded. Public-site visual regression detected the intended getting-started copy change; the visual check is advisory per the 2026-10-03 merge-queue retirement decision. Took over the interrupted session's stale live claim after confirming its recorded process was absent.",
   "description": "A docs re-audit found nonexistent extras (athena-spark, glue, emr-serverless, dataproc, fabric-spark, quanton), invented flags (InfluxDB, DuckLake --driver-version), invented adapter kwargs (platform-selection-guide, quick-reference), psycopg2 vs psycopg 3, DuckDB/Polars described as base install, contradictory ClickHouse selector status, and similar.",
   "sessions": [
     {
@@ -39,6 +39,14 @@
       "op": "takeover",
       "op_id": "e90c89ee5e304b00b4ce48532919d4ec",
       "reason": "Taking over the interrupted session 01a1210d-9423-7c91-bcdd-652ba872feca. Its exported log records PID 95729 and that process is no longer present; PR #2823 is already merged, but this claim remains live.",
+      "session_id": "f00fbcc194ab47a6a9508e7176243455"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:c5daffc9eae3c5f9ce6578f7",
+      "at": "2026-10-09T17:14:00Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "b82b61844b0e4ba6bb36aed24b84fa4f",
       "session_id": "f00fbcc194ab47a6a9508e7176243455"
     }
   ]
