@@ -5,7 +5,7 @@
     "If enabled: agy is given a read-only permission rule that lets it read files without --dangerously-skip-permissions, the workflow gains an agy job and secret, a captured successful envelope is a parse_output test, and quota and auth messages (including CALIBRATED_AUTH_PATTERNS[\"agy\"]) are calibrated with tests"
   ],
   "context": "2026-10-09 tracker review: marked as an owner decision (recommendation: close). Absorbs the agy auth calibration from oracle-absence-classification-lows-20261008 (part 3). The agy half of oracle-self-attested-file-list-reviewers-20261008 also belongs here.",
-  "description": "Owner decision needed: enable agy as a reviewer, or close this item? Options: (1) enable agy: add the workflow job, the secret, a fifth reviewer slot, and calibrate its quota and auth messages; (2) close as \"documented as unable to read (docs/operations/oracle-review-v2.md:230-233,276-277); revisit if a reviewer pool runs short\". Recommendation: close. agy denies its own read commands in headless plan mode, so it cannot review file-list briefs, and the docs already say so. The oracle has four other reviewers, and enabling agy costs a job, a secret and calibration work for little gain. (Evidence: .github/oracle-reviewers.yml agy entry is disabled with reads_files: false; oracle-review-v2.md:230-233,276-277.)\n\nA schema check on 2026-10-08 showed that `agy --mode plan --json-schema` without `--output-format json` exits 0 with an error and no output (now fixed in commands.py). In headless plan mode agy denies its own read commands (\"a tool required the command permission that headless mode cannot prompt for\"), so it returns an empty response. agy stays disabled with reads_files: false. The response-envelope parsing added for agy has not been checked against a successful CI run.\n\nIf agy is enabled, this item also owns the agy auth calibration: CALIBRATED_AUTH_PATTERNS[\"agy\"] in _project/scripts/oracle_reviewers/absence.py is empty (moved from oracle-absence-classification-lows-20261008).",
+  "description": "Owner decision needed: enable agy as a reviewer, or close this item? Options: (1) enable agy: add the workflow job, the secret, a fifth reviewer slot, and calibrate its quota and auth messages; (2) close as \"documented as unable to read (docs/operations/oracle-review-v2.md:230-233,276-277); revisit if a reviewer pool runs short\". Recommendation: close. agy denies its own read commands in headless plan mode, so it cannot review file-list briefs, and the docs already say so. Enabling it costs a job, a secret and calibration work, and the other reviewers (opus, sol, luna, muse, sonnet) already fill the tier orders. (Evidence: .github/oracle-reviewers.yml agy entry is disabled with reads_files: false; oracle-review-v2.md:230-233,276-277.)\n\nA schema check on 2026-10-08 showed that `agy --mode plan --json-schema` without `--output-format json` exits 0 with an error and no output (now fixed in commands.py). In headless plan mode agy denies its own read commands (\"a tool required the command permission that headless mode cannot prompt for\"), so it returns an empty response. agy stays disabled with reads_files: false. The response-envelope parsing added for agy has not been checked against a successful CI run.\n\nIf agy is enabled, this item also owns the agy auth calibration: CALIBRATED_AUTH_PATTERNS[\"agy\"] in _project/scripts/oracle_reviewers/absence.py is empty (moved from oracle-absence-classification-lows-20261008).",
   "sessions": [
     {
       "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
@@ -21,6 +21,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "b47c35621a9f41a1bf921a40de7507ab",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:32:09Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "e768ebd10a5e456c9ca4a4f108f57dcb",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
