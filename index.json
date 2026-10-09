@@ -13721,7 +13721,7 @@
         "nightly-liveness-diagnose-harden-20261008"
       ],
       "priority": "medium-high",
-      "status": "blocked",
+      "status": "open",
       "title": "Port the scheduled-workflow-liveness check to nightly-v2 before nightly.yml is retired"
     },
     "nightly-v2-throughput-uat-port-20261009": {
