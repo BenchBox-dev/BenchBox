@@ -138,16 +138,16 @@ class TPCDSStreamManager:
                                 )
                             else:
                                 base_query = self.query_manager.get_query(query_id, seed=config.parameter_seed)
-                                stream_query.sql = f"-- Query {query_id}{variant}\\n{base_query}"
+                                stream_query.sql = f"-- Query {query_id}{variant}\n{base_query}"
                         else:
                             base_query = self.query_manager.get_query(query_id, seed=config.parameter_seed)
-                            stream_query.sql = f"-- Query {query_id}{variant}\\n{base_query}"
+                            stream_query.sql = f"-- Query {query_id}{variant}\n{base_query}"
                     else:
                         stream_query.sql = self.query_manager.get_query(query_id, seed=config.parameter_seed)
                 except Exception as e:
                     variant_suffix = variant if variant else ""
                     stream_query.sql = (
-                        f"-- Query {query_id}{variant_suffix} (generation failed: {e})\\nSELECT 1 AS placeholder_query;"
+                        f"-- Query {query_id}{variant_suffix} (generation failed: {e})\nSELECT 1 AS placeholder_query;"
                     )
 
                 stream_queries.append(stream_query)
