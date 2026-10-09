@@ -15501,18 +15501,13 @@
       "title": "Add the Polars matrix spec with interleaved runs, engine setups, correctness evidence and fair analysis"
     },
     "pvm-s4-run-polars-matrix": {
-      "claim": {
-        "expires_at": "2026-10-10T09:50:12Z",
-        "generation": "4c6cd00126404c34bab4ef4d9b379064",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c"
-      },
+      "claim": null,
       "needs": [
         "pvm-s3b-polars-matrix-spec",
         "pvm-s2-sf10-memory-time-probe"
       ],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Run the Polars version matrix on the M4 host under controlled conditions"
     },
     "pvm-s5-analyze-polars-matrix": {
