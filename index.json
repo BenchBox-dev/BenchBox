@@ -19514,17 +19514,12 @@
       "title": "Keep internal files out of the site under the Sphinx fallback renderer"
     },
     "site-split-00-adr-soundness-scope": {
-      "claim": {
-        "expires_at": "2026-10-10T00:25:24Z",
-        "generation": "5db313bf781d4f8c80254b2c1b6cf67a",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de"
-      },
+      "claim": null,
       "needs": [
         "site-split-agy-plan-review"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Record the site-repo split ADR and add the bundle attestation producer to soundness paths"
     },
     "site-split-01-tracker-reconcile": {
