@@ -1,10 +1,10 @@
 {
   "acceptance": [
     "Replying to several review threads starts no more than one full oracle-review evaluation, or the decision to keep the trigger is recorded with the reason",
-    "A connector review or stand-in approval still re-evaluates the required check (test or recorded run)"
+    "An oracle App review, a dismissal, and a stand-in still re-evaluate the required check (test or recorded run)"
   ],
-  "context": "Observed on PR #2751: 14 thread replies between 21:23 and 21:24 UTC on 2026-10-08 started 17 oracle-review runs, of which 13 were cancelled.",
-  "description": "`.github/workflows/oracle-review.yml` triggers on `pull_request_review: [submitted, dismissed]`. A reply in a review thread is a submitted review, so replying to N threads starts N runs. Concurrency cancels all but the last, but each one still takes a runner slot. On 2026-10-08 the core repo had CI queued for over 25 minutes while this happened.\n\nOptions:\n- filter in a cheap first step: exit early unless the review is a connector review, or an approval by a listed attester;\n- or keep the trigger and accept the cost.\n\nCheck first that the required check still re-evaluates when a real reviewer approves.",
+  "context": "Observed on PR #2751: 14 thread replies between 21:23 and 21:24 UTC on 2026-10-08 started 17 oracle-review runs, of which 13 were cancelled. Since the cut-over (#2758, 2026-10-09 00:16 UTC) the Codex connector is no longer a signal, so its reviews need no re-evaluation. Related: oracle-review-stale-check-runs-block-merge-20261008 (failed review-event runs stay on the head).",
+  "description": "`.github/workflows/oracle-review.yml` triggers on `pull_request_review: [submitted, dismissed]`. A reply in a review thread is a submitted review, so replying to N threads starts N runs. Concurrency cancels all but the last, but each one still takes a runner slot. On 2026-10-08 the core repo had CI queued for over 25 minutes while this happened.\n\nOptions:\n- filter in a cheap first step: exit early unless the review comes from the `benchbox-oracle` App's Bot account, or the event is a dismissal;\n- or keep the trigger and accept the cost.\n\nStand-ins are issue comments, not reviews, so they do not arrive through this trigger. Check first that the required check still re-evaluates when the oracle posts a review and when an oracle review is dismissed.",
   "links": [
     ".github/workflows/oracle-review.yml"
   ],
@@ -16,6 +16,14 @@
       "op": "create",
       "op_id": "249034d1bd4a4eb18bd708947a0ea447",
       "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T12:45:09Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "df1fe8ea4c8a4a98b91384eb84bc44f3",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
