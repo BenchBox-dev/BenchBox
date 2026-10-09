@@ -4276,12 +4276,17 @@
       "title": "Remove comments and docstrings from TPC-Havoc variant catalogs"
     },
     "comment-cleanup-transaction-primitives": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T01:02:29Z",
+        "generation": "976902ff0de3419da6517c5ce9b0e284",
+        "renewals": 0,
+        "worker": "mcp:antigravity-worker-2"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from Transaction primitives modules"
     },
     "comment-cleanup-tsbs-devops": {
