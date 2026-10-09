@@ -4955,10 +4955,15 @@
       "title": "Unify named compute resources under core compute_resource and compute_size settings with native keys as aliases"
     },
     "core-exec-d0-vocabulary-adr": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T16:38:31Z",
+        "generation": "47ee71c75fda4d9e9f4e44d002238dfa",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Gate: approve an ADR that defines BenchBox's core execution-variant vocabulary (engine, compute, deployment, gateway)"
     },
     "core-exec-deployment-selection-recorded": {
