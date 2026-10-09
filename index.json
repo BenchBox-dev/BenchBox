@@ -14353,7 +14353,7 @@
       "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "dropped",
       "title": "oracle-review starts a run for every review-thread reply"
     },
     "oracle-reviewer-checkout-has-no-base-commit-20261009": {
