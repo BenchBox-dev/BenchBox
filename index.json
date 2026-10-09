@@ -13743,15 +13743,10 @@
       "title": "Nightly Windows: make mirror and vendor trust-gate tests portable"
     },
     "nightly-windows-unit-coverage-decision-20261008": {
-      "claim": {
-        "expires_at": "2026-10-10T15:08:10Z",
-        "generation": "f404c1e6b28b4f6e90912a27e30c98dd",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Decide whether the new nightly gets a Windows unit-test leg before the legacy nightly.yml is retired"
     },
     "nightly-windows-unquarantine-20261008": {
