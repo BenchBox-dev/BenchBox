@@ -7675,7 +7675,7 @@
     "dlv2-82-makefile-rewrite": {
       "claim": null,
       "needs": [
-        "dlv2-43-makefile-agent-instructions-lockstep",
+        "dlv2-42-retire-dev-loop-scripts-tests",
         "dlv2-53-retire-legacy-release-path",
         "dlv2-81-config-cleanup"
       ],
