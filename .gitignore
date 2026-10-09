@@ -93,8 +93,6 @@ _project/*
 !_project/SOCIAL_*.md
 !_project/todo-db-export/
 !_project/todo-db-export/**
-!_project/baselines/
-!_project/baselines/**
 
 !_binaries/
 !_binaries/tpc-h/

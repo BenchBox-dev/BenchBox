@@ -95,8 +95,11 @@ uv run -- python scripts/perf_smoke_baseline.py \
 uv run -- benchbox compare _project/baselines/perf_smoke_duckdb_tpch_001.json \
   <path> --fail-on-regression 10% --min-regression-delta <floor>ms
 
-# 4. Open the pull request with the skip-perf-smoke label: it replaces
-#    the file the gate compares against.
+# 4. Stage both files. _project/ is ignored, so a first-time sources
+#    record needs `git add -f`; edits to the tracked files do not.
+#    Open the pull request: it replaces the file the gate compares
+#    against, so a failing Performance Smoke check on it is read against
+#    the old baseline.
 ```
 
 The script chooses the CPU model itself and refuses to build when none has
