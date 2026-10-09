@@ -3692,17 +3692,12 @@
       "title": "Remove comments from executable documentation samples"
     },
     "comment-cleanup-duckdb-family": {
-      "claim": {
-        "expires_at": "2026-10-10T00:17:03Z",
-        "generation": "b03755f1bbb84d23928479c760a5ad49",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from DuckDB family adapters"
     },
     "comment-cleanup-enforcement-switch": {
