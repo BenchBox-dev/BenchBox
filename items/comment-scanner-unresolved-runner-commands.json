@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "The comment scanner identifies and decomposes command strings passed to recognized runners like ssh, watch, or xargs into individual commands for interpreter scanning",
+    "Regression test verifies comments in single-string runner invocations are detected"
+  ],
+  "context": "Documented as a known scanner gap in docs/development/comment-policy.md: commands passed to a runner such as ssh or watch as one string are not split, so an interpreter inside that string is not followed.",
+  "description": "In scripts/comment_execution.py, commands passed to execution runners such as ssh, watch, or xargs as a single quoted string argument are currently not tokenized or decomposed into subcommands. As a result, nested interpreter invocations (e.g. ssh host python -c '...') inside runner strings can bypass comment and docstring scanning. Extend the execution analyzer to split runner arguments and inspect nested scripts.",
+  "sessions": [
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:8dff0892e031f17231e04e2e",
+      "at": "2026-10-09T12:50:33Z",
+      "client": "antigravity-client",
+      "op": "create",
+      "op_id": "c35a7762dde348cdb9c13b0f485b162d",
+      "session_id": "2c188abafba54577ab5700a7c822554e"
+    }
+  ]
+}
