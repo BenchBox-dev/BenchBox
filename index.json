@@ -10691,7 +10691,9 @@
     },
     "gw-snowflake-conn": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "core-exec-gateway-capability"
+      ],
       "priority": "high",
       "status": "open",
       "title": "Snowflake adapter gateway-endpoint override (conn, CLI, option specs)"
