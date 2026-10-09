@@ -4462,15 +4462,10 @@
       "title": "Extend comment scanner for MDX files to check top-level JSX comments and imports"
     },
     "comment-scanner-stdin-piped-interpreter-adapter": {
-      "claim": {
-        "expires_at": "2026-10-10T13:42:45Z",
-        "generation": "31fccc59ba7044b6979e90d4ef4b89bf",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:3a93d76fab1934bd71f35b65"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "open",
       "title": "Add comment-scanner adapter or detection for programs piped to interpreters on stdin"
     },
     "comment-scanner-unresolved-runner-commands": {
