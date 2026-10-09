@@ -21236,15 +21236,10 @@
       "title": "Decide aggregate tolerance for the nightly DuckDB performance gate"
     },
     "t3-perf-baseline-refresh-20261008": {
-      "claim": {
-        "expires_at": "2026-10-10T23:26:40Z",
-        "generation": "84d66aaa1df442cdbf447f266ff5cbb0",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Refresh the DuckDB TPC-H SF=0.01 perf baseline from retained CI-runner results"
     },
     "t3-perf-compare-delta-floor-20261008": {
