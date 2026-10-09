@@ -167,10 +167,10 @@ benchbox-mcp --transport streamable-http --host ::1
 Tools are executable actions that can be invoked by AI assistants. BenchBox MCP
 is a **beta-public scoped surface over the shared BenchBox engine**: all
 benchmark business logic lives in `benchbox.core` below both CLI and MCP, and
-each surface exposes a chosen subset of it. Surface asymmetry is deliberate and
-ledgered, never a parity backlog. The CLI controls that MCP does not expose,
-and the reason for each, are listed in the omission tables below the
-`run_benchmark` behavior notes.
+each surface exposes a chosen subset of it. Differences between the CLI and MCP
+surfaces are deliberate: the CLI controls that MCP does not expose, and the reason
+for each, are listed in the omission tables below the `run_benchmark` behavior
+notes.
 
 MCP run results are exported through `ResultExporter` as normal result JSON
 bundles and include `execution_context.entry_point = "mcp"` when the result
@@ -312,7 +312,7 @@ tables below list each one with one of three reasons:
 - **not-yet-demanded** — may be added later. Nothing about security or
   interaction blocks it; no MCP client has needed it yet.
 
-An omission that is absent from this ledger is a defect, not a decision.
+Any CLI control not listed in these tables is omitted unintentionally rather than by design.
 
 ### Per-Tool CLI↔MCP Mapping Ledger
 

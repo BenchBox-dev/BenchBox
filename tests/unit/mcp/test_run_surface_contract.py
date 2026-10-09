@@ -521,7 +521,7 @@ class TestMCPDocsContract:
 
         assert "beta-public scoped surface over the shared BenchBox engine" in normalized
         assert "all benchmark business logic lives in `benchbox.core` below both CLI and MCP" in normalized
-        assert "Surface asymmetry is deliberate and ledgered, never a parity backlog." in normalized
+        assert "Differences between the CLI and MCP surfaces are deliberate" in normalized
         assert "schema-level comparable to CLI result bundles" in normalized
 
     def test_docs_retire_the_superseded_anti_parity_framing(self):
@@ -599,7 +599,9 @@ class TestMCPDocsContract:
 
         for tier in sorted(RATIFIED_OMISSION_TIERS):
             assert f"**{tier}**" in normalized
-        assert "An omission that is absent from this ledger is a defect, not a decision." in normalized
+        assert (
+            "Any CLI control not listed in these tables is omitted unintentionally rather than by design." in normalized
+        )
 
     def test_security_scoped_omissions_are_never_promotable(self):
         ledger = _omission_ledger(_doc_text())

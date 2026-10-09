@@ -47,7 +47,7 @@ def test_every_public_symbol_has_an_authored_heading_or_anchor() -> None:
 def test_api_docs_lane_output_path_matches_the_workflow() -> None:
     reference = (ROOT / "docs/reference/api-reference.md").read_text(encoding="utf-8")
     workflow = WORKFLOW.read_text(encoding="utf-8")
-    assert "in the `api-docs` lane at `reference/python-api/`" in reference
+    assert "published at `reference/python-api/`" in reference
     assert "mkdir -p api-docs/reference/python-api" in workflow
     assert "docs/_build/html/reference/python-api api-docs/reference/" in workflow
     assert "Sphinx build" not in reference

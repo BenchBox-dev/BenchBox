@@ -98,7 +98,7 @@ def main() -> int:
                 "must never translate a Git merge directly into `live`",
                 "Visibility is orthogonal to archive acceptance",
                 "All six visibility states apply",
-                "Accepted source bytes remain preserved during the A0 freeze",
+                "Accepted source bytes remain preserved during withdrawal",
                 "Accepted-but-not-live results must not be described as already published",
                 '"presentation_status": "<active|withdrawal_requested|withdrawn|readmission_requested>"',
                 "Presentation: withdrawn → readmission_requested → active",
