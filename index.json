@@ -4303,12 +4303,17 @@
       "title": "Remove comments and docstrings from tuning generators, templates and profiles"
     },
     "comment-cleanup-uat-framework": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T01:04:03Z",
+        "generation": "11a7daa2bd7f41a3a838d4c773c24e02",
+        "renewals": 0,
+        "worker": "mcp:antigravity-worker-2"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove explanatory comments and docstrings from UAT harness code"
     },
     "comment-cleanup-unit-tests-cli-scripts-rest": {
