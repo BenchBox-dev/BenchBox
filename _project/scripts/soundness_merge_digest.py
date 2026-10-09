@@ -13,13 +13,15 @@ from pathlib import Path
 from typing import Any
 
 from oracle_review_check import (
-    _ORACLE_VERDICT,
     ORACLE_LOGIN,
     STANDIN_ATTESTERS,
     _attested_shas,
     latest_base_change,
 )
 
+ORACLE_VERDICT_LINE = re.compile(
+    r"### (?:oracle-verdict|oracle-review-shadow): (?P<state>[a-z]+) for `(?P<sha>[0-9a-f]{40})`"
+)
 MANIFEST_PATH = ".github/soundness-paths.txt"
 PREDICATE_PATH = "_project/scripts/soundness_paths.py"
 GOVERNANCE_PATHS = frozenset(
@@ -157,7 +159,7 @@ def _latest_oracle_review(evidence: PullEvidence, shas: frozenset[str] | set[str
 
 def _oracle_success(evidence: PullEvidence) -> bool:
     latest = _latest_oracle_review(evidence, set(evidence.content_shas))
-    verdict = _ORACLE_VERDICT.match(latest.body) if latest else None
+    verdict = ORACLE_VERDICT_LINE.match(latest.body) if latest else None
     return (
         latest is not None
         and verdict is not None

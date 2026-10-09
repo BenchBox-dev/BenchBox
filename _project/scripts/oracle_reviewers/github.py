@@ -12,7 +12,8 @@ from typing import Any
 
 from .retry import State
 
-STATE_ARTIFACT_PREFIX = "oracle-review-shadow-state-"
+STATE_ARTIFACT_PREFIX = "oracle-verdict-state-"
+LEGACY_STATE_ARTIFACT_PREFIX = "oracle-review-shadow-state-"
 STATE_FILE = "state.json"
 
 
@@ -104,11 +105,13 @@ def oracle_reviews(repo: str, pr: int) -> list[dict[str, Any]]:
     ]
 
 
-def state_artifact_name(pr: int) -> str:
-    return f"{STATE_ARTIFACT_PREFIX}{pr}"
+def state_artifact_name(pr: int, prefix: str = STATE_ARTIFACT_PREFIX) -> str:
+    return f"{prefix}{pr}"
 
 
-WORKFLOW_PATH = ".github/workflows/oracle-review-shadow.yml"
+WORKFLOW_PATH = ".github/workflows/oracle-verdict.yml"
+LEGACY_WORKFLOW_PATH = ".github/workflows/oracle-review-shadow.yml"
+STATE_SOURCES = ((STATE_ARTIFACT_PREFIX, WORKFLOW_PATH), (LEGACY_STATE_ARTIFACT_PREFIX, LEGACY_WORKFLOW_PATH))
 TRUSTED_EVENTS = frozenset({"pull_request_target", "issue_comment", "schedule", "workflow_dispatch"})
 
 
@@ -189,11 +192,12 @@ def trusted_run(
     pr: int,
     is_on_develop: Callable[[str, str], bool] = on_develop,
     pulls: Sequence[HeadPull] | None = None,
+    workflow_path: str = WORKFLOW_PATH,
 ) -> bool:
     head_sha = str(run.get("head_sha", ""))
     event = run.get("event")
     if not (
-        str(run.get("path", "")).split("@", 1)[0] == WORKFLOW_PATH
+        str(run.get("path", "")).split("@", 1)[0] == workflow_path
         and (run.get("repository") or {}).get("full_name") == repo
         and event in TRUSTED_EVENTS
         and re.fullmatch(r"[0-9a-f]{40}", head_sha) is not None
@@ -205,7 +209,14 @@ def trusted_run(
 
 
 def latest_state(repo: str, pr: int) -> State | None:
-    name = state_artifact_name(pr)
+    for prefix, workflow_path in STATE_SOURCES:
+        state = _latest_state(repo, pr, state_artifact_name(pr, prefix), workflow_path)
+        if state is not None:
+            return state
+    return None
+
+
+def _latest_state(repo: str, pr: int, name: str, workflow_path: str) -> State | None:
     listing = get_json(f"repos/{repo}/actions/artifacts?name={name}&per_page=30")
     candidates = sorted(
         (item for item in listing.get("artifacts", []) if not item.get("expired")),
@@ -221,7 +232,7 @@ def latest_state(repo: str, pr: int) -> State | None:
                 pulls = head_pulls(repo, run)
             except GitHubError:
                 continue
-        if not trusted_run(run, repo, pr, pulls=pulls):
+        if not trusted_run(run, repo, pr, pulls=pulls, workflow_path=workflow_path):
             continue
         with tempfile.TemporaryDirectory() as directory:
             result = subprocess.run(

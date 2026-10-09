@@ -983,8 +983,8 @@ def test_the_digest_no_longer_reads_head_workflow_runs(monkeypatch):
 ORACLE_BOT = "benchbox-oracle[bot]"
 
 
-def oracle_verdict(sha, state="success"):
-    return f"### oracle-review-shadow: {state} for `{sha}`\n\nDetails."
+def oracle_verdict(sha, state="success", context="oracle-verdict"):
+    return f"### {context}: {state} for `{sha}`\n\nDetails."
 
 
 def test_an_oracle_success_review_of_the_merged_content_is_a_signal():
@@ -1034,3 +1034,30 @@ def test_connector_signals_count_only_for_merges_before_the_cut_over():
     signals = {"reviews": (review(CONNECTOR, HEAD),), "reactions": (digest.Reaction(CONNECTOR, "+1", AFTER),)}
     assert digest.review_signals(evidence(merged_at="2026-10-09T02:00:00Z", **signals)) == ()
     assert digest.review_signals(evidence(**signals)) == ("connector-review", "connector-approval")
+
+
+@pytest.mark.parametrize("context", ["oracle-verdict", "oracle-review-shadow"], ids=["current", "legacy"])
+def test_the_digest_reads_both_first_lines(context):
+    success = evidence(reviews=(review(ORACLE_BOT, HEAD, user_type="Bot", body=oracle_verdict(HEAD, context=context)),))
+    failure = evidence(
+        reviews=(review(ORACLE_BOT, HEAD, user_type="Bot", body=oracle_verdict(HEAD, "failure", context)),)
+    )
+    assert digest.review_signals(success) == ("oracle-review",)
+    assert digest.review_signals(failure) == ()
+
+
+def test_the_digest_keeps_its_own_pattern_for_merged_history(monkeypatch):
+    import re
+
+    checker = sys.modules["oracle_review_check"]
+    current_only = re.compile(r"### oracle-verdict: (?P<state>[a-z]+) for `(?P<sha>[0-9a-f]{40})`")
+    monkeypatch.setattr(checker, "_ORACLE_VERDICT", current_only)
+    fresh_spec = importlib.util.spec_from_file_location("soundness_merge_digest_fresh", SCRIPT_PATH)
+    assert fresh_spec is not None and fresh_spec.loader is not None
+    fresh = importlib.util.module_from_spec(fresh_spec)
+    monkeypatch.setitem(sys.modules, fresh_spec.name, fresh)
+    fresh_spec.loader.exec_module(fresh)
+    legacy = oracle_verdict(HEAD, context="oracle-review-shadow")
+    assert fresh.ORACLE_VERDICT_LINE.match(legacy) is not None
+    pull = evidence(reviews=(review(ORACLE_BOT, HEAD, user_type="Bot", body=legacy),))
+    assert fresh.review_signals(pull) == ("oracle-review",)

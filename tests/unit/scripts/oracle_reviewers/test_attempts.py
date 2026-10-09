@@ -281,7 +281,7 @@ def test_cli_select_finalize_and_ensure_attempt(
     )
     assert out == {"state": "failure", "comment": "true", "review": "false", "has_state": "true"}
     status = json.loads((final_dir / "status.json").read_text(encoding="utf-8"))
-    assert status["context"] == "oracle-review-shadow"
+    assert status["context"] == "oracle-verdict"
     assert status["state"] == "failure"
     assert status["target_url"].endswith(f"/actions/runs/{RUN_ID}")
     state = json.loads((final_dir / "state" / "state.json").read_text(encoding="utf-8"))
@@ -491,7 +491,7 @@ def test_a_pending_run_posts_its_diagnostics_as_a_review(
     )
     assert out["state"] == "pending" and out["review"] == "true" and out["comment"] == "false"
     review = json.loads((tmp_path / "o" / "review.json").read_text(encoding="utf-8"))
-    assert review["body"].startswith(f"### oracle-review-shadow: pending for `{HEAD}`")
+    assert review["body"].startswith(f"### oracle-verdict: pending for `{HEAD}`")
     assert review["comments"] == [] and "sol: absent (auth)" in review["body"]
 
 
@@ -501,7 +501,7 @@ def test_withheld_result_is_posted_as_a_pending_review(policy: Policy, tmp_path:
     loaded, step, errors = _decide(policy, plan, tmp_path)
     final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, {})
     assert final.state == "pending" and final.review is not None
-    assert final.review["body"].startswith(f"### oracle-review-shadow: pending for `{HEAD}`")
+    assert final.review["body"].startswith(f"### oracle-verdict: pending for `{HEAD}`")
 
 
 def test_an_oversize_plan_finalizes_pending_for_its_size_and_names_the_ways_forward(

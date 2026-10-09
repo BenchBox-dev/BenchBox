@@ -5,8 +5,8 @@
 ```{tags} contributor, operations, ci
 ```
 
-`.github/workflows/oracle-review-shadow.yml` reviews soundness-path pull
-requests with agent CLIs and posts a non-required `oracle-review-shadow` status
+`.github/workflows/oracle-verdict.yml` reviews soundness-path pull requests
+with agent CLIs and posts a non-required `oracle-verdict` status and a review
 through the owner's GitHub App. The required `oracle-review` check reads that
 App's pull request reviews (see Cut-over). The policy lives in
 `.github/oracle-reviewers.yml`. The decision records are
@@ -182,9 +182,11 @@ The code, not the model, decides, and the stricter outcome wins:
 
 Severity orders the list and never gates: any listed defect, even a Low one,
 makes the result SHIP WITH FIXES. SHIP posts `success`; SHIP WITH FIXES and
-DO NOT SHIP post `failure`. The first line of the review body,
-`### oracle-review-shadow: <state> for <sha>`, is unchanged, and a
-`Decision:` line follows it. A list of more than 10 defects is not treated as
+DO NOT SHIP post `failure`. The first line of the review body is
+`### oracle-verdict: <state> for <sha>`, and a `Decision:` line follows it.
+Reviews posted before 2026-10-09 open with `### oracle-review-shadow:` instead;
+the required check still reads that line on an open pull request, and the
+merge digest reads both for good, because it reads merged history. A list of more than 10 defects is not treated as
 an invalid verdict, because every reviewer would then fail in turn and leave
 the pull request pending.
 
@@ -238,7 +240,7 @@ of their own.
   owner, member or collaborator, reruns the review on the current head. A reply
   on a review thread or a line comment does not trigger it, because those are
   review comments, not issue comments.
-- `gh workflow run oracle-review-shadow.yml --ref develop -f pr=<number>`
+- `gh workflow run oracle-verdict.yml --ref develop -f pr=<number>`
   does the same. A dispatch from any other ref is refused.
 - An hourly schedule retries pull requests whose last result on the current
   head is pending.
@@ -249,9 +251,12 @@ validation, or because a selected reviewer never reported, is not rerun on the
 same head; push a new head instead. Comment, dispatch and scheduled reruns
 share a daily budget per pull request (`retry.daily_budget`), with backoff that
 starts at one hour and doubles. The retry state is the
-`oracle-review-shadow-state-<number>` artifact of the latest run of this
-workflow whose commit is on `develop`; artifacts from any other workflow or
-branch are ignored.
+`oracle-verdict-state-<number>` artifact of the latest run of this workflow
+whose commit is on `develop`; artifacts from any other workflow or branch are
+ignored. When a pull request has no such artifact yet, `plan` reads the
+`oracle-review-shadow-state-<number>` artifact from runs of the workflow's
+former file, `.github/workflows/oracle-review-shadow.yml`, so the strike
+count, retry budget and backoff carry over the rename.
 
 A pull request whose brief exceeds the size cap even without the diff, because
 it changes so many files that the file list alone is too long, cannot be
@@ -285,9 +290,10 @@ signal the checker accepts. The required `oracle-review` check requires, from
 the `benchbox-oracle` App's Bot account:
 
 - a review of the head, not pending or dismissed, submitted after any retarget,
-  whose latest one opens with `### oracle-review-shadow: success for` the head
-  SHA, because the oracle posts every verdict as a comment review and a
-  defect outside the diff has no thread;
+  whose latest one opens with `### oracle-verdict: success for` (or, before
+  2026-10-09, `### oracle-review-shadow: success for`) the head SHA, because
+  the oracle posts every verdict as a comment review and a defect outside the
+  diff has no thread;
 - no unresolved review thread from the App.
 
 The verdict is read from the pull request's own review, not from the commit

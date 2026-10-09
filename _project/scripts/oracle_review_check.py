@@ -16,8 +16,11 @@ from soundness_paths import any_soundness_path
 
 ORACLE_LOGIN = "benchbox-oracle"
 ORACLE = "oracle"
-ORACLE_CONTEXT = "oracle-review-shadow"
-_ORACLE_VERDICT = re.compile(rf"### {ORACLE_CONTEXT}: (?P<state>[a-z]+) for `(?P<sha>[0-9a-f]{{40}})`")
+ORACLE_CONTEXT = "oracle-verdict"
+LEGACY_ORACLE_CONTEXT = "oracle-review-shadow"
+_ORACLE_VERDICT = re.compile(
+    rf"### (?:{ORACLE_CONTEXT}|{LEGACY_ORACLE_CONTEXT}): (?P<state>[a-z]+) for `(?P<sha>[0-9a-f]{{40}})`"
+)
 STANDIN_ATTESTERS = frozenset({"joeharris76"})
 _REFUSED_LINE = "Decision: **REFUSED**."
 _STANDIN_MARKER = re.compile(r"Stand-in oracle review: APPROVE ([0-9a-f]{40})")

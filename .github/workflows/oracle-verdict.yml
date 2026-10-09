@@ -1,6 +1,6 @@
-name: oracle-review-shadow
+name: oracle-verdict
 
-run-name: oracle-review-shadow (${{ github.event_name }} pr=${{ github.event.pull_request.number || github.event.issue.number || inputs.pr || 'sweep' }})
+run-name: oracle-verdict (${{ github.event_name }} pr=${{ github.event.pull_request.number || github.event.issue.number || inputs.pr || 'sweep' }})
 
 on:
   pull_request_target:
@@ -19,7 +19,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: oracle-review-shadow-${{ ((github.event_name == 'pull_request_target' && (github.event.action != 'edited' || github.event.changes.base)) || (github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/oracle-review') && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)) || github.event_name == 'workflow_dispatch') && format('pr-{0}', github.event.pull_request.number || github.event.issue.number || inputs.pr) || format('run-{0}', github.run_id) }}
+  group: oracle-verdict-${{ ((github.event_name == 'pull_request_target' && (github.event.action != 'edited' || github.event.changes.base)) || (github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/oracle-review') && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)) || github.event_name == 'workflow_dispatch') && format('pr-{0}', github.event.pull_request.number || github.event.issue.number || inputs.pr) || format('run-{0}', github.run_id) }}
   cancel-in-progress: true
 
 jobs:
@@ -78,7 +78,7 @@ jobs:
           CURRENT_REF: ${{ github.ref }}
         run: |
           if [ "$CURRENT_REF" != refs/heads/develop ]; then
-            echo "oracle-review-shadow: error: dispatch runs only from develop" >&2
+            echo "oracle-verdict: error: dispatch runs only from develop" >&2
             exit 2
           fi
 
@@ -89,7 +89,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .github/oracle-reviewers.yml
-            .github/workflows/oracle-review-shadow.yml
+            .github/workflows/oracle-verdict.yml
             .github/soundness-paths.txt
             _project/scripts/oracle_reviewers
             _project/scripts/soundness_paths.py
@@ -110,7 +110,7 @@ jobs:
       - name: Upload the plan
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          name: oracle-review-shadow-plan
+          name: oracle-verdict-plan
           path: ${{ runner.temp }}/oracle-plan
           if-no-files-found: error
           retention-days: 7
@@ -142,7 +142,7 @@ jobs:
       - name: Download the plan
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: oracle-review-shadow-plan
+          name: oracle-verdict-plan
           path: ${{ runner.temp }}/oracle-plan
 
       - name: Select the reviewer for attempt 1
@@ -183,7 +183,7 @@ jobs:
       - name: Download the plan
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: oracle-review-shadow-plan
+          name: oracle-verdict-plan
           path: ${{ runner.temp }}/oracle-plan
 
       - name: Set up Node.js
@@ -219,7 +219,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          name: oracle-review-shadow-attempt-1
+          name: oracle-verdict-attempt-1
           path: ${{ runner.temp }}/oracle-attempt/attempt-1.json
           if-no-files-found: error
           retention-days: 7
@@ -258,7 +258,7 @@ jobs:
       - name: Download the plan
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: oracle-review-shadow-plan
+          name: oracle-verdict-plan
           path: ${{ runner.temp }}/oracle-plan
 
       - name: Set up Node.js
@@ -307,7 +307,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          name: oracle-review-shadow-attempt-1
+          name: oracle-verdict-attempt-1
           path: ${{ runner.temp }}/oracle-attempt/attempt-1.json
           if-no-files-found: error
           retention-days: 7
@@ -346,7 +346,7 @@ jobs:
       - name: Download the plan
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: oracle-review-shadow-plan
+          name: oracle-verdict-plan
           path: ${{ runner.temp }}/oracle-plan
 
       - name: Install muse
@@ -380,7 +380,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          name: oracle-review-shadow-attempt-1
+          name: oracle-verdict-attempt-1
           path: ${{ runner.temp }}/oracle-attempt/attempt-1.json
           if-no-files-found: error
           retention-days: 7
@@ -412,13 +412,13 @@ jobs:
       - name: Download the plan
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: oracle-review-shadow-plan
+          name: oracle-verdict-plan
           path: ${{ runner.temp }}/oracle-plan
 
       - name: Download this run's attempts
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          pattern: oracle-review-shadow-attempt-*
+          pattern: oracle-verdict-attempt-*
           merge-multiple: true
           path: ${{ runner.temp }}/oracle-attempts
 
@@ -460,7 +460,7 @@ jobs:
       - name: Download the plan
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: oracle-review-shadow-plan
+          name: oracle-verdict-plan
           path: ${{ runner.temp }}/oracle-plan
 
       - name: Set up Node.js
@@ -496,7 +496,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          name: oracle-review-shadow-attempt-2
+          name: oracle-verdict-attempt-2
           path: ${{ runner.temp }}/oracle-attempt/attempt-2.json
           if-no-files-found: error
           retention-days: 7
@@ -535,7 +535,7 @@ jobs:
       - name: Download the plan
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: oracle-review-shadow-plan
+          name: oracle-verdict-plan
           path: ${{ runner.temp }}/oracle-plan
 
       - name: Set up Node.js
@@ -584,7 +584,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          name: oracle-review-shadow-attempt-2
+          name: oracle-verdict-attempt-2
           path: ${{ runner.temp }}/oracle-attempt/attempt-2.json
           if-no-files-found: error
           retention-days: 7
@@ -623,7 +623,7 @@ jobs:
       - name: Download the plan
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: oracle-review-shadow-plan
+          name: oracle-verdict-plan
           path: ${{ runner.temp }}/oracle-plan
 
       - name: Install muse
@@ -657,7 +657,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          name: oracle-review-shadow-attempt-2
+          name: oracle-verdict-attempt-2
           path: ${{ runner.temp }}/oracle-attempt/attempt-2.json
           if-no-files-found: error
           retention-days: 7
@@ -689,13 +689,13 @@ jobs:
       - name: Download the plan
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: oracle-review-shadow-plan
+          name: oracle-verdict-plan
           path: ${{ runner.temp }}/oracle-plan
 
       - name: Download this run's attempts
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          pattern: oracle-review-shadow-attempt-*
+          pattern: oracle-verdict-attempt-*
           merge-multiple: true
           path: ${{ runner.temp }}/oracle-attempts
 
@@ -737,7 +737,7 @@ jobs:
       - name: Download the plan
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: oracle-review-shadow-plan
+          name: oracle-verdict-plan
           path: ${{ runner.temp }}/oracle-plan
 
       - name: Set up Node.js
@@ -773,7 +773,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          name: oracle-review-shadow-attempt-3
+          name: oracle-verdict-attempt-3
           path: ${{ runner.temp }}/oracle-attempt/attempt-3.json
           if-no-files-found: error
           retention-days: 7
@@ -812,7 +812,7 @@ jobs:
       - name: Download the plan
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: oracle-review-shadow-plan
+          name: oracle-verdict-plan
           path: ${{ runner.temp }}/oracle-plan
 
       - name: Set up Node.js
@@ -861,7 +861,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          name: oracle-review-shadow-attempt-3
+          name: oracle-verdict-attempt-3
           path: ${{ runner.temp }}/oracle-attempt/attempt-3.json
           if-no-files-found: error
           retention-days: 7
@@ -900,7 +900,7 @@ jobs:
       - name: Download the plan
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: oracle-review-shadow-plan
+          name: oracle-verdict-plan
           path: ${{ runner.temp }}/oracle-plan
 
       - name: Install muse
@@ -934,7 +934,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          name: oracle-review-shadow-attempt-3
+          name: oracle-verdict-attempt-3
           path: ${{ runner.temp }}/oracle-attempt/attempt-3.json
           if-no-files-found: error
           retention-days: 7
@@ -966,13 +966,13 @@ jobs:
       - name: Download the plan
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: oracle-review-shadow-plan
+          name: oracle-verdict-plan
           path: ${{ runner.temp }}/oracle-plan
 
       - name: Download this run's attempts
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          pattern: oracle-review-shadow-attempt-*
+          pattern: oracle-verdict-attempt-*
           merge-multiple: true
           path: ${{ runner.temp }}/oracle-attempts
 
@@ -1014,7 +1014,7 @@ jobs:
       - name: Download the plan
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: oracle-review-shadow-plan
+          name: oracle-verdict-plan
           path: ${{ runner.temp }}/oracle-plan
 
       - name: Set up Node.js
@@ -1050,7 +1050,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          name: oracle-review-shadow-attempt-4
+          name: oracle-verdict-attempt-4
           path: ${{ runner.temp }}/oracle-attempt/attempt-4.json
           if-no-files-found: error
           retention-days: 7
@@ -1089,7 +1089,7 @@ jobs:
       - name: Download the plan
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: oracle-review-shadow-plan
+          name: oracle-verdict-plan
           path: ${{ runner.temp }}/oracle-plan
 
       - name: Set up Node.js
@@ -1138,7 +1138,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          name: oracle-review-shadow-attempt-4
+          name: oracle-verdict-attempt-4
           path: ${{ runner.temp }}/oracle-attempt/attempt-4.json
           if-no-files-found: error
           retention-days: 7
@@ -1177,7 +1177,7 @@ jobs:
       - name: Download the plan
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: oracle-review-shadow-plan
+          name: oracle-verdict-plan
           path: ${{ runner.temp }}/oracle-plan
 
       - name: Install muse
@@ -1211,7 +1211,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          name: oracle-review-shadow-attempt-4
+          name: oracle-verdict-attempt-4
           path: ${{ runner.temp }}/oracle-attempt/attempt-4.json
           if-no-files-found: error
           retention-days: 7
@@ -1263,7 +1263,7 @@ jobs:
       - name: Download the plan
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: oracle-review-shadow-plan
+          name: oracle-verdict-plan
           path: ${{ runner.temp }}/oracle-plan
 
       - name: Download this run's attempts
@@ -1271,7 +1271,7 @@ jobs:
         continue-on-error: true
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          pattern: oracle-review-shadow-attempt-*
+          pattern: oracle-verdict-attempt-*
           merge-multiple: true
           path: ${{ runner.temp }}/oracle-attempts
 
@@ -1285,7 +1285,7 @@ jobs:
         if: steps.finalize.outputs.has_state == 'true'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          name: oracle-review-shadow-state-${{ needs.plan.outputs.pr }}
+          name: oracle-verdict-state-${{ needs.plan.outputs.pr }}
           path: ${{ runner.temp }}/oracle-final/state/state.json
           if-no-files-found: error
           retention-days: 7
@@ -1294,7 +1294,7 @@ jobs:
         if: env.HAS_APP != 'true'
         env:
           RESULT_STATE: ${{ steps.finalize.outputs.state }}
-        run: echo "::notice::oracle-review-shadow is not posted because the App secrets are not set; result $RESULT_STATE for $HEAD_SHA"
+        run: echo "::notice::oracle-verdict is not posted because the App secrets are not set; result $RESULT_STATE for $HEAD_SHA"
 
       - name: Mint the App token
         id: app

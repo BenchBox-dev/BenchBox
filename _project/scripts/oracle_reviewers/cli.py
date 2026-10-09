@@ -23,7 +23,7 @@ from .verdict import DO_NOT_SHIP
 PLAN_FILE = "plan.json"
 BRIEF_FILE = "brief.md"
 DIFF_FILE = "diff.patch"
-WORKFLOW_FILE = "oracle-review-shadow.yml"
+WORKFLOW_FILE = "oracle-verdict.yml"
 WORKFLOW_SOURCE = Path(".github/workflows") / WORKFLOW_FILE
 DEVELOP_REF = "refs/heads/develop"
 NEW_DIFF_ACTIONS = ("opened", "synchronize")
@@ -71,7 +71,7 @@ def _read_json(path: Path) -> Any:
 
 def _pr_number(value: str) -> int:
     if not re.fullmatch(r"[1-9][0-9]{0,8}", value or ""):
-        raise SystemExit(f"oracle-review-shadow: invalid pull request number {value!r}")
+        raise SystemExit(f"oracle-verdict: invalid pull request number {value!r}")
     return int(value)
 
 
@@ -132,7 +132,7 @@ def _finish_plan(out_dir: Path, plan: dict[str, Any]) -> int:
             "tier": plan["tier"] or "",
         }
     )
-    _summary(f"oracle-review-shadow plan for #{plan['pr']}: {plan['decision']} ({plan['decision_reason']})")
+    _summary(f"oracle-verdict plan for #{plan['pr']}: {plan['decision']} ({plan['decision_reason']})")
     return 0
 
 
@@ -143,7 +143,7 @@ def command_plan(args: argparse.Namespace) -> int:
     event_name = os.environ["GITHUB_EVENT_NAME"]
     event = _event()
     if event_name == "workflow_dispatch" and os.environ.get("GITHUB_REF") != DEVELOP_REF:
-        print("oracle-review-shadow: error: dispatch runs only from develop", file=sys.stderr)
+        print("oracle-verdict: error: dispatch runs only from develop", file=sys.stderr)
         return 2
     pr = _pr_number(args.pr)
     out_dir = Path(args.out)
@@ -230,7 +230,7 @@ def command_plan(args: argparse.Namespace) -> int:
     try:
         plan["open_findings"] = dedup.open_fingerprints(github.review_threads(repo, pr), policy.bot_login)
     except (github.GitHubError, KeyError, ValueError) as exc:
-        _summary(f"oracle-review-shadow: open review threads could not be read, so none are suppressed: {exc}")
+        _summary(f"oracle-verdict: open review threads could not be read, so none are suppressed: {exc}")
     _plan_review(plan, out_dir, policy, tier, step, files, scoped, in_scope, full_diff, labels, previous, now)
     plan["decision_reason"] = f"{step.reason}; {rerun.reason}"
     return _finish_plan(out_dir, plan)
@@ -375,7 +375,7 @@ def _chain_reviewer(plan: Mapping[str, Any], name: str) -> Reviewer:
     for item in plan["chain"]:
         if item["name"] == name:
             return Reviewer.from_json(item)
-    raise SystemExit(f"oracle-review-shadow: {name!r} is not in this run's reviewer chain")
+    raise SystemExit(f"oracle-verdict: {name!r} is not in this run's reviewer chain")
 
 
 def command_review(args: argparse.Namespace) -> int:
@@ -383,7 +383,7 @@ def command_review(args: argparse.Namespace) -> int:
     plan = _read_json(plan_path)
     reviewer = _chain_reviewer(plan, args.reviewer)
     if reviewer.harness != args.harness:
-        raise SystemExit(f"oracle-review-shadow: {reviewer.name} does not run on the {args.harness} job")
+        raise SystemExit(f"oracle-verdict: {reviewer.name} does not run on the {args.harness} job")
     brief_path = plan_path.parent / BRIEF_FILE
     brief_path.chmod(0o600)
     prompt = brief_path.read_text(encoding="utf-8") if plan["brief_mode"] != "oversize" else ""
@@ -442,7 +442,7 @@ def command_finalize(args: argparse.Namespace) -> int:
         f"{os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/{plan['repo']}/actions/runs/{plan['run_id']}"
     )
     if plan["run_id"] != os.environ["GITHUB_RUN_ID"]:
-        raise SystemExit("oracle-review-shadow: the plan belongs to another run")
+        raise SystemExit("oracle-verdict: the plan belongs to another run")
     now = _now()
     if plan["decision"] == SUCCESS:
         final = report.fixed(retry.SUCCESS, "no soundness path changed")
@@ -497,7 +497,7 @@ def command_finalize(args: argparse.Namespace) -> int:
             "has_state": "true" if (out_dir / "state" / github.STATE_FILE).is_file() else "false",
         }
     )
-    _summary(f"oracle-review-shadow #{plan['pr']} {plan['head_sha']}: {final.state}: {final.description}")
+    _summary(f"oracle-verdict #{plan['pr']} {plan['head_sha']}: {final.state}: {final.description}")
     if final.body:
         _summary(final.body)
     return 0
@@ -513,7 +513,7 @@ def _reread_history(plan: Mapping[str, Any]) -> protocol.History:
         except (github.GitHubError, KeyError, TypeError, ValueError) as exc:
             error = exc
     _summary(
-        f"oracle-review-shadow: posting without confirming that head {plan['head_sha']} has no decision yet; "
+        f"oracle-verdict: posting without confirming that head {plan['head_sha']} has no decision yet; "
         f"the review list could not be re-read after {GUARD_ATTEMPTS} attempts: {error}"
     )
     return protocol.History()
@@ -525,7 +525,7 @@ def command_guard(args: argparse.Namespace) -> int:
     done = found.latest is not None and found.latest["head_sha"] == plan["head_sha"]
     _output({"skip": "true" if done else "false"})
     if done:
-        _summary(f"oracle-review-shadow: head {plan['head_sha']} already has a decision; this run posts nothing")
+        _summary(f"oracle-verdict: head {plan['head_sha']} already has a decision; this run posts nothing")
     return 0
 
 
@@ -545,12 +545,12 @@ def command_sweep(args: argparse.Namespace) -> int:
         github.dispatch(repo, WORKFLOW_FILE, pull["number"])
         dispatched += 1
         _summary(f"retry dispatched for #{pull['number']}")
-    _summary(f"oracle-review-shadow sweep dispatched {dispatched} retr{'y' if dispatched == 1 else 'ies'}")
+    _summary(f"oracle-verdict sweep dispatched {dispatched} retr{'y' if dispatched == 1 else 'ies'}")
     return 0
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="oracle-review-shadow")
+    parser = argparse.ArgumentParser(prog="oracle-verdict")
     commands = parser.add_subparsers(dest="command", required=True)
     plan = commands.add_parser("plan")
     plan.add_argument("--policy", required=True)
