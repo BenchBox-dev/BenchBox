@@ -13493,6 +13493,17 @@
       "status": "open",
       "title": "Port the scheduled-workflow-liveness check to nightly-v2 before nightly.yml is retired"
     },
+    "nightly-v2-windows-unit-leg-20261009": {
+      "claim": null,
+      "needs": [
+        "nightly-windows-utf8-reads-20261008",
+        "nightly-windows-path-quoting-20261008",
+        "nightly-windows-teardown-and-singles-20261008"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Add a Windows unit-test domain to nightly-v2 so retiring nightly.yml keeps Windows coverage"
+    },
     "nightly-windows-mcp-durable-fsync-followup": {
       "claim": null,
       "needs": [],
