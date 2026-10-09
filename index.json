@@ -4159,12 +4159,17 @@
       "title": "Remove comments and docstrings from shared test support"
     },
     "comment-cleanup-timeseries-adapters": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:38:34Z",
+        "generation": "8cfb38b8871b445492c4d5dce9ccd199",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from QuestDB and InfluxDB"
     },
     "comment-cleanup-tpcdi-generation": {
