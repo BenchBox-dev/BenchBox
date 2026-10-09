@@ -4294,12 +4294,17 @@
       "title": "Remove comments and docstrings from TSBS DevOps modules"
     },
     "comment-cleanup-tuning": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T01:03:15Z",
+        "generation": "f925f39cd7a44ee2a22a3603ed756c13",
+        "renewals": 0,
+        "worker": "mcp:antigravity-worker-2"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from tuning generators, templates and profiles"
     },
     "comment-cleanup-uat-framework": {
