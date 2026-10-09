@@ -7845,10 +7845,10 @@
     },
     "docs-move-internal-to-internal-root": {
       "claim": {
-        "expires_at": "2026-10-10T12:19:42Z",
-        "generation": "7bb84d81e4a746dabc52b3b09630a246",
+        "expires_at": "2026-10-10T21:14:51Z",
+        "generation": "585a95c5f7324cdba2324389749b7f6c",
         "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:a9f51c620a99fea6b166f0af"
+        "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:c5daffc9eae3c5f9ce6578f7"
       },
       "needs": [],
       "priority": "low",

@@ -46,6 +46,17 @@
       "op": "take",
       "op_id": "50fa2a4814d449029a25025e30371be6",
       "session_id": "a51cb5bff4a449988fe0c1453a9c9f24"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:c5daffc9eae3c5f9ce6578f7",
+      "at": "2026-10-09T21:14:51Z",
+      "client": "omp-coding-agent",
+      "displaced": "mcp:antigravity-client:joe@joe-mac-mini.local:a9f51c620a99fea6b166f0af",
+      "generation": "585a95c5f7324cdba2324389749b7f6c",
+      "op": "takeover",
+      "op_id": "6d206f32c25c4a79a59beb7ca8c9c808",
+      "reason": "Session a51cb5bff4a449988fe0c1453a9c9f24 has no matching local process; Muse reports external_agent_ingress_closed. PR #2817 remains open with failing checks, so takeover is needed to finish its existing work.",
+      "session_id": "f00fbcc194ab47a6a9508e7176243455"
     }
   ]
 }
