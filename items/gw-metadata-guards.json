@@ -2,7 +2,7 @@
   "acceptance": [
     "Gateway runs record the core platform.gateway{name, routed} block and tpc_compliant=false from core-exec-gateway-capability; get_platform_info adds only adapter-specific details (sanitized host, port, protocol, cache_control slot) and an ExecutionEngineReceipt with the default engine",
     "Per-query queries[].execution_engine uses the shared vocabulary (manifest routes_to names plus unknown), with receipt_source and fallback recorded; DuckDB, Snowflake and unknown buckets are reported separately, never blended",
-    "Baseline selection uses the core variants_comparable guard (not a separate is_native_run) in compare.py (block unless --allow-heterogeneous-comparison), regression_policy.py and analytics.py; a unit test proves a gateway run cannot enter a native baseline set",
+    "Baseline protection relies on the core variants_comparable guard that core-exec-gateway-capability wires into compare, regression and analytics; this item adds only the adapter fields that guard reads, plus a Snowflake and a Databricks test proving a gateway run from each adapter is excluded from a native baseline set",
     "SHOW WAREHOUSES/CURRENT_REGION probes degrade gracefully (metadata_degraded:true, never IndexError) on empty/truncated/synthetic gateway rows",
     "Cost suppression: cost_estimated null + cost_status not_comparable_gateway in both Snowflake and Databricks normalized metadata when gateway active"
   ],
@@ -23,6 +23,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "838334da58174535b9431c522316e77b",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:48:04Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "47407922fbd249279d2503f9287e4e76",
       "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
     }
   ]
