@@ -23637,7 +23637,7 @@
         "uat-native-dataframe-compatibility-rules",
         "uat-preflight-disk-headroom-gate"
       ],
-      "priority": "high",
+      "priority": "low",
       "status": "blocked",
       "title": "UAT release-gate re-run: enforce ordering, fresh root, and an explicit approval gate"
     },
