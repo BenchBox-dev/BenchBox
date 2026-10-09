@@ -14123,7 +14123,15 @@
     },
     "oracle-verdict-name-still-says-shadow-20261009": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "oracle-followup-read-bypass-out-of-scope-defect-20261009",
+        "oracle-oversize-pr-pending-loop-20261009",
+        "oracle-post-guard-reread-retry-20261009",
+        "oracle-protocol-test-gaps-20261009",
+        "oracle-marker-patch-map-file-limit-20261009",
+        "oracle-muse-installer-floating-channel-20261009",
+        "connector-wording-after-oracle-cutover-20261009"
+      ],
       "priority": "medium",
       "status": "open",
       "title": "Oracle reviews, status and workflow are still named \"oracle-review-shadow\" after it became the required reviewer"
