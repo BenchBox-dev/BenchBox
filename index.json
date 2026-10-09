@@ -15819,7 +15819,8 @@
       "claim": null,
       "needs": [
         "pvm-s5-analyze-polars-matrix",
-        "pvm-d1-publication-scope-decision"
+        "pvm-d1-publication-scope-decision",
+        "core-exec-polars-matrix-docs-refresh"
       ],
       "priority": "medium",
       "status": "blocked",
