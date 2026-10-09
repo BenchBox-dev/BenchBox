@@ -2006,10 +2006,10 @@
     },
     "canary-chdb-leak-source-20261009": {
       "claim": {
-        "expires_at": "2026-10-10T14:30:44Z",
-        "generation": "39cc87d0c43f4487946d4544e9006cc7",
+        "expires_at": "2026-10-10T16:43:16Z",
+        "generation": "66e1bcdc89704ed69e6f54d162f876a4",
         "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:905c6dff9634822e3c6b98bd"
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92"
       },
       "needs": [],
       "priority": "critical",

@@ -18,6 +18,17 @@
       "op": "take",
       "op_id": "7b70b459801147e4ab689ca3b013813b",
       "session_id": "ab67646309d04d93ac312505060c58eb"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-09T16:43:16Z",
+      "client": "claude-code",
+      "displaced": "mcp:tbh:joe@joe-mac-mini.local:905c6dff9634822e3c6b98bd",
+      "generation": "66e1bcdc89704ed69e6f54d162f876a4",
+      "op": "takeover",
+      "op_id": "06de0a85c9154e659888640af26d0e57",
+      "reason": "The owner directed that this session be the sole agent on the nightly-red-issues batch and take over the muse (tbh) session's items. The tbh session last wrote to this item at 2026-10-09T14:30:44Z and opened no PR for it.",
+      "session_id": "e40b1c8674df4499842f44749410458f"
     }
   ]
 }
