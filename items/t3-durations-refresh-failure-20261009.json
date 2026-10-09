@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "The cause of the 37944292492 t3:durations failure is recorded on #2827.",
+    "A nightly-v2 run (scheduled or dispatched) passes t3:durations and writes the durations file.",
+    "#2827 is closed."
+  ],
+  "context": "Found in the 2026-10-09 tracker review. Blocks dlv2-22-nightly-t3-shadow.",
+  "description": "Scheduled nightly-v2 run 37944292492 failed t3:durations with \"slow duration sample failed or has no successful pytest verdict\" (issue #2827). dlv2-22 needs green nightly-v2 runs, and this domain is red independently of perf and drift.\n\nFind why the slow duration sample fails, fix it, and confirm the refreshed durations file is produced.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:19:04Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "a047b084e36b40ce8cd7037d696e4ac8",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}
