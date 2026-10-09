@@ -3748,17 +3748,12 @@
       "title": "Remove or justify the unused expected-results delegation wrapper"
     },
     "comment-cleanup-experimental": {
-      "claim": {
-        "expires_at": "2026-10-10T00:17:57Z",
-        "generation": "afe3dcd15cab4573880c6781929fc47e",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from experimental code"
     },
     "comment-cleanup-explorer-build": {
