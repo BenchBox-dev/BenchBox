@@ -1,4 +1,5 @@
 {
+  "context": "2026-10-09 tracker review: Dropped. No `npx skill-sync` call remains in CI. #2083 vendored tools/skill-sync, which is pinned by TOOL_REF and TOOL_SHA256 in scripts/skill_sync_ci_policy.py:31-34, so the github-sha pin this item wanted to replace no longer exists.",
   "description": "The cloud/CI integrity gate that verifies the tracked skill snapshot runs\nskill-sync via a github-sha pin because the tool is not published to npm:\n\n  .github/workflows/pr.yml (skill-sync tracked snapshot verify step):\n    run: npx -y github:joeharris76/skill-sync#d3c9c45 verify --project .\n\nThe github pin is reproducible and tokenless, so this is acceptable as an\ninterim. Costs vs an npm dependency: a full repo clone on every CI run, no\nsemver, and reliance on GitHub availability.\n\nWhen skill-sync is published to npm, replace the single call site with:\n\n    run: npx -y skill-sync@<ver> verify --project .\n\nUpdate the adjacent comment, and optionally repoint the Makefile default\n`SKILL_SYNC ?= /Users/joe/Developer/skill-sync/dist/cli/index.js` to the\nnpm-installed binary so local `make skill-sync` / `make skill-sync-verify`\nuse the published tool too. The Makefile and `.pre-commit-config.yaml`\nalready resolve skill-sync via the override-able `SKILL_SYNC` path, so the\nonly hard-coded github pin is the one CI line above.\n",
   "legacy": {
     "deferrals": [
@@ -50,5 +51,15 @@
         "wid": "w2"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:24:02Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "b7e0bf62cdf8411489bf2d46b30159ee",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
 }
