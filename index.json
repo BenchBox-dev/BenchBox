@@ -4348,18 +4348,13 @@
       "title": "Remove comments and docstrings from utility and format conversion modules"
     },
     "comment-cleanup-validation": {
-      "claim": {
-        "expires_at": "2026-10-10T01:08:23Z",
-        "generation": "d988bf9e2f5a4bcc9caa8f73c9447086",
-        "renewals": 0,
-        "worker": "mcp:antigravity-worker-2"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget",
         "comment-cleanup-expected-wrapper"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from expected-results and validation"
     },
     "comment-cleanup-vector-search": {
