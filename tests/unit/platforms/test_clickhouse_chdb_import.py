@@ -26,3 +26,15 @@ def test_import_chdb_restores_cwd_when_native_load_fails(tmp_path):
             dependencies.import_chdb()
 
     assert os.getcwd() == original_cwd
+
+
+def test_import_chdb_returns_the_module_without_binding_the_adapter_module_global():
+    import types
+
+    fake_chdb = types.ModuleType("chdb")
+    assert dependencies.chdb is None
+
+    with patch.object(dependencies.importlib, "import_module", return_value=fake_chdb):
+        assert dependencies.import_chdb() is fake_chdb
+
+    assert dependencies.chdb is None
