@@ -4,7 +4,7 @@
     "manifest schema 2; verify requires the downloads member",
     "Oracle review cleared; first site-inputs.yml run after merge green"
   ],
-  "context": "Owner decision D-U (2026-10-09, in chat, decision dialog): the bundle carries these files (keeps the /docs/_downloads/ URLs unchanged and keeps the site build to repo plus bundle), rather than linking to GitHub or fetching from GitHub at build time. Found while making the site build from the bundle (site-split-22): the build stopped in publishLegacyFiles on the first missing download.",
+  "context": "Owner decision D-U (2026-10-09, in chat, decision dialog): the bundle carries these files (keeps the /docs/_downloads/ URLs unchanged and keeps the site build to repo plus bundle), rather than linking to GitHub or fetching from GitHub at build time. Found while making the site build from the bundle (site-split-22): the build stopped in publishLegacyFiles on the first missing download.\n2026-10-09 04:18Z FINISH EVIDENCE: core PR #2799 merged as 0d5f01e91 (03:54Z; oracle SHIP in enforce mode, CI green). Implementation note: the scan reads the bundled docs tree (out/docs), not tracked sources, because the TPC-DS template links live in generated query pages; a tracked-only scan found 21 of 183. First schema-2 bundle: site-inputs run 37882876078 on 0d5f01e91, success 04:13:40-04:17:11Z; manifest schema 2, parent 7b639aba1 (parent_source bundle); downloads/ holds 185 files (the converter needs 183, all present). The site fetcher (benchbox-site PR #1) verified it: digest sha256:eb2f3c11...; site accepts schemas 1 and 2. Local schema-2 build before merge: 10 members, verify OK, privacy passes, 2.83 MB compressed.",
   "description": "Small core PR (soundness path: scripts/site_inputs.py).\n\nThe docs link to 183 tracked core files outside docs/ (99 TPC-DS .tpl templates, 61 .py, 22 .sql, 1 .ini; about 0.9 MB). The site publishes each at /docs/_downloads/<md5>/<name>. The bundle lists them in repo-files.json but carries no contents, so the site build cannot publish them.\n\n1. In `scripts/site_inputs.py`, add a `downloads/` member: every tracked file outside docs/ that a Markdown link target in a tracked `docs/**/*.md` file resolves to (inline links, reference definitions and autolinks; fragments and queries stripped; schemes and site-absolute paths skipped; .md and .rst excluded). Copy each to `downloads/<repo-relative path>`.\n2. Bump the bundle schema to 2: `downloads` joins the required member set, and `cmd_verify` checks it.\n3. Tests for the link scan (relative, reference-style, fragment, outside vs inside docs, untracked target ignored) and for verify.\n4. The site adds schema 2 to its supported set and keeps schema 1 (N and N-1). Core lands first.",
   "sessions": [
     {
@@ -22,6 +22,14 @@
       "generation": "5b2ad0476c534dec936ca99cd7267095",
       "op": "take",
       "op_id": "9c78bd9c53f44bba8c27499b840ed777",
+      "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de",
+      "at": "2026-10-09T04:18:34Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "eeb3c94396bf4941b4bbf4a20cf81784",
       "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
     }
   ]
