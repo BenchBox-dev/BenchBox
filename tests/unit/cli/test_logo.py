@@ -8,13 +8,14 @@ import re
 from pathlib import Path
 from unittest.mock import patch
 
+import click
 import pytest
 from click.testing import CliRunner
 from rich.panel import Panel
 from rich.text import Text
 
 from benchbox.cli.app import cli
-from benchbox.cli.logo import LOGO, logo_supported
+from benchbox.cli.logo import LOGO, logo_supported, print_startup_logo, styled_logo
 from benchbox.cli.onboarding import _show_welcome_message
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -78,6 +79,64 @@ def test_version_json_has_no_logo() -> None:
     result = CliRunner().invoke(cli, ["--version-json"])
     assert result.exit_code == 0
     json.loads(result.output)
+
+
+def test_startup_logo_prints_before_command_output() -> None:
+    result = CliRunner().invoke(cli, ["auth", "status"])
+    assert result.exit_code == 0
+    assert LOGO_FIRST_ROW in result.output
+    assert result.output.index(LOGO_FIRST_ROW) < result.output.index("Service URL:")
+
+
+def test_startup_logo_skipped_for_subgroup_help() -> None:
+    result = CliRunner().invoke(cli, ["auth", "status", "--help"])
+    assert result.exit_code == 0
+    assert LOGO_FIRST_ROW not in result.output
+    assert LOGO_FIRST_ROW not in result.stderr
+
+
+def test_startup_logo_skipped_when_unsupported() -> None:
+    with patch("benchbox.cli.logo.logo_supported", return_value=False):
+        result = CliRunner().invoke(cli, ["auth", "status"])
+    assert result.exit_code == 0
+    assert LOGO_FIRST_ROW not in result.output
+    assert LOGO_FIRST_ROW not in result.stderr
+
+
+def _startup_ctx(params: dict[str, object]) -> click.Context:
+    ctx = click.Context(click.Command("dummy"))
+    ctx.params = dict(params)
+    return ctx
+
+
+def test_print_startup_logo_skips_quiet_param() -> None:
+    with patch.object(click, "echo") as mock_echo:
+        print_startup_logo(_startup_ctx({"quiet": True}))
+    mock_echo.assert_not_called()
+
+
+def test_print_startup_logo_skips_global_quiet() -> None:
+    with (
+        patch("benchbox.utils.printing.is_quiet", return_value=True),
+        patch("benchbox.cli.logo.styled_logo", return_value="logo") as mock_styled,
+    ):
+        print_startup_logo(_startup_ctx({}))
+    mock_styled.assert_not_called()
+
+
+def test_print_startup_logo_skips_resilient_parsing() -> None:
+    ctx = click.Context(click.Command("dummy"), resilient_parsing=True)
+    ctx.params = {}
+    with patch("benchbox.cli.logo.styled_logo", return_value="logo") as mock_styled:
+        print_startup_logo(ctx)
+    mock_styled.assert_not_called()
+
+
+def test_styled_logo_respects_stream_encoding() -> None:
+    ascii_stream = io.TextIOWrapper(io.BytesIO(), encoding="ascii")
+    assert styled_logo(ascii_stream) == ""
+    utf8_stream = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
+    assert LOGO_FIRST_ROW in styled_logo(utf8_stream)
 
 
 def test_welcome_prints_logo_before_panel() -> None:

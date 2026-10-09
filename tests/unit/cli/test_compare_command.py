@@ -162,7 +162,7 @@ class TestCompareCommand:
             assert result.exit_code in [0, 1]
             if result.exit_code == 0:
                 try:
-                    json.loads(result.output)
+                    json.loads(result.stdout)
                 except json.JSONDecodeError:
                     pytest.fail("Output is not valid JSON")
 
