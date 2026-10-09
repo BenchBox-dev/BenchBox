@@ -3766,12 +3766,17 @@
       "title": "Remove comments from Explorer build, browser tests and configuration"
     },
     "comment-cleanup-explorer-data": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:18:54Z",
+        "generation": "b346611a51c24347b04f95ae31acc288",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments from Explorer data and state modules"
     },
     "comment-cleanup-explorer-ui": {
