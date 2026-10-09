@@ -19579,13 +19579,18 @@
       "title": "Bootstrap the site repo: settings, agent instructions, Node hooks, CI and nightly probes"
     },
     "site-split-22-build-from-bundle": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T05:00:45Z",
+        "generation": "028f9937f1e949e9992fdf6249f83da0",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de"
+      },
       "needs": [
         "site-split-20-seed-site-repo",
         "site-split-12-bundle-downloads"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Make the site and Explorer build only from the repo and the fetched core bundle"
     },
     "site-split-23-node-deploy-plane": {
