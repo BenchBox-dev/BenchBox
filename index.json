@@ -4267,17 +4267,12 @@
       "title": "Remove comments and docstrings from TPC-Havoc runtime"
     },
     "comment-cleanup-tpchavoc-variants": {
-      "claim": {
-        "expires_at": "2026-10-10T01:01:44Z",
-        "generation": "fd7d769ea8184222af83d9b63474b940",
-        "renewals": 0,
-        "worker": "mcp:antigravity-worker-2"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from TPC-Havoc variant catalogs"
     },
     "comment-cleanup-transaction-primitives": {
