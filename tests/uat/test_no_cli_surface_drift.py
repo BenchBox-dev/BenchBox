@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import inspect
 import os
 import subprocess
@@ -83,7 +84,6 @@ ALLOWED_INTERNAL_CLI_FILES = {
 ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     "benchbox/cli/commands/setup.py",
     "benchbox/cli/commands/calculate_qphh.py",
-    "benchbox/cli/commands/compare.py",
     "benchbox/cli/commands/compare_dataframes.py",
     "benchbox/cli/commands/compare_plans.py",
     "benchbox/cli/commands/df_tuning.py",
@@ -97,6 +97,9 @@ ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     "benchbox/cli/commands/plan_history.py",
 }
 ALLOWED_INTERNAL_CLI_FILES = ALLOWED_INTERNAL_CLI_FILES | ALLOWED_HIDDEN_COMPAT_CLI_FILES
+ACCEPTED_CLI_SURFACE_DIGESTS = {
+    "benchbox/cli/commands/compare.py": "4a7f4c5b56d8c4d42c31ea742ef258db2fcdfd7b1def69fa3b4e77e0f6fda2b1",
+}
 FORBIDDEN_CLI_SURFACE_DECORATORS = {"argument", "command", "group", "option"}
 FORBIDDEN_CLI_SURFACE_FUNCTIONS = {
     "benchbox/cli/commands/convert.py": "convert",
@@ -117,7 +120,10 @@ def test_uat_did_not_modify_benchbox_cli_surface():
     for path in sorted(ALLOWED_INTERNAL_CLI_FILES):
         if path in ALLOWED_HIDDEN_COMPAT_CLI_FILES:
             continue
-        if _cli_surface_changed(
+        if path in ACCEPTED_CLI_SURFACE_DIGESTS:
+            if _cli_surface_digest(_source_at_worktree(path), path) != ACCEPTED_CLI_SURFACE_DIGESTS[path]:
+                forbidden.append(path)
+        elif _cli_surface_changed(
             path,
             base_source=_source_at_ref(base, path),
             current_source=_source_at_worktree(path),
@@ -373,6 +379,10 @@ def _cli_surface_changed(
     return _cli_surface_snapshot(base_source, path) != _cli_surface_snapshot(current_source, path)
 
 
+def _cli_surface_digest(source: str, path: str) -> str:
+    return hashlib.sha256("\n".join(_cli_surface_snapshot(source, path)).encode("utf-8")).hexdigest()
+
+
 def _cli_surface_snapshot(source: str, path: str) -> tuple[str, ...]:
     if not source:
         return ()
@@ -445,3 +455,22 @@ def _git(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
             f"git {' '.join(args)} failed with {result.returncode}: {result.stderr.strip() or result.stdout.strip()}"
         )
     return result
+
+
+def test_accepted_cli_surface_digest_changes_with_any_option_or_help_edit():
+    source = """import click
+
+@click.command("compare")
+@click.option("--fail-on-regression")
+def compare(fail_on_regression):
+    pass
+"""
+    path = "benchbox/cli/commands/compare.py"
+    edited_option = source.replace('"--fail-on-regression"', '"--fail-on-regression", type=str')
+    extra_option = source.replace(
+        '@click.option("--fail-on-regression")', '@click.option("--other")\n@click.option("--fail-on-regression")'
+    )
+
+    assert _cli_surface_digest(source, path) == _cli_surface_digest(source + "\nX = 1\n", path)
+    assert _cli_surface_digest(source, path) != _cli_surface_digest(edited_option, path)
+    assert _cli_surface_digest(source, path) != _cli_surface_digest(extra_option, path)
