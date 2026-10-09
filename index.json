@@ -14032,7 +14032,7 @@
       "needs": [],
       "priority": "medium",
       "status": "open",
-      "title": "Replace the muse installer hash pin, which protects only the bootstrap, with an honest floating install that cannot change mid-run"
+      "title": "Replace the muse installer hash pin, which protects only the bootstrap, with a plain install of the latest muse"
     },
     "oracle-oversize-pr-pending-loop-20261009": {
       "claim": null,
