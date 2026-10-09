@@ -1,11 +1,12 @@
 {
   "acceptance": [
-    "#2797's description states the Bot-only default and why",
-    "#2784's 300-file statement is corrected (or the item oracle-marker-patch-map-file-limit-20261009 records the correction)",
-    "#2758's PR title describes the change"
+    "`gh pr view 2797 --json body` shows the Bot-only default and no plain `benchbox-oracle` default",
+    "`gh pr view 2784 --json body` states the ~200-file limit and no 300-file claim",
+    "`gh pr view 2758 --json title` shows a descriptive title",
+    "A diff of each body before and after shows only the intended sentence changed (diffs kept in the scratchpad, summary in this item's context)"
   ],
-  "context": "Found in the completion audit of the oracle replacement on 2026-10-09. Editing a merged PR's title or body is a GitHub write the owner approves.",
-  "description": "PR descriptions are the durable record readers search later. Two merged ones are wrong:\n- #2797 says the follow-up sweep defaults `DEFAULT_REVIEW_AUTHORS` to `benchbox-oracle[bot]` and `benchbox-oracle`. Its second commit (881873c51, \"trust only the oracle Bot account as a default review author\") changed that: develop has only `benchbox-oracle[bot]`, and _graphql_login adds `[bot]` only when GitHub reports a Bot account, so a human account named benchbox-oracle is not trusted.\n- #2784 says a 300-file marker keeps its patch map; it keeps it only up to about 200 files (see oracle-marker-patch-map-file-limit-20261009).\nAlso, #2758's squash commit title on develop is \"feat/oracle review cutover\" (96c26ad3c), which reads as a branch name; a commit title cannot be changed, so the PR title is the only place to correct it.",
+  "context": "Found in the completion audit of the oracle replacement on 2026-10-09. The #2797 mismatch was found while preparing the external review; the owner authorized all three edits the same day. Independent of the code items; can run at any time.",
+  "description": "PR descriptions are the durable record readers search later. Three merged oracle PRs are wrong:\n- #2797's description says the follow-up sweep defaults `DEFAULT_REVIEW_AUTHORS` to `benchbox-oracle[bot]` and `benchbox-oracle`. Its second commit (881873c51, \"trust only the oracle Bot account as a default review author\") changed that: develop has only `benchbox-oracle[bot]`, and _graphql_login adds `[bot]` only when GitHub reports a Bot account, so a human account named benchbox-oracle is not trusted. The same description says the four muse install steps check a pinned SHA-256; that stays true until oracle-muse-installer-floating-channel-20261009 merges, and needs no edit.\n- #2784's test plan says \"A 300-file marker fits with its patch map; a 1000-file one keeps only the digest.\" Measured on develop: the map is kept only up to about 200 files (210 with no open defects).\n- #2758's title is \"feat/oracle review cutover\" (squash commit 96c26ad3c), which reads as a branch name. The commit title on develop cannot change; the PR title can.\n\nAuthorization (owner, 2026-10-09): edit these three merged PRs.\n\nRequired edits.\n- #2797: replace the follow-up-sweep bullet with the Bot-only default and the reason.\n- #2784: replace the 300-file sentence with the measured limit (about 200 files with 10 open defects; above it only the digest is kept and follow-ups become full reviews).\n- #2758: retitle to a plain description of the change, for example \"feat(oracle): make the oracle the required soundness reviewer\".\n\nGuardrails.\n- Edit only the named sentence or title; leave every other part of each body byte for byte. Fetch the body with `gh pr view <n> --json body -q .body` into the scratchpad, edit that file, and apply with `gh pr edit <n> --body-file <file>`; diff before and after.\n- No session or process wording in the new text (no \"audit\", \"handoff\", \"follow-up item\" ids); write for a reader who never saw the session.\n- No attribution lines.\n\nDecision gate. None remaining; the owner authorized the edits on 2026-10-09.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/pull/2797",
     "https://github.com/BenchBox-dev/BenchBox/pull/2784",
@@ -18,6 +19,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "92f13c7677904ebeb82b122aaf2c0a60",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T13:16:31Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "4ce8a09930ed4eaa8db4cb106b332d55",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
