@@ -3,6 +3,7 @@
     "nightly-v2 has a liveness domain using the hardened lookup, or a written reason it is not needed",
     "dlv2-70 lists this item as a condition for deleting nightly.yml"
   ],
+  "context": "PR #2835 current head 3d902ba85d85ae855780dd8c725635934fdc04c8 has a current-head oracle SHIP and a Joe stand-in attestation; required oracle-review rerun and CI gates are being reconciled.",
   "description": "nightly-v2.yml has no equivalent of the scheduled-workflow-liveness job. dlv2-70 deletes nightly.yml, which would remove the only check that a scheduled workflow has stopped firing. Port the hardened check into nightly-v2 as its own domain (with its own issue label, as the other domains have), or record why it is no longer needed. Do not copy the current per_page=1 query across.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2570"
@@ -15,6 +16,14 @@
       "op": "create",
       "op_id": "b2571f1583b7493e9b98dc21afe6d6cf",
       "session_id": "e40b1c8674df4499842f44749410458f"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:8d0fa0e2ef22aacc5284a44c",
+      "at": "2026-10-09T21:50:32Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "9715941c15264d53b6f1db7d271c7910",
+      "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
     }
   ]
 }
