@@ -14162,12 +14162,17 @@
       "title": "oracle map renders a staged gate's scale from the shared default and passes unknown provenance labels through"
     },
     "oracle-marker-patch-map-file-limit-20261009": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T19:43:08Z",
+        "generation": "d6e268d96ea84498b8bfdb071f99e6bd",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
+      },
       "needs": [
         "oracle-followup-read-bypass-out-of-scope-defect-20261009"
       ],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Pin and document the oracle marker's patch-map limit of about 200 files"
     },
     "oracle-merged-pr-descriptions-stale-20261009": {
