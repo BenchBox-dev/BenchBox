@@ -22889,10 +22889,15 @@
       "title": "Record the ClickHouse merge-settle wait in the result and apply it in the modes the owner chose"
     },
     "tuning-evidence-tuned-mode-promise-20261008": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T14:42:02Z",
+        "generation": "fb3d237bb4434d0ab5a97574f5b9a92f",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Define what the tuned mode promises, and record the owner's decisions on per-query settings, merge-wait symmetry and unmeasured templates"
     },
     "tuning-evidence-unmeasured-template-label-20261008": {
