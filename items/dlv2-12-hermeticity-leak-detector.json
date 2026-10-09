@@ -4,7 +4,7 @@
     "Leak detector enabled in T1; a deliberately leaking test fails it; test_tpch_generator.py cwd test passes",
     "No test derives repo root from cwd (grep evidence in PR)"
   ],
-  "context": "Codex C8: rule targets leaks, not legitimate in-test cwd use. Guardrail G3.\n\nStop checkpoint 2026-09-30 12:20 UTC: OPEN, no claim/implementation. Fresh worktree /Users/joe/Developer/BenchBox.wt-unit-test-state-isolation branchfix/unit-test-state-isolation, cleanheade95063c7b556ff529bc76b66c60be29a2b35c24d, lifecycle7b94b5c723e849fda297751027b9a683, agent-write-preflightPASS. No edits/tests/venv/publication. Oldhermetic WT14aba preserved (13priorunmergedcommits, do not reapply blindly). Investigated file-derived shared tests/utilities/paths.py helper and actual cwd-root assumptions in standardized commands, agent-write-preflight tests, TPCDS resource resolution, UAT CLI dispatch, test_runner and performance_profiler. Full home/wallclock injection and after-all-teardown cwd/env/registered-global leak detector remain required; keep reset safety nets without masking leaks. Negative leaked state must restore then fail; legitimate generator chdir/restoration must pass. See /tmp/HANDOFF-dlv2-codex-20260930T1220Z.md.",
+  "context": "Codex C8: rule targets leaks, not legitimate in-test cwd use. Guardrail G3.\n\nStop checkpoint 2026-09-30 12:20 UTC: OPEN, no claim/implementation. Fresh worktree /Users/joe/Developer/BenchBox.wt-unit-test-state-isolation branchfix/unit-test-state-isolation, cleanheade95063c7b556ff529bc76b66c60be29a2b35c24d, lifecycle7b94b5c723e849fda297751027b9a683, agent-write-preflightPASS. No edits/tests/venv/publication. Oldhermetic WT14aba preserved (13priorunmergedcommits, do not reapply blindly). Investigated file-derived shared tests/utilities/paths.py helper and actual cwd-root assumptions in standardized commands, agent-write-preflight tests, TPCDS resource resolution, UAT CLI dispatch, test_runner and performance_profiler. Full home/wallclock injection and after-all-teardown cwd/env/registered-global leak detector remain required; keep reset safety nets without masking leaks. Negative leaked state must restore then fail; legitimate generator chdir/restoration must pass. See /tmp/HANDOFF-dlv2-codex-20260930T1220Z.md.\n\nClosed 2026-10-09 (tracker review against develop 34de720b8): delivered by #2530 (cce8a9de0). Repo root comes from tests/utilities/paths.py, proven cwd-independent by tests/unit/test_repo_root_paths.py; the session runs with a disposable HOME/USERPROFILE before collection; tests/utilities/leak_detector.py is registered in pytest_plugins (tests/conftest.py:62-69) and tests/unit/test_leak_detector.py shows a leaking test fails at teardown while legitimate chdir/restore passes. The remaining direct Path.cwd()/os.getcwd() calls in tests check cwd behaviour or save/restore, not repo-root derivation. Not carried over: the 237 direct wall-clock reads #2530 listed; file a separate item only if a flaky test is traced to one.",
   "description": "Clean develop gave 93 local unit failures, many from environment coupling. Fix at source:\n1. Enumerate Path.cwd()/os.getcwd() repo-root assumptions in tests (grep -rnE \"Path\\.cwd\\(\\)|os\\.getcwd\\(\\)\" tests) and derive repo root from the test file location (one shared helper).\n2. Tests must not read the real home directory (~/.benchbox) or wall clock; inject them.\n3. Replace process-global mutable state (benchbox.utils.printing _QUIET, utils.config_interface provider) with injection where practical; keep the autouse reset fixtures in tests/conftest.py as a safety net.\n4. Add an autouse leak detector that fails a test only when cwd, os.environ, or registered globals differ after teardown. Tests that legitimately chdir (e.g. tests/unit/generators/test_tpch_generator.py:910) must restore via fixture and pass.",
   "sessions": [
     {
@@ -30,6 +30,14 @@
       "generation": "84f90a119ce946038a37066b19d0ccda",
       "op": "take",
       "op_id": "1a43231c31c34b0ba295959a822b15e4",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:18:07Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "9157359d247e4321acba400cdfd5067b",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
