@@ -3629,12 +3629,17 @@
       "title": "Remove comments and docstrings from DataFrame expression abstraction"
     },
     "comment-cleanup-dataframe-maintenance": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:14:03Z",
+        "generation": "048abb4461654d13a91c6a1b6e35112d",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from table-format maintenance adapters"
     },
     "comment-cleanup-dataframe-pandas": {
