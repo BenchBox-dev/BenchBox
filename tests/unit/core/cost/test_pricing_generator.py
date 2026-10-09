@@ -319,6 +319,13 @@ def test_select_fabric_cu_price_requires_agreement():
             "currencyCode": "USD",
             "retailPrice": 0.54,
         },
+        {
+            "productName": "Fabric Capacity",
+            "meterName": "Eventstream Custom Connector Capacity Usage CU",
+            "unitOfMeasure": "1 Hour",
+            "currencyCode": "USD",
+            "retailPrice": 0.2574,
+        },
     ]
     assert generator.select_fabric_cu_price(rows, region="eastus") == "0.18"
     rows[1]["retailPrice"] = 0.19
