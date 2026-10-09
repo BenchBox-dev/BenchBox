@@ -14192,12 +14192,17 @@
       "title": "Replace the muse installer hash pin, which protects only the bootstrap, with a plain install of the latest muse"
     },
     "oracle-oversize-pr-pending-loop-20261009": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T19:41:40Z",
+        "generation": "d8b905d4c18b483a93cb79514f885a8e",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
+      },
       "needs": [
         "oracle-followup-read-bypass-out-of-scope-defect-20261009"
       ],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "An oversize pull request never gets a review, yet the sweep keeps retrying it and posting pending reviews"
     },
     "oracle-patch-hash-hunk-positions-20261008": {
