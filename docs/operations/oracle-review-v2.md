@@ -49,7 +49,10 @@ Without the App secrets, the `post` job logs the result and succeeds.
    diff exceeds the brief cap, any reviewer that is not hard read-only with
    `reads_files: true`.
 3. `attempt-N-<harness>` runs that reviewer on a detached, credential-free
-   checkout of the head. It never runs pull request code. The result is an
+   checkout of the head. A Codex job first allows unprivileged user namespaces
+   (`kernel.apparmor_restrict_unprivileged_userns=0`), which the Ubuntu 24.04
+   runner restricts; without that, the Codex read-only sandbox cannot start and
+   Codex reports its review incomplete. It never runs pull request code. The result is an
    artifact with the run ID, head SHA, reviewer and either a validated verdict
    or an absence.
 4. `post` re-validates every artifact from this run, replays the selection,
