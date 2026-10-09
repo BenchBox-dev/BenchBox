@@ -13445,7 +13445,7 @@
       "needs": [],
       "priority": "medium-high",
       "status": "open",
-      "title": "Make test_benchmark_capacity_tool_is_tenant_scoped wait for lease expiry instead of a fixed 60 ms sleep, then un-quarantine the Windows integration-smoke leg"
+      "title": "Make test_benchmark_capacity_tool_is_tenant_scoped wait for lease expiry instead of a fixed 60 ms sleep"
     },
     "nightly-py310-dataframe-options-mock-target": {
       "claim": null,
