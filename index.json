@@ -3647,17 +3647,12 @@
       "title": "Remove comments and docstrings from pandas expression abstraction"
     },
     "comment-cleanup-dataframe-support": {
-      "claim": {
-        "expires_at": "2026-10-10T00:14:48Z",
-        "generation": "a871d35420ae442eb6de229775d6359d",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from shared DataFrame platform support"
     },
     "comment-cleanup-datafusion-typing": {
