@@ -74,14 +74,6 @@ _PROJECT_SCOPED_INFORMATION_SCHEMA_VIEWS = frozenset({"SCHEMATA"})
 
 
 def _is_project_scoped_information_schema_view(name: str) -> bool:
-    """True when a dotted INFORMATION_SCHEMA ref resolves at project level.
-
-    Dataset-qualifying such views produces
-    "Not found: Dataset <ds>.INFORMATION_SCHEMA". Verified live: bare
-    INFORMATION_SCHEMA.SCHEMATA succeeds with no default dataset, while
-    the qualified form 404s. Dataset-scoped views (TABLES, COLUMNS) are
-    unaffected.
-    """
     upper = (name or "").upper()
     if not upper.startswith("INFORMATION_SCHEMA."):
         return False

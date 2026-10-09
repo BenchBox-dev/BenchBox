@@ -2387,6 +2387,18 @@ class TestQualifyTableNames:
         assert result == "SELECT * FROM `p1.d1.MY_CUSTOM_TABLE`"
 
     @patch("benchbox.platforms.bigquery.bigquery")
+    def test_project_scoped_information_schema_view_stays_unqualified(self, mock_bigquery):
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        sql = "SELECT schema_name FROM INFORMATION_SCHEMA.SCHEMATA ORDER BY schema_name"
+        assert adapter._qualify_table_names(sql) == sql
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_dataset_scoped_information_schema_view_is_still_qualified(self, mock_bigquery):
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names("SELECT table_name FROM INFORMATION_SCHEMA.COLUMNS")
+        assert result == "SELECT table_name FROM `p1.d1.INFORMATION_SCHEMA.COLUMNS`"
+
+    @patch("benchbox.platforms.bigquery.bigquery")
     def test_qualifies_insert_into_target(self, mock_bigquery):
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         result = adapter._qualify_table_names("INSERT INTO insert_ops_lineitem SELECT * FROM lineitem")
