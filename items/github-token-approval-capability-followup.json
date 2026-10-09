@@ -1,5 +1,5 @@
 {
-  "context": "DORMANT until a trigger fires: the review requirement this item assumes was retired on 2026-07-18 without being applied (docs/operations/repo-admin-settings.md). Move back to open only when agent PRs move to a separate bot identity, or when required approving reviews or code-owner review are enforced at the ruleset layer. At that point `can_approve_pull_request_reviews: true` becomes a live self-approval loophole. Until then, do not act on it.",
+  "context": "DORMANT until a trigger fires: the review requirement this item assumes was retired on 2026-07-18 without being applied (docs/operations/repo-admin-settings.md). Move back to open only when agent PRs move to a separate bot identity, or when required approving reviews or code-owner review are enforced at the ruleset layer. At that point `can_approve_pull_request_reviews: true` becomes a live self-approval loophole. Until then, do not act on it.\n\n2026-10-09 tracker review: Dropped. The trigger workflow (develop-post-merge.yml) is gone and no ruleset requires approvals. The setting must stay on: sync-results-data-to-published.yml:328 and seed-corpus.yml:255 create PRs with GITHUB_TOKEN, which needs it. The doc correction is tracked in repo-admin-settings-actions-pr-permission-doc-20261009.",
   "description": "`docs/operations/repo-admin-settings.md:16-25` documents that\n`can_approve_pull_request_reviews: true` is set at the repo level (alongside\n`default_workflow_permissions: read`). The stated reason is that the\n`develop-post-merge.yml` `auto-revert-on-failure` job needs it so a\n`GITHUB_TOKEN`-driven `gh pr edit --add-reviewer` call can request review on\nthe auto-revert PR from the original PR author when the GraphQL author lookup\nsucceeds (confirmed: `develop-post-merge.yml` uses `--add-reviewer`, not an\napproval call — the setting is currently unused for approvals, only enabling\nthe *capability*).\n\nNOTE (2026-07-18): the review requirement this item's premise waits on was\nRETIRED without being applied (see docs/operations/repo-admin-settings.md,\n\"Soundness-path review enforcement (RETIRED 2026-07-18)\", and the closed\n_project/DONE/main/planning/auto-merge-review-gate-admin-enforcement.yaml).\nThis item therefore stays dormant UNLESS a retirement revisit trigger fires\n— in particular, agent PRs moving to a separate bot identity, at which\npoint require_code_owner_review becomes enforceable and this loophole\nanalysis becomes live again. Re-read it then; do not act on it before.\n\nOriginal premise: once the review requirement from\nauto-merge-review-gate-admin-enforcement is\nactually enforced at the ruleset layer (required_approving_review_count>=1,\nrequire_code_owner_review=true), this dormant capability becomes a live\nself-approval loophole: any workflow running with a `pull-requests: write`\n`GITHUB_TOKEN` could, in principle, call the PR-review-approve API and satisfy\nthe review requirement without a human ever looking at the diff — including\nfor a soundness-path PR. Today the setting only enables *requesting* review,\nnot approving one, and no workflow in this repo currently calls the approve\nendpoint — but the capability being switched on repo-wide means a future\nworkflow change (or a compromised/malicious workflow run) could exploit it\nsilently, with no code-level signal that it happened.\n",
   "legacy": {
     "anti_patterns": [
@@ -132,5 +132,15 @@
         "wid": "w3"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:24:15Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "13bb4835de01471bbc74db8d8cae455e",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
 }
