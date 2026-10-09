@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "A test shows a held plan posts a pending status and no decision",
+    "A test drives github.oracle_reviews through the paging call with more than one page",
+    "A test with more than 5 out-of-scope defects shows exactly 5 listed and the rest summarised",
+    "A test forces a long status description and asserts it is cut to 140 characters",
+    "The misnamed runner test is renamed or made to omit a status",
+    "Each new test fails when the rule it covers is disabled"
+  ],
+  "context": "Found in the completion audit of the oracle protocol on 2026-10-09. The marker size boundary is tracked separately in oracle-marker-patch-map-file-limit-20261009.",
+  "description": "A behaviour-by-behaviour audit of the oracle protocol tests on develop e7eb5ce7e found every named behaviour implemented and most covered, with these gaps:\n1. A malformed or repeated marker makes the plan return `hold` (tested), but the finalize step that turns `hold` into a pending status (cli.py around line 449) is not: test_attempts.py::test_cli_finalize_fixed_decisions covers only `success` and `fork`.\n2. test_cli_plan.py::test_more_than_a_hundred_reviews_are_all_read replaces github.oracle_reviews with a fake that returns 151 reviews, so nothing tests that the real call pages (`get_paginated`, `--paginate --slurp` in github.py).\n3. The cap of 5 on defects listed as \"not counted\" (outside the changed files) is not tested; the only test uses one such defect.\n4. No test forces a status description over 140 characters through report._clip.\n5. test_runner.py::test_a_follow_up_missing_a_prior_status_is_recorded_for_the_judge passes a status through and never omits one; its name overstates it (the real coverage is test_rounds.py::test_a_prior_defect_with_no_status_stays_open).\n6. The #2769 replay uses synthetic prior statuses and checks the planner and judge, not the posted review bodies.",
+  "links": [
+    "tests/unit/scripts/oracle_reviewers/test_cli_plan.py",
+    "tests/unit/scripts/oracle_reviewers/test_attempts.py",
+    "tests/unit/scripts/oracle_reviewers/test_rounds.py",
+    "tests/unit/scripts/oracle_reviewers/test_runner.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T12:48:15Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "1d1b5946accf4438a7f497cc552bde9e",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}

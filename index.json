@@ -13975,6 +13975,13 @@
       "status": "open",
       "title": "Oracle patch hashes drop hunk positions, so moving an edit can carry an earlier decision"
     },
+    "oracle-protocol-test-gaps-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Oracle protocol behaviours with partial tests: hold at finalize, review-list paging, not-counted cap, status truncation"
+    },
     "oracle-pull-request-target-retarget-race-20261008": {
       "claim": null,
       "needs": [],
