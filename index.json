@@ -4820,10 +4820,15 @@
       "title": "get_connection_from_pool passes the whole platform config to create_connection(**config), which raises TypeError for Glue and MotherDuck"
     },
     "connector-wording-after-oracle-cutover-20261009": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T19:41:14Z",
+        "generation": "1719d66fdb424036b315b76ba2c981ee",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Text outside the cleanup's scope still says soundness PRs need the Codex connector"
     },
     "consider-whether-other-core-drivers-polars-clickhouse-connec": {
