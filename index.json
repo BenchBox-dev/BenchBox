@@ -4455,10 +4455,15 @@
       "title": "Support adding legitimate comment exceptions in PRs without base branch circular dependency"
     },
     "comment-scanner-mdx-jsx-support": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T13:50:56Z",
+        "generation": "da278027c9d2475b8723353503834c86",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:3a93d76fab1934bd71f35b65"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Extend comment scanner for MDX files to check top-level JSX comments and imports"
     },
     "comment-scanner-stdin-piped-interpreter-adapter": {
