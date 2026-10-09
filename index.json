@@ -4040,12 +4040,17 @@
       "title": "Remove comments and docstrings from maintained project tools"
     },
     "comment-cleanup-publication-tooling": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:31:19Z",
+        "generation": "3bbadf6cfba7485a8f473adaa90f3d2a",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments from publication validators and release control tooling"
     },
     "comment-cleanup-publishing": {
