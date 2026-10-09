@@ -11330,9 +11330,9 @@
     },
     "internal-labels-in-code-and-rules": {
       "claim": {
-        "expires_at": "2026-10-09T23:46:49Z",
-        "generation": "57f91209f2b648f7b91f23fadcfe9f8e",
-        "renewals": 0,
+        "expires_at": "2026-10-10T00:48:05Z",
+        "generation": "a4b7de2d67674b569ea9caf75819a655",
+        "renewals": 1,
         "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:a9f51c620a99fea6b166f0af"
       },
       "needs": [],
