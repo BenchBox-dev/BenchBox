@@ -611,6 +611,7 @@ def select_fabric_cu_price(rows: list[dict], *, region: str) -> str:
         and row.get("unitOfMeasure") == "1 Hour"
         and "Capacity Usage" in str(row.get("meterName", ""))
         and "Overage" not in str(row.get("meterName", ""))
+        and "Custom Connector" not in str(row.get("meterName", ""))
     ]
     if not candidates:
         raise PricingGeneratorError(f"no Fabric Capacity Usage meters found in {region}")
