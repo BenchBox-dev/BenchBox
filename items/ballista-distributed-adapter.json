@@ -1,4 +1,5 @@
 {
+  "context": "Core execution-variant guardrails (added 2026-10-09; ADR docs/development/adr/adr-core-execution-variants.md, plan item core-exec-execution-variants): Ballista standalone vs cluster changes process topology, so it is a deployment (manifest deployment_modes, --platform ballista:<mode>), not an execution engine and not a per-platform mode key. Ballista is its own platform key, never a DataFusion engine variant, so its results never share identity with datafusion. Do not register bare generic option keys (engine, mode, backend, runtime, executor, warehouse). Follow the execution-variant section of docs/development/new-platform-acceptance-checklist.md.",
   "description": "Add support for Apache DataFusion Ballista, a distributed SQL query engine built on\nApache DataFusion and Apache Arrow. Ballista extends DataFusion's single-node execution\nto a distributed cluster architecture with a scheduler and multiple executor nodes.\n\nBallista is notable for:\n- Distributed SQL execution across a cluster (scheduler + executors)\n- Built on DataFusion - same SQL dialect, same query planning, same Arrow-native execution\n- Python bindings built from source (BallistaBuilder and BallistaSessionContext APIs)\n- Supports Parquet, CSV, and other Arrow-compatible formats on shared storage\n- Kubernetes-native deployment with Helm charts\n- Standalone mode for single-machine testing\n- Columnar execution via Apache Arrow with query vectorization\n- Claims 2.9x speedup over Spark on TPC-H at 100GB scale factor\n\nSince Ballista uses DataFusion internally, the existing DataFusion adapter provides\na strong foundation. The key differences are: (1) connection via BallistaBuilder to a\nremote scheduler instead of a local SessionContext, (2) data must reside on shared\nstorage accessible to all executors (S3, GCS, HDFS, or shared filesystem), and\n(3) distributed execution semantics (partitioning, shuffles, task scheduling).\n\nIMPORTANT: The `ballista` name on PyPI is occupied by an UNRELATED package (a PyTorch\nhelper). The Apache Ballista Python bindings are NOT published to PyPI as prebuilt\nwheels. Users must build from source using maturin from the main Ballista repo\n(apache/datafusion-ballista/python/). This significantly affects installation UX\nand CI integration.\n\nReference: https://github.com/apache/datafusion-ballista\nPython bindings: https://github.com/apache/datafusion-ballista/tree/main/python\n",
   "legacy": {
     "anti_patterns": [
@@ -327,5 +328,19 @@
         "wid": "w9"
       }
     ]
-  }
+  },
+  "links": [
+    "docs/development/new-platform-acceptance-checklist.md",
+    "item:core-exec-execution-variants"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:39:50Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "62971025832549c185622d2de342b5b4",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
+    }
+  ]
 }
