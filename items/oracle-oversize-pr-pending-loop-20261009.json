@@ -7,7 +7,7 @@
     "docs/operations/oracle-review-v2.md states what happens to an oversize pull request",
     "Merged through the normal PR flow with an oracle success review of the merged head"
   ],
-  "context": "Merged in #2832 (squash f014d8f66, 2026-10-09 19:40 UTC) after an oracle SHIP on head 492a4591c (shadow run 37973635508, sol). retry.OVERSIZE is added to PENDING_CAUSES, and report._settled records it for a pending oversize plan. The pending review and status (89 characters) name splitting the pull request or the owner's stand-in. Tests: test_an_oversize_plan_finalizes_pending_for_its_size_and_names_the_ways_forward (finalize cause; manual, pull-request and sweep reruns refused; new diff allowed) and test_an_oversize_head_is_not_retried_until_a_new_push (plan level). Mutation: recording all-absent fails the finalize test. Documented in oracle-review-v2.md. No live oversize PR has occurred to observe after merge; the behaviour is unit-tested only.",
+  "context": "Merged in #2832 (squash f014d8f66, 2026-10-09 19:40 UTC) after an oracle SHIP on head 492a4591c (shadow run 37973635508, sol). retry.OVERSIZE is added to PENDING_CAUSES, and report._settled records it for a pending oversize plan. The pending review and status (89 characters) name splitting the pull request or the owner's stand-in. Tests: test_an_oversize_plan_finalizes_pending_for_its_size_and_names_the_ways_forward and test_an_oversize_head_is_not_retried_until_a_new_push. Mutation: recording all-absent fails the finalize test. Documented in oracle-review-v2.md.\n\nPost-merge live check: canary #2847 (640 files with long paths, so the file list alone is 133 KB; closed unmerged, branch deleted). oracle-verdict run 37989093375 skipped every reviewer for size, posted the pending review with the oversize note (\"too large for the oracle ... Split it into smaller pull requests, or ask the owner for a stand-in review of this head\"), and set the status \"pending: too large for the oracle; split the pull request or ask the owner for a stand-in\". A dispatched same-head retry, run 37989694372, was refused at plan: \"the last run on head c1f39a0df... was pending for oversize, not absent reviewers\".",
   "description": "Problem. When the brief exceeds `brief_max_bytes` (100000) even without the diff, roughly 1500 or more changed files, the plan's brief mode is `oversize` and `selection._skip_reason` skips every reviewer (\"skipped: the brief exceeds the size cap even without the diff\"). The run ends pending with cause `all-absent`, which `retry.decide_rerun` treats as retryable, so the hourly sweep (`command_sweep`, `retry.due_for_retry`) redispatches the same head with backoff up to `daily_budget` (6) times a day. Under `findings_delivery: review` each run posts another pending review. No reviewer can ever run on that head, so only the owner's stand-in can satisfy the required check.\n\nRequired change.\n- Record a distinct pending cause for an oversize plan (add it to `retry.PENDING_CAUSES`), so `decide_rerun` refuses same-head retries for it like it does for integrity and unreported causes.\n- The pending review for an oversize head says, in plain words, that the change is too large for the oracle and that the owner's stand-in is the way to merge it, or to split the pull request.\n- A new push (new diff) still plans normally.\n\nOut of scope. Raising `brief_max_bytes`, splitting briefs, or reviewing oversize PRs some other way.\n\nGuardrails.\n- Never weaken the required `oracle-review` check; the stand-in rule is unchanged and only the owner posts it.\n- Very-high tier; verify after merge.\n- Worktree via `make worktree-create` and `make agent-write-preflight`; identity Joe Harris <joeharris76@gmail.com>; explicit staging; no comments or docstrings; `make comment-policy-check`.\n- May ship in one PR with oracle-post-guard-reread-retry-20261009, oracle-protocol-test-gaps-20261009 and oracle-marker-patch-map-file-limit-20261009; each item's acceptance must still be met and named in the PR body.\n\nDecision gate. None: the owner-facing behaviour (stand-in or split) is already the documented path for unreviewable PRs.",
   "links": [
     "_project/scripts/oracle_reviewers/selection.py",
@@ -57,6 +57,14 @@
       "generation": "d8b905d4c18b483a93cb79514f885a8e",
       "op": "finish",
       "op_id": "f9a602c07f254decaf8f1866f845ac9c",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T20:52:23Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "f816a000de6b4f22bdeea4c4bdb9ccf4",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
