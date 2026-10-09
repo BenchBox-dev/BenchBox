@@ -19957,8 +19957,7 @@
     "site-split-27-advisory-visual-regression": {
       "claim": null,
       "needs": [
-        "site-split-23-node-deploy-plane",
-        "site-split-30-rehearsal"
+        "site-split-23-node-deploy-plane"
       ],
       "priority": "medium",
       "status": "open",
