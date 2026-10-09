@@ -3423,17 +3423,12 @@
       "title": "Remove comments and docstrings from AMPLab modules"
     },
     "comment-cleanup-analysis-comparison": {
-      "claim": {
-        "expires_at": "2026-10-10T00:06:44Z",
-        "generation": "27566ec14c754698ab76fb3f408558d1",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from analysis and comparison modules"
     },
     "comment-cleanup-aws-cloud": {
