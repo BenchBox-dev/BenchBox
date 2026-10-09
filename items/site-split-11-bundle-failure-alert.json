@@ -4,7 +4,7 @@
     "No new secret or App is required",
     "Oracle review cleared"
   ],
-  "context": "Owner decision D-T (2026-10-08, in chat): a separate small core PR after the site-inputs corrections merge and before the seed, not part of that PR's final round. Found while diagnosing develop run 37694648015 (7ee64f98c), which failed validator_parity and opened no issue; the next run moved past it silently.\n2026-10-09 00:15Z: PR #2795 opened (branch feat/site-bundle-failure-alert, head dd768241c, worktree /Users/joe/Developer/BenchBox.wt-site-bundle-alert). Separate report-failure job with issues: write only. Needs shadow review, then owner stand-in (soundness path), then pr-arm.",
+  "context": "Owner decision D-T (2026-10-08, in chat): a separate small core PR after the site-inputs corrections merge and before the seed, not part of that PR's final round. Found while diagnosing develop run 37694648015 (7ee64f98c), which failed validator_parity and opened no issue; the next run moved past it silently.\n2026-10-09 00:15Z: PR #2795 opened (branch feat/site-bundle-failure-alert, head dd768241c, worktree /Users/joe/Developer/BenchBox.wt-site-bundle-alert). Separate report-failure job with issues: write only. Needs shadow review, then owner stand-in (soundness path), then pr-arm.\n2026-10-09 01:27Z FINISH EVIDENCE: #2795 merged as 1b3f03a9a (01:26:23Z). Implemented as a separate report-failure job (needs build, if failure(), permissions issues: write only) rather than a step, so the build job keeps read-only permissions; the step reuses the open site-bundle-failed issue or creates label and issue, with core SHA and run URL. Failed attestation names are not included: they live in the build job's workspace (the run URL leads to them). Tests: test_failed_bundle_build_reports_to_one_issue and test_bundle_build_job_keeps_read_only_permissions; CI green on 94514dac6. Oracle decided SHIP (enforce mode); no stand-in needed. Not yet exercised by a real failure.",
   "description": "Small core PR, after the site-inputs bundle changes are on develop and before the site repo is seeded.\n\nToday a failed `site-inputs.yml` run on develop raises no alert. Neither the develop workflow nor the corrected one has an issue step. The plan opens a `site-bundle-failed` issue only from the site deploy plane, for a dispatch that arrived. A core build failure never dispatches, so the only signal is a red workflow run.\n\n1. Add a final step to `.github/workflows/site-inputs.yml` with `if: failure()`.\n2. Using `github.token` with `issues: write`, open one issue labelled `site-bundle-failed`, or comment on the open one. Include the core SHA, the run URL and the failed attestation names.\n3. Close nothing automatically; the next green run may comment that the chain recovered.\n4. The workflow is a soundness path, so the PR needs oracle review. It needs no GitHub App.",
   "links": [
     ".github/workflows/site-inputs.yml"
@@ -33,6 +33,14 @@
       "generation": "9c13ed6fd62f4bc99fac3788f062518d",
       "op": "take",
       "op_id": "2a1bca11a8844e35ac6fcd8da7c73e3c",
+      "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de",
+      "at": "2026-10-09T01:26:51Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "fa49c083a0864d22bb673ca6f3210b51",
       "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
     }
   ]
