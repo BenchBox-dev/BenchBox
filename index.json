@@ -22722,15 +22722,10 @@
       "title": "Remove partitioning from DuckDB tuned templates (DuckDB always drops it)"
     },
     "tuning-evidence-adr3-clickhouse-corrections-20261008": {
-      "claim": {
-        "expires_at": "2026-10-10T14:30:49Z",
-        "generation": "c20fe31ba235482a990d6e061da181e4",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Correct the ClickHouse addendum in ADR-3: scope claims to SF1, mark the Q3/Q5 cause unproven, fix the TPC-DS failure count"
     },
     "tuning-evidence-benefit-rule-20261008": {
