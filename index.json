@@ -2029,13 +2029,18 @@
       "title": "Get one green release canary run on develop before v0.4.1"
     },
     "canary-green-verify-20261008": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T12:54:36Z",
+        "generation": "f42b4c5045c64549a8e74a1cab6ab0cc",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:905c6dff9634822e3c6b98bd"
+      },
       "needs": [
         "canary-compat-gate-test-predicate-20261008",
         "canary-chdb-stub-leak-20261008"
       ],
       "priority": "critical",
-      "status": "open",
+      "status": "active",
       "title": "Rerun the release canary on develop after the two test fixes and confirm it is green"
     },
     "canary-impact-01-junit-durations": {
