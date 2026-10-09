@@ -19492,6 +19492,13 @@
       "status": "open",
       "title": "Add SiriusDB (GPU-Native SQL Engine) Platform Adapter"
     },
+    "site-docs-broken-fragments-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Fix 10 broken fragment links that are live on benchbox.dev today"
+    },
     "site-parity-header-shrink-toggle": {
       "claim": null,
       "needs": [],

@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "The 10 links resolve on the built site",
+    "Their entries are removed from the site's known-broken-links.json and the deploy link gate still passes"
+  ],
+  "context": "Found 2026-10-09 while building the site's TypeScript link gate (site-split-23) against a real build of core 0d5f01e91's bundle. Checked against the live page: https://benchbox.dev/docs/usage/installation.html has no no-docker-required id.",
+  "description": "The site's deploy link gate found 10 internal links whose fragment does not exist on the target page. All 10 are broken on the live site too, so they predate the site split; they were added to the site repo's inventory/known-broken-links.json so the gate does not block deploys on existing breakage.\n\n- Site repo: the landing page links /docs/usage/installation.html#no-docker-required; the page has no such heading id.\n- Core docs: the CLI reference index (/docs/reference/cli/) links fragments that the results, tuning and utilities pages do not have: results.html#compare, #export, #results; tuning.html#tuning-dataframe, #tuning-init; utilities.html#benchmarks, #check-deps, #profile, #validate.\n\nFix the links or add the anchors, then remove the 10 entries from inventory/known-broken-links.json.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de",
+      "at": "2026-10-09T05:03:05Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "15983e3db1034247b3399532770f600d",
+      "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
+    }
+  ]
+}
