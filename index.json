@@ -15490,14 +15490,19 @@
       "title": "Generalize the DuckDB version-matrix runner and analyzer into engine-neutral tools without changing DuckDB output"
     },
     "pvm-s3b-polars-matrix-spec": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T09:11:43Z",
+        "generation": "4fe505b8aa734c0796439514f37415ac",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c"
+      },
       "needs": [
         "pvm-s3a-generalize-matrix-tooling",
         "pvm-s1-version-correctness-probe",
         "pvm-s2-sf10-memory-time-probe"
       ],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Add the Polars matrix spec with interleaved runs, engine setups, correctness evidence and fair analysis"
     },
     "pvm-s4-run-polars-matrix": {
