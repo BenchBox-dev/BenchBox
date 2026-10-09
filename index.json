@@ -7664,8 +7664,9 @@
       "claim": null,
       "needs": [
         "dlv2-42-retire-dev-loop-scripts-tests",
-        "dlv2-53-retire-legacy-release-path",
-        "dlv2-44-precommit-trim"
+        "dlv2-44-precommit-trim",
+        "site-split-50-core-site-removal",
+        "site-split-51-publication-retirement"
       ],
       "priority": "medium",
       "status": "open",
