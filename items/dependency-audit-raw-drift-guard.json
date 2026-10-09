@@ -2,7 +2,7 @@
   "acceptance": [
     "A pre-commit hook or make check fails if pyproject.toml dependencies are modified without matching updates to docs/development/dependency-audit-raw.md"
   ],
-  "context": "Discovered during PR #2787 followups when pinning bashlex==0.18; make audit-raw-check failed in CI because parse_deps.py had not been run locally.",
+  "context": "Slice 2 implemented in the same branch as comment-policy-pinned-notice-drift-guard: feat/policy-and-dependency-drift-guards, commit 9a25578a3d7727d8c6394bd3fbe8501f1664502a, PR https://github.com/BenchBox-dev/BenchBox/pull/2829 to develop (OPEN, MERGEABLE). Guard: parse_deps.py --check already existed and make audit-raw-check already used it and ran in ci-lint; this slice adds the missing pre-commit hook (id audit-raw) in .pre-commit-config.yaml covering pyproject.toml, the generator, and the doc. Verified: parse_deps.py --check exits 0 on clean tree; manifest-sensitivity probe confirms drift exits 1. Finish after squash-merge.",
   "description": "Modifying dependencies in pyproject.toml requires regenerating docs/development/dependency-audit-raw.md via _project/scripts/dependency_audit/parse_deps.py. Today, this is enforced only by make audit-raw-check in CI. Add a pre-commit check or tooling guard that detects when pyproject.toml dependencies change without updating dependency-audit-raw.md, preventing push-time CI failures.",
   "sessions": [
     {
@@ -12,6 +12,14 @@
       "op": "create",
       "op_id": "149f55e2d9574d00b008f29436471e78",
       "session_id": "2c188abafba54577ab5700a7c822554e"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:3a93d76fab1934bd71f35b65",
+      "at": "2026-10-09T16:20:07Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "8ced1ea7b7cd4915905cceedf5c3ff47",
+      "session_id": "b5a8c9cf1e3044e0b29099c7c26c16c1"
     }
   ]
 }
