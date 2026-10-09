@@ -4177,17 +4177,12 @@
       "title": "Remove comments and docstrings from TPC-DI generation"
     },
     "comment-cleanup-tpcdi-runtime": {
-      "claim": {
-        "expires_at": "2026-10-10T00:40:03Z",
-        "generation": "f971701891794b3cb2e62a1396c5bdbf",
-        "renewals": 0,
-        "worker": "mcp:antigravity-closeout"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from TPC-DI runtime and ETL"
     },
     "comment-cleanup-tpcds-dataframe": {
