@@ -16,6 +16,7 @@ from benchbox.core.tpchavoc.equivalence import (
     build_clickhouse_with_tpch,
     find_clickhouse_divergences,
 )
+from benchbox.platforms.clickhouse import _dependencies
 from benchbox.sql_compat.rules.execution_filter.clickhouse_tpchavoc import CLICKHOUSE_TPCHAVOC_SKIPS
 from tests.utilities.optional_engines import chdb_skip_reason
 
@@ -24,6 +25,14 @@ pytestmark = [
     pytest.mark.tpchavoc,
     pytest.mark.slow,
 ]
+
+
+@pytest.fixture(autouse=True)
+def _restore_chdb_module_global(monkeypatch):
+    monkeypatch.setattr(_dependencies, "chdb", None)
+    yield
+    monkeypatch.undo()
+    _dependencies.chdb = None
 
 
 @pytest.fixture(scope="module")

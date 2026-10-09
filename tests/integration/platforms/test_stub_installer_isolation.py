@@ -1,4 +1,5 @@
 import sys
+import types
 
 import pytest
 
@@ -75,3 +76,18 @@ def test_stub_installer_ignores_warningregistry(monkeypatch):
     first_module = sys.modules[STUB_PATCHED_MODULES[0]]
     monkeypatch.setattr(first_module, "__warningregistry__", {"test": 1}, raising=False)
     assert find_stub_adapter_attr_leaks(before) == []
+
+
+@pytest.mark.integration
+@pytest.mark.platform_smoke
+def test_stub_guard_flags_unrestored_chdb_write():
+    from benchbox.platforms.clickhouse import _dependencies
+
+    import_stub_patched_modules()
+    before = snapshot_stub_adapter_attrs()
+    previous = _dependencies.chdb
+    _dependencies.chdb = types.ModuleType("chdb")
+    try:
+        assert "benchbox.platforms.clickhouse._dependencies.chdb" in find_stub_adapter_attr_leaks(before)
+    finally:
+        _dependencies.chdb = previous
