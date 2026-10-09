@@ -4,7 +4,7 @@
     "Full-99 TPC-DS scheduled or non-blocking path wired with measured runtime documented",
     "Mutation targets, coverage map regen, pinning and mutation guards green, pr-preflight run"
   ],
-  "context": "Depends on df-parity-staged-builders-small (skew burn-down) and df-parity-staged-tpch-tpcds (subset decision plus measurements). Same promotion guardrails as df-parity-promote-nyctaxi-tsbs.",
+  "context": "Depends on df-parity-staged-builders-small (skew burn-down) and df-parity-staged-tpch-tpcds (subset decision plus measurements). Same promotion guardrails as df-parity-promote-nyctaxi-tsbs.\n\nClosed 2026-10-09 (tracker review against develop 34de720b8): tpch and tpch_skew (#2435) and tpcds (#2612) are in GATES, and STAGED_GATES is empty (benchbox/core/equivalence/cross_surface.py). Make targets are at Makefile:210-217 and 234-236. CI steps are at ci.yml:1045-1059 (the correctness-gate job, successor of pr.yml). Mutation targets are at tests/integration/test_cross_surface_mutation_sensitivity.py:47-49. The drift guard and pinning guard run at ci.yml:754-764. The coverage map rows are enforced (_project/analysis/oracle-coverage-map.md:40,42,43). Enforcement of the mutation tests themselves is tracked in cross-surface-mutation-sensitivity-not-enforced-20261009.",
   "description": "Promote tpch_skew, tpch, and the budgeted tpcds subset to enforced blocking gates with full CI wiring, and wire the full-99 TPC-DS scheduled path. Guardrails: promotion only with clean burn-downs; no baseline entries muting genuine regressions; do not bundle unrelated cleanup.",
   "sessions": [
     {
@@ -22,6 +22,14 @@
       "generation": "2efa72a78bf14693bd94088420e058d3",
       "op": "take",
       "op_id": "2594e8fde2f34f1ba361e2c0bf4a0033",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:31:26Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "1de1813465a4438b816bfc30d645ffd7",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
