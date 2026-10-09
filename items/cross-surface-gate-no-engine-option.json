@@ -1,12 +1,15 @@
 {
   "acceptance": [
-    "The gate accepts an engine argument and builds the Polars adapter with it",
+    "The gate accepts an execution_engine argument (CLI and Make target) and builds the polars-df adapter with it; undeclared values fail through the core validator",
     "A test shows the gate's collects carry the requested engine argument",
-    "Existing gate behaviour and output are unchanged when no engine is given"
+    "Existing gate behaviour and output are unchanged when no engine is given",
+    "PR merged through the normal flow"
   ],
-  "description": "build_production_contexts constructs each adapter with no options, so the gate always runs polars-df with engine=default. To exercise another engine, the only lever is POLARS_ENGINE_AFFINITY. Probed on 2026-10-08, the variable changes the engine from Polars 1.31.0 on (the streaming engine's `polars-stream` log lines appear only with it set to streaming), and has no effect on 1.0.0, 1.12.0 and 1.22.0. Let the gate take the engine as an option and pass it to the adapter, so the check uses the same code path as `benchbox run --platform-option engine=...` and works on every supported version that accepts the engine.",
+  "context": "Decision gate: start after core-exec-polars-cli-mcp-adoption. Guardrails: shared core-exec guardrails (see core-exec-d0-vocabulary-adr context); never install non-lock Polars in the primary clone.",
+  "description": "build_production_contexts (benchbox/core/equivalence/cross_surface.py) constructs each adapter with no options, so the gate always runs polars-df with the default engine. The only lever today is POLARS_ENGINE_AFFINITY, which changes the engine from Polars 1.31.0 on (probed 2026-10-08: the streaming engine's polars-stream log lines appear only with it set to streaming) and has no effect on 1.0.0, 1.12.0 and 1.22.0. After core-exec-polars-cli-mcp-adoption, let the gate take an execution_engine argument and pass it to the adapter, so the check uses the same core setting and code path as `benchbox run --execution-engine ...` and fails closed through resolve_requested on platforms or versions that cannot honour it.",
   "links": [
-    "benchbox/core/equivalence/cross_surface.py"
+    "benchbox/core/equivalence/cross_surface.py",
+    "item:core-exec-polars-cli-mcp-adoption"
   ],
   "sessions": [
     {
@@ -16,6 +19,14 @@
       "op": "create",
       "op_id": "c489a775d57840929c5b87c31b16e959",
       "session_id": "1f74fac6df92445cbacc470514ed2645"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:36:31Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "a2d1c82d6e654365a6b91434cc9dc6e5",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
     }
   ]
 }

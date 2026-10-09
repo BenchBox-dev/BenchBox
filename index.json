@@ -5542,10 +5542,12 @@
     },
     "cross-surface-gate-no-engine-option": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "core-exec-polars-cli-mcp-adoption"
+      ],
       "priority": "low",
       "status": "open",
-      "title": "The cross-surface gate cannot select a Polars engine except through an environment variable that older Polars ignores"
+      "title": "Let the cross-surface gate run polars-df with a requested execution engine"
     },
     "cross-surface-gate-rollout-followups": {
       "claim": null,
