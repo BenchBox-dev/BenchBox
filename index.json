@@ -3590,19 +3590,14 @@
       "title": "Remove comments from remaining integration and contract suites"
     },
     "comment-cleanup-cross-module-unit-tests": {
-      "claim": {
-        "expires_at": "2026-10-10T00:57:48Z",
-        "generation": "9fb38bae957542ca8e1f13c3b1139224",
-        "renewals": 0,
-        "worker": "mcp:antigravity-worker-2"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-unit-tests-core",
         "comment-cleanup-unit-tests-platforms",
         "comment-cleanup-unit-tests-cli-scripts-rest"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments from remaining cross-module unit tests"
     },
     "comment-cleanup-data-fetch-organization": {
