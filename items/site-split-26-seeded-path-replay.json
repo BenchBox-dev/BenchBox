@@ -4,7 +4,7 @@
     "The list is empty when site-split-50's PR is opened",
     "No Python or shell file is ported to the site repo"
   ],
-  "context": "Owner decision D-Q (2026-10-08, in chat). Found during the batch handoff re-evaluation: the plan had no rule for core changes to seeded paths between the seed and the core deletions.\nSeed commit (site-split-20): 1b3f03a9ad2895cec4e2f6c26fef3fcc2393e0ee.\n2026-10-09 05:50Z replay pass (before site-split-25 starts): `git log 1b3f03a9a..origin/develop -- website results-explorer landing docs/blog _blog _project/design/site-inventory` is empty at core 0d5f01e91. Last replayed core commit: 0d5f01e91aaa6e4092d02ee512f389dfcfc74d38. Re-run this pass immediately before site-split-25 begins comparing bundles if core moved, and again before site-split-40.\n2026-10-09 ~12:50Z pass 2: empty through befa8c326ae (core #2802 schema 3 touched only scripts/site_inputs.py and tests, not seeded paths).\n2026-10-09 14:20Z pass 3: empty through c745420bb. Last replayed core commit: c745420bb.",
+  "context": "Owner decision D-Q (2026-10-08, in chat). Found during the batch handoff re-evaluation: the plan had no rule for core changes to seeded paths between the seed and the core deletions.\nSeed commit (site-split-20): 1b3f03a9ad2895cec4e2f6c26fef3fcc2393e0ee.\n2026-10-09 05:50Z replay pass (before site-split-25 starts): `git log 1b3f03a9a..origin/develop -- website results-explorer landing docs/blog _blog _project/design/site-inventory` is empty at core 0d5f01e91. Last replayed core commit: 0d5f01e91aaa6e4092d02ee512f389dfcfc74d38. Re-run this pass immediately before site-split-25 begins comparing bundles if core moved, and again before site-split-40.\n2026-10-09 ~12:50Z pass 2: empty through befa8c326ae (core #2802 schema 3 touched only scripts/site_inputs.py and tests, not seeded paths).\n2026-10-09 14:20Z pass 3: empty through c745420bb.\n2026-10-09 15:15Z pass 4: empty through fa354ee0d.\n2026-10-09 16:50Z pass 5 through d6b966b48: one commit, d6b966b48 (core #2828, owner D-X), changes the landing release pill in website/src/pages/index.astro from v0.4.1 to v0.4.2. Replayed as a no-op: the site's copy computes the pill from the bundle manifest's package_version (already v0.4.2), so no site change is needed. Last replayed core commit: d6b966b48.",
   "description": "The seed copies website/, results-explorer/, landing/, docs/blog/, _blog/ and _project/design/site-inventory/ from core once. Core keeps changing those paths until site-split-50 deletes them; five such PRs merged in one day (#2726, #2753, #2763, #2768, #2614). Without a rule, those changes would be lost.\n\nOwner decision D-Q: replay, no freeze.\n\n1. Use the seed commit recorded in site-split-20 as the starting point.\n2. Before site-split-25, before site-split-40, and as a precondition of site-split-50, list `git log <last replayed>..origin/develop -- <seeded paths>`.\n3. Port each listed commit to the site repo in a site PR, applying the seed renames (results-explorer/ to explorer/, docs/blog/ to blog/, _blog/ to drafts/, _project/design/site-inventory/ to inventory/). Name the core commit in the PR body.\n4. Record the last replayed core commit in this item's context after each pass.\n\nFinish this item when site-split-50's PR is ready and the list is empty.",
   "sessions": [
     {
@@ -29,6 +29,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "c6dd374050614e7b8cf0374b6acbd533",
+      "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de",
+      "at": "2026-10-09T16:48:55Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "fa7192307ac14f558202093de541a25f",
       "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
     }
   ]
