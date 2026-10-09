@@ -4,7 +4,7 @@
     "dlv2-70-retire-scheduled-workflows lists nightly-v2-windows-unit-leg-20261009 and nightly-v2-liveness-port-20261008 in needs",
     "Issue #2568 is closed by the un-quarantine item or by that recorded decision, not by retirement alone"
   ],
-  "context": "Decision made when the batch was planned: add the Windows unit domain; nothing in this item needs a further choice. Verified in nightly-v2.yml lines 225-290: the matrix covers ubuntu, macos and windows on Python 3.11 to 3.14 but runs build, install and generator smoke only. dlv2-70 needs dlv2-22-nightly-t3-shadow and dlv2-f3-flip-window and requires at least seven green shadow nights; nightly-v2 has been red on every run since 2026-09-30, so retirement cannot be accelerated yet.",
+  "context": "DECISION (2026-10-09): add a Windows unit domain to nightly-v2, implemented by nightly-v2-windows-unit-leg-20261009, and a liveness domain, implemented by nightly-v2-liveness-port-20261008. Windows unit coverage is therefore kept, not retired by deleting nightly.yml. Recorded where dlv2-70-retire-scheduled-workflows sees it: its needs now include both new items, and its acceptance gains 'nightly-v2 runs the Windows unit domain and the liveness domain green before nightly.yml is deleted'. Reason: in nightly-v2.yml the windows-latest matrix legs only build, install and run dbgen/dsdgen; the ~32,000-test Windows run exists only in nightly.yml, and nightly-v2 has no liveness check. Issue #2568 is closed by the un-quarantine item (nightly-windows-unquarantine-20261008) on run evidence, not by retirement.",
   "description": "An earlier analysis proposed closing issue #2568 by retiring the legacy nightly.yml, on the grounds that every Windows leg in nightly-v2 is green. That reasoning does not hold. In nightly-v2.yml the windows-latest t3:matrix jobs only build the wheel, install it, and run the bundled dbgen and dsdgen; they do not run the unit suite. The ~32,000-test Windows run exists only in nightly.yml. Retiring nightly.yml under dlv2-70 would end Windows unit coverage without anyone deciding to. The same retirement would also delete the scheduled-workflow-liveness job, which nightly-v2 does not have. Decide between adding a Windows unit leg to nightly-v2 (after the Windows fixes land) and accepting no Windows unit coverage, and record the decision where dlv2-70 will see it.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2568"
@@ -33,6 +33,14 @@
       "generation": "f404c1e6b28b4f6e90912a27e30c98dd",
       "op": "take",
       "op_id": "26a8aeb175d14a32aeb07d5417d3f61f",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-09T15:08:21Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "1b7881c68e9c4ea985454c381ef5f6c4",
       "session_id": "e40b1c8674df4499842f44749410458f"
     }
   ]
