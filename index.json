@@ -14283,7 +14283,7 @@
     "oracle-patch-hash-hunk-positions-20261008": {
       "claim": null,
       "needs": [],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Oracle patch hashes drop hunk positions, so moving an edit can carry an earlier decision"
     },
