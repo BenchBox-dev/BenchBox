@@ -3,7 +3,7 @@
     "JSX comment syntax ({/* ... */}) in .mdx files is detected and flagged by the comment policy checker.",
     "Unit test added to tests/unit/scripts/test_comment_policy.py verifying MDX JSX comment detection."
   ],
-  "context": "Follow-up item 8 from comment-checker-review-followups. Currently listed as a known gap in docs/development/comment-policy.md.",
+  "context": "Implemented in worktree branch feat/comment-scanner-enhancements, commit 8e6c2484736dd23dff4579f5e9d9ca08194d2672, PR https://github.com/BenchBox-dev/BenchBox/pull/2821 targeting develop. Dedicated mdx language: prose fences as Markdown, JSX {/* */} findings, import/export blocks to TS scanner; existing mdx test rewritten plus 13 new mdx tests passing. Docs gaps updated. CI comment-policy gate SUCCESS on PR; full matrix queued; oracle review pending external connector (no stand-in posted). Do not finish until PR squash-merges to develop.",
   "description": ".mdx pages map directly to the Markdown scanner in scripts/comment_syntax.py, meaning that top-level MDX import statements and JSX comments ({/* comment */}) outside fenced Markdown code blocks bypass the checker. Parse top-level MDX constructs with a JavaScript/TypeScript scanner or AST parser to inspect comments outside code fences.",
   "sessions": [
     {
@@ -21,6 +21,14 @@
       "generation": "da278027c9d2475b8723353503834c86",
       "op": "take",
       "op_id": "d0de3a1b79fc42f1b57da22445ba8643",
+      "session_id": "b5a8c9cf1e3044e0b29099c7c26c16c1"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:3a93d76fab1934bd71f35b65",
+      "at": "2026-10-09T15:07:46Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "4a83d09b65604df882a26b5804de59bf",
       "session_id": "b5a8c9cf1e3044e0b29099c7c26c16c1"
     }
   ]
