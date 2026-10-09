@@ -4121,12 +4121,17 @@
       "title": "Remove comments from maintained site and container assets"
     },
     "comment-cleanup-spark-family": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:36:10Z",
+        "generation": "f2a6971bfc9a42e2a24b8bd55fd029d4",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from Spark-family adapters"
     },
     "comment-cleanup-sql-compat": {
