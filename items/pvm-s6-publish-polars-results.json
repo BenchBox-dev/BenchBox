@@ -74,6 +74,15 @@
       "op_id": "cf48fa1dda2a4870be72131aa50290c7",
       "reason": "Holder is this conversation's previous todo-db server instance; it restarted under a new identity and cannot resume. PR #2804 is merged and acceptance verified; taking over only to finish.",
       "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T16:31:10Z",
+      "client": "claude-code",
+      "generation": "b8fc903bfd0242f6b9b92aa3aa668d1b",
+      "op": "finish",
+      "op_id": "074adb5d08cb4ef5ab532b8bc72fa1d4",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
     }
   ]
 }
