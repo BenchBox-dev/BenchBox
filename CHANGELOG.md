@@ -136,6 +136,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   existing platform-specific keys such as Polars `streaming` and Databend
   `warehouse` become deprecated aliases. Documentation only; no behavior
   changes yet.
+- **Execution-engine declarations in the platform manifest.** Platforms can
+  now declare the execution engines they support, each with one of a fixed set
+  of engine classes, and the manifest rejects unknown classes, a declared
+  `default`, and an engine name that means different classes on different
+  platforms. Polars declares `auto`, `in-memory` and `streaming`. Every
+  adapter gains a `resolve_execution_engine` hook that accepts only `default`
+  until the platform maps its engines. A new test fails when a platform
+  registers a bare option key such as `engine`, `mode` or `warehouse`. No
+  command-line, MCP or result behavior changes yet.
 - **Curated ClickHouse tuning templates.** TPC-H, SSB, and TPC-DS ship tuned
   templates for ClickHouse, so `--tuning tuned` there applies sort keys and
   partitions instead of falling back to session settings.

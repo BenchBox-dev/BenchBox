@@ -22,6 +22,21 @@ SUPPORT_STATUS_VALUES: tuple[SupportStatus, ...] = (
     "document_only",
 )
 
+EXECUTION_ENGINE_CLASSES: tuple[str, ...] = (
+    "adaptive",
+    "in-memory",
+    "streaming",
+    "gpu",
+    "native-vectorized",
+    "standard",
+    "distributed",
+    "jit",
+    "delegated",
+)
+DEFAULT_EXECUTION_ENGINE = "default"
+_EXECUTION_ENGINE_FIELDS = frozenset({"class", "display_name", "description", "dependencies", "selectable"})
+_EXECUTION_ENGINE_FIELD_LIST = ", ".join(sorted(_EXECUTION_ENGINE_FIELDS))
+
 _PLATFORM_KEY_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 _REQUIRED_METADATA_FIELDS = frozenset(
     {
@@ -128,6 +143,29 @@ def _validate_capabilities(key: str, capabilities: object) -> None:
         defaults = [name for name, value in deployment_modes.items() if value.get("default_for_platform")]
         if defaults != [default_deployment]:
             raise ValueError(f"Platform {key!r} must mark exactly its default deployment: {default_deployment!r}")
+
+    _validate_execution_engines(key, capabilities.get("execution_engines", {}))
+
+
+def _validate_execution_engines(key: str, engines: object) -> None:
+    if not isinstance(engines, dict):
+        raise ValueError(f"Platform {key!r} execution_engines must be an object")
+    for name, engine in engines.items():
+        if name == DEFAULT_EXECUTION_ENGINE or not _PLATFORM_KEY_PATTERN.fullmatch(name):
+            raise ValueError(f"Platform {key!r} cannot declare execution engine {name!r}")
+        if not isinstance(engine, dict) or set(engine) != _EXECUTION_ENGINE_FIELDS:
+            raise ValueError(
+                f"Platform {key!r} execution engine {name!r} must have exactly: {_EXECUTION_ENGINE_FIELD_LIST}"
+            )
+        if engine["class"] not in EXECUTION_ENGINE_CLASSES:
+            raise ValueError(f"Platform {key!r} execution engine {name!r} has unknown class {engine['class']!r}")
+        if not isinstance(engine["display_name"], str) or not isinstance(engine["description"], str):
+            raise ValueError(f"Platform {key!r} execution engine {name!r} needs string display_name and description")
+        dependencies = engine["dependencies"]
+        if not isinstance(dependencies, list) or not all(isinstance(item, str) for item in dependencies):
+            raise ValueError(f"Platform {key!r} execution engine {name!r} dependencies must be a list of strings")
+        if not isinstance(engine["selectable"], bool):
+            raise ValueError(f"Platform {key!r} execution engine {name!r} selectable must be a boolean")
 
 
 def _parse_adapter(key: str, adapter_data: object) -> AdapterImportSpec | None:
@@ -239,6 +277,16 @@ def _validate_manifest_set(entries: list[PlatformManifestEntry]) -> None:
             if previous is not None:
                 raise ValueError(f"Duplicate platform alias {alias.name!r} on {previous!r} and {entry.key!r}")
             alias_targets[alias.name] = entry.key
+
+    engine_classes: dict[str, tuple[str, str]] = {}
+    for entry in entries:
+        for name, engine in entry.capabilities.get("execution_engines", {}).items():
+            first_key, first_class = engine_classes.setdefault(name, (entry.key, engine["class"]))
+            if first_class != engine["class"]:
+                raise ValueError(
+                    f"Execution engine {name!r} is {first_class!r} on {first_key!r} "
+                    f"but {engine['class']!r} on {entry.key!r}"
+                )
 
     adapter_coordinates = [
         (entry.adapter.module, entry.adapter.class_name) for entry in entries if entry.adapter is not None
@@ -455,7 +503,30 @@ _PLATFORM_MANIFEST_JSON = """[
     "capabilities": {
       "supports_sql": false,
       "supports_dataframe": true,
-      "default_mode": "dataframe"
+      "default_mode": "dataframe",
+      "execution_engines": {
+        "auto": {
+          "class": "adaptive",
+          "display_name": "Auto",
+          "description": "Polars chooses the engine for each query",
+          "dependencies": ["polars"],
+          "selectable": true
+        },
+        "in-memory": {
+          "class": "in-memory",
+          "display_name": "In-memory",
+          "description": "Materializes each query in memory",
+          "dependencies": ["polars"],
+          "selectable": true
+        },
+        "streaming": {
+          "class": "streaming",
+          "display_name": "Streaming",
+          "description": "Processes each query in batches to bound memory",
+          "dependencies": ["polars"],
+          "selectable": true
+        }
+      }
     },
     "support_status": "stable"
   },
@@ -3219,7 +3290,9 @@ def get_adapter_imports() -> tuple[tuple[str, str, str], ...]:
 __all__ = [
     "AdapterImportSpec",
     "AliasScope",
+    "DEFAULT_EXECUTION_ENGINE",
     "DefaultMode",
+    "EXECUTION_ENGINE_CLASSES",
     "PLATFORM_MANIFEST",
     "PLATFORM_MANIFEST_BY_KEY",
     "PlatformManifestEntry",

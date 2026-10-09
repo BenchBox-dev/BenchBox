@@ -93,6 +93,15 @@ class DeploymentCapability:
     auth_methods: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class ExecutionEngineCapability:
+    engine_class: str
+    display_name: str = ""
+    description: str = ""
+    dependencies: tuple[str, ...] = ()
+    selectable: bool = True
+
+
 @dataclass
 class PlatformCapability:
     supports_sql: bool = False
@@ -100,6 +109,7 @@ class PlatformCapability:
     default_mode: Literal["sql", "dataframe"] = "sql"
     deployment_modes: dict[str, DeploymentCapability] = field(default_factory=dict)
     default_deployment: str = "local"
+    execution_engines: dict[str, ExecutionEngineCapability] = field(default_factory=dict)
     platform_family: Optional[str] = None
     inherits_from: Optional[str] = None
     cost_class: CostClass = "free"
@@ -540,6 +550,17 @@ class PlatformRegistry:
                 auth_methods=deepcopy(mode_spec.get("auth_methods", [])),
             )
 
+        execution_engines = {
+            name: ExecutionEngineCapability(
+                engine_class=spec["class"],
+                display_name=spec["display_name"],
+                description=spec["description"],
+                dependencies=tuple(spec["dependencies"]),
+                selectable=spec["selectable"],
+            )
+            for name, spec in caps.get("execution_engines", {}).items()
+        }
+
         import benchbox.sql_compat.rules.benchmark_gate.clickhouse_local_gate  # noqa: F401
         import benchbox.sql_compat.rules.benchmark_gate.lakesail_gate  # noqa: F401
         import benchbox.sql_compat.rules.benchmark_gate.pg_family_gate  # noqa: F401
@@ -565,6 +586,7 @@ class PlatformRegistry:
             default_mode=caps.get("default_mode", "sql"),
             deployment_modes=deployment_modes,
             default_deployment=caps.get("default_deployment", "local"),
+            execution_engines=execution_engines,
             platform_family=caps.get("platform_family"),
             inherits_from=caps.get("inherits_from"),
             cost_class=caps.get("cost_class", "free"),
@@ -721,6 +743,16 @@ class PlatformRegistry:
         if caps is None or not caps.deployment_modes:
             return deployment_mode == "local"
         return deployment_mode in caps.deployment_modes
+
+    @classmethod
+    def get_available_execution_engines(cls, platform_name: str) -> list[str]:
+        caps = cls.get_platform_capabilities(platform_name)
+        return [] if caps is None else list(caps.execution_engines)
+
+    @classmethod
+    def supports_execution_engine(cls, platform_name: str, engine: str) -> bool:
+        caps = cls.get_platform_capabilities(platform_name)
+        return caps is not None and engine in caps.execution_engines
 
 
 _OPTIONAL_ADAPTERS: tuple[tuple[str, str, str], ...] = get_adapter_imports()
