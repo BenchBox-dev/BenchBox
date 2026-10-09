@@ -7652,11 +7652,12 @@
         "dlv2-53-retire-legacy-release-path",
         "dlv2-70-retire-scheduled-workflows",
         "dlv2-42-retire-dev-loop-scripts-tests",
-        "site-split-54-publication-github-cleanup"
+        "site-split-54-publication-github-cleanup",
+        "dlv2-80a-github-cleanup-queue-era"
       ],
       "priority": "medium",
       "status": "open",
-      "title": "Clean up obsolete GitHub branches, labels, and secrets"
+      "title": "Delete the release branch and the release-canary and no-auto-merge labels once their code is gone"
     },
     "dlv2-80a-github-cleanup-queue-era": {
       "claim": null,

@@ -1,13 +1,12 @@
 {
   "acceptance": [
-    "Step 1 deletion lists generated, archived, and executed; archive tags created for auto-revert/* and any branch with unmerged commits",
-    "TODO_DB_URL, TODO_DB_RO_AUTH_TOKEN and TODO_EXPORT_PR_TOKEN are deleted, and the docs that named them (todo-db-benchbox-extraction.md, hosted-credentials.md, github-org-transfer.md) no longer describe them as repository secrets",
-    "Step 2 (after dlv2-53 and dlv2-42): the release branch, incident:release-canary-red and no-auto-merge are deleted and no workflow or script references them",
+    "The release branch, incident:release-canary-red and no-auto-merge are deleted and no workflow or script references them",
+    "Branches, labels and secrets left unused by dlv2-70 are listed and deleted or kept with a reason",
     "No workflow references a deleted label or secret (G4)",
     "Post-cleanup branch/label/secret-name lists archived"
   ],
-  "context": "muse M12/M13.\n\n2026-10-09 tracker review: the secret rule changed from \"no reference anywhere in the repo\" to \"no workflow consumes it\". Tracker specs and decision records under _project/ still mention these names and stay as history. dlv2-62 is no longer a need; the publication branch is owned by site-split-54-publication-github-cleanup. The label for quarantined tests is nightly-quarantine. dlv2-f3 and dlv2-01 are done and were removed from needs. Step 1 does not have to wait for the release path work.",
-  "description": "Pre-approved admin changes (standing approvals); G5 backups and archive tags first. Run in two steps.\n\nStep 1, can be done now:\n- Branches: gh-readonly-queue/* with no queued entry and no workflow run referencing the SHA; auto-revert/* after closing their PRs (archive tags first); auto/* whose PRs are closed; fix/*, claude/*, feat/*, docs/*, chore/* whose PRs are merged or closed. Never delete develop, published-results, todo-state, v*, or any branch with an open PR.\n- Labels: delete incident:develop-red and incident:develop-red-revert-conflict.\n- Secrets: delete TODO_DB_URL, TODO_DB_RO_AUTH_TOKEN and TODO_EXPORT_PR_TOKEN. No workflow consumes them (todo-state-validate.yml is asserted credential-free by tests/unit/scripts/test_todo_state_workflow.py). Fix the stale docs in the same change: docs/operations/todo-db-benchbox-extraction.md:125-131 (and the check at :164-165), docs/operations/hosted-credentials.md, and docs/operations/github-org-transfer.md:48 and :103.\n\nStep 2, after dlv2-53 and dlv2-42 have removed the code that uses them:\n- Branch: `release` (removed with dlv2-53).\n- Labels: incident:release-canary-red (used by release-canary.yml:530 and scripts/release_canary_incident.py:26) and no-auto-merge (used by scripts/pr_landing.py:55).\n\nOut of scope here: the `publication` branch, environment, secrets and App belong to site-split-54-publication-github-cleanup.\n\nKeep the labels awaiting-owner and incident:todo-export-failed, and confirm that the nightly-quarantine and t3:* labels exist. Keep the secrets CODECOV_TOKEN (D6) and RULESET_DRIFT_TOKEN (D7).",
+  "context": "muse M12/M13.\n\n2026-10-09 tracker review: the secret rule changed from \"no reference anywhere in the repo\" to \"no workflow consumes it\". Tracker specs and decision records under _project/ still mention these names and stay as history. dlv2-62 is no longer a need; the publication branch is owned by site-split-54-publication-github-cleanup. The label for quarantined tests is nightly-quarantine. dlv2-f3 and dlv2-01 are done and were removed from needs. The step that does not wait for the release path was split into dlv2-80a-github-cleanup-queue-era.",
+  "description": "Pre-approved admin changes (standing approvals); G5 backups and archive tags first. The release-independent cleanup (queue-era branches, develop-red labels, unused todo-db secrets) moved to dlv2-80a-github-cleanup-queue-era.\n\nAfter dlv2-53 and dlv2-42 have removed the code that uses them:\n- Branch: `release` (removed with dlv2-53; archive tag first).\n- Labels: incident:release-canary-red (used by release-canary.yml:530 and scripts/release_canary_incident.py:26) and no-auto-merge (used by scripts/pr_landing.py:55).\n- Any branches, labels or secrets that dlv2-70's workflow deletions leave unused.\n\nOut of scope here: the `publication` branch, environment, secrets and App belong to site-split-54-publication-github-cleanup.\n\nKeep the secrets CODECOV_TOKEN (D6) and RULESET_DRIFT_TOKEN (D7).",
   "sessions": [
     {
       "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
@@ -39,6 +38,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "2f67eb3f8b504f9b877b19b302630d83",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:38:15Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "a0a3a75672154d4090c64f08fb9a84fb",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
