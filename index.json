@@ -3535,12 +3535,17 @@
       "title": "Remove comments and docstrings from core query/schema catalogs"
     },
     "comment-cleanup-core-configuration": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:10:44Z",
+        "generation": "896fd4b8356d4abf830643d6c7277ebc",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from core configuration"
     },
     "comment-cleanup-core-dataframe": {
