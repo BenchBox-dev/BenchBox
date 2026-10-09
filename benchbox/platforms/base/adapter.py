@@ -8,6 +8,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from benchbox.core.execution_engine import ExecutionEngineHook
 from benchbox.core.loaded_tables import is_data_loading_skipped, require_loaded_tables
 from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH
 from benchbox.core.results.schema import compute_plan_capture_stats
@@ -97,6 +98,7 @@ class _ManifestStreamCapability:
 
 
 class PlatformAdapter(
+    ExecutionEngineHook,
     ConnectionLifecycleMixin,
     DialectTranslationMixin,
     PhaseTrackingMixin,

@@ -34,6 +34,7 @@ from benchbox.core.dataframe.query_resolution import (
 from benchbox.core.dataframe.query_validation import validate_dataframe_query_results
 from benchbox.core.dataframe.schema_utils import get_benchmark_schema_columns
 from benchbox.core.exceptions import ConfigurationError, InsufficientMemoryError
+from benchbox.core.execution_engine import ExecutionEngineHook
 from benchbox.core.results import (
     BenchmarkInfoInput,
     ResultBuilder,
@@ -226,7 +227,7 @@ def _client_link_block_for_dataframe(benchmark_config: Any, options_map: dict[st
     }
 
 
-class BenchmarkExecutionMixin:
+class BenchmarkExecutionMixin(ExecutionEngineHook):
     driver_isolation_capability: DriverIsolationCapability = DriverIsolationCapability.NOT_APPLICABLE
     is_dataframe_adapter: bool = True
 

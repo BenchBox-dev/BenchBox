@@ -443,7 +443,8 @@ different things on different platforms.
 
 Grandfathered keys, generated from the live option registries (the platform
 option specs, the CLI platform defaults including spec aliases, and the MCP
-allowlist) when this ADR was accepted:
+allowlist) with every manifest adapter module imported, because some adapter
+packages register their option specs on import:
 
 | Platform | Key | Where registered | Removed by |
 |---|---|---|---|
@@ -451,6 +452,7 @@ allowlist) when this ADR was accepted:
 | databend | `warehouse` | option spec | The compute unification change makes it an alias of `compute_resource`. |
 | fabric_dw | `warehouse` | option spec | The compute unification change makes the existing `database` option canonical, because in Fabric Data Warehouse the warehouse is the target database, not compute. `warehouse` becomes a deprecated alias of `database`. |
 | clickhouse | `mode` | alias of `deployment_mode` | The deployment selection change makes `deployment_mode`, and so `mode`, an alias of the deployment selector. |
+| influxdb | `mode` | option spec, registered when the InfluxDB adapter package loads | The deployment selection change maps `core` and `cloud` to manifest deployment modes and makes `mode` an alias of the deployment selector. |
 
 Related native keys that are not on the list:
 
@@ -459,9 +461,9 @@ Related native keys that are not on the list:
   alias of `compute_resource`.
 - Velox `deployment` is not a reserved word. The deployment selection change
   makes it an alias of the deployment selector.
-- InfluxDB `mode` and LakeSail `sail_mode` are command-line arguments only and
-  are not registered options. The deployment selection change maps them to
-  manifest deployment modes.
+- LakeSail `sail_mode` is a command-line argument only and is not a
+  registered option. The deployment selection change maps it to manifest
+  deployment modes.
 
 After those changes no canonical key is a reserved word. The aliases that
 remain are listed in the deprecated alias table (D12) and are removed by the
