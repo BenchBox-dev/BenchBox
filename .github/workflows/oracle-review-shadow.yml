@@ -351,13 +351,11 @@ jobs:
 
       - name: Install muse
         continue-on-error: true
-        env:
-          MUSE_INSTALLER_SHA256: 5196d820127a241211c96cf38f0b2e30cff8506a82e9da9508cd5f826632a0ca
         run: |
           curl -fsSL --proto '=https' --tlsv1.2 https://dev.meta.ai/install.sh -o "$RUNNER_TEMP/muse-install.sh"
-          test "$(sha256sum "$RUNNER_TEMP/muse-install.sh" | cut -d ' ' -f 1)" = "$MUSE_INSTALLER_SHA256"
           bash "$RUNNER_TEMP/muse-install.sh"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "Installed $("$HOME/.local/bin/muse" --version)" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Run the reviewer
         working-directory: trusted
@@ -630,13 +628,11 @@ jobs:
 
       - name: Install muse
         continue-on-error: true
-        env:
-          MUSE_INSTALLER_SHA256: 5196d820127a241211c96cf38f0b2e30cff8506a82e9da9508cd5f826632a0ca
         run: |
           curl -fsSL --proto '=https' --tlsv1.2 https://dev.meta.ai/install.sh -o "$RUNNER_TEMP/muse-install.sh"
-          test "$(sha256sum "$RUNNER_TEMP/muse-install.sh" | cut -d ' ' -f 1)" = "$MUSE_INSTALLER_SHA256"
           bash "$RUNNER_TEMP/muse-install.sh"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "Installed $("$HOME/.local/bin/muse" --version)" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Run the reviewer
         working-directory: trusted
@@ -909,13 +905,11 @@ jobs:
 
       - name: Install muse
         continue-on-error: true
-        env:
-          MUSE_INSTALLER_SHA256: 5196d820127a241211c96cf38f0b2e30cff8506a82e9da9508cd5f826632a0ca
         run: |
           curl -fsSL --proto '=https' --tlsv1.2 https://dev.meta.ai/install.sh -o "$RUNNER_TEMP/muse-install.sh"
-          test "$(sha256sum "$RUNNER_TEMP/muse-install.sh" | cut -d ' ' -f 1)" = "$MUSE_INSTALLER_SHA256"
           bash "$RUNNER_TEMP/muse-install.sh"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "Installed $("$HOME/.local/bin/muse" --version)" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Run the reviewer
         working-directory: trusted
@@ -1188,13 +1182,11 @@ jobs:
 
       - name: Install muse
         continue-on-error: true
-        env:
-          MUSE_INSTALLER_SHA256: 5196d820127a241211c96cf38f0b2e30cff8506a82e9da9508cd5f826632a0ca
         run: |
           curl -fsSL --proto '=https' --tlsv1.2 https://dev.meta.ai/install.sh -o "$RUNNER_TEMP/muse-install.sh"
-          test "$(sha256sum "$RUNNER_TEMP/muse-install.sh" | cut -d ' ' -f 1)" = "$MUSE_INSTALLER_SHA256"
           bash "$RUNNER_TEMP/muse-install.sh"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "Installed $("$HOME/.local/bin/muse" --version)" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Run the reviewer
         working-directory: trusted

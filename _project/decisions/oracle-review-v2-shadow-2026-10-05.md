@@ -105,6 +105,12 @@ it logs the result and succeeds.
   load no other secret and never the App key, hold only `contents: read`, run
   the reviewer with `--disable-write --disable-shell`, and their output
   reaches the posting job only as a validated verdict or a redacted excerpt.
+  2026-10-09: a SHA-256 pin of `install.sh` was added and then removed. It
+  covered only the bootstrap script, not the launcher or the binary, which
+  change with each release, about daily; and it would have stopped every muse
+  install, with no alert, whenever Meta edited the script. muse runs the latest
+  `muse-stable` release on every run, and each attempt writes the installed
+  version to its job summary. The owner confirmed this on 2026-10-09.
 - The policy's `max_attempts`, and so the number of reviewer slots in the
   workflow, must cover the longest chain of enabled reviewers (four today);
   enabling agy needs a fifth slot and an agy job.
