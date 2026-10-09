@@ -3843,12 +3843,17 @@
       "title": "Remove comments and docstrings from H2O db benchmark modules"
     },
     "comment-cleanup-joinorder": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:21:00Z",
+        "generation": "a49cb4bdbf1c49438c5d142df2c7c95d",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from JoinOrder modules"
     },
     "comment-cleanup-joinorder-synthetic": {
