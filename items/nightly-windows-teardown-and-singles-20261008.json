@@ -2,7 +2,7 @@
   "acceptance": [
     "No WinError 32 failures remain on windows-latest 3.12",
     "Every remaining Windows-only failure is fixed, skipped with a reason in the test, or linked to its own tracker item",
-    "The Windows 3.11 and 3.12 'Run fast tests' steps pass in one scheduled nightly"
+    "The Windows 3.11 and 3.12 'Run fast tests' steps pass in a dispatched nightly.yml run on develop"
   ],
   "context": "The issue reports 1 error in addition to the failures on both Python versions. Do this after the encoding and path items so the residual list is short.",
   "description": "Two groups remain after encoding and path fixes. First, 'PermissionError [WinError 32]' at teardown where files are still open: find the unclosed handles and close them, or release them in the fixture. Second, about 20 single failures in platform adapter and utility tests that the issue did not cluster, plus an error in the 'Run fast tests' step. Triage each from the latest Windows log into fix, Windows skip with a stated reason, or a separate tracked defect. Do not leave a failure unexplained.",
@@ -16,6 +16,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "15dea33c55cb4870af79483cc2531aee",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-09T11:34:59Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "ac7ef37bc99a4b7c801cbae259a11ed3",
       "session_id": "e40b1c8674df4499842f44749410458f"
     }
   ]
