@@ -2455,10 +2455,10 @@
     },
     "ci-dedupe-09-preflight-impact-selection": {
       "claim": {
-        "expires_at": "2026-09-25T16:07:32Z",
-        "generation": "e793ff83a5e14703aa870d3cb89830b0",
+        "expires_at": "2026-10-10T23:35:29Z",
+        "generation": "adda2829ff374bc8bf867eaafe422055",
         "renewals": 0,
-        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:aa802de5ae8cc2800aa5f3ff"
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
       },
       "needs": [],
       "priority": "high",
