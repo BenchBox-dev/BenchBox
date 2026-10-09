@@ -4013,12 +4013,17 @@
       "title": "Remove comments and docstrings from PostgreSQL family adapters"
     },
     "comment-cleanup-presto-trino": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:29:38Z",
+        "generation": "7826869b6bf24cc4916a4fc5e25ea63c",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from Presto and Trino family"
     },
     "comment-cleanup-pricing-consumer": {
