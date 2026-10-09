@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "A recorded decision (a, b or c) with the reason",
+    "If (a) or (b): a test shows a codex-authored PR excludes codex reviewers and a claude-authored PR excludes claude reviewers",
+    "docs/operations/oracle-review-v2.md states how the author family is determined",
+    "Merged through the normal PR flow with an oracle success review, if code changes"
+  ],
+  "context": "Observed 2026-10-09 during the oracle follow-up batch (muse install canaries #2842 and #2845).",
+  "description": "The oracle skips reviewers of the same family as the PR's author (`selection.excluded_families`), reading `author-family:<family>` labels and falling back to `default_author_family: claude` (.github/oracle-reviewers.yml). On 2026-10-09 the repository had no `author-family:*` labels at all, and nothing in .github, scripts or _project/scripts applies one (`git grep author-family` finds only the policy key and the reviewer package). Every PR is therefore treated as claude-authored: claude reviewers are skipped everywhere, and a PR written by a codex or muse agent can be reviewed by codex or muse, which defeats the diversity rule. Found while running oracle canaries: the labels had to be created by hand to make muse the first eligible reviewer (canaries #2842 and #2845), and were deleted afterwards.\n\nDecide and implement one of:\n(a) PR tooling (`make pr-open`, or the agent PR flow) applies the right `author-family:` label from the authoring agent;\n(b) the plan step infers the family from commit trailers or the PR author;\n(c) accept the claude default and document that diversity covers only claude authors.\n\nGuardrails. Never weaken the required oracle-review check. A label must not let an author choose a weaker reviewer: the tier order and allowed tiers still apply. Very-high tier for any change to the reviewer package or policy.",
+  "links": [
+    ".github/oracle-reviewers.yml",
+    "_project/scripts/oracle_reviewers/selection.py",
+    "_project/scripts/oracle_reviewers/cli.py",
+    "Makefile"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T21:09:38Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "e737903561ed4769a3534f8d2b689e5f",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}

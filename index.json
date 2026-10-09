@@ -14088,6 +14088,13 @@
       "status": "open",
       "title": "agy cannot read files as a headless oracle reviewer"
     },
+    "oracle-author-family-labels-never-applied-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "No PR carries an author-family label, so the oracle treats every PR as claude-authored and its reviewer-diversity rule never excludes codex or muse"
+    },
     "oracle-checker-drop-legacy-first-line-20261023": {
       "claim": null,
       "needs": [],
