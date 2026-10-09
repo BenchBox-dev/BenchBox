@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "t3:docker pulls its images without hitting the anonymous rate limit (authenticated or mirrored), shown by a passing dispatched run.",
+    "The codespell job no longer builds a Docker Hub container, or pulls it authenticated."
+  ],
+  "context": "Found in the 2026-10-09 tracker review. Blocks dlv2-22-nightly-t3-shadow green runs.",
+  "description": "Docker Hub refuses unauthenticated pulls with \"429 Too Many Requests\" / \"toomanyrequests\". This failed all three nightly-v2 t3:docker jobs (postgres, trino, clickhouse) in dispatch 37991400931, and the codespell job in Documentation runs 37991354788 and 37994012169 (the codespell-project/actions-codespell container build). The codespell job is continue-on-error, but t3:docker failures block a green nightly-v2.\n\nUse authenticated pulls (a read-only Docker Hub token), a registry mirror such as ghcr.io copies of the images, or for codespell an install through uv instead of the Docker action.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:19:09Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "2361543aa6eb4922a200e79efba70b47",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}
