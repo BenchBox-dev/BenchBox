@@ -90,6 +90,16 @@ class TestDatabricksDataFrameAdapterInitialization:
                 table_format="hudi",
             )
 
+    def test_hudi_rejection_precedes_parent_validation(self, mock_databricks_sql):
+        with pytest.raises(ValueError, match="does not support table_format"):
+            DatabricksDataFrameAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="test_token",
+                table_format="hudi",
+                hudi_primary_key="not a valid identifier!",
+            )
+
     def test_initialization_with_cluster_id(self, mock_databricks_sql):
 
         adapter = DatabricksDataFrameAdapter(

@@ -71,7 +71,7 @@ benchbox run --platform databricks --benchmark tpch --scale 1.0 \
 | `driver_version` | (latest) | Pin the Databricks SQL connector version (e.g. `3.3.0`) |
 | `driver_auto_install` | false | Auto-install the requested driver version via uv if missing |
 | `table_format` | `delta` | Table format: `delta` or `hudi` (Hudi emits `USING HUDI` DDL) |
-| `hudi_primary_key` | (none) | Hudi record key column (required for Hudi tables) |
+| `hudi_primary_key` | (none) | Hudi record key column (recommended; required at write time) |
 | `hudi_precombine_field` | (none) | Hudi precombine (ordering) field |
 | `hudi_table_type` | `cow` | Hudi table type: `cow` (copy-on-write) or `mor` (merge-on-read) |
 
@@ -90,8 +90,13 @@ validation yet). Requirements and limits:
 - The target runtime must support Hudi (Databricks Runtime with Hudi support
   and the Hudi Spark bundle / `HoodieSparkSessionExtension` where needed);
   BenchBox only emits the `USING HUDI` DDL and does not install libraries.
-- `hudi_primary_key` should be set: Hudi needs a record key, and BenchBox
-  passes it through as the `primaryKey` table property. Each key is emitted
+- `hudi_primary_key` should be set: Hudi needs a record key at write time,
+  and BenchBox passes it through as the `primaryKey` table property (only
+  for tables whose column list defines it). Keyless tables are created but
+  cannot be written.
+- Tuned dry-run previews (`DeltaDDLGenerator`) render Delta DDL and ZORDER
+  post-load statements regardless of `table_format`; only executed DDL goes
+  through the Hudi conversion described here. Each key is emitted
   only for tables whose DDL defines that column, so one global key never
   leaks into the other tables of a multi-table benchmark; tables without
   the column still get `USING HUDI` plus the table type.
