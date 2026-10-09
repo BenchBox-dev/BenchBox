@@ -19627,6 +19627,15 @@
       "status": "open",
       "title": "Replay core changes to seeded site paths into the site repo until core removes them"
     },
+    "site-split-27-advisory-visual-regression": {
+      "claim": null,
+      "needs": [
+        "site-split-23-node-deploy-plane"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Add the advisory visual-regression job to site CI against the deployed artifact"
+    },
     "site-split-30-rehearsal": {
       "claim": null,
       "needs": [

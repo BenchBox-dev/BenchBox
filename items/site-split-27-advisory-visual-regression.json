@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "An advisory job runs on site PRs, compares against the deployed artifact, and uploads diffs without failing ci",
+    "The job is not in the ci aggregate's needs"
+  ],
+  "context": "Split out of site-split-21 (step 4, advisory visual regression) on 2026-10-09: the comparison needs a deployed artifact and receipts, which the deploy plane (site-split-23) provides. S1 (benchbox-site PR #1) shipped the rest of item 21.",
+  "description": "Owner decision D8: visual regression in the site repo is advisory, not part of the required `ci` aggregate.\n\n1. Add a site CI job that captures the public pages from the PR build (the Explorer's `test:e2e:public-site` capture spec is the starting point) and compares them with captures of the currently deployed artifact, found through the newest deploy receipt.\n2. Report differences as a job summary and an uploaded diff artifact; never fail `ci` on them.\n3. Port or drop `explorer/scripts/download-public-site-visual-baseline.mjs`, which expects core's baseline artifacts.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de",
+      "at": "2026-10-09T04:46:48Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "51e14becbf554b40a8296eaf5767cedc",
+      "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
+    }
+  ]
+}
