@@ -24243,7 +24243,7 @@
       "needs": [],
       "priority": "low",
       "status": "open",
-      "title": "An automatic branch update adds an unattributed commit that leaves the pull request BLOCKED"
+      "title": "GitHub's Update branch action adds a web-flow commit that leaves the pull request BLOCKED"
     },
     "unified-adapter-interface": {
       "claim": null,
