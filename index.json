@@ -10655,7 +10655,9 @@
     },
     "gw-databricks": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "core-exec-gateway-capability"
+      ],
       "priority": "high",
       "status": "open",
       "title": "Databricks adapter gateway label + PAT-only guardrail"

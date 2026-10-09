@@ -1,11 +1,11 @@
 {
   "acceptance": [
-    "gateway label (native/espresso/custom) accepted, stored, and forwarded through from_config (extend hardcoded key loop) and --gateway CLI arg, registered in _OPTION_SPEC_ROWS",
+    "gateway (native/espresso/custom, from the manifest gateways declaration) is accepted through the core gateway setting from core-exec-gateway-capability, stored, and forwarded through from_config (extend the hardcoded key loop); no adapter-level choice list or separate --gateway definition",
     "gateway!=native with DATABRICKS_CLIENT_ID/CLIENT_SECRET/CONFIG_PROFILE in env raises ConfigurationError directing to PAT; PAT path passes server_hostname through unchanged",
     "Databricks gateway docs: espressocomputing server_hostname + unchanged http_path, PAT-only caveat",
     "No live-vendor calls in tests; mock tokens only"
   ],
-  "context": "Plan: /Users/joe/.jcode/scratch/espresso-greybeam-plan-v2.md items B1-B3. Sources: benchbox/platforms/databricks/adapter.py (__init__ ~L269, add_cli_arguments ~L483, from_config ~L497 key loop). server_hostname override channel already exists; this item is label plumbing + OAuth guardrail + docs. Guardrails: worktree policy, never git add -A, no credentials in git, userinfo sanitization before logging.",
+  "context": "Plan: /Users/joe/.jcode/scratch/espresso-greybeam-plan-v2.md items B1-B3, now layered on the core gateway capability (core-exec-gateway-capability; ADR docs/development/adr/adr-core-execution-variants.md D9/D10). Sources: benchbox/platforms/databricks/adapter.py (__init__ ~L269, add_cli_arguments ~L483, from_config ~L497 key loop). server_hostname override channel already exists; this item is label plumbing + OAuth guardrail + docs. Guardrails: worktree policy, never git add -A, no credentials in git, userinfo sanitization before logging.",
   "description": "Add gateway label plumbing to DatabricksAdapter per plan v2 B1-B3: forward gateway through from_config key loop, add --gateway CLI arg and option-spec row, enforce PAT-only guardrail via OAuth env-var detection, document Espresso server_hostname usage.",
   "sessions": [
     {
@@ -15,6 +15,14 @@
       "op": "create",
       "op_id": "d2af1071373043f7acc484288969e105",
       "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:37:36Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "ce01cfb3ff294a20898eff6497b8f2f1",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
     }
   ]
 }
