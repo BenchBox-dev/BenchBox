@@ -14008,6 +14008,15 @@
       "status": "done",
       "title": "Check the first muse oracle attempt on muse-spark-1.3-contributor"
     },
+    "oracle-oversize-pr-pending-loop-20261009": {
+      "claim": null,
+      "needs": [
+        "oracle-followup-read-bypass-out-of-scope-defect-20261009"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "An oversize pull request never gets a review, yet the sweep keeps retrying it and posting pending reviews"
+    },
     "oracle-patch-hash-hunk-positions-20261008": {
       "claim": null,
       "needs": [],

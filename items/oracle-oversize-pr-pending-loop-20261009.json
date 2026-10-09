@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "Test: an oversize plan's finalize records the new pending cause, and decide_rerun refuses a same-head retry for it (manual and sweep)",
+    "Test: a new diff on the same pull request still plans and reviews normally",
+    "Test: the pending review body for an oversize head names the stand-in and splitting as the ways forward, and its status text is at most 140 characters",
+    "Mutation check: recording `all-absent` instead makes a test fail",
+    "docs/operations/oracle-review-v2.md states what happens to an oversize pull request",
+    "Merged through the normal PR flow with an oracle success review of the merged head"
+  ],
+  "context": "Found by the muse adversarial review of the oracle protocol completion audit on 2026-10-09 and confirmed against develop e7eb5ce7e (selection._skip_reason oversize branch; retry.decide_rerun lets only all-absent pending heads retry). Rare, but it is a small never-decisive loop of the kind the protocol set out to end.",
+  "description": "Problem. When the brief exceeds `brief_max_bytes` (100000) even without the diff, roughly 1500 or more changed files, the plan's brief mode is `oversize` and `selection._skip_reason` skips every reviewer (\"skipped: the brief exceeds the size cap even without the diff\"). The run ends pending with cause `all-absent`, which `retry.decide_rerun` treats as retryable, so the hourly sweep (`command_sweep`, `retry.due_for_retry`) redispatches the same head with backoff up to `daily_budget` (6) times a day. Under `findings_delivery: review` each run posts another pending review. No reviewer can ever run on that head, so only the owner's stand-in can satisfy the required check.\n\nRequired change.\n- Record a distinct pending cause for an oversize plan (add it to `retry.PENDING_CAUSES`), so `decide_rerun` refuses same-head retries for it like it does for integrity and unreported causes.\n- The pending review for an oversize head says, in plain words, that the change is too large for the oracle and that the owner's stand-in is the way to merge it, or to split the pull request.\n- A new push (new diff) still plans normally.\n\nOut of scope. Raising `brief_max_bytes`, splitting briefs, or reviewing oversize PRs some other way.\n\nGuardrails.\n- Never weaken the required `oracle-review` check; the stand-in rule is unchanged and only the owner posts it.\n- Very-high tier; verify after merge.\n- Worktree via `make worktree-create` and `make agent-write-preflight`; identity Joe Harris <joeharris76@gmail.com>; explicit staging; no comments or docstrings; `make comment-policy-check`.\n- May ship in one PR with oracle-post-guard-reread-retry-20261009, oracle-protocol-test-gaps-20261009 and oracle-marker-patch-map-file-limit-20261009; each item's acceptance must still be met and named in the PR body.\n\nDecision gate. None: the owner-facing behaviour (stand-in or split) is already the documented path for unreviewable PRs.",
+  "links": [
+    "_project/scripts/oracle_reviewers/selection.py",
+    "_project/scripts/oracle_reviewers/retry.py",
+    "_project/scripts/oracle_reviewers/cli.py",
+    "_project/scripts/oracle_reviewers/report.py",
+    "docs/operations/oracle-review-v2.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T13:14:04Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "406adb51ad6e4ed8b951f1c97b93a240",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}
