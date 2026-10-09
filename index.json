@@ -15511,17 +15511,12 @@
       "title": "Run the Polars version matrix on the M4 host under controlled conditions"
     },
     "pvm-s5-analyze-polars-matrix": {
-      "claim": {
-        "expires_at": "2026-10-10T11:20:45Z",
-        "generation": "26178837d31b4cde9f8dbb4fb3d45cf0",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c"
-      },
+      "claim": null,
       "needs": [
         "pvm-s4-run-polars-matrix"
       ],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Analyze the Polars matrix: engine-separated 2.0 vs 1.x results with disclosed limits"
     },
     "pvm-s6-publish-polars-results": {
