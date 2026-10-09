@@ -7722,7 +7722,7 @@
         "dlv2-f3-flip-window"
       ],
       "priority": "low",
-      "status": "open",
+      "status": "dropped",
       "title": "Pilot GitHub native stacked PRs once merge-queue support is confirmed on this repository"
     },
     "dlv2-defer-tpch-digest-darwin-arm64": {
