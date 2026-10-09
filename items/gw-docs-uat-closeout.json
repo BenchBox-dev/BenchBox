@@ -1,7 +1,7 @@
 {
   "acceptance": [
-    "docs/platforms/snowflake-gateways.md: setup, Enterprise caveat, options table, PAT-only note, TLS/OCSP, key-pair mandate, PrivateLink, exposure warning, quiescence runbook, log-join, TCO worksheet, semantic gaps, no-rewrite stance",
-    "snowflake.md + databricks.md pointers only; README/matrix untouched; no new manifest keys",
+    "docs/platforms/snowflake-gateways.md: setup, Enterprise caveat, options table (core --gateway plus Snowflake gateway connection options), PAT-only note, TLS/OCSP, key-pair mandate, PrivateLink, exposure warning, quiescence runbook, log-join, TCO worksheet, semantic gaps, no-rewrite stance",
+    "snowflake.md + databricks.md pointers only; README/matrix untouched; no new platform keys (the manifest gateways declarations are documented, not new keys)",
     "TCO inputs opaque + cost-not-comparable banner rule",
     "Write-only UAT runbook (SF 0.01, caps, evidence checklist); not executed; G3 recorded"
   ],
@@ -15,6 +15,14 @@
       "op": "create",
       "op_id": "78ec10f0459047bbbfb487bdd954e51f",
       "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:48:29Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "965586de50634eedb3665529a194d479",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
     }
   ]
 }
