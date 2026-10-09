@@ -4487,7 +4487,7 @@
     "comment-scanner-mdx-jsx-support": {
       "claim": null,
       "needs": [],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Extend comment scanner for MDX files to check top-level JSX comments and imports"
     },

@@ -1,10 +1,12 @@
 {
   "acceptance": [
     "JSX comment syntax ({/* ... */}) in .mdx files is detected and flagged by the comment policy checker.",
-    "Unit test added to tests/unit/scripts/test_comment_policy.py verifying MDX JSX comment detection."
+    "Unit test added to tests/unit/scripts/test_comment_policy.py verifying MDX JSX comment detection.",
+    "Valid ESM in an .mdx file with comments between tokens (for example inside an import or export statement) is reported or fails closed, not dropped silently. A test covers it.",
+    "`{ /* x */ }` with whitespace inside the braces is reported or fails closed. A test covers it."
   ],
-  "context": "Implemented in worktree branch feat/comment-scanner-enhancements, commit 8e6c2484736dd23dff4579f5e9d9ca08194d2672, PR https://github.com/BenchBox-dev/BenchBox/pull/2821 targeting develop. Dedicated mdx language: prose fences as Markdown, JSX {/* */} findings, import/export blocks to TS scanner; existing mdx test rewritten plus 13 new mdx tests passing. Docs gaps updated. CI comment-policy gate SUCCESS on PR; full matrix queued; oracle review pending external connector (no stand-in posted). Do not finish until PR squash-merges to develop.",
-  "description": ".mdx pages map directly to the Markdown scanner in scripts/comment_syntax.py, meaning that top-level MDX import statements and JSX comments ({/* comment */}) outside fenced Markdown code blocks bypass the checker. Parse top-level MDX constructs with a JavaScript/TypeScript scanner or AST parser to inspect comments outside code fences.",
+  "context": "Implemented in worktree branch feat/comment-scanner-enhancements, commit 8e6c2484736dd23dff4579f5e9d9ca08194d2672, PR https://github.com/BenchBox-dev/BenchBox/pull/2821 targeting develop. Dedicated mdx language: prose fences as Markdown, JSX {/* */} findings, import/export blocks to TS scanner; existing mdx test rewritten plus 13 new mdx tests passing. Docs gaps updated. CI comment-policy gate SUCCESS on PR; full matrix queued; oracle review pending external connector (no stand-in posted). Do not finish until PR squash-merges to develop.\n\n2026-10-09 tracker review: Priority lowered to low (one tracked .mdx file). #2821 meets the first two acceptance items; the oracle found D3 (comments inside export/import dropped silently) and the whitespace `{ /* x */ }` miss, now acceptance 3 and 4. The TypeScript work in #2821 is tracked as worktree-typescript-module-resolution. Recommend splitting #2821 per item so MDX does not block the stdin and runner items (see comment-scanner-unresolved-runner-commands).",
+  "description": ".mdx pages map directly to the Markdown scanner in scripts/comment_syntax.py, meaning that top-level MDX import statements and JSX comments ({/* comment */}) outside fenced Markdown code blocks bypass the checker. Parse top-level MDX constructs with a JavaScript/TypeScript scanner or AST parser to inspect comments outside code fences.\n\nPR #2821 meets the written acceptance, but its oracle review found two gaps: comments inside export/import statements are dropped silently (finding D3), and `{ /* x */ }` with whitespace inside the braces is missed. Only one .mdx file is tracked in the repository (a golden fixture), so the practical risk is low. Finish this item after #2821 merges.",
   "sessions": [
     {
       "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:8dff0892e031f17231e04e2e",
@@ -39,6 +41,14 @@
       "op": "release",
       "op_id": "e3127a6cc8c24fabad2c5e67c0b22fe6",
       "session_id": "b5a8c9cf1e3044e0b29099c7c26c16c1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T23:29:45Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "492d05a0f7ac40908f38a254f1ef980d",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
