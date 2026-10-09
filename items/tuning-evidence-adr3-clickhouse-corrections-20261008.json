@@ -48,6 +48,15 @@
       "op": "update",
       "op_id": "eaba5ad70da84fc19bafdfd84fbdb7f1",
       "session_id": "11344d8456c14298801d7c917bc4b4db"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-09T13:33:31Z",
+      "client": "claude-code",
+      "generation": "d7fe8e0c699440adbd03da7678f04e7b",
+      "op": "release",
+      "op_id": "e156cd1c6f5f463ea7e805576d6212b0",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
     }
   ]
 }
