@@ -41,7 +41,7 @@ def test_member_digest_covers_single_file(tmp_path: Path) -> None:
     assert site_inputs.member_digest(target) == site_inputs.file_sha(target)
 
 
-def _bundle(tmp_path: Path, schema: int = 1, attestations: str = "pass") -> Path:
+def _bundle(tmp_path: Path, schema: int = 2, attestations: str = "pass") -> Path:
     out = tmp_path / "bundle"
     members = {
         "docs": "docs tree",
@@ -52,9 +52,10 @@ def _bundle(tmp_path: Path, schema: int = 1, attestations: str = "pass") -> Path
         "explorer/parity": "parity tree",
         "landing/prompt-catalog.json": '{"prompts": []}\n',
         "api-public-symbols.json": '{"symbols": []}\n',
+        "downloads": "download tree",
         "attestations.json": "attestation tree",
     }
-    dirs = {"docs", "explorer/fixtures", "explorer/parity"}
+    dirs = {"docs", "explorer/fixtures", "explorer/parity", "downloads"}
     for name, body in members.items():
         if name == "attestations.json":
             continue
@@ -106,7 +107,7 @@ def test_verify_rejects_tampered_member(tmp_path: Path) -> None:
 
 
 def test_verify_rejects_schema_mismatch(tmp_path: Path) -> None:
-    assert site_inputs.cmd_verify(_bundle(tmp_path, schema=2)) == 1
+    assert site_inputs.cmd_verify(_bundle(tmp_path, schema=1)) == 1
 
 
 def test_verify_rejects_failed_attestation(tmp_path: Path) -> None:
@@ -428,3 +429,41 @@ def test_bundle_build_job_keeps_read_only_permissions() -> None:
     workflow = yaml.safe_load(_site_inputs_workflow())
     assert workflow["permissions"] == {"contents": "read", "actions": "read"}
     assert "permissions" not in _site_inputs_jobs()["build"]
+
+
+def test_link_targets_cover_inline_reference_and_autolinks() -> None:
+    text = (
+        'See [a](../../examples/a.py) and [b](<../x.sql> "title").\n'
+        "[ref]: ../../pytest.ini\n"
+        "Auto <../../scripts/c.py> and [web](https://example.com) and [top](/docs/x.html) and [frag](#here).\n"
+    )
+    assert site_inputs.link_targets(text) == [
+        "../../examples/a.py",
+        "../x.sql",
+        "../../pytest.ini",
+        "../../scripts/c.py",
+    ]
+
+
+def test_referenced_downloads_keep_tracked_files_outside_docs(tmp_path: Path) -> None:
+    docs = tmp_path / "docs"
+    _write(
+        docs / "guide/page.md",
+        "[t](../../tools/t.tpl#L3) [m](other.md) [n](../../notes.md) [u](../../untracked.py) [d](../../tools)\n",
+    )
+    tracked = ["tools/t.tpl", "notes.md", "docs/guide/other.md"]
+    assert site_inputs.referenced_downloads(docs, tracked) == ["tools/t.tpl"]
+
+
+def test_build_downloads_copies_each_file_at_its_repo_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    docs = tmp_path / "docs"
+    _write(docs / "page.md", "[ini](../pytest.ini)\n")
+    monkeypatch.setattr(site_inputs, "git_ls_files", lambda: ["pytest.ini"])
+    out = tmp_path / "downloads"
+    assert site_inputs.build_downloads(out, docs) == ["pytest.ini"]
+    assert (out / "pytest.ini").read_bytes() == (site_inputs.ROOT / "pytest.ini").read_bytes()
+
+
+def test_bundle_schema_two_requires_downloads() -> None:
+    assert site_inputs.SCHEMA == 2
+    assert "downloads" in site_inputs.REQUIRED_MEMBERS

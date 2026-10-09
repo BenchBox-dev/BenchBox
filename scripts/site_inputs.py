@@ -4,18 +4,21 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import posixpath
+import re
 import shutil
 import subprocess
 import sys
 import tomllib
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-SCHEMA = 1
+SCHEMA = 2
 PARENT_SOURCES = ("bundle", "dispatch", "local")
 GENERATED_QUERIES = Path("docs/benchmarks/queries")
 
@@ -56,6 +59,7 @@ REQUIRED_MEMBERS = (
     "explorer/parity",
     "landing/prompt-catalog.json",
     "api-public-symbols.json",
+    "downloads",
     "attestations.json",
 )
 REQUIRED_ATTESTATIONS = (
@@ -202,6 +206,47 @@ def build_parity(out_parity: Path) -> None:
     out_parity.mkdir(parents=True, exist_ok=True)
     for fixture in sorted(src.glob("*.json")):
         shutil.copy2(fixture, out_parity / fixture.name)
+
+
+LINK_SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
+INLINE_LINK = re.compile(r"\]\(\s*<?([^)\s>]+)>?(?:\s+\"[^\"]*\")?\s*\)")
+REFERENCE_LINK = re.compile(r"^\s*\[[^\]]+\]:\s*<?([^\s>]+)>?", re.MULTILINE)
+AUTOLINK = re.compile(r"<(\.{1,2}/[^>\s]+)>")
+
+
+def link_targets(text: str) -> list[str]:
+    targets = dict.fromkeys(INLINE_LINK.findall(text) + REFERENCE_LINK.findall(text) + AUTOLINK.findall(text))
+    return [
+        target for target in targets if target and not target.startswith(("#", "/")) and not LINK_SCHEME.match(target)
+    ]
+
+
+def referenced_downloads(docs_dir: Path, tracked: list[str]) -> list[str]:
+    files = set(tracked)
+    found: set[str] = set()
+    for source in sorted(docs_dir.rglob("*.md")):
+        page = "docs/" + source.relative_to(docs_dir).as_posix()
+        text = source.read_text(encoding="utf-8", errors="replace")
+        for target in link_targets(text):
+            clean = unquote(target.split("#", 1)[0].split("?", 1)[0])
+            if not clean:
+                continue
+            resolved = posixpath.normpath(posixpath.join(posixpath.dirname(page), clean))
+            if resolved.startswith(("docs/", "../")) or resolved in ("docs", ".", ".."):
+                continue
+            if resolved in files and not resolved.endswith((".md", ".rst")):
+                found.add(resolved)
+    return sorted(found)
+
+
+def build_downloads(out_downloads: Path, docs_dir: Path) -> list[str]:
+    out_downloads.mkdir(parents=True, exist_ok=True)
+    paths = referenced_downloads(docs_dir, git_ls_files())
+    for rel in paths:
+        target = out_downloads / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / rel, target)
+    return paths
 
 
 def build_prompt_catalog(out: Path) -> None:
@@ -381,6 +426,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     (out / "landing").mkdir(parents=True, exist_ok=True)
     build_prompt_catalog(out / "landing/prompt-catalog.json")
     shutil.copy2(ROOT / "_project/design/site-inventory/api-public-symbols.json", out / "api-public-symbols.json")
+    build_downloads(out / "downloads", out / "docs")
     build_attestations(out / "attestations.json", out, core_sha, parent_sha)
     members = {
         "docs": member_digest(out / "docs"),
@@ -391,6 +437,7 @@ def cmd_build(args: argparse.Namespace) -> int:
         "explorer/parity": member_digest(out / "explorer/parity"),
         "landing/prompt-catalog.json": member_digest(out / "landing/prompt-catalog.json"),
         "api-public-symbols.json": member_digest(out / "api-public-symbols.json"),
+        "downloads": member_digest(out / "downloads"),
         "attestations.json": member_digest(out / "attestations.json"),
     }
     manifest = {
