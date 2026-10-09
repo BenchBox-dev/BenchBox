@@ -82,10 +82,10 @@ def test_version_json_has_no_logo() -> None:
 
 
 def test_startup_logo_prints_before_command_output() -> None:
-    result = CliRunner().invoke(cli, ["auth", "status"])
+    result = CliRunner().invoke(cli, ["platforms", "list"])
     assert result.exit_code == 0
-    assert LOGO_FIRST_ROW in result.output
-    assert result.output.index(LOGO_FIRST_ROW) < result.output.index("Service URL:")
+    assert LOGO_FIRST_ROW in result.stderr
+    assert result.output.index(LOGO_FIRST_ROW) < result.output.index("DuckDB")
 
 
 def test_startup_logo_skipped_for_subgroup_help() -> None:
@@ -97,7 +97,7 @@ def test_startup_logo_skipped_for_subgroup_help() -> None:
 
 def test_startup_logo_skipped_when_unsupported() -> None:
     with patch("benchbox.cli.logo.logo_supported", return_value=False):
-        result = CliRunner().invoke(cli, ["auth", "status"])
+        result = CliRunner().invoke(cli, ["platforms", "list"])
     assert result.exit_code == 0
     assert LOGO_FIRST_ROW not in result.output
     assert LOGO_FIRST_ROW not in result.stderr
