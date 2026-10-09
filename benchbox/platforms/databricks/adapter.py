@@ -3204,7 +3204,7 @@ class DatabricksAdapter(PlatformAdapter):
                 table=table_name,
                 statement=f"ANALYZE TABLE {table_name} COMPUTE STATISTICS",
                 status="skipped",
-                phase="pre_load",
+                phase="ddl",
             )
             self.logger.info(f"Skipped ANALYZE for Hudi table {table_name}")
 
