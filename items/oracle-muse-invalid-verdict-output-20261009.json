@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Raw output from at least two failing muse runs is captured and classified (extra data, wrong keys, or other)",
+    "A decision is recorded: parser change, prompt change, reviewer order change, or no change, with the reason",
+    "Any code change has a test built from a captured failing output that fails before the fix and passes after, and a wrong-shape answer is still recorded absent",
+    "Merged through the normal PR flow with an oracle success review, if a change is made"
+  ],
+  "context": "Found during the closing verification of the oracle follow-up sequence on 2026-10-09; muse canaries #2842 and #2845 (both closed unmerged). Related: oracle-absence-classification-lows-20261008 (its context notes the first wrong-keys run).",
+  "description": "On 2026-10-09, after the unpinned install (#2831), muse was selected three times on canary runs and gave a parseable verdict only once:\n- run 37982258535 (PR #2842): \"invalid: the verdict must have exactly the keys ('status', 'incomplete_reason', 'decision', 'summary', 'files_examined', 'defects', 'prior_defects')\";\n- run 37983182017 (PR #2842, next head): valid verdict, SHIP;\n- run 37986952599 (PR #2845, oracle-verdict.yml): \"invalid: the reviewer output is not JSON: Extra data\".\nAll three ran Muse Code 1.4.4 (1.4.4-R5419.1). An invalid answer counts as absent, so the next reviewer runs and nothing passes wrongly. But when muse is the only eligible reviewer (low and medium-high tiers with codex and claude excluded by author family), the result stays pending.\n\nInvestigate. Capture the raw muse output on a failing run: the attempt artifact's redacted diagnostic, or a local `muse` run with the same brief and schema-in-prompt. Determine whether the extra data is a trailing message, several JSON objects, or prose around the JSON, and whether wrong keys are a schema drift in the muse model's answer. Compare with `verdict.parse_output` for the muse harness.\n\nPossible fixes, to decide after the evidence: make parse_output take the last complete JSON object from muse's output, strengthen the schema instruction in the muse prompt, or move muse later in the tier orders.\n\nGuardrails. An unparseable or wrong-shape answer must never pass; it stays absent. Never weaken the required oracle-review check. Very-high tier; normal oracle PR flow.",
+  "links": [
+    "_project/scripts/oracle_reviewers/verdict.py",
+    "_project/scripts/oracle_reviewers/commands.py",
+    ".github/oracle-reviewers.yml"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T20:38:31Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "44cce67dc1664bd3a4ccf4fd8d9e6491",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}
