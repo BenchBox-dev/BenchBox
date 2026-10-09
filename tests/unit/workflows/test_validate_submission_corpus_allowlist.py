@@ -60,6 +60,8 @@ def test_corpus_allowlist_step_fails_closed_on_disallowed_path(tmp_path: Path) -
         cwd=tmp_path,
         env={
             "PATH": "/usr/bin:/bin:/usr/local/bin",
+            "HOME": tmp_path.as_posix(),
+            "USERPROFILE": tmp_path.as_posix(),
             "CORPUS_CHANGED_PATHS_FILE": (tmp_path / "changed.txt").as_posix(),
         },
     )
@@ -88,6 +90,8 @@ def test_corpus_allowlist_step_passes_for_only_supported_data(tmp_path: Path) ->
         cwd=tmp_path,
         env={
             "PATH": "/usr/bin:/bin:/usr/local/bin",
+            "HOME": tmp_path.as_posix(),
+            "USERPROFILE": tmp_path.as_posix(),
             "CORPUS_CHANGED_PATHS_FILE": (tmp_path / "changed.txt").as_posix(),
         },
     )

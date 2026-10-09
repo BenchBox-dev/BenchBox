@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 import sys
 from pathlib import Path
 
@@ -20,7 +21,7 @@ GOLDEN_DRY_RUN = Path(__file__).resolve().parents[2] / "fixtures" / "version_mat
 
 
 def _golden_lines() -> list[str]:
-    return GOLDEN_DRY_RUN.read_text(encoding="utf-8").replace("{python}", sys.executable).splitlines()
+    return GOLDEN_DRY_RUN.read_text(encoding="utf-8").replace("{python}", shlex.quote(sys.executable)).splitlines()
 
 
 def test_prerelease_detection_covers_dev_and_stable_versions() -> None:
