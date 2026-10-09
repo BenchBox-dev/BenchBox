@@ -1807,7 +1807,9 @@
     },
     "bodo-jit-and-mpi-support": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "core-exec-polars-cli-mcp-adoption"
+      ],
       "priority": "low",
       "status": "open",
       "title": "Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter"

@@ -1,4 +1,10 @@
 {
+  "acceptance": [
+    "JIT compilation and MPI distributed execution are declared in the manifest execution_engines capability (classes jit and distributed, or as the ADR names them) and selected with --execution-engine; no platform-specific jit/mpi/mode option is registered",
+    "Each run records an ExecutionEngineReceipt with requested, applied and resolution; the default pandas-compatible path is recorded as the default engine",
+    "The vocabulary parity test passes with the new declarations"
+  ],
+  "context": "Core execution-variant guardrails (added 2026-10-09; ADR docs/development/adr/adr-core-execution-variants.md, plan item core-exec-execution-variants): Bodo's JIT and MPI execution are execution engines under ADR D1 (same deployment, different execution machinery); if MPI multi-node changes process topology across hosts, treat that part as a deployment mode instead and decide with the user. Do not register bare generic option keys. Follow the execution-variant section of docs/development/new-platform-acceptance-checklist.md. Note the description's warning that the Bodo adapter source may not exist and must be checked first.",
   "description": "The Bodo DataFrame adapter currently uses Pandas-compatible I/O only.\n@bodo.jit is Bodo's core value proposition - auto-parallelization of Pandas\ncode via JIT compilation. MPI multi-node execution is the next tier.\n\nDeferred from bodo-dataframe-platform (completed 2026-02-09). The initial\nadapter established the Pandas-compatible baseline; these items add the\nperformance-differentiating features.\n\nNote: the Bodo adapter source file does not currently exist in the codebase\n(only __pycache__ artifacts remain). The adapter may need to be recreated\nor the DONE item may have been completed as research-only.\n",
   "legacy": {
     "item_meta": {
@@ -53,5 +59,15 @@
         "wid": "w3"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ab8a830d931cbe1e9cbc66f3",
+      "at": "2026-10-09T14:39:44Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "b5c09c1f1ecc484e9a42ac21dfbcc53e",
+      "session_id": "ece27cd7b1e84cfdb901409d637eabe8"
+    }
+  ]
 }
