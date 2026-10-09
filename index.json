@@ -4773,10 +4773,15 @@
       "title": "✅ Configurable Platform Version Pinning"
     },
     "conftest-leak-guard-warningregistry-20261008": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T12:50:38Z",
+        "generation": "61421ef2984a4ca099a14330170a941b",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Exclude CPython __warningregistry__ from stub-installer adapter leak detector"
     },
     "connection-parameter-conflicts-in-tpc-test-methods": {
