@@ -14038,6 +14038,13 @@
       "status": "open",
       "title": "Decide whether SHIP_WITH_FIXES with an empty defect list should keep turning into SHIP"
     },
+    "oracle-verdict-name-still-says-shadow-20261009": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Oracle reviews, status and workflow are still named \"oracle-review-shadow\" after it became the required reviewer"
+    },
     "orphan-detector-freeze-branch-residual-20260804": {
       "claim": null,
       "needs": [],
