@@ -3432,12 +3432,17 @@
       "title": "Remove comments and docstrings from analysis and comparison modules"
     },
     "comment-cleanup-aws-cloud": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-10T00:07:13Z",
+        "generation": "9422faddfc284c11b6907285d52571f6",
+        "renewals": 0,
+        "worker": "mcp:antigravity-closeout"
+      },
       "needs": [
         "comment-cleanup-pilot-budget"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from AWS adapters and support"
     },
     "comment-cleanup-checker": {
