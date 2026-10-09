@@ -6,7 +6,7 @@
     "publication-canaries.yml's latest scheduled run (2026-10-04) is confirmed to be inside its cron cadence window, or its lapse is fixed",
     "The job shows no failed steps in the dispatched nightly.yml run on develop recorded by nightly-windows-unquarantine-20261008; removing its quarantine is handled there"
   ],
-  "context": "Job conclusion is not evidence while continue-on-error is set. The job showed success with no failed steps on the 2026-10-08 nightly. nightly-v2.yml has no liveness job.",
+  "context": "Merged as PR #2815 (script, 33 tests; review follow-ups fixed in the same PR: no grace for a workflow with scheduled history, newest ten runs always listed for a flagged workflow). Cause of the 9 earlier false alarms: not reproduced; recorded on issue #2570 with evidence (comment 2026-10-09). publication-canaries.yml is not a lapse: it has no schedule trigger any more (workflow_dispatch only). Not yet verified: the job's own step results in a dispatched nightly.yml run on develop; that is recorded by nightly-windows-unquarantine-20261008, which removes the quarantine only if every step passed. nightly-v2 gets the same check as a t3:liveness domain in nightly-v2-liveness-port-20261008.",
   "description": "The liveness job in .github/workflows/nightly.yml (about line 687) queries `runs?per_page=1&event=schedule` and reads runs[0]. It failed on 9 of 11 nightlies in late September and early October, each time naming a different workflow, although the reporter later listed daily scheduled runs for those workflows. The cause is not established: a stale first row from the API, and a real gap in scheduled runs that later caught up, both fit. A check on 2026-10-08 found per_page=1 and the newest of 20 rows agree for five workflows, so the stale row did not reproduce. Do not change the query on the assumption that it is the cause. First make the job print, for any workflow it flags, the newest 10 runs with id, created_at, run_started_at and status. Then harden the lookup (query with a `created=>=` bound of the cadence window plus a page of rows, and choose the newest by created_at) and keep failing for a workflow that has truly stopped. publication-canaries.yml had its latest scheduled run on 2026-10-04, so check its cadence in case that one is a real lapse.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2570"
@@ -35,6 +35,14 @@
       "generation": "4f5ab5621e9946bf87a048039ca8341e",
       "op": "take",
       "op_id": "3c5acba2d07c4965bca40ce59eecd4b4",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-09T16:49:22Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "cd9d784b91984a4f8e9957311d79acd3",
       "session_id": "e40b1c8674df4499842f44749410458f"
     }
   ]
