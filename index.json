@@ -13600,15 +13600,10 @@
       "title": "Remove the three quarantines from nightly.yml after a dispatched run on develop shows each leg passing"
     },
     "nightly-windows-utf8-reads-20261008": {
-      "claim": {
-        "expires_at": "2026-10-10T12:42:09Z",
-        "generation": "4745b834fb7e4b209e208d9d20509816",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium-high",
-      "status": "active",
+      "status": "open",
       "title": "Windows unit suite: read repository text files as UTF-8 in tests and workflow-reading helpers"
     },
     "nightly-windows-worktree-claim-path-assertions": {
