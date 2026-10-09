@@ -5,7 +5,7 @@
     "docs/operations/soundness-drain.md states the recovery that actually works",
     "A test or recorded CI evidence covers the stale-failure case"
   ],
-  "context": "Related: oracle-review-thread-reply-run-churn-20261008 (runs per thread reply). Stale runs on #2784: 37852065358, 37852876606, 37854418822.",
+  "context": "Related: oracle-review-thread-reply-run-churn-20261008 (runs per thread reply). Stale runs on #2784: 37852065358, 37852876606, 37854418822. Cut-over case (2026-10-09): pull requests opened before #2758 merged (#2792, #2795) carry failing runs that checked out the pre-cut-over base and require the connector. Re-running them reuses that payload and fails again (#2795: 37864807452, 37864572758, 37863646272; #2792: 37862880188, 37861958697), even though fresh reopen runs pass under --signal oracle. They clear only with a new push, a connector signal while the App is installed, or a stand-in.",
   "description": "On #2784 (head 8eb562e01) every required check passed and a fresh pull_request (reopened) oracle-review run succeeded after the stand-in, yet the pull request stayed BLOCKED. Earlier oracle-review runs started by pull_request_review (submitted) events, before the stand-in existed, had concluded failure and still counted. Merging needed each stale run re-run one at a time: parallel `gh run rerun` calls cancel each other through the oracle-review-<pr> concurrency group. #2769 showed the same symptom. The documented recovery (close/reopen) is not enough on its own, and it restarts the whole CI suite.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/pull/2784",
@@ -18,6 +18,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "13c621b403c84077a59b9be209380010",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-09T00:44:49Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "b16abb12f8cc4f3f8d78feeb99909ef5",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
