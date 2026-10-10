@@ -3,7 +3,7 @@
     "nightly-v2 has a t3:liveness domain that runs scripts/scheduled_workflow_liveness.py, merged to develop (in #2835 or a split-out PR), or a written reason it is not needed",
     "A nightly-v2 verification dispatch on develop shows t3:liveness green with the script's evidence listing in the log"
   ],
-  "context": "2026-10-10: split PR #2857 opened from branch feat/nightly-v2-liveness-domain at f738367c3deeb951b65bf858df33bafa5ed5f195 and armed (auto-merge squash). Verification: 48 workflow tests passed; ruff clean; scope liveness-only. Oracle-review check currently waiting for the oracle's review of the new head; requested via /oracle-review comment. CI lanes pending (single snapshot taken, not repolled). Textual-conflict notice vs open PR #2817 noted; coordinate before landing. Resumption: watch checks once, rerun stale oracle-review if needed, resolve review threads, ensure merge; then nightly-v2 verification dispatch for t3:liveness.",
+  "context": "2026-10-10: liveness code merged via PR #2857. Verification dispatch: nightly-v2 run 38027036252 on develop ab0c41b5 (also contains aggregate #2859). Resumption: read t3:liveness once; on green, take + finish this item.",
   "description": "nightly-v2.yml has no equivalent of the scheduled-workflow-liveness job. dlv2-70 deletes nightly.yml, which would remove the only check that a scheduled workflow has stopped firing. Port the check into nightly-v2 as its own domain (t3:liveness, with its own issue label, as the other domains have), or record why it is no longer needed. The domain runs the shared script scripts/scheduled_workflow_liveness.py, which replaced the old per_page=1 query and prints the newest ten scheduled runs of any workflow it flags.\n\nPR #2835 adds this domain (job `liveness`, runs the script with read-only actions access). The same PR also adds the Windows unit-test domain. Recommendation: split the liveness domain out of #2835 into its own PR so it is not held by the Windows domain, whose tests still stall (see nightly-v2-windows-unit-leg-20261009).\n\nUntil dlv2-70 deletes nightly.yml, the liveness check runs in both workflows (nightly.yml and nightly-v2.yml). Issue #2570 tracks the nightly.yml job; the nightly-v2 job opens its own t3:liveness issue when it fails.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2570",
@@ -82,6 +82,14 @@
       "generation": "56e3756d144940b0b4691993c5e30247",
       "op": "release",
       "op_id": "307e07545bf848e28741b6e8ce9057af",
+      "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:8d0fa0e2ef22aacc5284a44c",
+      "at": "2026-10-10T05:18:24Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "f2bb7e697fad49d8959ae98977aebaf8",
       "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
     }
   ]
