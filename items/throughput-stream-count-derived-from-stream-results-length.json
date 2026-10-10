@@ -4,7 +4,7 @@
     "Explorer pipeline and local result import withhold Throughput@Size when a completed phase's configured count differs from stream_results length; pipeline entries use stream_count_mismatch when the primary exclusion would otherwise be missing_primary_metric. Failed and partial phases retain the phase-failure exclusion instead of being relabeled as a count mismatch.",
     "Unit tests cover matching counts, absent configured counts, run.streams/config.streams mismatches, and failed/partial truncation across corpus validation and Explorer ranking/import behavior."
   ],
-  "context": "PR #2894 remains open. The fix is staged in `/Users/joe/Developer/BenchBox.wt-throughput-stream-count-derived`; focused tests, runtime smoke, docs, comment policy, Ruff, and diff checks passed. First `git commit` attempt ran the project's comment/docstring hook but hit the shell's 300-second timeout before creating a commit; `git status` confirmed the five intended files remain staged and HEAD is still 3fba17e. Retry the same commit with a longer timeout; do not bypass the hook. Oracle threads `PRRT_kwDOQ7J64c6rHcEX` and `PRRT_kwDOQ7J64c6rHcEZ` remain open and should be resolved after pushing the fix and obtaining current-head Oracle success.",
+  "context": "The five-file fix is staged in `/Users/joe/Developer/BenchBox.wt-throughput-stream-count-derived`. The first project commit hook exceeded 300 seconds without committing; a retry of the same commit is running with a 1200-second timeout as job bg_62. Do not bypass the comment/docstring policy hook. Focused tests (328), runtime smoke, docs, comment policy, Ruff, and diff checks already passed. Oracle threads `PRRT_kwDOQ7J64c6rHcEX` and `PRRT_kwDOQ7J64c6rHcEZ` remain open pending the fix push and current-head Oracle success.",
   "description": "For completed throughput phases, compare configured --streams (run.streams, falling back to config.streams) with the number of recorded stream_results. Report a mismatch instead of ranking an invalid completed run. Failed or partial phases may legitimately record fewer streams and must be excluded by phase status rather than treated as configuration defects.",
   "sessions": [
     {
@@ -167,6 +167,14 @@
       "client": "omp-coding-agent",
       "op": "update",
       "op_id": "96b8a7e6bcaa455f9c55304be43bf15a",
+      "session_id": "024527ae77c1405f86cdbdf1079f6e14"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396",
+      "at": "2026-10-10T21:05:43Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "cb6a886b88774886ba7f8395d9a0b4ce",
       "session_id": "024527ae77c1405f86cdbdf1079f6e14"
     }
   ]
