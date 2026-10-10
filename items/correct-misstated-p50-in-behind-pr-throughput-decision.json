@@ -72,5 +72,16 @@
         "wid": "w1"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396",
+      "at": "2026-10-10T12:28:24Z",
+      "client": "omp-coding-agent",
+      "generation": "2d17ad9d3e7849f7955fd257e27a6fbd",
+      "op": "take",
+      "op_id": "fe5a4e2283c44780962553540e34d118",
+      "session_id": "024527ae77c1405f86cdbdf1079f6e14"
+    }
+  ]
 }
