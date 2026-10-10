@@ -6,7 +6,7 @@
     "Approved/no-change/rejected disposition is explicit. Any accepted algorithm change waits for later authorization and separate scoped implementation; source-only cleanup remains unchanged.",
     "Completed historical tracker claims are reconciled with current implementation rather than silently reopened or treated as live proof."
   ],
-  "context": "The decision-only correction is staged in `/Users/joe/Developer/BenchBox.wt-tpcds-legacy-stream-timing-effects`. `make ci-docs`, `make comment-policy-check` (0 violations, 19 native checks), `git diff --check`, and earlier `make pr-preflight` passed. The first `git commit` attempt timed out after 300 seconds while the project's comment/docstring hook was running; status confirms the file remains staged and HEAD is unchanged. Retry the same commit with a longer timeout; do not bypass the hook. Effective worktree identity is Joe Harris <joeharris76@gmail.com>. After commit, publish the docs PR and follow CI/review/merge gates.",
+  "context": "The decision-only correction is staged in `/Users/joe/Developer/BenchBox.wt-tpcds-legacy-stream-timing-effects`. `make ci-docs`, `make comment-policy-check` (0 violations, 19 native checks), `git diff --check`, and earlier `make pr-preflight` passed. The 300-second commit attempt timed out during the comment/docstring hook; a retry with a 1200-second timeout is running as job bg_63. Do not bypass the hook. Effective worktree identity is Joe Harris <joeharris76@gmail.com>. After the hook commits, push/open the docs PR and follow CI/review/merge gates.",
   "description": "Read-only decision task. Evaluate all current legacy permutation/parameter callers in tpcds power tests, benchmark runner, throughput and dataframe query_resolution, including global random.seed effects. Prior completed items tpcds-throughput-permutation-compliance and dataframe-parameter-substitution-parity are historical context, not proof that all current callers migrated. Compare smallest viable retained/corrected/replaced design against official dsqgen ordered multi-stream output and public compatibility.\n\nDecision must disclose ordering, substitutions, seeds, RNG isolation, raw identity, result comparability and timed-window effects per caller. Text cleanup deletes false equivalence claims but preserves current algorithms. A migration requires later explicit behavior-change approval and separate implementation tasks/PRs, never hidden in comment removal. Execution guard: creation of this TODO is planning, not approval to execute the reviewed cleanup. Obtain later implementation authorization. Use a separate linked worktree and agent-write-preflight; preserve unrelated work. Freeze nonoverlapping code/test/doc paths with the integrator before dispatch. Ordinary independent PRs target develop; serialize shared test-lock checks and integration, not module edits. Required native/external soundness review remains mandatory, with no auto-merge bypass. No live cloud/stress, deployment, publication, historical-result rewriting, or unapproved external-repository writes.",
   "sessions": [
     {
@@ -144,6 +144,14 @@
       "client": "omp-coding-agent",
       "op": "update",
       "op_id": "a6797f2781f5477c892e123a7d845782",
+      "session_id": "024527ae77c1405f86cdbdf1079f6e14"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396",
+      "at": "2026-10-10T21:07:41Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "04e6ad2d679e4e9aae09fc983393cc3c",
       "session_id": "024527ae77c1405f86cdbdf1079f6e14"
     }
   ]
