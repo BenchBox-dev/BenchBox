@@ -3,7 +3,7 @@
     "Scripts containing shell pipelines feeding inline scripts to interpreters (perl, ruby, python) on stdin are scanned for comments or surfaced as coverage errors.",
     "Regression tests in tests/unit/scripts/test_comment_policy.py cover stdin pipeline sinks."
   ],
-  "context": "Implemented in worktree branch feat/comment-scanner-enhancements: pipeline inspector in scripts/comment_payloads.py (piped_stdin_entries wired into shell_command_unit, scan_source_payload seam, echo/printf literal extraction, dynamic/unmodeled fail-closed, gate regex extended, mask covers piped lines). Bash AST analysis lives in comment_payloads.py, not comment_execution.py. 19 new regression tests (4 test fns, parametrized) in tests/unit/scripts/test_comment_policy.py, all passing.\n\n2026-10-09 tracker review: PR #2821 meets the written acceptance. Before it merges, two oracle findings must be fixed. D1: the masking at scripts/comment_syntax.py:604 blanks the whole piped line, so `echo 'pass' | python3 # explanation` loses a shell comment that is caught today. This is a regression. D2: printf escapes such as \\043 (an escaped #) are not handled. Add a regression test for each. Recommend splitting #2821 per item so this item and the runner item do not wait on the MDX work.",
+  "context": "Implemented in worktree branch feat/comment-scanner-enhancements: pipeline inspector in scripts/comment_payloads.py (piped_stdin_entries wired into shell_command_unit, scan_source_payload seam, echo/printf literal extraction, dynamic/unmodeled fail-closed, gate regex extended, mask covers piped lines). Bash AST analysis lives in comment_payloads.py, not comment_execution.py. 19 new regression tests (4 test fns, parametrized) in tests/unit/scripts/test_comment_policy.py, all passing.\n\n2026-10-09 tracker review: PR #2821 meets the written acceptance. Before it merges, two oracle findings must be fixed. D1: the masking at scripts/comment_syntax.py:604 blanks the whole piped line, so `echo 'pass' | python3 # explanation` loses a shell comment that is caught today. This is a regression. D2: printf escapes such as \\043 (an escaped #) are not handled. Add a regression test for each. Recommend splitting #2821 per item so this item and the runner item do not wait on the MDX work.\n\n2026-10-10 worktree progress: D11's printf `%%` branch now reconstructs one percent byte; `test_piped_printf_escaped_percent_matches_shell_output` asserts exact valid Python source bytes. D12's pipeline adapter now considers the first producer/consumer pair only and fails closed for dynamic immediate consumers; `test_dynamic_later_pipeline_command_does_not_hide_interpreter_input` and `test_dynamic_pipeline_consumer_fails_closed` cover both outcomes. Focused D10-D12 selection passed 15 tests; the full scanner policy test file passed 737 tests with -n0; final `make pr-preflight` passed 737 changed-file tests. PR #2821 remains open and these fixes are not committed yet. D10 split-runner work is shared with `comment-scanner-unresolved-runner-commands`; plain `env` forms already scan, while `sudo`/`nohup` now use known-option parsing and unsupported options fail closed. Keep this item open until PR #2821 merges.",
   "description": "Programs piped to interpreters on stdin (e.g., printf '...' | perl, echo '...' | ruby) in shell scripts or commands currently bypass the comment scanner because stdin pipelines are unmodeled. Detect pipeline sinks terminating in script interpreters and route the piped string payload to the corresponding language scanner, or flag bare unmodeled interpreter stdin usage as a coverage error.",
   "sessions": [
     {
@@ -55,6 +55,14 @@
       "generation": "dcf5457025794e3c9d77c1860229057f",
       "op": "take",
       "op_id": "3955ab2194e543e3a2b9102db9e0b95f",
+      "session_id": "760b0930a01047bb8025dda090b79735"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:bd5956809339499407531943",
+      "at": "2026-10-10T19:46:36Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "756629d867c449edbd506ae4d2306753",
       "session_id": "760b0930a01047bb8025dda090b79735"
     }
   ]
