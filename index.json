@@ -21240,7 +21240,7 @@
       "needs": [],
       "priority": "high",
       "status": "open",
-      "title": "Decide aggregate tolerance for the nightly DuckDB performance gate"
+      "title": "Give the perf gate's aggregate check an absolute floor so host noise stops failing the nightly"
     },
     "t3-perf-baseline-refresh-20261008": {
       "claim": null,
