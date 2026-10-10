@@ -4,7 +4,7 @@
     "Explorer pipeline and local result import withhold Throughput@Size when a completed phase's configured count differs from stream_results length; pipeline entries use stream_count_mismatch when the primary exclusion would otherwise be missing_primary_metric. Failed and partial phases retain the phase-failure exclusion instead of being relabeled as a count mismatch.",
     "Unit tests cover matching counts, absent configured counts, run.streams/config.streams mismatches, and failed/partial truncation across corpus validation and Explorer ranking/import behavior."
   ],
-  "context": "PR #2894 remains open on branch fix/throughput-stream-count-derived. Oracle findings were addressed: corpus and Explorer mismatch helpers now apply only to COMPLETED throughput phases, so FAILED/PARTIAL truncation is neither a corpus hard error nor mislabeled count exclusion. Coverage includes run.streams/config.streams and FAILED/PARTIAL; hosted-results docs state the status boundary. Verification after fix: 328 focused tests; standalone smoke confirmed corpus acceptance of a failed 2-of-3 bundle and Explorer preservation of `missing_primary_metric`; `make ci-docs` passed; comment-policy passed (0 violations, 19 native checks); Ruff format/check and `git diff --check` passed. Explicit-file commit command is running its hook in background job bg_60. Oracle review threads remain unresolved pending push/new review: `PRRT_kwDOQ7J64c6rHcEX` (corpus hard-fail) and `PRRT_kwDOQ7J64c6rHcEZ` (mislabeling). After commit hook succeeds, push branch, update PR #2894, resolve addressed threads, and require current-head Oracle success plus required CI before arming. No changes to unrelated PR #2835 paths.",
+  "context": "PR #2894 remains open. The fix is staged in `/Users/joe/Developer/BenchBox.wt-throughput-stream-count-derived`; focused tests, runtime smoke, docs, comment policy, Ruff, and diff checks passed. First `git commit` attempt ran the project's comment/docstring hook but hit the shell's 300-second timeout before creating a commit; `git status` confirmed the five intended files remain staged and HEAD is still 3fba17e. Retry the same commit with a longer timeout; do not bypass the hook. Oracle threads `PRRT_kwDOQ7J64c6rHcEX` and `PRRT_kwDOQ7J64c6rHcEZ` remain open and should be resolved after pushing the fix and obtaining current-head Oracle success.",
   "description": "For completed throughput phases, compare configured --streams (run.streams, falling back to config.streams) with the number of recorded stream_results. Report a mismatch instead of ranking an invalid completed run. Failed or partial phases may legitimately record fewer streams and must be excluded by phase status rather than treated as configuration defects.",
   "sessions": [
     {
@@ -159,6 +159,14 @@
       "generation": "222f06eca0ef43748ff3777e37327ea6",
       "op": "take",
       "op_id": "e3ad6607056b4b90a380c394366fcfea",
+      "session_id": "024527ae77c1405f86cdbdf1079f6e14"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396",
+      "at": "2026-10-10T21:04:19Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "96b8a7e6bcaa455f9c55304be43bf15a",
       "session_id": "024527ae77c1405f86cdbdf1079f6e14"
     }
   ]
