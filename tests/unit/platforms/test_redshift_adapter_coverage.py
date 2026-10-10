@@ -750,6 +750,21 @@ class TestNormalizedResultMetadata:
         mock_cursor.fetchall.return_value = []
         return mock_conn
 
+    def test_offline_serverless_hostname_yields_workgroup_identity(self):
+        adapter = _make_adapter(
+            host="wg-offline.123456789012.us-east-1.redshift-serverless.amazonaws.com",
+        )
+
+        info = adapter.get_platform_info()
+        assert info["configuration"]["workgroup_name"] == "wg-offline"
+        assert info["configuration"]["cluster_identifier"] is None
+
+        metadata = adapter.get_normalized_result_metadata(platform_info=info)
+        assert metadata["platform_deployment"]["workgroup"] == "wg-offline"
+        assert metadata["platform_compute"]["workgroup"] == "wg-offline"
+        assert metadata["platform_compute"]["resource"] == "wg-offline"
+        assert metadata["platform_compute"]["resource_kind"] == "workgroup"
+
     def test_serverless_metadata_maps_cloud_compute_storage_and_cache(self):
         adapter = _make_adapter(
             host="wg.123456789012.us-east-1.redshift-serverless.amazonaws.com",

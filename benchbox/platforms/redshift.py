@@ -157,6 +157,9 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         self.strict_validation = config.get("strict_validation", True)
 
         self.deployment_type = self._detect_deployment_type(self.host or "")
+        self.workgroup_name = config.get("workgroup_name") or config.get("compute_resource")
+        if self.workgroup_name is None and self.deployment_type == "serverless" and self.cluster_identifier is None:
+            self.workgroup_name = self._extract_identifier_from_hostname(self.host or "", self.deployment_type)
 
         if not all([self.host, self.username, self.password]):
             missing = []
@@ -414,6 +417,7 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 "iam_role_configured": bool(self.iam_role),
                 "cluster_identifier": self.cluster_identifier
                 or (identifier if deployment_type != "serverless" else None),
+                "workgroup_name": self.workgroup_name,
                 "compupdate": getattr(self, "compupdate", None),
                 "result_cache_enabled": not self.disable_result_cache,
                 "wlm_query_slot_count": self.wlm_query_slot_count,
@@ -525,9 +529,16 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         collection_status = "available" if observed else "partial"
         if service_model == "unknown" and not observed:
             collection_status = "unavailable"
+        from benchbox.core.compute_resource import resolve_resource_kind
+
+        canonical_resource = (
+            config.get("compute_resource") or config.get("workgroup_name") or config.get("cluster_identifier")
+        )
         return _compact_metadata(
             {
                 "service_model": service_model,
+                "resource": canonical_resource,
+                "resource_kind": resolve_resource_kind("redshift", config),
                 "workgroup": config.get("workgroup_name"),
                 "namespace": config.get("namespace_name"),
                 "cluster_id": config.get("cluster_identifier"),
