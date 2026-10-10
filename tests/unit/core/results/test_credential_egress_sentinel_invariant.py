@@ -128,14 +128,21 @@ def _registered_platform_names() -> tuple[str, ...]:
 
 def _prepare_config_for_platform(platform_name: str, tmp_path: Path) -> dict[str, object]:
     config = _sentinel_config(tmp_path)
-    if platform_name == "clickhouse":
+    if platform_name in {"clickhouse", "clickhouse-local"}:
         config["deployment"] = "local"
         config["deployment_mode"] = "local"
+        config["mode"] = "local"
+    elif platform_name == "clickhouse-server":
+        config["deployment_mode"] = "server"
+        config["mode"] = "server"
+    elif platform_name == "clickhouse-cloud":
+        config["deployment_mode"] = "cloud"
+        config["mode"] = "cloud"
     elif platform_name == "ducklake":
         config["catalog"] = "duckdb"
     elif platform_name in {"pg-duckdb", "timescaledb"}:
         config["deployment_mode"] = "self-hosted"
-    elif platform_name == "firebolt":
+    elif platform_name == "firebolt" or platform_name == "influxdb":
         config["deployment_mode"] = "core"
     elif platform_name == "snowpark-connect":
         config["user"] = "EGRESS_USERNAME_SENTINEL"
