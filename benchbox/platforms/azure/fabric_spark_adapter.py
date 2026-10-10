@@ -548,13 +548,16 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> FabricSparkAdapter:
+        from benchbox.core.compute_resource import normalize_compute_options
+
+        config = normalize_compute_options("fabric-spark", config)
         params: dict[str, Any] = {
             "workspace_id": config.get("workspace_id"),
             "lakehouse_id": config.get("lakehouse_id"),
             "tenant_id": config.get("tenant_id"),
             "livy_endpoint": config.get("livy_endpoint"),
             "onelake_path": config.get("onelake_path"),
-            "spark_pool_name": config.get("spark_pool_name"),
+            "spark_pool_name": config.get("compute_resource") or config.get("spark_pool_name"),
             "timeout_minutes": config.get("timeout_minutes", 60),
             "spark_config": config.get("spark_config"),
             "table_format": config.get("table_format"),
