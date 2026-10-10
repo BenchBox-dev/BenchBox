@@ -4953,17 +4953,12 @@
       "title": "Copyright and License Declaration Updates ✅ COMPLETED"
     },
     "core-exec-compute-resource-unification": {
-      "claim": {
-        "expires_at": "2026-10-11T12:53:31Z",
-        "generation": "d7c8d1a4a4014014a1591dd172402768",
-        "renewals": 0,
-        "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:6e8a424eda2c7006605aa48b"
-      },
+      "claim": null,
       "needs": [
         "core-exec-result-schema-2-3"
       ],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Unify named compute resources under core compute_resource and compute_size settings with native keys as aliases"
     },
     "core-exec-d0-vocabulary-adr": {
