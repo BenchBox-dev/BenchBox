@@ -33,5 +33,10 @@
   "path": "/blog.html",
   "reason": "new page: the all-posts page that the Sphinx header linked to but never built",
   "owner_approval": "pending"
+ },
+ {
+  "path": "/docs/_downloads/*/TPC_EULA.txt",
+  "reason": "adjacent TPC-H and TPC-DS license sidecars accompany downloadable query files",
+  "owner_approval": "pending"
  }
 ]

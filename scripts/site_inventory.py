@@ -421,6 +421,8 @@ def _entry_matches(pattern: str, key: str) -> bool:
         return key == pattern
     if pattern.endswith(("/", "*")):
         return key.startswith(pattern.rstrip("*"))
+    if "*" in pattern:
+        return re.fullmatch(re.escape(pattern).replace(r"\*", "[^/]*"), key) is not None
     return _split_key(key)[0] == pattern
 
 

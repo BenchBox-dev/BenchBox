@@ -103,6 +103,7 @@ def _run(
     candidate: Path,
     *,
     rules: list[dict[str, str]] | None = None,
+    added_paths: list[dict[str, str]] | None = None,
     api_ids: list[str] | None = None,
     published: Path | None = None,
     extra: list[str] | None = None,
@@ -127,7 +128,7 @@ def _run(
         "--redirect-pages",
         str(_json(tmp_path / "redirects.json", [REDIRECT])),
         "--added-paths",
-        str(_json(tmp_path / "added.json", [ADDED])),
+        str(_json(tmp_path / "added.json", [ADDED] if added_paths is None else added_paths)),
         "--allowed-inventory-losses",
         str(_json(tmp_path / "losses.json", inventory_losses or [])),
         "--known-broken",
@@ -265,6 +266,35 @@ def test_unreviewed_additions_fail_the_report_and_are_listed(tmp_path: Path) -> 
     added = report["comparisons"][0]["added_paths"]
     assert (added["total"], added["unreviewed"]) == (2, ["/docs/new.html"])
     assert added["by_rule"] == {"/sitemap.xml": ["/sitemap.xml"]}
+
+
+def test_added_path_glob_matches_only_adjacent_tpc_eula_sidecars(tmp_path: Path) -> None:
+    baseline = _site(tmp_path / "base", theme=False, feed_link="/blog/a.html")
+    candidate = _site(tmp_path / "cand", theme=False, feed_link="/blog/a.html")
+    _write(candidate, "docs/_downloads/abc123/TPC_EULA.txt")
+    _write(candidate, "docs/_downloads/abc123/query.sql")
+    _write(candidate, "docs/_downloads/abc123/nested/TPC_EULA.txt")
+
+    code, report = _run(
+        tmp_path,
+        baseline,
+        candidate,
+        added_paths=[
+            {
+                "path": "/docs/_downloads/*/TPC_EULA.txt",
+                "reason": "adjacent TPC license sidecars accompany downloadable query files",
+                "owner_approval": "pending",
+            }
+        ],
+    )
+
+    added = report["comparisons"][0]["added_paths"]
+    assert code == 1
+    assert added["by_rule"] == {"/docs/_downloads/*/TPC_EULA.txt": ["/docs/_downloads/abc123/TPC_EULA.txt"]}
+    assert added["unreviewed"] == [
+        "/docs/_downloads/abc123/nested/TPC_EULA.txt",
+        "/docs/_downloads/abc123/query.sql",
+    ]
 
 
 def test_committed_policy_files_carry_reasons_and_only_the_signed_approvals() -> None:
