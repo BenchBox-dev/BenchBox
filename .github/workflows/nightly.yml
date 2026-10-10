@@ -345,11 +345,8 @@ jobs:
           retention-days: 14
 
   integration-smoke:
-    name: >-
-      integration-smoke (${{ matrix.os }}, ${{ matrix.python-version }})${{
-      matrix.os == 'windows-latest' && ' (quarantine #2569)' || '' }}
+    name: integration-smoke (${{ matrix.os }}, ${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     env:
       BENCHBOX_TEST_TIER: t2
     strategy:
@@ -686,10 +683,9 @@ jobs:
         working-directory: website
 
   scheduled-workflow-liveness:
-    name: "scheduled-workflow-liveness (quarantine #2570)"
+    name: scheduled-workflow-liveness
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    continue-on-error: true
     permissions:
       actions: read
       contents: read
