@@ -10894,6 +10894,15 @@
       "status": "done",
       "title": "Record that the identity remediation instruction is external, and inoculate agents against following it"
     },
+    "harness-reapply-clickhouse-session-settings-20261010": {
+      "claim": null,
+      "needs": [
+        "tuning-evidence-measurement-harness-20261008"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Harness re-applies ClickHouse server session settings beyond load time"
+    },
     "heavy-tier-merge-group-dead-code-20261009": {
       "claim": null,
       "needs": [],

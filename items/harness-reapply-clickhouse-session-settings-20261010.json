@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Timed executions carry the configured adapter session (assert via system.query_log Settings on a kept database)",
+    "A/A calibration passes on ClickHouse SF1 TPC-H without answer mismatch",
+    "Existing harness suites pass"
+  ],
+  "description": "Item-26 evidence (runs/clickhouse-q3-q5-probe-20261008/findings-26.md section 5): ClickHouse server session SETs are applied once per arm connection at load; timed rounds can run under bare server defaults after the session is lost (Run 1: 180/180 timed executions with 2-setting bare session vs 20/20 configured warmups). The join_use_nulls flip moved Q13 42<->41 deterministically and solely blocked A/A calibration. Arm comparisons stay apples-to-apples but absolute parity with shipped runs breaks. Change: re-apply the adapter session per round (or attach settings per query, or pin session_id); add a test asserting timed executions carry the configured session. ClickHouse verdicts (benefit rule, per-query settings, session pack) should prefer post-fix cells.",
+  "sessions": [
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:7e55d16b199130b0978d8efa",
+      "at": "2026-10-10T09:26:45Z",
+      "client": "omp-coding-agent",
+      "op": "create",
+      "op_id": "2eda522a9cf445b6b64464bfc8f7d496",
+      "session_id": "4dbe22cfa4cf47a5bab075c4c3ac203f"
+    }
+  ]
+}
