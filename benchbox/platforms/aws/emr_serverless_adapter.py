@@ -557,8 +557,11 @@ spark.stop()
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> EMRServerlessAdapter:
+        from benchbox.core.compute_resource import normalize_compute_options
+
+        config = normalize_compute_options("emr-serverless", config)
         params = {
-            "application_id": config.get("application_id"),
+            "application_id": config.get("compute_resource") or config.get("application_id"),
             "s3_staging_dir": config.get("s3_staging_dir"),
             "execution_role_arn": config.get("execution_role_arn"),
             "region": config.get("region", "us-east-1"),

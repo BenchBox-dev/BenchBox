@@ -86,7 +86,8 @@ class AthenaSparkAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkExternalT
         s3_staging_dir: str | None = None,
         region: str = "us-east-1",
         database: str | None = None,
-        engine_version: str = "PySpark engine version 3",
+        runtime_version: str | None = None,
+        engine_version: str | None = None,
         session_idle_timeout_minutes: int = 15,
         coordinator_dpu_size: int = 1,
         max_concurrent_dpus: int = 20,
@@ -101,6 +102,11 @@ class AthenaSparkAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkExternalT
             if not deps_satisfied:
                 raise ConfigurationError(get_dependency_error_message("athena-spark", missing))
 
+        if engine_version is not None and runtime_version is None:
+            from benchbox.core.compute_resource import warn_deprecated_compute_alias
+
+            warn_deprecated_compute_alias("athena-spark", "engine_version", "runtime_version")
+            runtime_version = engine_version
         if not workgroup:
             raise ConfigurationError("workgroup is required for Athena Spark. Must be a Spark-enabled workgroup.")
 
@@ -118,7 +124,8 @@ class AthenaSparkAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkExternalT
         self.s3_staging_dir = s3_staging_dir.rstrip("/")
         self.region = region
         self.database = database or "benchbox"
-        self.engine_version = engine_version
+        self.runtime_version = runtime_version or "PySpark engine version 3"
+        self.engine_version = self.runtime_version
         self.session_idle_timeout_minutes = session_idle_timeout_minutes
         self.coordinator_dpu_size = coordinator_dpu_size
         self.max_concurrent_dpus = max_concurrent_dpus
@@ -172,8 +179,8 @@ class AthenaSparkAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkExternalT
             "type": "interactive_spark",
             "region": self.region,
             "workgroup": self.workgroup,
+            "runtime_version": self.runtime_version,
             "engine_version": self.engine_version,
-            "engine_version_source": "config",
             "supports_sql": True,
             "supports_dataframe": True,
             "billing_model": "DPU-hour",
@@ -200,6 +207,7 @@ class AthenaSparkAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkExternalT
                 "CoordinatorDpuSize": self.coordinator_dpu_size,
                 "MaxConcurrentDpus": self.max_concurrent_dpus,
                 "DefaultExecutorDpuSize": self.default_executor_dpu_size,
+                "EngineVersion": self.runtime_version,
             }
 
             if self.notebook_version:
@@ -540,12 +548,15 @@ result.show(100, truncate=False)
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> AthenaSparkAdapter:
+        from benchbox.core.compute_resource import normalize_compute_options
+
+        config = normalize_compute_options("athena-spark", config)
         params = {
-            "workgroup": config.get("workgroup"),
+            "workgroup": config.get("compute_resource") or config.get("workgroup"),
             "s3_staging_dir": config.get("s3_staging_dir"),
             "region": config.get("region", "us-east-1"),
             "database": config.get("database", "benchbox"),
-            "engine_version": config.get("engine_version", "PySpark engine version 3"),
+            "runtime_version": config.get("runtime_version") or config.get("engine_version"),
             "session_idle_timeout_minutes": config.get("session_idle_timeout_minutes", 15),
             "coordinator_dpu_size": config.get("coordinator_dpu_size", 1),
             "max_concurrent_dpus": config.get("max_concurrent_dpus", 20),

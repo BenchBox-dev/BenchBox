@@ -523,10 +523,13 @@ spark.stop()
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> DataprocAdapter:
+        from benchbox.core.compute_resource import normalize_compute_options
+
+        config = normalize_compute_options("dataproc", config)
         params = {
             "project_id": config.get("project_id"),
             "region": config.get("region", "us-central1"),
-            "cluster_name": config.get("cluster_name"),
+            "cluster_name": config.get("compute_resource") or config.get("cluster_name"),
             "gcs_staging_dir": config.get("gcs_staging_dir"),
             "database": config.get("database", "benchbox"),
             "master_machine_type": config.get("master_machine_type", "n2-standard-4"),
