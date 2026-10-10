@@ -15,10 +15,11 @@ def analyze_dry_run_output(dry_run_dir: str):
         print(f"  benchbox run --dry-run {dry_run_dir} --platform duckdb --benchmark tpch --scale 0.01")
         return
 
-    summary_file = dry_run_path / "summary.json"
-    if not summary_file.exists():
-        print(f"❌ Summary file not found: {summary_file}")
+    candidates = sorted(dry_run_path.glob("*.json"))
+    if not candidates:
+        print(f"❌ Summary file not found in: {dry_run_dir}")
         return
+    summary_file = candidates[0]
 
     with open(summary_file, encoding="utf-8") as f:
         summary = json.load(f)
@@ -31,17 +32,17 @@ def analyze_dry_run_output(dry_run_dir: str):
     print("=" * 60)
 
     print("\nSystem:")
-    print(f"  - OS: {system['os']}")
-    print(f"  - Memory: {system['memory_gb']:.1f} GB")
-    print(f"  - CPU Cores: {system.get('cpu_cores', 'N/A')}")
+    print(f"  - OS: {system['os_name']}")
+    print(f"  - Memory: {system['memory_total_gb']:.1f} GB")
+    print(f"  - CPU Cores: {system.get('cpu_cores_physical', 'N/A')}")
 
     print("\nBenchmark:")
     print(f"  - Name: {benchmark['name']}")
     print(f"  - Scale Factor: {benchmark['scale_factor']}")
 
-    queries_dir = dry_run_path / "queries"
-    if queries_dir.exists():
-        query_files = list(queries_dir.glob("*.sql"))
+    query_dirs = sorted(dry_run_path.glob("*_queries_*"))
+    if query_dirs:
+        query_files = list(query_dirs[0].glob("*.sql"))
         print("\nQueries:")
         print(f"  - Total: {len(query_files)}")
 
@@ -56,11 +57,11 @@ def analyze_dry_run_output(dry_run_dir: str):
         if len(query_files) > 5:
             print(f"    ... and {len(query_files) - 5} more queries")
 
-    if "resource_estimates" in summary:
-        resources = summary["resource_estimates"]
+    if "estimated_resources" in summary:
+        resources = summary["estimated_resources"]
         print("\nResource Estimates:")
-        print(f"  - Memory: ~{resources.get('estimated_memory_mb', 'N/A')} MB")
-        print(f"  - Storage: ~{resources.get('estimated_storage_mb', 'N/A')} MB")
+        print(f"  - Memory: ~{resources.get('estimated_memory_usage_mb', 'N/A')} MB")
+        print(f"  - Data: ~{resources.get('estimated_data_size_mb', 'N/A')} MB")
 
     print("\n✅ Analysis complete!")
 

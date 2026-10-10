@@ -6,11 +6,16 @@ import subprocess
 from pathlib import Path
 
 
-def validate_extracted_queries(dry_run_dir: str, target_dialect: str = "duckdb"):
-    queries_dir = Path(dry_run_dir) / "queries"
+def _queries_dir(dry_run_dir: str) -> Path | None:
+    candidates = sorted(Path(dry_run_dir).glob("*_queries_*"))
+    return candidates[0] if candidates else None
 
-    if not queries_dir.exists():
-        print(f"❌ Queries directory not found: {queries_dir}")
+
+def validate_extracted_queries(dry_run_dir: str, target_dialect: str = "duckdb"):
+    queries_dir = _queries_dir(dry_run_dir)
+
+    if queries_dir is None:
+        print(f"❌ Queries directory not found in: {dry_run_dir}")
         return False
 
     query_files = list(queries_dir.glob("*.sql"))
@@ -44,10 +49,10 @@ def validate_extracted_queries(dry_run_dir: str, target_dialect: str = "duckdb")
 
 
 def lint_with_sqlfluff(dry_run_dir: str, dialect: str = "duckdb"):
-    queries_dir = Path(dry_run_dir) / "queries"
+    queries_dir = _queries_dir(dry_run_dir)
 
-    if not queries_dir.exists():
-        print(f"❌ Queries directory not found: {queries_dir}")
+    if queries_dir is None:
+        print(f"❌ Queries directory not found in: {dry_run_dir}")
         return
 
     try:

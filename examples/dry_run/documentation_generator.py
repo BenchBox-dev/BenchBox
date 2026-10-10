@@ -36,7 +36,11 @@ def generate_benchmark_documentation(benchmark_name: str, output_dir: str = "./d
         return None
 
     print("  2. Analyzing results...")
-    with open(Path(dry_run_dir) / "summary.json", encoding="utf-8") as f:
+    candidates = sorted(Path(dry_run_dir).glob("*.json"))
+    if not candidates:
+        print(f"❌ Summary file not found in: {dry_run_dir}")
+        return None
+    with open(candidates[0], encoding="utf-8") as f:
         summary = json.load(f)
 
     doc_content = [
@@ -47,26 +51,19 @@ def generate_benchmark_documentation(benchmark_name: str, output_dir: str = "./d
         "## Overview",
         "",
         f"- **Query Count**: {len(summary.get('queries', {}))}",
-        f"- **Table Count**: {len(summary.get('schema_info', {}).get('tables', {}))}",
     ]
 
-    if "resource_estimates" in summary:
-        resources = summary["resource_estimates"]
+    if "estimated_resources" in summary:
+        resources = summary["estimated_resources"]
         doc_content.extend(
             [
                 "",
                 "## Resource Requirements",
                 "",
-                f"- **Memory**: ~{resources.get('estimated_memory_mb', 'N/A')} MB",
-                f"- **Storage**: ~{resources.get('estimated_storage_mb', 'N/A')} MB",
+                f"- **Memory**: ~{resources.get('estimated_memory_usage_mb', 'N/A')} MB",
+                f"- **Data**: ~{resources.get('estimated_data_size_mb', 'N/A')} MB",
             ]
         )
-
-    if "schema_info" in summary and "tables" in summary["schema_info"]:
-        tables = summary["schema_info"]["tables"]
-        doc_content.extend(["", "## Tables", ""])
-        for table_name, table_info in tables.items():
-            doc_content.append(f"- **{table_name}**: {table_info.get('column_count', 'N/A')} columns")
 
     if "queries" in summary:
         queries = summary["queries"]
