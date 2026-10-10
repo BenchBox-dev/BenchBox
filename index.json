@@ -21544,9 +21544,9 @@
     },
     "throughput-stream-count-derived-from-stream-results-length": {
       "claim": {
-        "expires_at": "2026-10-11T18:09:38Z",
-        "generation": "23f17f9e35954fd3a94c2348087c52fa",
-        "renewals": 0,
+        "expires_at": "2026-10-11T18:55:42Z",
+        "generation": "996ba84ad1994af8ad4af10a07cc1d56",
+        "renewals": 1,
         "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396"
       },
       "needs": [],
