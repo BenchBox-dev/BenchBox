@@ -4,7 +4,7 @@
     "Fake-driver save/load round-trip per adapter passes.",
     "DataFusion tuned run logs no 'Failed to save tuning metadata'."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P3.1 (A1.3, N-5).\n\nParallel scout 2026-10-10 reconfirmed follow-up scope on origin/develop, no change vs brief-6.md: _platform_key() metadata.py:186; plain set 415-427; T-SQL set line 428; branch logic 505-528; manifest keys synapse/fabric_dw/pg-duckdb; hand-written DDL test list tests/unit/core/tuning/test_tuning_metadata.py:312-332 with stub forcing fallback path.\n\n2026-10-10 follow-up (native worker, verified by orchestrator): PR #2861 OPEN unarmed, head fb4946081ac2ba73a8669591b9348ed53d578087, local==remote==PR, worktree BenchBox.wt-tuning-metadata-keys. Fix: _normalize_platform_key() folds case/separators, aliases azure_synapse->synapse + fabric_warehouse->fabric_dw; T-SQL set now {synapse, fabric_dw}, plain set underscore + pg_mooncake, ClickHouse branches underscore keys. Test: registry-parametrized DDL over 47 SQL platforms both key paths + T-SQL sys.indexes guard; sqlglot parse per adapter dialect. Evidence: runs/tuning-portable-metadata-store-20261001/ (fast-suite-final.log 37037 pass/26 skip; smoke-index-ddl.log T-SQL guard on both key paths, plain index for pg-duckdb/pg_duckdb/pg-mooncake). Registry move declined with reason in PR body. Accepted risk: persisted labels normalized for hyphenated keys, drift hash-based. Blockers: oracle review, CI, external soundness + owner merge. No completion claimed.",
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P3.1 (A1.3, N-5).\n\nParallel scout 2026-10-10 reconfirmed follow-up scope on origin/develop, no change vs brief-6.md: _platform_key() metadata.py:186; plain set 415-427; T-SQL set line 428; branch logic 505-528; manifest keys synapse/fabric_dw/pg-duckdb; hand-written DDL test list tests/unit/core/tuning/test_tuning_metadata.py:312-332 with stub forcing fallback path.\n\n2026-10-10 follow-up (native worker, verified by orchestrator): PR #2861 OPEN unarmed, head fb4946081ac2ba73a8669591b9348ed53d578087, local==remote==PR, worktree BenchBox.wt-tuning-metadata-keys. Fix: _normalize_platform_key() folds case/separators, aliases azure_synapse->synapse + fabric_warehouse->fabric_dw; T-SQL set now {synapse, fabric_dw}, plain set underscore + pg_mooncake, ClickHouse branches underscore keys. Test: registry-parametrized DDL over 47 SQL platforms both key paths + T-SQL sys.indexes guard; sqlglot parse per adapter dialect. Evidence: runs/tuning-portable-metadata-store-20261001/ (fast-suite-final.log 37037 pass/26 skip; smoke-index-ddl.log T-SQL guard on both key paths, plain index for pg-duckdb/pg_duckdb/pg-mooncake). Registry move declined with reason in PR body. Accepted risk: persisted labels normalized for hyphenated keys, drift hash-based. Oracle-verdict SUCCESS/SHIP on fb49460 (2026-10-10T02:25Z, luna, no merge-blocking defects); stale failed oracle-review run 38015957907 rerun requested serially. Blockers: external soundness review + owner merge. No completion claimed.",
   "deferrals": [
     {
       "created_at": "2026-10-08T11:40:49Z",
@@ -114,6 +114,14 @@
       "generation": "4acb503cb0c64378815105220d8254b3",
       "op": "release",
       "op_id": "e93bd84fcb0a474ba78b5687d03513e8",
+      "session_id": "4dbe22cfa4cf47a5bab075c4c3ac203f"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:7e55d16b199130b0978d8efa",
+      "at": "2026-10-10T02:49:25Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "e30fc77151e24fc0a4421966c034d868",
       "session_id": "4dbe22cfa4cf47a5bab075c4c3ac203f"
     }
   ]
