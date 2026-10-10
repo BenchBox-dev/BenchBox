@@ -95,13 +95,17 @@ def test_server_load_waits_for_merges() -> None:
     assert loading_time == 1.5
 
 
-def test_untuned_server_load_does_not_wait_for_merges() -> None:
+def test_untuned_server_load_waits_for_merges() -> None:
     adapter = _Adapter("server", tuning_enabled=False)
 
-    with patch("benchbox.platforms.clickhouse.workload.wait_for_merges_to_settle") as wait:
-        _load(adapter)
+    with patch(
+        "benchbox.platforms.clickhouse.workload.wait_for_merges_to_settle",
+        return_value=MergeSettleResult(True, 0.0, 6),
+    ) as wait:
+        _, loading_time, _ = _load(adapter)
 
-    wait.assert_not_called()
+    wait.assert_called_once()
+    assert loading_time == 1.5
 
 
 def test_local_load_does_not_wait_for_merges() -> None:
@@ -138,3 +142,80 @@ def test_merge_check_failure_does_not_fail_the_load(caplog: pytest.LogCaptureFix
         _load(adapter)
 
     assert "Could not check ClickHouse background merges" in caplog.text
+
+
+def test_server_load_records_merge_settle_phase() -> None:
+    from benchbox.platforms.clickhouse.merge_settle import MERGE_SETTLE_TIMEOUT_SECONDS
+
+    adapter = _Adapter("server", tuning_enabled=False)
+
+    with patch(
+        "benchbox.platforms.clickhouse.workload.wait_for_merges_to_settle",
+        return_value=MergeSettleResult(True, 2.5, 84),
+    ):
+        _, loading_time, _ = _load(adapter)
+
+    assert loading_time == 1.5
+    phase = adapter.build_merge_settle_phase()
+    assert phase is not None
+    assert (phase.settled, phase.waited_seconds, phase.active_parts) == (True, 2.5, 84)
+    assert phase.timeout_seconds == MERGE_SETTLE_TIMEOUT_SECONDS
+
+
+def test_merge_settle_phase_is_exported_next_to_data_loading() -> None:
+    from datetime import datetime
+
+    from benchbox.core.results.models import (
+        BenchmarkResults,
+        DataLoadingPhase,
+        ExecutionPhases,
+        MergeSettlePhase,
+        SetupPhase,
+    )
+    from benchbox.core.results.schema import SchemaV2Validator, build_result_payload
+
+    result = BenchmarkResults(
+        benchmark_name="TPC-H",
+        platform="clickhouse",
+        scale_factor=0.01,
+        execution_id="merge-settle",
+        timestamp=datetime(2026, 10, 9, 12, 0, 0),
+        duration_seconds=12.5,
+        total_queries=1,
+        successful_queries=1,
+        failed_queries=0,
+        query_results=[
+            {
+                "query_id": "Q1",
+                "status": "SUCCESS",
+                "execution_time_seconds": 1.25,
+                "rows_returned": 1,
+                "iteration": 1,
+                "stream_id": 0,
+                "run_type": "measurement",
+            }
+        ],
+        execution_phases=ExecutionPhases(
+            setup=SetupPhase(
+                data_loading=DataLoadingPhase(
+                    duration_ms=3500, status="SUCCESS", total_rows_loaded=10, tables_loaded=8, per_table_stats={}
+                ),
+                merge_settle=MergeSettlePhase(settled=True, waited_seconds=2.5, active_parts=84, timeout_seconds=600.0),
+            )
+        ),
+    )
+
+    payload = build_result_payload(result)
+
+    SchemaV2Validator().validate(payload)
+    assert payload["phases"]["merge_settle"] == {
+        "settled": True,
+        "waited_seconds": 2.5,
+        "active_parts": 84,
+        "timeout_seconds": 600.0,
+    }
+    assert payload["phases"]["data_loading"]["duration_ms"] == 3500
+
+
+def test_merge_settle_phase_is_omitted_when_no_settle_ran() -> None:
+    assert _Adapter("local").build_merge_settle_phase() is None
