@@ -194,6 +194,7 @@ class PlatformHookRegistry:
         if auto_install is None:
             auto_install = options.get("driver_auto_install", False)
         execution_mode = overrides.get("execution_mode") or options.get("execution_mode")
+        execution_engine = overrides.get("execution_engine") or options.get("execution_engine") or "default"
         return DatabaseConfig(
             type=platform,
             name=name,
@@ -202,6 +203,7 @@ class PlatformHookRegistry:
             driver_version=driver_version,
             driver_auto_install=bool(auto_install),
             execution_mode=execution_mode,
+            execution_engine=execution_engine,
         )
 
     @classmethod

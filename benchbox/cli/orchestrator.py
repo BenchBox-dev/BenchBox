@@ -337,6 +337,7 @@ class BenchmarkOrchestrator:
                 verbose=self._verbosity.verbose if self._verbosity else False,
                 very_verbose=self._verbosity.very_verbose if self._verbosity else False,
                 tuning_config=opts.get("df_tuning_config"),
+                execution_engine=getattr(database_config, "execution_engine", None) or "default",
                 **dataframe_options,
             )
         adapter = get_platform_adapter(database_config.type, **(platform_cfg or {}))

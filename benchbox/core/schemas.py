@@ -309,6 +309,7 @@ class DatabaseConfig(BaseModel):
     driver_auto_install: bool = False
     driver_auto_install_used: bool = False
     execution_mode: Optional[Literal["sql", "dataframe", "data_only"]] = None
+    execution_engine: str = "default"
 
     @field_validator("type")
     @classmethod
