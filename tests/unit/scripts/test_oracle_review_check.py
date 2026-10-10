@@ -386,6 +386,28 @@ def test_main_requires_the_oracle_and_prints_no_parity(monkeypatch: pytest.Monke
     assert oracle_review_check.main(["--repo", "o/r", "--pr", "7"]) == 1
 
 
+@pytest.mark.parametrize(
+    ("reviews", "expected_status"),
+    [
+        ([], oracle_review_check.WAITING),
+        ([_oracle_review("pending")], oracle_review_check.WAITING),
+        ([_oracle_review("failure")], oracle_review_check.WAITING),
+        ([_oracle_review("success")], oracle_review_check.PASS),
+    ],
+    ids=["absent", "pending", "failure", "success"],
+)
+def test_main_requires_an_oracle_decision_for_verdict_workflow_only(
+    monkeypatch: pytest.MonkeyPatch, reviews: list[dict[str, Any]], expected_status: int
+) -> None:
+    _stub_main(monkeypatch, reviews)
+    monkeypatch.setattr(
+        oracle_review_check,
+        "fetch_files",
+        lambda token, repo, pr: [{"filename": ".github/workflows/oracle-verdict.yml"}],
+    )
+    assert oracle_review_check.main(["--repo", "o/r", "--pr", "7"]) == expected_status
+
+
 def test_the_connector_signal_is_no_longer_accepted() -> None:
     with pytest.raises(SystemExit):
         oracle_review_check.main(["--repo", "o/r", "--pr", "7", "--signal", "connector"])

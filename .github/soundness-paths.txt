@@ -84,6 +84,7 @@ file	scripts/publication/verify_lane_isolation.py
 file	_project/scripts/soundness_paths.py
 file	_project/scripts/oracle_review_check.py
 file	.github/workflows/oracle-review.yml
+file	.github/workflows/oracle-verdict.yml
 file	_project/scripts/check_soundness_review.py
 file	.github/oracle-reviewers.yml
 prefix	_project/scripts/oracle_reviewers/

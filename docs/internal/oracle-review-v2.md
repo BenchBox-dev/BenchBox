@@ -13,6 +13,12 @@ App's pull request reviews (see Cut-over). The policy lives in
 `_project/decisions/oracle-review-v2-shadow-2026-10-05.md` and, for verdicts,
 evidence and review rounds, `_project/decisions/oracle-review-protocol-2026-10-08.md`.
 
+The soundness manifest explicitly lists `.github/workflows/oracle-verdict.yml`,
+in addition to covering all workflows by directory prefix. A pull request changing
+only this workflow is subject to the same required `oracle-review` gate as other
+soundness changes; an absent, pending or failed oracle decision does not pass on
+its own.
+
 ## Setup
 
 1. Create a GitHub App owned by the repository owner with **Commit statuses:
