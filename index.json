@@ -14159,7 +14159,7 @@
       "needs": [],
       "priority": "medium",
       "status": "open",
-      "title": "No PR carries an author-family label, so the oracle treats every PR as claude-authored and its reviewer-diversity rule never excludes codex or muse"
+      "title": "Remove the oracle's author-family label lookup and hard-code the claude author default"
     },
     "oracle-checker-drop-legacy-first-line-20261023": {
       "claim": null,

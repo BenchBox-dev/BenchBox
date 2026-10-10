@@ -1,12 +1,12 @@
 {
   "acceptance": [
-    "A recorded owner decision (delete the lookup, apply labels from PR tooling, or keep the claude default) with the reason, in docs/operations/oracle-review-v2.md",
-    "If the lookup is deleted: the claude exclusion is hard-coded, or sonnet is last in the low-medium and medium-high orders, and a test shows claude reviewers are not selected for a PR with no label",
-    "If labels are kept: a test shows a codex-authored PR excludes codex reviewers and a claude-authored PR excludes claude reviewers",
-    "Merged through the normal PR flow with an oracle success review, if code changes"
+    "The decision and its reason are recorded in docs/operations/oracle-review-v2.md",
+    "selection.py no longer reads author-family labels and .github/oracle-reviewers.yml has no author_label_prefix; the claude exclusion is fixed in policy or code",
+    "A test shows claude reviewers are not selected for a PR (where the tier is not diversity-exempt) and that adding an author-family label changes nothing",
+    "Merged through the normal PR flow with an oracle success review"
   ],
-  "context": "Observed 2026-10-09 during the oracle follow-up batch (muse install canaries #2842 and #2845).\n\n2026-10-09 tracker review: marked as an owner decision. Recommended option 1 (delete the `author_label_prefix` lookup) because a label is a steering lever and no reliable author signal exists on this repository. Related: oracle-muse-invalid-verdict-output-20261009 and oracle-self-attested-file-list-reviewers-20261008 depend on which reviewers are eligible.",
-  "description": "Owner decision needed: should the oracle keep reading `author-family:<family>` labels at all? Options: (1) delete the `author_label_prefix` lookup and then either hard-code the claude exclusion or move sonnet last in the low-medium and medium-high orders; (2) keep the lookup and have PR tooling (`make pr-open` or the agent PR flow) apply the label; (3) keep today's behaviour (claude default) and document that diversity covers only claude authors. Recommendation: option 1. The label is a reviewer-steering lever that any agent holding the token can set, so it does not tell the oracle who wrote the change. Inferring the family from commit trailers or the PR author (the old option b) is impossible: AGENTS.md forbids agent attribution trailers, and every PR author is joeharris76. Record the decision in docs/operations/oracle-review-v2.md. Decide this before the muse items (oracle-muse-invalid-verdict-output-20261009, oracle-self-attested-file-list-reviewers-20261008). Evidence: _project/scripts/oracle_reviewers/selection.py:60-64 (`excluded_families` falls back to `default_author_family`), .github/oracle-reviewers.yml:103-105 (tier orders).\n\nThe oracle skips reviewers of the same family as the PR's author (`selection.excluded_families`), reading `author-family:<family>` labels and falling back to `default_author_family: claude` (.github/oracle-reviewers.yml). On 2026-10-09 the repository had no `author-family:*` labels at all, and nothing in .github, scripts or _project/scripts applies one (`git grep author-family` finds only the policy key and the reviewer package). Every PR is therefore treated as claude-authored: claude reviewers are skipped everywhere, and a PR written by a codex or muse agent can be reviewed by codex or muse, which defeats the diversity rule. Found while running oracle canaries: the labels had to be created by hand to make muse the first eligible reviewer (canaries #2842 and #2845), and were deleted afterwards.\n\nGuardrails. Never weaken the required oracle-review check. A label must not let an author choose a weaker reviewer: the tier order and allowed tiers still apply. Very-high tier for any change to the reviewer package or policy.",
+  "context": "Observed 2026-10-09 during the oracle follow-up batch (muse install canaries #2842 and #2845).\n\n2026-10-09 tracker review: marked as an owner decision. Recommended option 1 (delete the `author_label_prefix` lookup) because a label is a steering lever and no reliable author signal exists on this repository. Related: oracle-muse-invalid-verdict-output-20261009 and oracle-self-attested-file-list-reviewers-20261008 depend on which reviewers are eligible.\n\n2026-10-09: the owner accepted the recommendation; option 1 with a hard-coded claude exclusion is decided. The item is now implementation work.",
+  "description": "Decision (owner, 2026-10-09): option 1. Delete the `author_label_prefix` lookup and hard-code the claude exclusion, so the reviewer-diversity rule keeps its current effect (claude-family reviewers are skipped where the tier allows) without a label any agent could set to steer reviewer choice. Record the decision in docs/operations/oracle-review-v2.md. The muse items (oracle-muse-invalid-verdict-output-20261009, oracle-self-attested-file-list-reviewers-20261008) can proceed on this basis.\n\nWhy: the label is a reviewer-steering lever that any agent holding the token can set, so it does not tell the oracle who wrote the change. Inferring the family from commit trailers or the PR author is impossible: AGENTS.md forbids agent attribution trailers, and every PR author is joeharris76. Options not chosen: apply labels from PR tooling (still settable by any agent), or keep the lookup and document that only claude authors are covered.\n\nBackground. The oracle skips reviewers of the same family as the PR's author (`selection.excluded_families`, _project/scripts/oracle_reviewers/selection.py:60-64), reading `author-family:<family>` labels and falling back to `default_author_family: claude` (.github/oracle-reviewers.yml). On 2026-10-09 the repository had no `author-family:*` labels and nothing applies one, so every PR is treated as claude-authored. Tier orders: .github/oracle-reviewers.yml:103-105 (opus is diversity-exempt at very-high). Found while running oracle canaries #2842 and #2845, which needed hand-made labels.\n\nGuardrails. Never weaken the required oracle-review check. The tier order and allowed tiers still apply. Very-high tier for any change to the reviewer package or policy.",
   "links": [
     ".github/oracle-reviewers.yml",
     "_project/scripts/oracle_reviewers/selection.py",
@@ -28,6 +28,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "26824125e4f849e8a86f816f2980ddfb",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-10T00:05:11Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "9600a43aca0d4b57895aa4453fa58fe9",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
