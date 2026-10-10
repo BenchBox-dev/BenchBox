@@ -20095,9 +20095,9 @@
     },
     "site-split-30-rehearsal": {
       "claim": {
-        "expires_at": "2026-10-11T01:14:48Z",
-        "generation": "076f227c028d4b5ba90c62ff23378474",
-        "renewals": 0,
+        "expires_at": "2026-10-11T12:23:31Z",
+        "generation": "24cefefa5a214c9f9a78502db87a2afb",
+        "renewals": 1,
         "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:34427fd6ff4639228ad9cd98"
       },
       "needs": [

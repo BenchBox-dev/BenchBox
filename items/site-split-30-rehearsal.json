@@ -102,6 +102,15 @@
       "op_id": "15864f350ab34a039de75eb46cb6e794",
       "reason": "Actor mapped to Claude 4a560440 transcript. Shutdown 01:08:25Z killed bb1mhgqyq/bn9otrzv3; current ps confirms controller 43239 and MCP 43309 absent. Remaining 44767/28217 are unrelated sessions. Prior writer cannot resume; no process killed here.",
       "session_id": "8fa717097fcf438d8eac8a356ebf8686"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:34427fd6ff4639228ad9cd98",
+      "at": "2026-10-10T12:23:31Z",
+      "client": "omp-coding-agent",
+      "generation": "24cefefa5a214c9f9a78502db87a2afb",
+      "op": "take",
+      "op_id": "5a79792ad3844598ac2db22e60b61adc",
+      "session_id": "8fa717097fcf438d8eac8a356ebf8686"
     }
   ]
 }
