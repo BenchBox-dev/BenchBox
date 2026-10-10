@@ -135,7 +135,7 @@ def get_adapter(
     if resolved_mode == "sql":
         return _get_sql_adapter(base_platform, **config)
     else:
-        return _get_dataframe_adapter(base_platform, **config)
+        return _get_dataframe_adapter(base_platform, execution_engine=requested_engine, **config)
 
 
 def _resolve_family_deployment(
@@ -182,6 +182,9 @@ def _get_sql_adapter(platform: str, **config: Any) -> Any:
 def _get_dataframe_adapter(platform: str, **config: Any) -> Any:
     import benchbox.platforms.dataframe as _df
 
+    requested_engine = config.pop("execution_engine", None) or "default"
+    if platform == "polars":
+        config["execution_engine"] = requested_engine
     driver_package = config.pop("driver_package", None)
     driver_version = config.pop("driver_version", None) or config.pop("driver_version_requested", None)
     driver_version_resolved = config.pop("driver_version_resolved", None)

@@ -225,6 +225,7 @@ def test_interactive_guided_flow_uses_prompted_values_and_saves_preferences(tmp_
             supports_dataframe=False,
             deployment_modes={},
             default_deployment=None,
+            execution_engines={},
         )
 
         def _confirm_side_effect(prompt, default=False):
@@ -376,6 +377,7 @@ def test_interactive_stats_controls_reach_benchmark_config(tmp_path: Path):
             supports_dataframe=False,
             deployment_modes={},
             default_deployment=None,
+            execution_engines={},
         )
 
         def _confirm_side_effect(prompt, default=False):
@@ -487,6 +489,7 @@ def test_interactive_execution_type_derived_from_phases(tmp_path: Path):
             supports_dataframe=False,
             deployment_modes={},
             default_deployment=None,
+            execution_engines={},
         )
 
         def _confirm_side_effect(prompt, default=False):
@@ -595,6 +598,7 @@ def test_interactive_dataframe_tuning_acceptance_applies_runtime_defaults(tmp_pa
             supports_dataframe=True,
             deployment_modes={},
             default_deployment=None,
+            execution_engines={},
         )
 
         def _confirm_side_effect(prompt, default=False):
@@ -704,6 +708,7 @@ def test_interactive_wizard_baseline_maps_to_notuning_for_external_mode(tmp_path
             supports_dataframe=False,
             deployment_modes={},
             default_deployment=None,
+            execution_engines={},
         )
 
         def _confirm_side_effect(prompt, default=False):
@@ -816,6 +821,7 @@ def test_interactive_dataframe_wizard_baseline_skips_runtime_defaults(tmp_path: 
             supports_dataframe=True,
             deployment_modes={},
             default_deployment=None,
+            execution_engines={},
         )
 
         def _confirm_side_effect(prompt, default=False):
@@ -894,6 +900,7 @@ def test_fallback_wizard_baseline_reclassifies_runtime_state_for_dataframe_platf
                     supports_dataframe=True,
                     deployment_modes={},
                     default_deployment=None,
+                    execution_engines={},
                 ),
             )
         )
@@ -997,6 +1004,7 @@ def test_direct_dataframe_tuning_config_propagates_to_benchmark_config(tmp_path:
                     supports_dataframe=True,
                     deployment_modes={},
                     default_deployment=None,
+                    execution_engines={},
                 ),
             )
         )
@@ -1119,6 +1127,7 @@ def test_interactive_tuning_declined_sets_notuning_state(tmp_path: Path):
             supports_dataframe=False,
             deployment_modes={},
             default_deployment=None,
+            execution_engines={},
         )
 
         def _confirm_side_effect(prompt, default=False):
@@ -1185,6 +1194,7 @@ def test_interactive_cloud_platform_stops_when_credentials_are_missing():
             supports_dataframe=False,
             deployment_modes={},
             default_deployment=None,
+            execution_engines={},
         )
 
         result = runner.invoke(run, [], obj=_run_obj())
@@ -1242,6 +1252,7 @@ class TestRunCommandValidation:
                         supports_dataframe=False,
                         deployment_modes={},
                         default_deployment=None,
+                        execution_engines={},
                     ),
                 )
             )
@@ -1381,6 +1392,7 @@ class TestRunCommandValidation:
                         supports_dataframe=False,
                         deployment_modes={},
                         default_deployment=None,
+                        execution_engines={},
                     ),
                 )
             )
@@ -1420,6 +1432,7 @@ class TestRunCommandValidation:
                         supports_dataframe=False,
                         deployment_modes={},
                         default_deployment=None,
+                        execution_engines={},
                     ),
                 )
             )
@@ -1447,6 +1460,7 @@ class TestRunCommandValidation:
                         supports_dataframe=False,
                         deployment_modes={},
                         default_deployment=None,
+                        execution_engines={},
                     ),
                 )
             )
@@ -1483,6 +1497,7 @@ class TestRunCommandValidation:
                         supports_dataframe=False,
                         deployment_modes={},
                         default_deployment=None,
+                        execution_engines={},
                     ),
                 )
             )
@@ -1511,6 +1526,7 @@ class TestRunCommandValidation:
                         supports_dataframe=False,
                         deployment_modes={},
                         default_deployment=None,
+                        execution_engines={},
                     ),
                 )
             )
@@ -1539,6 +1555,7 @@ class TestRunCommandValidation:
                         supports_dataframe=False,
                         deployment_modes={},
                         default_deployment=None,
+                        execution_engines={},
                     ),
                 )
             )
@@ -1567,6 +1584,7 @@ class TestRunCommandValidation:
                         supports_dataframe=False,
                         deployment_modes={},
                         default_deployment=None,
+                        execution_engines={},
                     ),
                 )
             )

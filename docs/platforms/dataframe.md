@@ -174,14 +174,19 @@ Result: Write query **once per family**, run on **multiple platforms**.
 
 ```bash
 benchbox run --platform polars-df --benchmark tpch --scale 1 \
-  --platform-option streaming=true \
+  --execution-engine streaming \
   --platform-option rechunk=true
 ```
 
+| Engine value | Meaning |
+|--------------|---------|
+| `default` | Each Polars version's own default |
+| `auto` | Polars chooses the engine for each query |
+| `in-memory` | Materialize each query in memory |
+| `streaming` | Process each query in batches to bound memory |
+
 | Option | Default | Description |
 |--------|---------|-------------|
-| `streaming` | `false` | Enable streaming mode for large datasets |
-| `engine` | `default` | Collect engine: `default`, `in-memory` or `streaming`; applies to every Polars materialization |
 | `rechunk` | `true` | Rechunk data for better memory layout |
 | `n_rows` | - | Limit rows to read (for testing) |
 
@@ -577,8 +582,10 @@ BenchBox automatically detects:
 #### Platform-Specific Smart Defaults
 
 **Polars:**
-- Low memory: `streaming_mode=true`, `chunk_size=50000`
-- High memory: `engine_affinity="in-memory"`, `lazy_evaluation=true`
+- Smart defaults no longer select an execution engine: `--tuning auto` and
+  `--tuning tuned` leave the engine at `default` on every host. Pass
+  `--execution-engine streaming` to stream explicitly.
+- Low memory: `chunk_size=50000`; high memory: `lazy_evaluation=true`
 
 **Pandas:**
 - Low memory: `dtype_backend="numpy_nullable"`, `memory_map=true`
@@ -638,9 +645,9 @@ MemoryError: Unable to allocate array
 
 For scale factors > 10:
 
-1. **Polars:** Enable streaming mode
+1. **Polars:** Run with the streaming engine
    ```bash
-   --platform-option streaming=true
+   --execution-engine streaming
    ```
 
 2. **Pandas:** Consider switching to Polars or Dask

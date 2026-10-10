@@ -173,7 +173,8 @@ def test_cell_command_pins_rechunk_engine_and_single_iteration() -> None:
         "--platform-option",
         "rechunk=false",
     ]
-    assert "engine=in-memory" in command
+    assert command[command.index("--execution-engine") + 1] == "in-memory"
+    assert not any(part.startswith("engine=") for part in command)
 
 
 def test_environment_check_rejects_stale_runtime_and_wrong_version() -> None:
@@ -261,6 +262,43 @@ def test_result_extraction_records_engine_runtime_and_per_query_row_counts() -> 
     assert runner.extract_result(payload, POLARS, cell)["result_ok"] is False
 
 
+def test_result_extraction_reads_the_execution_engine_receipt() -> None:
+    cell = next(
+        item for item in POLARS.cells() if item.benchmark == "tpch" and item.setup == "C" and item.version == "2.0.0"
+    )
+    queries = [
+        {"id": str(number), "stream": 0, "run_type": "measurement", "rows": number, "ms": 2.0, "status": "SUCCESS"}
+        for number in range(1, 23)
+    ]
+    payload = {
+        "platform": {
+            "version": cell.version,
+            "config": {
+                "rechunk_effective": False,
+                "execution_engine": {
+                    "requested": "streaming",
+                    "applied": "streaming",
+                    "applied_class": "streaming",
+                    "applied_native": {"collect_kwargs": {"engine": "streaming"}},
+                    "resolution": "explicit",
+                    "observed": "not_captured",
+                    "observed_source": "none",
+                },
+                "collect_engine_argument": "streaming",
+                "polars_runtime_package": "polars-runtime-32",
+                "polars_runtime_version": cell.version,
+            },
+        },
+        "summary": {"validation": "uncertain", "queries": {"total": 22, "failed": 0, "passed": 22}},
+        "queries": queries,
+    }
+
+    extracted = runner.extract_result(payload, POLARS, cell)
+
+    assert extracted["result_ok"] is True
+    assert extracted["engine_requested"] == "streaming"
+
+
 def test_analyzer_accepts_uncertain_status_only_with_clean_evidence_and_matching_counts(tmp_path: Path) -> None:
     accepted = _analyze(tmp_path, _full_records(TIMINGS))
 
@@ -308,6 +346,22 @@ def test_analyzer_rejects_cells_with_rechunk_effective_true_or_wrong_status(tmp_
 
     assert any("rechunk_effective" in reason for reason in _cell(result, "1.31.0", "A")["reasons"])
     assert any("validation status failed" in reason for reason in _cell(result, "2.0.0", "C")["reasons"])
+
+
+def test_analyzer_reads_the_execution_engine_receipt(tmp_path: Path) -> None:
+    records = _full_records(TIMINGS)
+    for record in records:
+        record["execution_engine"] = {"requested": record.pop("engine_requested")}
+
+    accepted = _analyze(tmp_path, records)
+
+    assert all(cell["qualified"] for cell in accepted["cells"])
+    broken = _full_records(TIMINGS)
+    for record in broken:
+        record["execution_engine"] = {"requested": "streaming"}
+    rejected = _analyze(tmp_path, broken)
+
+    assert any("engine_requested streaming" in reason for cell in rejected["cells"] for reason in cell["reasons"])
 
 
 def test_analyzer_keeps_known_divergences_out_of_the_common_subset(tmp_path: Path) -> None:

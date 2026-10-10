@@ -17,19 +17,25 @@ except ImportError:
     POLARS_AVAILABLE = False
 
 from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration
+from benchbox.core.execution_engine import ExecutionEngineReceipt, ExecutionEngineUnavailableError
+from benchbox.core.platform_manifest import DEFAULT_EXECUTION_ENGINE
 from benchbox.platforms.dataframe.expression_family import (
     ExpressionFamilyAdapter,
 )
 from benchbox.platforms.dataframe.shared_loading import dialect_preserves_empty_strings
 from benchbox.platforms.polars_compat import (
-    OBSERVED_EXECUTION_NOT_CAPTURED,
+    ENGINE_AFFINITY_KEY,
+    IN_MEMORY_ENGINE,
     active_runtime,
+    collect_accepts_engine,
+    collect_affinity,
     collect_engine_option,
+    collect_engine_supported,
     collect_frame,
     csv_empty_string_option,
+    default_collect_engine,
     reader_rechunk_effective,
     reader_rechunk_option,
-    validate_collect_engine,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,7 +70,7 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         rechunk: bool = True,
         n_rows: int | None = None,
         tuning_config: DataFrameTuningConfiguration | None = None,
-        engine: str = "default",
+        execution_engine: str = "default",
     ) -> None:
         if not POLARS_AVAILABLE:
             raise ImportError("Polars not installed. Install with: pip install polars")
@@ -79,15 +85,83 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         self.streaming = streaming
         self.rechunk = rechunk
         self.n_rows = n_rows
-        self.engine = engine
+        self.engine = execution_engine
 
         pl.enable_string_cache()
 
+        self._engine_receipt = self.resolve_execution_engine(execution_engine)
+
         self._validate_and_apply_tuning()
 
-        if self.engine == "in-memory" and self.streaming:
-            raise ValueError("engine='in-memory' conflicts with streaming mode")
-        validate_collect_engine(self.collect_engine)
+    def _tuning_engine(self) -> str | None:
+        from benchbox.core.execution_engine import resolve_requested
+
+        affinity = self._tuning_config.execution.engine_affinity
+        if affinity is not None:
+            return resolve_requested("polars", affinity)
+        if self._tuning_config.execution.streaming_mode:
+            return "streaming"
+        return None
+
+    def resolve_execution_engine(self, requested: str) -> ExecutionEngineReceipt:
+        import warnings
+
+        from benchbox.core.execution_engine import (
+            ExecutionEngineResolution,
+            resolve_requested,
+            supported_execution_engines,
+        )
+
+        resolved = resolve_requested("polars", requested)
+        explicit = None if resolved == DEFAULT_EXECUTION_ENGINE else resolved
+        tuning = self._tuning_engine()
+        legacy = "streaming" if self.streaming else None
+        ordered: tuple[tuple[str, str | None, ExecutionEngineResolution], ...] = (
+            ("explicit setting", explicit, "explicit"),
+            ("tuning file", tuning, "tuning_profile"),
+            ("legacy option", legacy, "legacy_option"),
+        )
+        present = [(source, value, resolution) for source, value, resolution in ordered if value is not None]
+        if len({value for _, value, _ in present}) > 1:
+            raise ValueError(
+                "Conflicting execution engine sources: "
+                + " vs ".join(f"{source} requests {value!r}" for source, value, _ in present)
+            )
+        if tuning is not None:
+            logger.warning(
+                "Tuning [%s]: tuning file selects execution engine %r; runs with different engines may not be comparable",
+                self.platform_name,
+                tuning,
+            )
+        if legacy is not None:
+            warnings.warn(
+                "The Polars streaming option is deprecated; use execution_engine='streaming'",
+                DeprecationWarning,
+                stacklevel=3,
+            )
+        selected: str
+        resolution: ExecutionEngineResolution
+        if present:
+            _, selected, resolution = present[0]
+            if selected != DEFAULT_EXECUTION_ENGINE and not collect_engine_supported(selected):
+                raise ExecutionEngineUnavailableError(
+                    f"Polars {pl.__version__} does not support execution engine {selected!r}"
+                )
+        else:
+            selected, resolution = default_collect_engine(), "version_default"
+        engines = supported_execution_engines("polars")
+        collect_kwargs = collect_engine_option(selected) if collect_accepts_engine() else {}
+        applied_native: dict[str, Any] = {"collect_kwargs": collect_kwargs}
+        applied_native[ENGINE_AFFINITY_KEY] = collect_affinity()
+        return ExecutionEngineReceipt(
+            requested=resolved,
+            applied=selected,
+            applied_class=engines[selected].engine_class if selected in engines else None,
+            applied_native=applied_native,
+            resolution=resolution,
+            observed="not_captured",
+            observed_source="none",
+        )
 
     def _apply_tuning(self) -> None:
         import os
@@ -99,11 +173,6 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
             self._log_verbose(f"Set POLARS_MAX_THREADS={config.parallelism.thread_count}")
             self._record_runtime_tuning(f"POLARS_MAX_THREADS={config.parallelism.thread_count}")
 
-        if config.execution.streaming_mode:
-            self.streaming = True
-            self._log_verbose("Enabled streaming mode from tuning configuration")
-            self._record_runtime_tuning("streaming_mode=on")
-
         if not config.memory.rechunk_after_filter:
             self.rechunk = False
             self._log_verbose("Disabled rechunk from tuning configuration")
@@ -114,20 +183,15 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
             self._log_verbose(f"Set streaming chunk size={config.memory.chunk_size}")
             self._record_runtime_tuning(f"streaming_chunk_size={config.memory.chunk_size}")
 
-        if config.execution.engine_affinity == "streaming":
-            self.streaming = True
-            self._log_verbose("Set streaming mode from engine_affinity='streaming'")
-            self._record_runtime_tuning("engine_affinity=streaming")
-
     @property
     def platform_name(self) -> str:
         return "Polars"
 
     @property
     def collect_engine(self) -> str:
-        if self.engine == "default" and self.streaming:
-            return "streaming"
-        return self.engine
+        receipt = self._engine_receipt
+        applied = receipt.applied if receipt.applied is not None else IN_MEMORY_ENGINE
+        return applied if collect_accepts_engine() else DEFAULT_EXECUTION_ENGINE
 
     def materialize(self, df: PolarsLazyDF) -> PolarsDF:
         return collect_frame(df, self.collect_engine)
@@ -247,13 +311,15 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         return tuple(df.row(0))
 
     def get_platform_info(self) -> dict[str, Any]:
+        from dataclasses import asdict
+
+        receipt = asdict(self._engine_receipt)
+        receipt["applied_native"] = dict(receipt.get("applied_native") or {})
         info = {
             "platform": self.platform_name,
             "family": self.family,
-            "streaming": self.streaming,
-            "engine_requested": self.engine,
+            "execution_engine": receipt,
             "collect_engine_argument": collect_engine_option(self.collect_engine).get("engine"),
-            "observed_execution": OBSERVED_EXECUTION_NOT_CAPTURED,
             "rechunk": self.rechunk,
             "rechunk_effective": reader_rechunk_effective(self.rechunk),
             "working_dir": str(self.working_dir),

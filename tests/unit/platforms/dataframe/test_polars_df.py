@@ -65,7 +65,7 @@ class TestPolarsDataFrameAdapter:
         assert info["platform"] == "Polars"
         assert info["family"] == "expression"
         assert "version" in info
-        assert info["streaming"] is False
+        assert info["execution_engine"]["resolution"] == "version_default"
 
     def test_create_context(self):
 

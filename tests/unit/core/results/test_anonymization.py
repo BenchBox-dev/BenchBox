@@ -1333,7 +1333,7 @@ class TestCloudWarehouseAndOutputLocation:
         assert "bucket" not in json.dumps(config["platform_options"])
 
     @pytest.mark.parametrize("engine", ["default", "in-memory", "streaming"])
-    def test_generic_engine_option_values_stay_readable(self, engine):
+    def test_generic_engine_option_values_are_hashed(self, engine):
         payload = {
             "config": {"platform_options": {"engine": engine}},
             "platform": {"raw_config": {"options": {"engine": engine}}},
@@ -1341,8 +1341,8 @@ class TestCloudWarehouseAndOutputLocation:
 
         anonymized = AnonymizationManager().anonymize_result_payload(payload)
 
-        assert anonymized["config"]["platform_options"]["engine"] == engine
-        assert anonymized["platform"]["raw_config"]["options"]["engine"] == engine
+        assert anonymized["config"]["platform_options"]["engine"].startswith("engine_")
+        assert anonymized["platform"]["raw_config"]["options"]["engine"].startswith("engine_")
 
     def test_other_engine_values_and_locations_stay_hashed(self):
         payload = {

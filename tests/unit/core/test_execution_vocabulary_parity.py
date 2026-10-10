@@ -21,11 +21,7 @@ from benchbox.mcp.schemas import MCP_PLATFORM_OPTION_ALLOWLIST, MCP_PLATFORM_OPT
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
-GRANDFATHERED_KEYS = frozenset(
-    {
-        ("polars", "engine"),
-    }
-)
+GRANDFATHERED_KEYS: frozenset[tuple[str, str]] = frozenset()
 CORE_VOCABULARY_KEYS = ("execution_engine", "compute_resource", "compute_size", "gateway")
 
 

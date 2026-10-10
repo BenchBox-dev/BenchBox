@@ -156,8 +156,3 @@ message_keys:
 option_map_keys:
 - options
 - platformoptions
-public_option_values:
-  engine:
-  - default
-  - in-memory
-  - streaming

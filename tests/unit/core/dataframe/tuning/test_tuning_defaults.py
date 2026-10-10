@@ -117,7 +117,8 @@ class TestGetSmartDefaults:
         profile = SystemProfile(cpu_cores=4, available_memory_gb=2.0)
         config = get_smart_defaults("polars", profile)
 
-        assert config.execution.streaming_mode is True
+        assert config.execution.engine_affinity is None
+        assert config.execution.streaming_mode is False
         assert config.memory.chunk_size is not None
 
     def test_polars_high_memory_defaults(self):
@@ -125,7 +126,7 @@ class TestGetSmartDefaults:
         profile = SystemProfile(cpu_cores=32, available_memory_gb=128.0)
         config = get_smart_defaults("polars", profile)
 
-        assert config.execution.engine_affinity == "in-memory"
+        assert config.execution.engine_affinity is None
         assert config.execution.streaming_mode is False
 
     def test_pandas_defaults(self):

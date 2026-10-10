@@ -1997,10 +1997,13 @@ def _interactive_prompt_platform_options(s: types.SimpleNamespace) -> None:
 
     platform_opts = getattr(s, "_interactive_platform_options", None)
     if platform_opts is None:
-        from benchbox.cli.benchmarks import prompt_platform_options
+        from benchbox.cli.benchmarks import prompt_execution_engine, prompt_platform_options
 
         platform_opts = prompt_platform_options(s.database_config.type) or {}
         s._interactive_platform_options = platform_opts
+        engine = prompt_execution_engine(s.database_config.type)
+        s.execution_engine = engine
+        s.database_config.execution_engine = engine
 
     if not platform_opts:
         return

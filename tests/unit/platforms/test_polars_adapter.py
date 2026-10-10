@@ -33,10 +33,12 @@ class TestPolarsAdapterBasics:
 
             assert adapter.platform_name == "Polars"
             assert adapter.execution_mode == "lazy"
-            assert adapter.streaming is False
+            assert adapter.get_platform_info()["configuration"]["execution_engine"]["resolution"] == (
+                "platform_default"
+            )
             assert adapter.rechunk is True
 
-    def test_initialization_custom_config(self):
+    def test_initialization_custom_config(self, recwarn):
         from benchbox.platforms.polars_platform import PolarsAdapter
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -49,9 +51,17 @@ class TestPolarsAdapterBasics:
             )
 
             assert adapter.execution_mode == "eager"
-            assert adapter.streaming is True
             assert adapter.n_rows == 1000
             assert adapter.rechunk is False
+            assert any(issubclass(warning.category, DeprecationWarning) for warning in recwarn.list)
+
+    def test_sql_adapter_rejects_non_default_engine(self):
+        from benchbox.core.execution_engine import UnsupportedExecutionEngineError
+        from benchbox.platforms.polars_platform import PolarsAdapter
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with pytest.raises(UnsupportedExecutionEngineError, match="Allowed: default$"):
+                PolarsAdapter(working_dir=tmpdir, execution_engine="duckdb")
 
     def test_platform_name(self):
         from benchbox.platforms.polars_platform import PolarsAdapter
@@ -106,7 +116,7 @@ class TestPolarsAdapterFromConfig:
             assert adapter.platform_name == "Polars"
             assert adapter.execution_mode == "lazy"
 
-    def test_from_config_with_execution_mode(self):
+    def test_from_config_with_execution_mode(self, recwarn):
         from benchbox.platforms.polars_platform import PolarsAdapter
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -121,7 +131,7 @@ class TestPolarsAdapterFromConfig:
             adapter = PolarsAdapter.from_config(config)
 
             assert adapter.execution_mode == "eager"
-            assert adapter.streaming is True
+            assert any(issubclass(warning.category, DeprecationWarning) for warning in recwarn.list)
 
 
 class TestPolarsDataFrameContext:
@@ -216,6 +226,7 @@ class TestPolarsAdapterConnection:
             assert info["connection_mode"] == "in-memory"
             assert "client_library_version" in info
             assert info["client_library_version"] == pl.__version__
+            assert info["configuration"]["execution_engine"]["resolution"] == "platform_default"
 
 
 class TestPolarsAdapterSchemaCreation:

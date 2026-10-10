@@ -7,7 +7,10 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from benchbox.core.execution_engine import ExecutionEngineReceipt
 
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
@@ -124,11 +127,12 @@ class PolarsAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
 
         adapter_config["execution_mode"] = config.get("execution_mode", "lazy")
 
-        adapter_config["streaming"] = config.get("streaming", False)
-
         adapter_config["n_rows"] = config.get("n_rows")
 
         adapter_config["rechunk"] = config.get("rechunk", True)
+
+        adapter_config["execution_engine"] = config.get("execution_engine") or "default"
+        adapter_config["streaming"] = config.get("streaming", False)
 
         adapter_config["force_recreate"] = config.get("force", False)
 
@@ -146,6 +150,11 @@ class PolarsAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
 
         return cls(**adapter_config)
 
+    def resolve_execution_engine(self, requested: str) -> ExecutionEngineReceipt:
+        from benchbox.core.execution_engine import platform_default_receipt
+
+        return platform_default_receipt("polars", requested)
+
     def __init__(self, **config):
         super().__init__(**config)
         if pl is None:
@@ -153,15 +162,26 @@ class PolarsAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
 
         self.working_dir = Path(config.get("working_dir", "./polars_working"))
         self.execution_mode = config.get("execution_mode", "lazy")
-        self.streaming = config.get("streaming", False)
         self.n_rows = config.get("n_rows")
         self.rechunk = config.get("rechunk", True)
+        self._engine_receipt = self.resolve_execution_engine(config.get("execution_engine") or "default")
+
+        if config.get("streaming", False):
+            import warnings
+
+            warnings.warn(
+                "The Polars streaming option is deprecated and has no effect on SQL execution",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
         self._table_schemas: dict[str, dict] = {}
 
         self.working_dir.mkdir(parents=True, exist_ok=True)
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
+        from dataclasses import asdict
+
         platform_info = {
             "platform_type": "polars",
             "platform_name": "Polars",
@@ -169,7 +189,7 @@ class PolarsAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
             "configuration": {
                 "working_dir": str(self.working_dir),
                 "execution_mode": self.execution_mode,
-                "streaming": self.streaming,
+                "execution_engine": asdict(self._engine_receipt),
                 "n_rows_limit": self.n_rows,
                 "rechunk": self.rechunk,
                 "rechunk_effective": reader_rechunk_effective(self.rechunk),
@@ -200,8 +220,6 @@ class PolarsAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         config_applied.append(f"threads={n_threads}")
 
         config_applied.append(f"execution_mode={self.execution_mode}")
-        if self.streaming:
-            config_applied.append("streaming=enabled")
 
         self.log_very_verbose(f"Polars configuration: {', '.join(config_applied)}")
 
@@ -512,7 +530,6 @@ class PolarsAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
             "polars_available": pl is not None,
             "working_dir": str(self.working_dir),
             "execution_mode": self.execution_mode,
-            "streaming": self.streaming,
             "sql_mode": False,
         }
 

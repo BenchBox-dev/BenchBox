@@ -240,11 +240,10 @@ class TestPolarsAdapterInitialization:
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = PolarsAdapter(working_dir=tmpdir)
             assert adapter.execution_mode == "lazy"
-            assert adapter.streaming is False
             assert adapter.n_rows is None
             assert adapter.rechunk is True
 
-    def test_custom_config_values(self):
+    def test_custom_config_values(self, recwarn):
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = PolarsAdapter(
                 working_dir=tmpdir,
@@ -254,9 +253,9 @@ class TestPolarsAdapterInitialization:
                 rechunk=False,
             )
             assert adapter.execution_mode == "eager"
-            assert adapter.streaming is True
             assert adapter.n_rows == 500
             assert adapter.rechunk is False
+            assert any(issubclass(warning.category, DeprecationWarning) for warning in recwarn.list)
 
 
 class TestPolarsAdapterConnectionAndInfo:
@@ -278,14 +277,15 @@ class TestPolarsAdapterConnectionAndInfo:
             assert info["client_library_version"] == pl.__version__
             assert info["platform_version"] == pl.__version__
 
-    def test_platform_info_configuration_section(self):
+    def test_platform_info_configuration_section(self, recwarn):
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = PolarsAdapter(working_dir=tmpdir, execution_mode="eager", streaming=True)
             info = adapter.get_platform_info()
             config = info["configuration"]
             assert config["execution_mode"] == "eager"
-            assert config["streaming"] is True
+            assert config["execution_engine"]["resolution"] == "platform_default"
             assert config["result_cache_enabled"] is False
+            assert any(issubclass(warning.category, DeprecationWarning) for warning in recwarn.list)
 
 
 class TestPolarsSchemaCreation:

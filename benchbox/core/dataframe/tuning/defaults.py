@@ -170,16 +170,8 @@ def _apply_memory_recommendations(
 
 
 def _configure_polars(config: DataFrameTuningConfiguration, profile: SystemProfile) -> None:
-    available_gb = profile.available_memory_gb
-
-    if available_gb >= 64:
-        config.execution.engine_affinity = "in-memory"
-        config.execution.streaming_mode = False
-    elif available_gb >= 16:
-        config.execution.engine_affinity = "in-memory"
-    else:
-        config.execution.engine_affinity = "streaming"
-        config.execution.streaming_mode = True
+    config.execution.engine_affinity = None
+    config.execution.streaming_mode = False
 
     config.execution.lazy_evaluation = True
 

@@ -1,6 +1,4 @@
 execution:
-  streaming_mode: true
-  engine_affinity: streaming
   lazy_evaluation: true
 
 memory:

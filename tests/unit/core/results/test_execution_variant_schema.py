@@ -124,7 +124,7 @@ def test_absent_producers_do_not_fill_new_fields():
 def test_current_polars_producer_request_defines_variant(engine, tmp_path):
     from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
 
-    adapter = PolarsDataFrameAdapter(engine=engine, working_dir=tmp_path)
+    adapter = PolarsDataFrameAdapter(execution_engine=engine, working_dir=tmp_path)
     result = make_benchmark_results(
         platform="polars-df",
         platform_info={"configuration": adapter.get_platform_info()},
@@ -132,7 +132,7 @@ def test_current_polars_producer_request_defines_variant(engine, tmp_path):
     payload = build_result_payload(result)
     expected = "polars-df" if engine == "default" else f"polars-df+{engine}"
     assert payload["platform"]["variant"] == expected
-    assert "execution_engine" not in payload["platform"]
+    assert payload["platform"]["execution_engine"]["requested"] == engine
 
 
 @pytest.mark.parametrize("engine", ["default", "in-memory", "streaming"])

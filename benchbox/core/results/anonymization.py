@@ -44,7 +44,9 @@ _PUBLIC_DROP_CHILD_KEYS = {
     parent: frozenset(children) for parent, children in _ANONYMIZATION_SPECS["public_drop_child_keys"].items()
 }
 _OPTION_MAP_KEYS = frozenset(_ANONYMIZATION_SPECS["option_map_keys"])
-_PUBLIC_OPTION_VALUES = {key: frozenset(values) for key, values in _ANONYMIZATION_SPECS["public_option_values"].items()}
+_PUBLIC_OPTION_VALUES = {
+    key: frozenset(values) for key, values in (_ANONYMIZATION_SPECS.get("public_option_values") or {}).items()
+}
 _OPTION_SOURCE_LABELS = frozenset(
     {
         "registered_default",

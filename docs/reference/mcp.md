@@ -227,6 +227,7 @@ modes remain available because they do not hold the request for execution.
 | `queries` | string or null | No | `null` | Comma-separated query IDs, for example `1,3,6`. |
 | `phases` | string or null | No | `null` | Comma-separated phases; execution defaults to `load,power` when omitted. |
 | `mode` | string or null | No | `null` | Execution mode: `sql`, `dataframe`, or `data_only`. |
+| `execution_engine` | string | No | `default` | Execution engine: which execution machinery runs the query, validated against the platform manifest; equivalent to the CLI `--execution-engine` flag. |
 | `capture_plans` | boolean | No | `false` | Capture query plans where the selected platform supports them. |
 | `dry_run` | boolean | No | `false` | Preview the run plan without executing queries. |
 | `validate_only` | boolean | No | `false` | Validate platform, benchmark, scale, and mode without executing. |

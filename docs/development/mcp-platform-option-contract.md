@@ -46,6 +46,15 @@ never be able to change the endpoint.
 | Velox | `adaptive_enabled` | Velox execution options | execution | Reject unreviewed execution flags. |
 | Velox | `driver_memory`, `offheap_size`, `shuffle_partitions` | Velox resource envelope | resource | Reject paths, scheduler endpoints, and unbounded values. |
 
+## Core parameters
+
+Top-level tool parameters outside `platform_options` carry their own contract
+entries in `MCP_CORE_PARAMETER_CONTRACT`:
+
+| Parameter | Consumer | Security class | Compatibility alias / rejected alternatives |
+|---|---|---|---|
+| `execution_engine` | Core `resolve_requested` against the platform manifest, then the adapter's execution-engine receipt | execution | Platform-specific engine option names are rejected; the Polars `engine` platform option was removed without an alias. |
+
 ## Change protocol
 
 Adding an option requires all of the following in one change:

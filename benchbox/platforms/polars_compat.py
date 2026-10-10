@@ -6,14 +6,10 @@ from functools import cache
 from importlib import metadata
 from typing import Any
 
-COLLECT_ENGINES = ("default", "in-memory", "streaming")
 RUNTIME_MODULE_PREFIX = "_polars_runtime_"
 RUNTIME_PACKAGE_ABSENT = "absent"
-OBSERVED_EXECUTION_NOT_CAPTURED = "not_captured"
-
-
-class PolarsEngineUnsupportedError(ValueError):
-    pass
+ENGINE_AFFINITY_KEY = "POLARS_ENGINE_AFFINITY"
+IN_MEMORY_ENGINE = "in-memory"
 
 
 @cache
@@ -61,14 +57,24 @@ def collect_engine_supported(engine: str) -> bool:
     return True
 
 
-def validate_collect_engine(engine: str) -> str:
+@cache
+def default_collect_engine() -> str:
     import polars as pl
 
-    if engine not in COLLECT_ENGINES:
-        raise ValueError(f"Unknown Polars engine '{engine}'; expected one of {', '.join(COLLECT_ENGINES)}")
-    if not collect_engine_supported(engine):
-        raise PolarsEngineUnsupportedError(f"Polars {pl.__version__} cannot collect with engine='{engine}'")
-    return engine
+    parameters = inspect.signature(pl.LazyFrame.collect).parameters
+    if "engine" not in parameters:
+        return IN_MEMORY_ENGINE
+    default = parameters["engine"].default
+    if isinstance(default, str) and default:
+        return default
+    return IN_MEMORY_ENGINE
+
+
+def collect_affinity() -> str | None:
+    import polars as pl
+
+    value = pl.Config.state().get(ENGINE_AFFINITY_KEY)
+    return str(value) if value else None
 
 
 def collect_engine_option(engine: str) -> dict[str, str]:
