@@ -14,7 +14,7 @@ _WARNED_ALIASES: set[tuple[str, str]] = set()
 
 @dataclass(frozen=True)
 class ComputeDeclaration:
-    resource_kind: str | dict[str, str] | None
+    resource_kind: str | Mapping[str, str] | None
     resource_aliases: tuple[str, ...]
     size_aliases: tuple[str, ...]
     size_choices: tuple[str, ...] = ()
@@ -79,7 +79,32 @@ def normalize_compute_options(platform: str, options: Mapping[str, Any]) -> dict
     resolved = dict(options)
     _normalize_compute_family(platform, resolved, COMPUTE_RESOURCE_OPTION, declaration.resource_aliases)
     _normalize_compute_family(platform, resolved, COMPUTE_SIZE_OPTION, declaration.size_aliases)
+    _reject_ambiguous_resource_kind(platform, declaration, resolved)
     return resolved
+
+
+def _reject_ambiguous_resource_kind(
+    platform: str, declaration: ComputeDeclaration, resolved: Mapping[str, Any]
+) -> None:
+    from benchbox.core.hooks.platform_hooks import PlatformOptionError
+
+    kind = declaration.resource_kind
+    if not isinstance(kind, Mapping):
+        return
+    present = [alias for alias in declaration.resource_aliases if resolved.get(alias) is not None]
+    if len(present) > 1:
+        names = " and ".join(f"'{alias}={resolved[alias]}'" for alias in present)
+        raise PlatformOptionError(
+            f"Ambiguous compute resource for platform '{platform}': {names} "
+            f"name different vendor objects. Keep only one native key."
+        )
+    if resolved.get(COMPUTE_RESOURCE_OPTION) is not None and not present:
+        names = ", ".join(f"'{alias}'" for alias in declaration.resource_aliases)
+        raise PlatformOptionError(
+            f"Ambiguous compute resource for platform '{platform}': "
+            f"'{COMPUTE_RESOURCE_OPTION}={resolved[COMPUTE_RESOURCE_OPTION]}' "
+            f"could be {names}. Use one native key instead."
+        )
 
 
 def _normalize_compute_family(
@@ -100,7 +125,16 @@ def _normalize_compute_family(
                 )
         seen[alias] = resolved[alias]
         warn_deprecated_compute_alias(platform, alias, canonical)
-    if resolved.get(canonical) is None and seen:
+    canonical_value = resolved.get(canonical)
+    if canonical_value is not None:
+        for alias, value in seen.items():
+            if value != canonical_value:
+                raise PlatformOptionError(
+                    f"Conflicting compute settings for platform '{platform}': "
+                    f"'{canonical}={canonical_value}' disagrees with '{alias}={value}'. "
+                    f"Keep only '{canonical}'."
+                )
+    elif seen:
         resolved[canonical] = next(iter(seen.values()))
 
 
@@ -111,9 +145,27 @@ def resolve_resource_kind(platform: str, merged: Mapping[str, Any]) -> str | Non
     kind = declaration.resource_kind
     if kind is None or isinstance(kind, str):
         return kind
-    for alias in declaration.resource_aliases:
-        if merged.get(alias) is not None and alias in kind:
+    present = [alias for alias in declaration.resource_aliases if merged.get(alias) is not None]
+    if len(present) > 1:
+        from benchbox.core.hooks.platform_hooks import PlatformOptionError
+
+        names = " and ".join(f"'{alias}={merged[alias]}'" for alias in present)
+        raise PlatformOptionError(
+            f"Ambiguous compute resource for platform '{platform}': {names} "
+            f"name different vendor objects. Keep only one native key."
+        )
+    for alias in present:
+        if alias in kind:
             return kind[alias]
+    if merged.get(COMPUTE_RESOURCE_OPTION) is not None:
+        from benchbox.core.hooks.platform_hooks import PlatformOptionError
+
+        names = ", ".join(f"'{alias}'" for alias in declaration.resource_aliases)
+        raise PlatformOptionError(
+            f"Ambiguous compute resource for platform '{platform}': "
+            f"'{COMPUTE_RESOURCE_OPTION}={merged[COMPUTE_RESOURCE_OPTION]}' "
+            f"could be {names}. Use one native key instead."
+        )
     return None
 
 
