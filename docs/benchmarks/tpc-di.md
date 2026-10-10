@@ -227,23 +227,35 @@ print(customer_validation)
 ### ETL Process Simulation
 
 ```python
+import duckdb
+from benchbox import TPCDI
+
 tpcdi = TPCDI(scale_factor=1.0, output_dir="tpcdi_etl")
 
 source_data = tpcdi.generate_source_data()
 
-transformation_results = tpcdi.run_etl_process(
-    source_data=source_data,
-    batch_id=1,
-    effective_date="2023-01-01"
+conn = duckdb.connect(":memory:")
+schema_sql = tpcdi.get_create_tables_sql()
+conn.execute("BEGIN TRANSACTION")
+for statement in schema_sql.split(';'):
+    if statement.strip():
+        conn.execute(statement)
+conn.execute("COMMIT")
+
+transformation_results = tpcdi.run_etl_pipeline(
+    connection=conn,
+    batch_type="historical",
+    validate_data=True,
 )
 
 validation_results = {}
 for query_id in ["V1", "V2", "V3"]:
     query_sql = tpcdi.get_query(query_id)
-    validation_results[query_id] = "PASSED"
+    rows = conn.execute(query_sql).fetchall()
+    validation_results[query_id] = "PASSED" if rows else "EMPTY"
 ```
 
-This simulates the ETL process. The source data files are simulated, and the ETL step is a simplified example. The validation loop does not execute the queries: it records every result as `"PASSED"` as a simplification.
+This simulates the ETL process: source files are generated, the pipeline loads them, and the validation queries execute against the loaded warehouse.
 
 ### DuckDB Integration Example
 
@@ -256,25 +268,20 @@ data_files = tpcdi.generate_data()
 
 conn = duckdb.connect("tpcdi.duckdb")
 schema_sql = tpcdi.get_create_tables_sql()
-conn.execute(schema_sql)
+conn.execute("BEGIN TRANSACTION")
+for statement in schema_sql.split(';'):
+    if statement.strip():
+        conn.execute(statement)
+conn.execute("COMMIT")
 
-tables_to_load = [
-    'DimCustomer', 'DimAccount', 'DimSecurity', 'DimCompany',
-    'DimBroker', 'DimDate', 'DimTime',
-    'FactTrade', 'FactCashBalances', 'FactHoldings',
-    'FactMarketHistory', 'FactWatches'
-]
-
-for table_name in tables_to_load:
-    file_path = tpcdi.output_dir / f"{table_name.lower()}.csv"
-    if file_path.exists():
-        conn.execute(f"""
-            INSERT INTO {table_name}
-            SELECT * FROM read_csv('{file_path}',
-                                  header=true,
-                                  auto_detect=true)
-        """)
-        print(f"Loaded {table_name}")
+from pathlib import Path
+for table_file in data_files:
+    table_name = Path(table_file).stem
+    conn.execute(f"""
+        INSERT INTO {table_name}
+        SELECT * FROM read_csv('{table_file}', delim='|', header=false)
+    """)
+    print(f"Loaded {table_name}")
 
 validation_queries = ["V1", "V2", "V3"]
 for query_id in validation_queries:

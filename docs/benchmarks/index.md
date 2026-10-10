@@ -375,12 +375,12 @@ from benchbox import TPCH, TPCDS, JoinOrder
 benchmarks = {
     "tpch": TPCH(scale_factor=1.0),
     "tpcds": TPCDS(scale_factor=1.0),
-    "joinorder": JoinOrder(scale_factor=1.0)
+    "joinorder": JoinOrder(scale_factor=1.0),
 }
 
-results = {}
 for name, benchmark in benchmarks.items():
-    results[name] = run_benchmark(benchmark)
+    queries = benchmark.get_queries()
+    print(f"{name}: {len(queries)} queries")
 ```
 
 ### Regression Testing
@@ -388,17 +388,17 @@ Use a small scale factor for fast execution, and allow 10% variance against the 
 ```python
 from benchbox import ReadPrimitives
 
-read_primitives = ReadPrimitives(scale_factor=0.001)
+read_primitives = ReadPrimitives(scale_factor=0.01)
 regression_queries = [
-    "aggregation_basic",
-    "join_inner_simple",
+    "aggregation_distinct",
+    "broadcast_join_two_tables",
     "filter_selective",
-    "sort_large_result"
+    "limit",
 ]
 
 for query_id in regression_queries:
-    current_time = measure_query(primitives.get_query(query_id))
-    assert current_time < baseline_time * 1.1
+    query_sql = read_primitives.get_query(query_id)
+    print(f"{query_id}: {len(query_sql)} characters")
 ```
 
 ## Resource Characteristics
@@ -411,7 +411,7 @@ for query_id in regression_queries:
 | TPC-DS     | Q1, Q6, Q11        | Q14, Q67, Q78          | 99            |
 | SSB        | Q1.1-Q1.3          | Q4.1-Q4.3              | 13            |
 | Join Order | 2-3 table joins    | 6+ table joins         | 113           |
-| Primitives | Single-table scans | Complex aggregations   | 50+           |
+| Primitives | Single-table scans | Complex aggregations | 157           |
 | ClickBench | Simple scans       | Multi-column analytics | 43            |
 
 **Note:** Execution times vary significantly based on platform, hardware, and configuration. Run benchmarks to establish baselines for your environment.

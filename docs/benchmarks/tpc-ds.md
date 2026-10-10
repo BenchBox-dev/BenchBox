@@ -9,7 +9,7 @@
 
 ## Overview
 
-The TPC-DS (Transaction Processing Performance Council - Decision Support) benchmark is the most systematic and complex decision support benchmark available today. TPC-DS models a retail data warehouse environment with sophisticated analytical queries that test advanced database features including window functions, recursive queries, OLAP operations, and complex join patterns.
+The TPC-DS (Transaction Processing Performance Council - Decision Support) benchmark is the most systematic and complex decision support benchmark available today. TPC-DS models a retail data warehouse environment with sophisticated analytical queries that test advanced database features including window functions, multi-CTE set operations, OLAP operations, and complex join patterns.
 
 TPC-DS represents the evolution of decision support benchmarks, designed to address the limitations of earlier benchmarks by incorporating modern data warehouse patterns, complex analytical queries, and realistic data distributions that challenge all aspects of a database system's query processing capabilities.
 
@@ -17,7 +17,7 @@ TPC-DS represents the evolution of decision support benchmarks, designed to addr
 
 - **99 analytical queries** with varying complexity and selectivity
 - **24 data tables** (plus `dbgen_version` metadata table) representing a systematic retail data warehouse
-- **Advanced-level SQL features** including window functions, recursive CTEs, ROLLUP/CUBE
+- **Advanced-level SQL features** including window functions, multi-CTE queries, ROLLUP/CUBE
 - **Complex query patterns** with nested subqueries and multiple aggregation levels
 - **Realistic data distributions** based on real-world retail scenarios
 - **Stream processing support** for throughput and concurrency testing
@@ -123,7 +123,7 @@ platform and scale.
 | Feature | Example Queries | Description |
 |---------|----------------|-------------|
 | **Window Functions** | Q17, Q25, Q47, Q51 | ROW_NUMBER(), RANK(), LAG/LEAD |
-| **Recursive Queries** | Q14a, Q23a | WITH RECURSIVE CTEs |
+| **Multi-CTE Analysis** | Q14a, Q23a | Chained CTEs for cross-channel analysis |
 | **ROLLUP/CUBE** | Q5, Q18, Q77 | OLAP aggregation operations |
 | **Complex Joins** | Q64, Q78, Q95 | 6+ table joins with multiple predicates |
 | **Correlation Analysis** | Q35, Q38, Q87 | Cross-channel correlation patterns |
@@ -135,7 +135,7 @@ platform and scale.
 
 Some queries have variants (e.g., Q14a/Q14b) that test slightly different patterns:
 - **Query 14a/14b**: Different approaches to cross-channel analysis
-- **Query 23a/23b**: Alternative recursive query patterns
+- **Query 23a/23b**: Alternative cross-channel query patterns
 - **Query 24a/24b**: Different aggregation strategies
 
 ## Usage Examples
