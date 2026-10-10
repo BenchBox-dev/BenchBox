@@ -2613,6 +2613,11 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     default=None,
     help="Execution mode: sql or dataframe",
 )
+@advanced_option(
+    "--gateway",
+    default=None,
+    help="Route queries through a gateway (e.g. espresso, greybeam, custom).",
+)
 @advanced_option("--seed", type=int, help="RNG seed for query parameter generation")
 @advanced_option(
     "--streams",
@@ -2729,6 +2734,7 @@ def run(
     platform_option_pairs: tuple[tuple[str, str], ...],
     benchmark_option_pairs: tuple[tuple[str, str], ...],
     mode: str | None,
+    gateway: str | None,
     seed: int | None,
     concurrency: int | None,
     iterations: int | None,
@@ -2778,6 +2784,7 @@ def run(
         platform_option_pairs=platform_option_pairs,
         benchmark_option_pairs=benchmark_option_pairs,
         mode=mode,
+        gateway=gateway,
         seed=seed,
         concurrency=concurrency,
         iterations=iterations,
