@@ -315,7 +315,9 @@ def extract_result(payload: dict[str, Any], spec: PolarsMatrixSpec, cell: Cell) 
                 "status": query.get("status"),
                 "ms": query.get("ms"),
             }
-    receipt = config.get("execution_engine") if isinstance(config.get("execution_engine"), dict) else {}
+    receipt = platform_info.get("execution_engine")
+    if not isinstance(receipt, dict):
+        receipt = config.get("execution_engine") if isinstance(config.get("execution_engine"), dict) else {}
     requested = receipt.get("requested", config.get("engine_requested"))
     expected = spec.query_counts[cell.benchmark]
     checks = {
@@ -330,8 +332,11 @@ def extract_result(payload: dict[str, Any], spec: PolarsMatrixSpec, cell: Cell) 
         "query_total": counts.get("total"),
         "query_failed": counts.get("failed"),
         "rechunk_effective": config.get("rechunk_effective"),
+        "execution_engine": receipt,
         "engine_requested": requested,
-        "collect_engine_argument": config.get("collect_engine_argument"),
+        "collect_engine_argument": (receipt.get("applied_native") or {})
+        .get("collect_kwargs", {})
+        .get("engine", config.get("collect_engine_argument")),
         "polars_version": platform_info.get("version"),
         "polars_runtime_package": config.get("polars_runtime_package"),
         "polars_runtime_version": config.get("polars_runtime_version"),

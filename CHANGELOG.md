@@ -45,7 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `run_benchmark`/`start_benchmark` accept `execution_engine`; both validate
   against the platform manifest and fail before any work on undeclared values.
   Polars DataFrame runs record a receipt with requested, applied and observed
-  values. The Polars `engine` platform option is removed; the Polars
+  values, including literal collect arguments in published bundles. Tuning files
+  and deprecated streaming aliases record their selected engine as the request.
+  The Polars `engine` platform option is removed; the Polars
   `streaming` option, `--polars-streaming` and the MCP Polars `streaming` key
   are deprecated aliases for the streaming engine.
 

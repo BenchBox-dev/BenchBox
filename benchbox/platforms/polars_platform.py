@@ -70,12 +70,6 @@ class PolarsAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
             help="Execution mode: lazy (recommended) or eager",
         )
         polars_group.add_argument(
-            "--polars-streaming",
-            action="store_true",
-            default=False,
-            help="Enable streaming mode for large datasets",
-        )
-        polars_group.add_argument(
             "--polars-n-rows",
             type=int,
             default=None,
@@ -132,7 +126,6 @@ class PolarsAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         adapter_config["rechunk"] = config.get("rechunk", True)
 
         adapter_config["execution_engine"] = config.get("execution_engine") or "default"
-        adapter_config["streaming"] = config.get("streaming", False)
 
         adapter_config["force_recreate"] = config.get("force", False)
 
@@ -147,6 +140,8 @@ class PolarsAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         ]:
             if key in config:
                 adapter_config[key] = config[key]
+        if "streaming" in config:
+            adapter_config["streaming"] = config["streaming"]
 
         return cls(**adapter_config)
 
@@ -165,7 +160,6 @@ class PolarsAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         self.n_rows = config.get("n_rows")
         self.rechunk = config.get("rechunk", True)
         self._engine_receipt = self.resolve_execution_engine(config.get("execution_engine") or "default")
-
         if config.get("streaming", False):
             import warnings
 

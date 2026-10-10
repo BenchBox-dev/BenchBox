@@ -293,7 +293,7 @@ class TestExecutionEngineResolution:
             adapter = PolarsDataFrameAdapter(tuning_config=tuning)
 
         receipt = adapter.get_platform_info()["execution_engine"]
-        assert receipt["requested"] == "default"
+        assert receipt["requested"] == "in-memory"
         assert receipt["applied"] == "in-memory"
         assert receipt["resolution"] == "tuning_profile"
         assert any("may not be comparable" in message for message in caplog.messages)
@@ -304,6 +304,7 @@ class TestExecutionEngineResolution:
         adapter = PolarsDataFrameAdapter(tuning_config=tuning)
 
         receipt = adapter.get_platform_info()["execution_engine"]
+        assert receipt["requested"] == "streaming"
         assert receipt["applied"] == "streaming"
         assert receipt["resolution"] == "tuning_profile"
 
@@ -386,7 +387,7 @@ class TestEngineMetadata:
         ("kwargs", "requested", "resolution", "argument"),
         [
             ({}, "default", "version_default", "installed_default"),
-            ({"streaming": True}, "default", "legacy_option", "streaming"),
+            ({"streaming": True}, "streaming", "legacy_option", "streaming"),
             ({"execution_engine": "streaming"}, "streaming", "explicit", "streaming"),
         ],
     )
@@ -399,7 +400,8 @@ class TestEngineMetadata:
             argument = polars_compat.default_collect_engine()
         assert info["execution_engine"]["requested"] == requested
         assert info["execution_engine"]["resolution"] == resolution
-        assert info["collect_engine_argument"] == argument
+        assert info["execution_engine"]["applied_native"]["collect_kwargs"] == {"engine": argument}
+        assert "collect_engine_argument" not in info
 
     def test_result_bundle_config_carries_the_engine_fields(self):
         platform_info = build_platform_info(
@@ -409,7 +411,8 @@ class TestEngineMetadata:
         assert platform_info.platform_version == pl.__version__
         assert platform_info.config["execution_engine"]["requested"] == "in-memory"
         assert platform_info.config["execution_engine"]["applied"] == "in-memory"
-        assert platform_info.config["collect_engine_argument"] == "in-memory"
+        assert platform_info.config["execution_engine"]["applied_native"]["collect_kwargs"] == {"engine": "in-memory"}
+        assert "collect_engine_argument" not in platform_info.config
         assert "polars_runtime_version" in platform_info.config
         assert "polars_runtime_package" in platform_info.config
 

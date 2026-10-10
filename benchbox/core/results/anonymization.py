@@ -524,6 +524,17 @@ class AnonymizationManager:
         ):
             return value
 
+        if isinstance(value, str) and key_path[-4:] == (
+            "execution_engine",
+            "applied_native",
+            "collect_kwargs",
+            "engine",
+        ):
+            from benchbox.core.execution_engine import supported_execution_engines
+
+            if value in supported_execution_engines("polars"):
+                return value
+
         if isinstance(value, str) and self._looks_like_connection_string(value):
             return PUBLIC_REDACTED_VALUE
 

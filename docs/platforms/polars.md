@@ -52,8 +52,8 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.1
 | `driver_version` | (latest) | Pin the polars package version (e.g. `1.36.1`) |
 | `driver_auto_install` | false | Auto-install the requested driver version via uv if missing |
 
-The SQL module accepts only the default execution engine. The `streaming`
-platform option is deprecated and has no effect on SQL execution.
+The SQL module accepts only the default execution engine. Engine selection and
+the deprecated streaming aliases apply only to DataFrame execution.
 
 ### Execution Engine (DataFrame Mode: `polars-df`)
 

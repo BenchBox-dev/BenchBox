@@ -398,12 +398,11 @@ class TestPolarsAdapterCLIArguments:
             [
                 "--polars-execution-mode",
                 "eager",
-                "--polars-streaming",
             ]
         )
 
         assert args.polars_execution_mode == "eager"
-        assert args.polars_streaming is True
+        assert not hasattr(args, "polars_streaming")
 
 
 class TestPolarsAdapterIntegration:

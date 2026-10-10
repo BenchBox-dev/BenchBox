@@ -2646,6 +2646,13 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     "Allowed values depend on the platform (see the platform manifest); "
     "'default' lets the platform or version decide.",
 )
+@advanced_option(
+    "--polars-streaming",
+    is_flag=True,
+    default=False,
+    hidden=True,
+    help="Deprecated alias for --execution-engine streaming on polars-df.",
+)
 @advanced_option("--seed", type=int, help="RNG seed for query parameter generation")
 @advanced_option(
     "--streams",
@@ -2778,7 +2785,11 @@ def run(
     client_region: str | None = None,
     client_cloud: str | None = None,
     no_link_probe: bool = False,
+    polars_streaming: bool = False,
 ) -> None:
+    if polars_streaming:
+        console.print("[yellow]--polars-streaming is deprecated; use --execution-engine streaming.[/yellow]")
+        platform_option_pairs = (*platform_option_pairs, ("streaming", "true"))
     s = types.SimpleNamespace(
         ctx=ctx,
         platform=platform,

@@ -273,18 +273,17 @@ def test_result_extraction_reads_the_execution_engine_receipt() -> None:
     payload = {
         "platform": {
             "version": cell.version,
+            "execution_engine": {
+                "requested": "streaming",
+                "applied": "streaming",
+                "applied_class": "streaming",
+                "applied_native": {"collect_kwargs": {"engine": "streaming"}},
+                "resolution": "explicit",
+                "observed": "not_captured",
+                "observed_source": "none",
+            },
             "config": {
                 "rechunk_effective": False,
-                "execution_engine": {
-                    "requested": "streaming",
-                    "applied": "streaming",
-                    "applied_class": "streaming",
-                    "applied_native": {"collect_kwargs": {"engine": "streaming"}},
-                    "resolution": "explicit",
-                    "observed": "not_captured",
-                    "observed_source": "none",
-                },
-                "collect_engine_argument": "streaming",
                 "polars_runtime_package": "polars-runtime-32",
                 "polars_runtime_version": cell.version,
             },
@@ -297,6 +296,8 @@ def test_result_extraction_reads_the_execution_engine_receipt() -> None:
 
     assert extracted["result_ok"] is True
     assert extracted["engine_requested"] == "streaming"
+    assert extracted["execution_engine"] == payload["platform"]["execution_engine"]
+    assert extracted["collect_engine_argument"] == "streaming"
 
 
 def test_analyzer_accepts_uncertain_status_only_with_clean_evidence_and_matching_counts(tmp_path: Path) -> None:

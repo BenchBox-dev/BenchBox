@@ -157,6 +157,7 @@ EXPECTED_OMISSION_TIERS = {
     "--client-cloud": "not-yet-demanded",
     "--tuning": "not-yet-demanded",
     "--validation": "not-yet-demanded",
+    "--polars-streaming": "not-yet-demanded",
 }
 
 _TABLE_SEPARATOR_CELL = re.compile(r"^:?-{3,}:?$")

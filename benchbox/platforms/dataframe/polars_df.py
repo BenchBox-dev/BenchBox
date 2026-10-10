@@ -161,7 +161,7 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         applied_native: dict[str, Any] = {"collect_kwargs": collect_kwargs}
         applied_native[ENGINE_AFFINITY_KEY] = affinity
         return ExecutionEngineReceipt(
-            requested=resolved,
+            requested=selected if present else resolved,
             applied=selected,
             applied_class=engines[selected].engine_class if selected in engines else None,
             applied_native=applied_native,
@@ -326,7 +326,6 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
             "platform": self.platform_name,
             "family": self.family,
             "execution_engine": receipt,
-            "collect_engine_argument": collect_engine_option(self.collect_engine).get("engine"),
             "rechunk": self.rechunk,
             "rechunk_effective": reader_rechunk_effective(self.rechunk),
             "working_dir": str(self.working_dir),
