@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from benchbox.core.deployment import select_adapter_deployment
+
 from .client import InfluxDBConnection
 
 logger = logging.getLogger(__name__)
@@ -18,7 +20,7 @@ class InfluxDBSetupMixin:
         self.ssl = config.get("ssl", True)
         self.verify_ssl = config.get("verify_ssl") if config.get("verify_ssl") is not None else True
         self.ca_cert_path = config.get("ca_cert_path")
-        self.mode = config.get("mode", "cloud")
+        self.mode = select_adapter_deployment("influxdb", config, config.get("mode") or "cloud")
 
         if not self.token:
             logger.warning("No InfluxDB token provided. Set --token or INFLUXDB_TOKEN environment variable.")

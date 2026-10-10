@@ -8,6 +8,7 @@ import argparse
 import subprocess
 from typing import Any
 
+from benchbox.core.deployment import deployment_class, select_adapter_deployment
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 from ..utils.dependencies import (
@@ -87,7 +88,9 @@ class LakeSailAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecu
         )
         self.adaptive_enabled = config.get("adaptive_enabled") if config.get("adaptive_enabled") is not None else True
 
-        self.sail_mode = config.get("sail_mode") or "local"
+        self.sail_mode = select_adapter_deployment("lakesail", config, config.get("sail_mode") or "local")
+        self.deployment_selected = self.sail_mode
+        self.deployment_selected_class = deployment_class("lakesail", self.sail_mode)
         self.sail_workers = config.get("sail_workers")
         self.table_format = config.get("table_format") or "parquet"
 
@@ -169,6 +172,7 @@ class LakeSailAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecu
                     "app_name",
                     "driver_memory",
                     "sail_mode",
+                    "deployment_mode",
                     "sail_workers",
                     "shuffle_partitions",
                     "adaptive_enabled",
@@ -540,6 +544,7 @@ _build_lakesail_config = make_registered_platform_config_builder(
         "app_name",
         "driver_memory",
         "sail_mode",
+        "deployment_mode",
         "sail_workers",
         "shuffle_partitions",
         "adaptive_enabled",

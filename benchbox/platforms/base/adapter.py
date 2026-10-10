@@ -116,6 +116,8 @@ class PlatformAdapter(
     default_service_port: int | None = None
     supports_external_tables: bool = False
     plan_capture_phase_eligible: bool = True
+    deployment_selected: str | None = None
+    deployment_selected_class: str | None = None
 
     def __init__(self, **config):
         self.platform_config = config

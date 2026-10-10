@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from benchbox.core.benchmark_mixins import CursorValidationQueryExecutionMixin
+from benchbox.core.deployment import deployment_class, select_adapter_deployment
 from benchbox.core.sql_utils import normalize_table_name_in_sql
 from benchbox.platforms.base.config_utils import make_registered_platform_config_builder
 from benchbox.platforms.base.runtime_metadata import build_default_normalized_result_metadata
@@ -49,12 +50,9 @@ except ImportError:
 def _resolve_firebolt_deployment_mode(
     config: dict, url: str | None, client_id: str | None, client_secret: str | None
 ) -> str:
-    deployment_mode = config.get("deployment_mode")
-
-    if deployment_mode:
-        if deployment_mode not in {"core", "cloud"}:
-            raise ValueError(f"Invalid Firebolt deployment mode '{deployment_mode}'. Valid modes: core, cloud")
-        return deployment_mode
+    selected = select_adapter_deployment("firebolt", config, None)
+    if selected is not None:
+        return selected
 
     if url and not (client_id or client_secret):
         return "core"
@@ -147,6 +145,8 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         )
 
         self.deployment_mode = _resolve_firebolt_deployment_mode(config, self.url, self.client_id, self.client_secret)
+        self.deployment_selected = self.deployment_mode
+        self.deployment_selected_class = deployment_class("firebolt", self.deployment_mode)
 
         self.database = config.get("database") or os.environ.get("FIREBOLT_DATABASE") or "benchbox"
 
@@ -430,8 +430,7 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             }
         return _compact_metadata({"platform_runtime": runtime})
 
-    @staticmethod
-    def _firebolt_deployment_metadata(info: Mapping[str, Any], config: Mapping[str, Any]) -> dict[str, Any]:
+    def _firebolt_deployment_metadata(self, info: Mapping[str, Any], config: Mapping[str, Any]) -> dict[str, Any]:
         mode = str(config.get("deployment_mode") or info.get("connection_mode") or "core")
         is_cloud = mode == "cloud"
         url = config.get("url") or info.get("url")
@@ -443,6 +442,8 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 "endpoint_class": endpoint_class,
                 "metadata_source": "requested",
                 "collection_status": "partial",
+                "selected": self.deployment_selected,
+                "selected_class": self.deployment_selected_class,
                 "account": config.get("account_name") if is_cloud else None,
                 "engine": config.get("engine_name") if is_cloud else None,
                 "database": config.get("database"),

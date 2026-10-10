@@ -15,6 +15,8 @@ class ClickHouseLocalAdapter(ClickHouseAdapter):
     def __init__(self, **config: Any) -> None:
         config["deployment_mode"] = "local"
         super().__init__(**config)
+        self.deployment_selected = None
+        self.deployment_selected_class = None
 
     @property
     def platform_name(self) -> str:

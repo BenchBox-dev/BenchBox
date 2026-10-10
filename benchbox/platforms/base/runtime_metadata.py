@@ -82,6 +82,8 @@ def build_default_normalized_result_metadata(
         endpoint_class=endpoint_class,
         metadata_source="inferred",
         collection_status="partial",
+        selected=getattr(adapter, "deployment_selected", None),
+        selected_class=getattr(adapter, "deployment_selected_class", None),
     ).to_dict()
 
     execution_environment = _execution_environment_metadata(

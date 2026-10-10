@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from benchbox.core.deployment import deployment_class, select_adapter_deployment
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 from ..utils.dependencies import (
@@ -103,9 +104,9 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
 
         self._dialect = "spark"
 
-        self.deployment = self._validate_deployment(
-            config.get("deployment") or config.get("deployment_mode") or "local"
-        )
+        self.deployment = self._validate_deployment(select_adapter_deployment("velox", config, "local"))
+        self.deployment_selected = self.deployment
+        self.deployment_selected_class = deployment_class("velox", self.deployment)
 
         if self.deployment == "local":
             self._df_caching_supported = True
@@ -183,13 +184,16 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
     def from_config(cls, config: dict[str, Any]):
         from benchbox.platforms.base.config_utils import build_adapter_config
 
+        nested = config.get("options")
+        merged = {**nested, **config} if isinstance(nested, dict) else config
         return cls(
             **build_adapter_config(
-                config,
+                merged,
                 platform="velox",
                 fields=[
                     "deployment",
                     "deployment_mode",
+                    "_explicit_platform_options",
                     "endpoint",
                     "gluten_jar_path",
                     "gluten_version",
@@ -526,6 +530,7 @@ _build_velox_config = make_registered_platform_config_builder(
     "pyspark",
     [
         "deployment",
+        "deployment_mode",
         "endpoint",
         "gluten_jar_path",
         "gluten_version",

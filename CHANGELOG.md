@@ -15,10 +15,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without changing legacy variant identity; explicit requests survive JSON re-export.
   Publication drops compute resource names and hashes gateway hosts.
 
+- Result bundles now record the factory-resolved deployment as
+  `platform.deployment.selected` with `selected_class`, and non-default
+  deployments appear in `platform.variant` (for example `firebolt~cloud`).
+  The `--platform name:mode` selector is the canonical spelling on every
+  platform that declares deployment modes; `--platform firebolt:cloud`,
+  `pg-duckdb:motherduck`, `influxdb:core`, `ducklake:postgres_catalog`,
+  `velox:remote`, and `lakesail:distributed` now work end to end, and
+  LakeSail `distributed` really selects the distributed adapter.
+- The native deployment keys are deprecated aliases of the selector and warn
+  once per run: Velox `deployment`, LakeSail `sail_mode`, InfluxDB `mode`,
+  ClickHouse `deployment_mode` and `mode` (the MCP `deployment_mode` key is
+  retained and resolves the same way), Firebolt `deployment_mode` and
+  `firebolt_mode`, DuckLake `deployment_mode`, pg-duckdb `deployment_mode`.
+  Saved configurations and credential profiles holding these keys keep
+  working. The aliases are removed in 0.6.0.
+
 ### Before you upgrade
 
 - Result bundles now use additive schema 2.3. Readers must accept this version.
   Older bundles remain readable and published bundles and IDs are unchanged.
+
+- **Deployment selection is explicit and fail-closed.** A `--platform
+  name:mode` selector that disagrees with a deployment platform option (for
+  example `--platform firebolt:core --platform-option deployment_mode=cloud`)
+  now fails before any work starts instead of silently picking one; pass one
+  spelling. Unknown deployment values are rejected the same way.
 
 - **ClickHouse tuned runs are faster, and their results are not comparable with earlier ones.**
   The tuned session settings no longer switch the join algorithm to

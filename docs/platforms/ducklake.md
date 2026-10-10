@@ -45,7 +45,7 @@ All options are passed as `--platform-option KEY=VALUE`.
 | `metadata_path` | Generated under `benchmark_runs/databases/` | Path to the DuckLake catalog metadata file (`.ducklake`, or `.sqlite` for the sqlite backend) |
 | `data_path` | Generated under `benchmark_runs/databases/.../ducklake_data/` | Path to the DuckLake Parquet data directory (local path or `s3://` URI) |
 | `catalog` | `duckdb` | Catalog metadata backend: `duckdb`, `sqlite`, or `postgres` |
-| `deployment_mode` | *(derived)* | `local`, `local_catalog_s3`, `postgres_catalog`, or `postgres_catalog_s3` |
+| `deployment_mode` | *(derived)* | Deprecated alias of `--platform ducklake:<mode>`: `local`, `local_catalog_s3`, `postgres_catalog`, or `postgres_catalog_s3` |
 | `pg_host` | `localhost` | PostgreSQL hostname (`catalog=postgres` only) |
 | `pg_port` | `5432` | PostgreSQL port (`catalog=postgres` only) |
 | `pg_database` | `ducklake_catalog` | PostgreSQL database name - **must already exist** (`catalog=postgres` only) |

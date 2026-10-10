@@ -3,8 +3,10 @@
 # Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import warnings
+from collections.abc import Mapping
 from typing import Any, Literal, Optional
 
+from benchbox.core.deployment import DEPLOYMENT_ALIAS_KEYS, resolve_deployment
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.platforms.base.adapter import check_isolation_capability
 from benchbox.platforms.clickhouse.deployment_mode import (
@@ -101,30 +103,50 @@ def get_adapter(
         supported = ", ".join(mode_support) if mode_support else "none"
         raise ValueError(f"Platform '{platform}' does not support {resolved_mode} mode. Supported modes: {supported}")
 
-    resolved_deployment = _resolve_deployment_mode(base_platform, deployment, deployment_from_name, caps)
+    if base_platform in DEPLOYMENT_ALIAS_KEYS:
+        resolution = _resolve_family_deployment(base_platform, deployment, deployment_from_name, config)
+        if resolution.explicit and resolution.selected is not None:
+            config["deployment_mode"] = resolution.selected
+    else:
+        resolved_deployment = _resolve_deployment_mode(base_platform, deployment, deployment_from_name, caps)
 
-    if resolved_deployment is not None:
-        if not PlatformRegistry.supports_deployment_mode(base_platform, resolved_deployment):
-            available = PlatformRegistry.get_available_deployment_modes(base_platform)
-            if available:
-                available_str = ", ".join(available)
-                raise ValueError(
-                    f"Platform '{base_platform}' does not support deployment mode '{resolved_deployment}'. "
-                    f"Available: {available_str}"
-                )
-            else:
-                raise ValueError(
-                    f"Platform '{base_platform}' does not support deployment modes. "
-                    f"Remove the ':{resolved_deployment}' suffix."
-                )
+        if resolved_deployment is not None:
+            if not PlatformRegistry.supports_deployment_mode(base_platform, resolved_deployment):
+                available = PlatformRegistry.get_available_deployment_modes(base_platform)
+                if available:
+                    available_str = ", ".join(available)
+                    raise ValueError(
+                        f"Platform '{base_platform}' does not support deployment mode '{resolved_deployment}'. "
+                        f"Available: {available_str}"
+                    )
+                else:
+                    raise ValueError(
+                        f"Platform '{base_platform}' does not support deployment modes. "
+                        f"Remove the ':{resolved_deployment}' suffix."
+                    )
 
-    if resolved_deployment is not None:
-        config["deployment_mode"] = resolved_deployment
+        if resolved_deployment is not None:
+            config["deployment_mode"] = resolved_deployment
 
     if resolved_mode == "sql":
         return _get_sql_adapter(base_platform, **config)
     else:
         return _get_dataframe_adapter(base_platform, **config)
+
+
+def _resolve_family_deployment(
+    platform: str,
+    explicit_deployment: Optional[str],
+    deployment_from_name: Optional[str],
+    config: dict[str, Any],
+):
+    nested = config.get("options")
+    nested_options = dict(nested) if isinstance(nested, Mapping) else {}
+    values = {**nested_options, **config}
+    marker = values.get("_explicit_platform_options")
+    explicit = set(marker.keys()) if isinstance(marker, Mapping) else None
+    selector = explicit_deployment if explicit_deployment is not None else deployment_from_name
+    return resolve_deployment(platform, selector, values, explicit)
 
 
 def _resolve_deployment_mode(

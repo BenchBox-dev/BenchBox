@@ -42,7 +42,7 @@ docker build \
 docker compose run --rm velox-runner --benchmark tpch --scale 0.1
 
 docker compose up -d velox-connect
-benchbox run --platform velox --platform-option deployment=remote \
+benchbox run --platform velox:remote \
     --platform-option endpoint=sc://localhost:50051 \
     --benchmark tpch --scale 0.1
 ```
@@ -68,8 +68,7 @@ benchbox run --platform velox --benchmark tpch --scale 0.1 \
 ### CLI Options
 
 ```bash
-benchbox run --platform velox --benchmark tpch --scale 1.0 \
-    --platform-option deployment=local \
+benchbox run --platform velox:local --benchmark tpch --scale 1.0 \
     --platform-option gluten_jar_path=/opt/gluten.jar \
     --platform-option offheap_size=16g \
     --platform-option driver_memory=8g \
@@ -84,7 +83,7 @@ rest are adapter constructor parameters only.
 
 | Option | CLI | Default | Description |
 |--------|-----|---------|-------------|
-| `deployment` | yes | `local` | `local` (in-process SparkSession, Linux only) or `remote` (connect to Spark-Connect) |
+| `deployment` | yes | `local` | Deprecated alias of `--platform velox:local\|remote`: `local` (in-process SparkSession, Linux only) or `remote` (connect to Spark-Connect) |
 | `endpoint` | yes | `sc://localhost:50051` | Spark-Connect endpoint for `remote` mode |
 | `gluten_jar_path` | yes (alias: `jar`) | - | Absolute path to the Gluten bundle jar (required for `local` mode) |
 | `offheap_size` | yes | `8g` | `spark.memory.offHeap.size` for Velox (sized separately from JVM heap) |
@@ -151,8 +150,7 @@ First start a Gluten-enabled Spark-Connect server. Then run `benchbox` on the ho
 cd docker/velox
 docker compose up -d velox-connect
 
-benchbox run --platform velox --benchmark tpch --scale 1.0 \
-    --platform-option deployment=remote \
+benchbox run --platform velox:remote --benchmark tpch --scale 1.0 \
     --platform-option endpoint=sc://localhost:50051
 ```
 

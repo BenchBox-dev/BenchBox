@@ -45,7 +45,8 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
         self._apply_cloud_defaults(config)
 
         super().__init__(**config)
-
+        self.deployment_selected = "managed"
+        self.deployment_selected_class = "managed"
         config.pop("_is_cloud_subclass", None)
 
         logger.info(f"ClickHouse Cloud adapter initialized for host: {self.host}")
@@ -261,8 +262,7 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
                 metadata["service_id"] = ".".join(labels[:-4]) or None
         return _compact_metadata(metadata)
 
-    @staticmethod
-    def _clickhouse_cloud_deployment_metadata(config: Mapping[str, Any]) -> dict[str, Any]:
+    def _clickhouse_cloud_deployment_metadata(self, config: Mapping[str, Any]) -> dict[str, Any]:
         return _compact_metadata(
             {
                 "deployment_type": "managed_cloud",
@@ -270,6 +270,8 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
                 "endpoint_class": "cloud_endpoint",
                 "metadata_source": "requested",
                 "collection_status": "partial",
+                "selected": self.deployment_selected,
+                "selected_class": self.deployment_selected_class,
                 "service_endpoint": config.get("host"),
                 "port": config.get("port"),
                 "secure": config.get("secure"),

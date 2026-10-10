@@ -64,9 +64,7 @@ The CLI runs LakeSail with its defaults:
 ```bash
 benchbox run --platform lakesail --benchmark tpch --scale 1.0
 ```
-
-LakeSail registers no `--platform-option` keys, so the settings below are set by
-constructing the adapter directly:
+Settings below can also be set by constructing the adapter directly (here `sail_mode` still works as a deprecated alias of the selector):
 
 ```python
 from benchbox.platforms.lakesail import LakeSailAdapter
@@ -85,7 +83,7 @@ adapter = LakeSailAdapter(
 | Option | Default | Description |
 |--------|---------|-------------|
 | `endpoint` | `sc://localhost:50051` | Sail server Spark Connect URL |
-| `sail_mode` | `local` | Deployment mode: `local` or `distributed` |
+| `deployment_mode` | `local` | Deprecated alias of `--platform lakesail:local\|distributed`; `sail_mode` is an alias of this option |
 | `sail_workers` | - | Worker count for distributed mode |
 | `app_name` | `BenchBox-LakeSail` | Application name for the session |
 | `driver_memory` | `4g` | Driver memory allocation (e.g., `4g`, `8g`) |
@@ -214,7 +212,7 @@ LakeSail supports the following tuning types:
 
 ### Local Mode
 
-Single-node, multi-threaded execution. Best for development, testing, and small-to-medium scale benchmarks. `local` is the default `sail_mode`.
+Single-node, multi-threaded execution. Best for development, testing, and small-to-medium scale benchmarks. `local` is the default deployment.
 
 ```bash
 benchbox run --platform lakesail --benchmark tpch --scale 1.0
@@ -227,10 +225,10 @@ benchbox run --platform lakesail --benchmark tpch --scale 1.0
 
 ### Distributed Mode
 
-Multi-node cluster execution for large-scale benchmarks. Distributed mode is selected through the Python adapter (`sail_mode="distributed"`, `sail_workers=4`), not through the CLI command below.
+Multi-node cluster execution for large-scale benchmarks. Select it with the platform selector:
 
 ```bash
-benchbox run --platform lakesail --benchmark tpch --scale 100.0
+benchbox run --platform lakesail:distributed --benchmark tpch --scale 100.0
 ```
 
 - Multiple Rust worker nodes coordinated by a Sail server
@@ -313,7 +311,7 @@ Query execution timed out
 **Solutions:**
 1. Increase driver memory: `driver_memory="16g"`
 2. Adjust shuffle partitions: `shuffle_partitions=32`
-3. For large-scale benchmarks, use distributed mode: `sail_mode="distributed"`
+3. For large-scale benchmarks, use distributed mode: `--platform lakesail:distributed`
 4. Check Sail server resource availability
 
 ### Table Already Exists
