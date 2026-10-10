@@ -183,6 +183,9 @@ def _discover_result_files_with_metadata(
         "    benchbox compare baseline.json current.json --fail-on-regression 10% --min-regression-delta 5ms\n"
         "\n"
         "\b\n"
+        "    # Ignore aggregate slowdowns of 80 ms or less (noisy hosted runners)\n"
+        "    benchbox compare baseline.json current.json --fail-on-regression 10% --min-aggregate-regression-delta 80ms\n"
+        "\b\n"
         "    # Compare files with query plan analysis\n"
         "    benchbox compare baseline.json current.json --include-plans\n"
         "\n"
@@ -281,7 +284,15 @@ def _discover_result_files_with_metadata(
     type=str,
     help=(
         "With --fail-on-regression, count a query as regressed only when it also slows by more than this "
-        'duration (e.g., "5ms", "0.005s"). Aggregate metrics are judged by percentage alone.'
+        'duration (e.g., "5ms", "0.005s"). Applies to per-query comparisons only.'
+    ),
+)
+@click.option(
+    "--min-aggregate-regression-delta",
+    type=str,
+    help=(
+        "With --fail-on-regression, count an aggregate metric as regressed only when it also slows by "
+        'more than this duration (e.g., "80ms", "0.08s"). Applies to aggregate metrics only.'
     ),
 )
 @click.option(
@@ -346,6 +357,7 @@ def compare(
     list_platforms,
     fail_on_regression,
     min_regression_delta,
+    min_aggregate_regression_delta,
     output_format,
     output_file,
     generate_charts,
@@ -362,8 +374,14 @@ def compare(
     if min_regression_delta is not None and not fail_on_regression:
         raise click.UsageError("--min-regression-delta requires --fail-on-regression")
 
+    if min_aggregate_regression_delta is not None and not fail_on_regression:
+        raise click.UsageError("--min-aggregate-regression-delta requires --fail-on-regression")
+
     if min_regression_delta is not None and platforms:
         raise click.UsageError("--min-regression-delta applies to result file comparison, not platform runs")
+
+    if min_aggregate_regression_delta is not None and platforms:
+        raise click.UsageError("--min-aggregate-regression-delta applies to result file comparison, not platform runs")
 
     if run_mode_flag:
         warnings.warn(
@@ -407,6 +425,7 @@ def compare(
             result_files=result_files,
             fail_on_regression=fail_on_regression,
             min_regression_delta=min_regression_delta,
+            min_aggregate_regression_delta=min_aggregate_regression_delta,
             output_format=output_format,
             output_file=output_file,
             show_all_queries=show_all_queries,
@@ -438,6 +457,7 @@ def compare(
             fail_on_regression=fail_on_regression,
             show_all_queries=show_all_queries,
             min_regression_delta=min_regression_delta,
+            min_aggregate_regression_delta=min_aggregate_regression_delta,
         )
 
 
@@ -449,6 +469,7 @@ def _run_interactive_wizard(
     fail_on_regression: str | None,
     show_all_queries: bool,
     min_regression_delta: str | None = None,
+    min_aggregate_regression_delta: str | None = None,
 ):
     console.print("\n[bold blue]BenchBox Platform Comparison[/bold blue]")
     console.print("Compare benchmark performance across different platforms.\n")
@@ -466,6 +487,10 @@ def _run_interactive_wizard(
     if mode_choice == "1":
         if min_regression_delta is not None:
             raise click.UsageError("--min-regression-delta applies to result file comparison, not platform runs")
+        if min_aggregate_regression_delta is not None:
+            raise click.UsageError(
+                "--min-aggregate-regression-delta applies to result file comparison, not platform runs"
+            )
         _interactive_platform_comparison(
             output_format=output_format,
             output_file=output_file,
@@ -479,6 +504,7 @@ def _run_interactive_wizard(
             fail_on_regression=fail_on_regression,
             show_all_queries=show_all_queries,
             min_regression_delta=min_regression_delta,
+            min_aggregate_regression_delta=min_aggregate_regression_delta,
         )
 
 
@@ -603,6 +629,7 @@ def _interactive_file_comparison(
     fail_on_regression: str | None,
     show_all_queries: bool,
     min_regression_delta: str | None = None,
+    min_aggregate_regression_delta: str | None = None,
 ):
     console.print("\n[bold]Step 2:[/bold] How do you want to select files?\n")
     console.print("  [cyan]1[/cyan]  Browse by benchmark/platform/scale (recommended)")
@@ -639,6 +666,7 @@ def _interactive_file_comparison(
         include_plans=include_plans,
         plan_threshold=0.0,
         min_regression_delta=min_regression_delta,
+        min_aggregate_regression_delta=min_aggregate_regression_delta,
     )
 
 
@@ -1090,6 +1118,7 @@ def _run_file_comparison(
     include_plans: bool = False,
     plan_threshold: float = 0.0,
     min_regression_delta: str | None = None,
+    min_aggregate_regression_delta: str | None = None,
 ):
     if len(result_files) < 2:
         console.print("[red]Error: At least 2 result files required for comparison[/red]")
@@ -1102,6 +1131,7 @@ def _run_file_comparison(
 
     regression_threshold = _validate_regression_threshold(fail_on_regression)
     min_delta_ms = _validate_min_regression_delta(min_regression_delta)
+    min_aggregate_delta_ms = _validate_min_regression_delta(min_aggregate_regression_delta)
 
     if len(result_files) > 2:
         console.print("[yellow]Note: Multi-file comparison not yet supported. Comparing first 2 files only.[/yellow]\n")
@@ -1117,7 +1147,7 @@ def _run_file_comparison(
 
     _output_file_comparison(comparison, baseline, current, output_format, output_file, show_all_queries)
 
-    _check_regression_threshold(comparison, regression_threshold, min_delta_ms)
+    _check_regression_threshold(comparison, regression_threshold, min_delta_ms, min_aggregate_delta_ms)
 
 
 def _validate_min_regression_delta(min_regression_delta: str | None) -> float | None:
@@ -1234,13 +1264,16 @@ def _check_regression_threshold(
     comparison: dict[str, Any],
     regression_threshold: float | None,
     min_delta_ms: float | None = None,
+    min_aggregate_delta_ms: float | None = None,
 ) -> None:
     if regression_threshold is None:
         return
     criteria = f"threshold: {regression_threshold * 100:.1f}%"
     if min_delta_ms is not None:
         criteria += f", minimum query slowdown: {min_delta_ms:g} ms"
-    has_regression = _check_regression(comparison, regression_threshold, min_delta_ms)
+    if min_aggregate_delta_ms is not None:
+        criteria += f", minimum aggregate slowdown: {min_aggregate_delta_ms:g} ms"
+    has_regression = _check_regression(comparison, regression_threshold, min_delta_ms, min_aggregate_delta_ms)
     if has_regression:
         console.print(f"\n[bold red]❌ Performance regression detected ({criteria})[/bold red]")
         sys.exit(1)
@@ -1376,14 +1409,31 @@ def _query_slowdown_exceeds(query: dict[str, Any], min_delta_ms: float | None) -
     return (current_ms - baseline_ms) > min_delta_ms
 
 
-def _check_regression(comparison: dict[str, Any], threshold: float, min_delta_ms: float | None = None) -> bool:
+def _metric_slowdown_exceeds(metric_data: dict[str, Any], min_aggregate_delta_ms: float | None) -> bool:
+    if min_aggregate_delta_ms is None:
+        return True
+    baseline_s = metric_data.get("baseline")
+    current_s = metric_data.get("current")
+    if baseline_s is None or current_s is None:
+        return True
+    return (current_s - baseline_s) * 1000.0 > min_aggregate_delta_ms
+
+
+def _check_regression(
+    comparison: dict[str, Any],
+    threshold: float,
+    min_delta_ms: float | None = None,
+    min_aggregate_delta_ms: float | None = None,
+) -> bool:
     threshold_percent = threshold * 100
 
     perf_changes = comparison.get("performance_changes", {})
     for _metric_name, metric_data in perf_changes.items():
         if not isinstance(metric_data, dict):
             continue
-        if is_regression(metric_data.get("change_percent", 0), threshold_percent):
+        if is_regression(metric_data.get("change_percent", 0), threshold_percent) and _metric_slowdown_exceeds(
+            metric_data, min_aggregate_delta_ms
+        ):
             return True
 
     query_comparisons = comparison.get("query_comparisons", [])
