@@ -3,7 +3,7 @@
     "t3:docker pulls its images without hitting the anonymous rate limit (authenticated or mirrored), shown by a passing dispatched run.",
     "The codespell job no longer builds a Docker Hub container, or pulls it authenticated."
   ],
-  "context": "Found in the 2026-10-09 tracker review. Blocks dlv2-22-nightly-t3-shadow green runs.",
+  "context": "Found in the 2026-10-09 tracker review. Blocks dlv2-22-nightly-t3-shadow green runs.\n\nDecision (owner, 2026-10-09): no Docker Hub secret. Official images use public.ecr.aws/docker/library; vendor images use a verified non-Docker-Hub vendor registry, otherwise a pinned GHCR mirror workflow with GITHUB_TOKEN packages:write. Preserve pinned digests. Replace the codespell Docker action with uv installation. Native implementation is in fix/ci-registry-pulls; one combined nightly-v2 run_drift=true verification dispatch follows merged Docker/drift/perf fixes. Parent owns tracker; no external agents used.",
   "description": "Docker Hub refuses unauthenticated pulls with \"429 Too Many Requests\" / \"toomanyrequests\". This failed all three nightly-v2 t3:docker jobs (postgres, trino, clickhouse) in dispatch 37991400931, and the codespell job in Documentation runs 37991354788 and 37994012169 (the codespell-project/actions-codespell container build). The codespell job is continue-on-error, but t3:docker failures block a green nightly-v2.\n\nUse authenticated pulls (a read-only Docker Hub token), a registry mirror such as ghcr.io copies of the images, or for codespell an install through uv instead of the Docker action.",
   "sessions": [
     {
@@ -21,6 +21,14 @@
       "generation": "915913163b364e2f844065c0debb764b",
       "op": "take",
       "op_id": "0fa91eecebbb40a896fbb38cccc4577d",
+      "session_id": "12a278318efc4205bf01aa4132116f81"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:0b65b59dfd5ecfabcfde36b0",
+      "at": "2026-10-10T01:36:04Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "52a07ec718404682a0b76124bcc61c25",
       "session_id": "12a278318efc4205bf01aa4132116f81"
     }
   ]
