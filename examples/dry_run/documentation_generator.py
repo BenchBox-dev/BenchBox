@@ -40,7 +40,7 @@ def generate_benchmark_documentation(benchmark_name: str, output_dir: str = "./d
     if not candidates:
         print(f"❌ Summary file not found in: {dry_run_dir}")
         return None
-    with open(candidates[0], encoding="utf-8") as f:
+    with open(candidates[-1], encoding="utf-8") as f:
         summary = json.load(f)
 
     doc_content = [

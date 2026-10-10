@@ -8,7 +8,7 @@ from pathlib import Path
 
 def _queries_dir(dry_run_dir: str) -> Path | None:
     candidates = sorted(Path(dry_run_dir).glob("*_queries_*"))
-    return candidates[0] if candidates else None
+    return candidates[-1] if candidates else None
 
 
 def validate_extracted_queries(dry_run_dir: str, target_dialect: str = "duckdb"):

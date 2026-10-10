@@ -30,6 +30,8 @@ from benchbox.tpch import TPCH
 from benchbox.platforms.duckdb import DuckDBAdapter
 from benchbox.core.tuning.interface import UnifiedTuningConfiguration, TuningType
 
+tuning = UnifiedTuningConfiguration()
+
 tuning.enable_platform_optimization(
     TuningType.PARTITIONING,
     table_name="lineitem",
@@ -49,11 +51,8 @@ tuning.enable_platform_optimization(
 )
 
 benchmark = TPCH(scale_factor=1.0)
-
-adapter = DuckDBAdapter(memory_limit="8GB", threads=8)
-results = adapter.run_benchmark(benchmark, tuning_config=tuning)
-
-print(f"Optimized execution: {results.total_execution_time:.2f}s")
+adapter = DuckDBAdapter(memory_limit="8GB", threads=8, tuning_config=tuning)
+results = adapter.run_benchmark(benchmark)
 ```
 
 This configuration partitions `lineitem` on the ship date and adds clustering on frequently joined columns.
@@ -80,8 +79,8 @@ tuning.enable_platform_optimization(
 )
 
 benchmark = TPCH(scale_factor=1.0)
-adapter = ClickHouseAdapter(local_mode=True)
-results = adapter.run_benchmark(benchmark, tuning_config=tuning)
+adapter = ClickHouseAdapter(local_mode=True, tuning_config=tuning)
+results = adapter.run_benchmark(benchmark)
 ```
 
 This configuration partitions `lineitem` by ship date and sorts it by common filter columns.
@@ -123,10 +122,11 @@ benchmark = TPCH(scale_factor=10.0)
 adapter = DatabricksAdapter(
     warehouse_id="your_warehouse_id",
     catalog="main",
-    schema="benchmarks"
+    schema="benchmarks",
+    tuning_config=tuning,
 )
 
-results = adapter.run_benchmark(benchmark, tuning_config=tuning)
+results = adapter.run_benchmark(benchmark)
 ```
 
 Z-ordering gives multi-dimensional clustering. Auto-optimize handles background compaction, and auto-compact merges small files. Bloom filters help on high-cardinality columns.
@@ -162,10 +162,11 @@ benchmark = TPCH(scale_factor=100.0)
 adapter = SnowflakeAdapter(
     warehouse="LARGE_WH",
     database="BENCHMARKS",
-    schema="TPCH"
+    schema="TPCH",
+    tuning_config=tuning,
 )
 
-results = adapter.run_benchmark(benchmark, tuning_config=tuning)
+results = adapter.run_benchmark(benchmark)
 ```
 
 Clustering keys cover frequently filtered columns, large tables are partitioned, and `LARGE_WH` is a larger warehouse.
@@ -195,10 +196,11 @@ benchmark = TPCH(scale_factor=1000.0)
 adapter = BigQueryAdapter(
     project_id="your_project",
     dataset_id="benchmarks",
-    location="US"
+    location="US",
+    tuning_config=tuning,
 )
 
-results = adapter.run_benchmark(benchmark, tuning_config=tuning)
+results = adapter.run_benchmark(benchmark)
 ```
 
 This uses native BigQuery partitioning on a date column and clustering for multi-column optimization.
@@ -249,8 +251,8 @@ def create_comprehensive_tuning(benchmark_name: str, scale_factor: float):
 
 tuning = create_comprehensive_tuning("tpcds", scale_factor=10.0)
 benchmark = TPCDS(scale_factor=10.0)
-adapter = DuckDBAdapter(memory_limit="16GB", threads=16)
-results = adapter.run_benchmark(benchmark, tuning_config=tuning)
+adapter = DuckDBAdapter(memory_limit="16GB", threads=16, tuning_config=tuning)
+results = adapter.run_benchmark(benchmark)
 ```
 
 For TPC-DS, the function partitions each fact table by date, clusters it by primary key, and enables primary-key and foreign-key constraints.
@@ -268,8 +270,8 @@ tuning.enable_primary_keys()
 tuning.enable_foreign_keys()
 
 benchmark = TPCH(scale_factor=1.0)
-adapter = DuckDBAdapter()
-results = adapter.run_benchmark(benchmark, tuning_config=tuning)
+adapter = DuckDBAdapter(tuning_config=tuning)
+results = adapter.run_benchmark(benchmark)
 ```
 
 Primary keys are defined for referential integrity. Foreign keys enable join optimizations.

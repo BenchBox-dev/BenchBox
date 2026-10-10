@@ -36,6 +36,31 @@ describe("legacy public file paths", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+  it("publishes the matching TPC license beside downloadable query templates", () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), "benchbox-tpc-"));
+    try {
+      const docsRoot = path.join(root, "docs");
+      const tpch = "../benchbox/_binaries/tpc-h/templates/queries/1.sql";
+      const tpcds = "../_sources/tpc-ds/query_templates/query1.tpl";
+      mkdirSync(path.join(root, "benchbox/_binaries/tpc-h/templates/queries"), { recursive: true });
+      mkdirSync(path.join(root, "_sources/tpc-h"), { recursive: true });
+      mkdirSync(path.join(root, "_sources/tpc-ds/query_templates"), { recursive: true });
+      writeFileSync(path.join(root, "benchbox/_binaries/tpc-h/templates/queries/1.sql"), "select 1;\n");
+      writeFileSync(path.join(root, "_sources/tpc-ds/query_templates/query1.tpl"), "select 2;\n");
+      writeFileSync(path.join(root, "_sources/tpc-h/EULA.txt"), "TPC-H license\n");
+      writeFileSync(path.join(root, "_sources/tpc-ds/EULA.txt"), "TPC-DS license\n");
+      const out = path.join(root, "out");
+
+      publishLegacyFiles({ downloads: [tpch, tpcds], images: [] }, docsRoot, out);
+
+      const tpchDownload = path.join(out, downloadUrlPath(tpch));
+      const tpcdsDownload = path.join(out, downloadUrlPath(tpcds));
+      expect(readFileSync(path.join(path.dirname(tpchDownload), "TPC_EULA.txt"), "utf-8")).toBe("TPC-H license\n");
+      expect(readFileSync(path.join(path.dirname(tpcdsDownload), "TPC_EULA.txt"), "utf-8")).toBe("TPC-DS license\n");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("download and image records", () => {

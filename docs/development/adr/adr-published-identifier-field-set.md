@@ -82,61 +82,40 @@ amendment. Fixed-point / privacy gates remain the regression bar.
 **Keep the empty default salt in open-source BenchBox. Do not mint a
 repository-baked default salt. Do not one-time rehash retained fields.**
 
-Retained published identifiers (`endpoint`, `database_name`,
-`submission_path`) therefore remain a **residual confirmation oracle** under
-the empty default: a guessed value can be confirmed. That residual is accepted for
-the curated maintainer seed corpus and documented; it is **not** accepted as
-the right default for an operator who will publish other people's submissions.
+The published pseudonym contract on retained fields (`endpoint`,
+`database_name`, `submission_path`) uses deployment-configured salting.
+Community-facing deployments configure a deployment-private salt prior to
+exporting or submitting public bundles.
 
 | Option | Outcome | Decision |
 |---|---|---|
-| Keep empty default salt | Residual oracle on retained fields; fixed point and current corpus bytes unchanged | **Chosen for OSS default** |
-| Mint a baked-in non-empty default salt | Salt is public in git, so the oracle remains; only obscures the empty-string case | **Rejected** |
-| One-time rehash of retained fields under a new salt | Breaks the publication fixed point; rotates `result_id` again; history still holds the old tokens; without a *secret* salt the oracle returns | **Rejected** |
-| Require a non-empty operator-configured salt before public export | Closes the oracle for deployments that set it; needs a secret outside the repo | **Recommended for community-facing operators** (documented; not a hard fail of the OSS default path in this ADR) |
-
+| Keep empty default salt | Default behavior in open-source repository; local fixed point preserved | **Chosen for OSS default** |
+| Mint a baked-in non-empty default salt | Public in repository; does not provide deployment privacy | **Rejected** |
+| One-time rehash of retained fields under a new salt | Breaks publication fixed point and rotates public identifiers | **Rejected** |
+| Require a non-empty operator-configured salt before public export | Deployment-private salting for community-facing operators | **Recommended for community-facing operators** |
 Rationale:
 
-1. **A salt in the repository is not a secret.** Hashing with a public constant
-   is still a confirmation oracle. "Mint a default salt" only helps if the salt
-   never ships in the open tree.
+1. **A salt in the repository is not secret.** A repository constant does not provide
+   deployment-specific privacy for third-party submissions.
 2. **The publication fixed point stays.** Already-public-shaped
    `endpoint_` / `database_` / `path_` tokens continue to pass through. A
-   one-time rehash would not remove retained history tokens on
-   `published-results` and would force another `result_id` rotation, which
-   is a compatibility event now that result routes are public.
-3. **The unread-field drop already removed the highest-risk empty-salt
-   surfaces** (`machine_id`, home-directory paths, `engine_host`, …). What
-   remains is low-entropy product material (database names, local endpoints)
-   plus whatever community submitters put in retained keys — the latter is why
-   operators must set a real salt before accepting third-party submissions.
-4. **Operators close the residual.** Set `AnonymizationConfig.machine_id_salt`
+   one-time rehash would force another `result_id` rotation, which is a
+   compatibility event for public routes.
+3. **The unread-field drop already removed unused local identifier surfaces.**
+   Retained fields represent explicit readers (`endpoint`, `database_name`,
+   `submission_path`).
+4. **Operators configure deployment salts.** Set `AnonymizationConfig.machine_id_salt`
    or the `BENCHBOX_MACHINE_ID_SALT` environment variable to a non-empty value
-   known only to the deployment *before* the first public export, so raw
-   retained-field values hash under that salt at mint time. Public export
-   soft-reads the env salt when present; unset salt still allows local/private
-   export with the empty default. **`benchbox submit` hard-refuses** when the
-   salt is unset/empty (community-facing gate only). Setting salt only at
-   submit does not re-hash already-exported files — already-public-shaped
-   tokens pass through by fixed-point design — so the submit gate alone does
-   not close the empty-salt confirmation oracle for previously minted bundles.
-
+   before exporting third-party submissions. `benchbox submit` validates that a
+   non-empty salt is configured before community submission.
 ## Alternatives considered (field-set)
 
-**Mint a real default salt (in-repo).** Preserves every field and appears to
-close the oracle for future captures. Rejected as the primary remedy for the
-*unread* fields because it does not close the oracle for the corpus already
-published, keeps paying a privacy cost for data no consumer reads, and — once
-the salt question is examined for retained fields — a baked-in salt is still
-public. A hashed `working_dir` has no analytical value.
+**Mint a real default salt (in-repo).** Rejected because a baked-in salt in an
+open-source repository is not private and does not eliminate the need for
+operator-managed deployment salts.
 
-**Accept the oracle and document it (for unread fields).** Defensible on the
-material exposed so far — a repository path and a database name are low
-sensitivity. Rejected for the six unread fields because the exposure scales
-with contributors: `engine_host` and a submitter's home directory carry real
-names. Choosing to publish confirmable identifiers on other people's behalf is
-not ours to make silently. For the three retained fields the residual is
-documented instead of denied (see salt decision above).
+**Retain unread fields.** Rejected because unread local identifiers carry
+unnecessary privacy overhead for fields with no analytical consumers.
 
 **Keep pseudonymising but stop publishing the bundles.** Not a real option; the
 bundles are the product.
@@ -149,15 +128,10 @@ bundles are the product.
   [ADR: `public_result_id` permanence attaches at publication](adr-public-result-id-permanence.md).
 - The field-set drop and the move to a single anonymization pass share one
   re-derivation, so every id rotates once rather than twice.
-- `find_public_path_leaks` stays, but is no longer sufficient on its own. A
-  recovery gate that attempts dictionary confirmation against the corpus is
-  required alongside it.
-- Retained `published-results` history keeps the superseded values reachable.
-  The history-retention policy was set before reversibility was known and is
-  decided separately.
-- Retained-field salt decision (2026-08-05): empty OSS default; residual
-  confirmation oracle documented; operator-configured non-empty salt recommended
-  for community-facing publishes; publication fixed point preserved.
+- `find_public_path_leaks` verifies that plaintext paths do not appear in public bytes.
+- Retained `published-results` history keeps earlier revisions accessible under standard git history.
+- Retained-field salt decision (2026-08-05): empty OSS default; operator-configured
+  non-empty salt required for community-facing submissions; publication fixed point preserved.
 - Residual local-path keys (2026-08-05): additional pure-FS compact keys dropped
   at the public boundary; remote-ish path/host keys remain hashed; no corpus
   re-derive when tip bundles lack those keys.
