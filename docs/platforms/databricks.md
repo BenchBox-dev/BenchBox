@@ -111,7 +111,7 @@ validation yet). Requirements and limits:
 benchbox run --platform databricks --benchmark tpch \
   --platform-option driver_version=3.3.0 \
   --platform-option driver_auto_install=true \
-  --platform-option warehouse_id=abc123xyz
+  --platform-option compute_resource=abc123xyz
 ```
 
 The driver package for Databricks is `databricks-sql-connector`.

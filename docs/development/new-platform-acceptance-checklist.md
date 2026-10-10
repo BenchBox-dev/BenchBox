@@ -26,6 +26,12 @@ Use this checklist before opening a platform-support PR. It is deliberately conc
 - Declare every deployment mode in the manifest with its class (`local`, `self-hosted`, or `managed`) and exactly one platform default; the `--platform name:mode` selector is the only canonical spelling.
 - Name no canonical option `engine`, `mode`, `backend`, `runtime`, `executor`, or `warehouse`; list any reserved-word alias in the core deprecated-alias table with its removal release.
 - Record the factory-resolved deployment in result metadata as `platform.deployment.selected` with `selected_class`, and cover each mode with an adapter test.
+- Declare compute when the platform bills a named compute object: add a manifest `capabilities.compute` block with
+  `resource_kind` (`warehouse`, `engine`, `workgroup`, `cluster`, `pool`, `application` or `service`),
+  `native_resource_keys` and `native_size_keys`. The core registers `compute_resource` and `compute_size`
+  with the native keys as deprecated aliases automatically; never register a canonical key named `engine`,
+  `mode`, `backend`, `runtime`, `executor` or `warehouse`. The adapter reads the canonical names first with
+  native fallback, and results carry the canonical kind and size alongside legacy fields.
 - Add `driver_package` and `installation_command`; dependency extras belong in `pyproject.toml`.
 - Add DDL/query compatibility rules or an explicit exemption in the SQL compatibility inventory when the adapter rewrites SQL or DDL.
 - Add unit tests for adapter construction, SQL rendering/loading behavior, registry metadata, optional import failure behavior, and any deployment-mode routing.

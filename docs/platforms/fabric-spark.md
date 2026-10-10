@@ -74,7 +74,7 @@ benchbox run --platform fabric-spark --benchmark tpch --dry-run ./preview \
 | `tenant_id` | - | Azure tenant ID (for service principal) |
 | `livy_endpoint` | auto-derived | Custom Livy API endpoint URL |
 | `onelake_path` | auto-derived | OneLake path for data staging |
-| `spark_pool_name` | - | Spark pool name (uses workspace default) |
+| `compute_resource` | - | Named Spark pool (deprecated alias: `spark_pool_name`, removed in 0.6.0) |
 | `timeout_minutes` | 60 | Statement timeout in minutes |
 
 ## Python API

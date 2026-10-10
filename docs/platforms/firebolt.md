@@ -88,7 +88,7 @@ benchbox run --platform firebolt:cloud --benchmark tpch --scale 1.0 \
   --platform-option client_id=$FIREBOLT_CLIENT_ID \
   --platform-option client_secret=$FIREBOLT_CLIENT_SECRET \
   --platform-option account_name=your_account \
-  --platform-option engine_name=your_engine \
+  --platform-option compute_resource=your_engine \
   --platform-option database=benchmarks
 ```
 
@@ -100,7 +100,7 @@ benchbox run --platform firebolt:cloud --benchmark tpch --scale 1.0 \
 | `client_id` | (none) | Cloud OAuth client ID |
 | `client_secret` | (none) | Cloud OAuth client secret |
 | `account_name` | (none) | Firebolt Cloud account |
-| `engine_name` | (none) | Cloud engine name |
+| `compute_resource` | (none) | Cloud engine name (deprecated alias: `engine_name`, removed in 0.6.0) |
 | `database` | (auto) | Database name |
 | `api_endpoint` | api.firebolt.io | API endpoint for Cloud |
 
@@ -144,7 +144,7 @@ adapter = FireboltAdapter(
     client_id="your_client_id",
     client_secret="your_client_secret",
     account_name="your_account",
-    engine_name="benchmark_engine",
+    compute_resource="benchmark_engine",
     database="benchmarks",
 )
 
@@ -202,7 +202,7 @@ benchbox run --platform firebolt --benchmark tpch --scale 0.1 \
 
 ```bash
 benchbox run --platform firebolt --benchmark tpch --scale 10.0 \
-  --platform-option engine_name=large_engine \
+  --platform-option compute_resource=large_engine \
   --tuning tuned
 ```
 

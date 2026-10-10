@@ -58,20 +58,20 @@ The commands cover basic usage, usage with a storage path, and a dry run that pr
 ```bash
 benchbox run --platform synapse-spark --benchmark tpch --scale 1.0 \
   --platform-option workspace_name=my-synapse-workspace \
-  --platform-option spark_pool_name=sparkpool1 \
+  --platform-option compute_resource=sparkpool1 \
   --platform-option storage_account=mystorageaccount \
   --platform-option storage_container=benchbox
 
 benchbox run --platform synapse-spark --benchmark tpch --scale 1.0 \
   --platform-option workspace_name=my-synapse-workspace \
-  --platform-option spark_pool_name=sparkpool1 \
+  --platform-option compute_resource=sparkpool1 \
   --platform-option storage_account=mystorageaccount \
   --platform-option storage_container=benchbox \
   --platform-option storage_path=data/benchbox
 
 benchbox run --platform synapse-spark --benchmark tpch --dry-run ./preview \
   --platform-option workspace_name=my-synapse-workspace \
-  --platform-option spark_pool_name=sparkpool1 \
+  --platform-option compute_resource=sparkpool1 \
   --platform-option storage_account=mystorageaccount \
   --platform-option storage_container=benchbox
 ```
@@ -99,7 +99,7 @@ from benchbox.platforms.azure import SynapseSparkAdapter
 
 adapter = SynapseSparkAdapter(
     workspace_name="my-synapse-workspace",
-    spark_pool_name="sparkpool1",
+    compute_resource="sparkpool1",
     storage_account="mystorageaccount",
     storage_container="benchbox",
     tenant_id="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",

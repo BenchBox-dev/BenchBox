@@ -72,11 +72,11 @@ Download from [Microsoft Download Center](https://learn.microsoft.com/en-us/sql/
 ```bash
 benchbox run --platform fabric --benchmark tpch --scale 0.1 \
   --platform-option workspace=your-workspace-guid \
-  --platform-option warehouse=your_warehouse_name
+  --platform-option database=your_warehouse_name
 
 benchbox run --platform fabric --benchmark tpch --scale 1 \
   --platform-option workspace=your-workspace-guid \
-  --platform-option warehouse=your_warehouse_name \
+  --platform-option database=your_warehouse_name \
   --platform-option auth_method=service_principal \
   --platform-option tenant_id=your-tenant-id \
   --platform-option client_id=your-client-id \
@@ -93,7 +93,7 @@ from benchbox import TPCH
 
 adapter = FabricWarehouseAdapter(
     workspace="your-workspace-guid",
-    warehouse="your_warehouse_name",
+    database="your_warehouse_name",
     auth_method="default_credential"
 )
 
@@ -117,7 +117,7 @@ Uses Azure CLI, managed identity, or environment variables:
 ```python
 adapter = FabricWarehouseAdapter(
     workspace="your-workspace-guid",
-    warehouse="your_warehouse_name",
+    database="your_warehouse_name",
     auth_method="default_credential"
 )
 ```
@@ -137,7 +137,7 @@ For automated/CI environments:
 ```python
 adapter = FabricWarehouseAdapter(
     workspace="your-workspace-guid",
-    warehouse="your_warehouse_name",
+    database="your_warehouse_name",
     auth_method="service_principal",
     tenant_id="your-tenant-id",
     client_id="your-client-id",
@@ -156,7 +156,7 @@ For development/testing:
 ```python
 adapter = FabricWarehouseAdapter(
     workspace="your-workspace-guid",
-    warehouse="your_warehouse_name",
+    database="your_warehouse_name",
     auth_method="interactive"
 )
 ```
@@ -246,7 +246,7 @@ By default, BenchBox disables Fabric's result cache for accurate benchmarking:
 ```python
 adapter = FabricWarehouseAdapter(
     workspace="...",
-    warehouse="...",
+    database="...",
     disable_result_cache=True
 )
 ```
@@ -258,7 +258,7 @@ To enable (for production-like testing):
 ```python
 adapter = FabricWarehouseAdapter(
     workspace="...",
-    warehouse="...",
+    database="...",
     disable_result_cache=False
 )
 ```

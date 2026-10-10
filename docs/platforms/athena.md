@@ -45,7 +45,7 @@ Set the access key variables, or use an AWS profile instead.
 ```bash
 benchbox run --platform athena --benchmark tpch --scale 1.0 \
   --platform-option region=us-east-1 \
-  --platform-option workgroup=primary \
+  --platform-option compute_resource=primary \
   --platform-option database=benchbox \
   --platform-option s3_staging_dir=s3://your-bucket/athena-results/
 ```
@@ -80,7 +80,7 @@ from benchbox.platforms.athena import AthenaAdapter
 
 adapter = AthenaAdapter(
     region="us-east-1",
-    workgroup="primary",
+    compute_resource="primary",
     database="benchmarks",
     s3_staging_dir="s3://my-bucket/athena-results/",
     s3_data_dir="s3://my-bucket/benchmark-data/",
