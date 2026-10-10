@@ -102,6 +102,15 @@
       "op": "renew",
       "op_id": "5474a64526ed4c47b661cd6a9d404548",
       "session_id": "760b0930a01047bb8025dda090b79735"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:bd5956809339499407531943",
+      "at": "2026-10-10T20:13:24Z",
+      "client": "omp-coding-agent",
+      "generation": "9a6265ca94a5468a850dbf3e1ec1dcaf",
+      "op": "renew",
+      "op_id": "f0a522e870dd41c8a7f2f6fab67da683",
+      "session_id": "760b0930a01047bb8025dda090b79735"
     }
   ]
 }
