@@ -5,7 +5,7 @@
     "Stream numbering stays 1..S as decided for the throughput batch.",
     "make comment-policy-check passes."
   ],
-  "context": "Implemented modulo alignment, explicit stream-ID tests for 0, 1, 2, and 41, bundled-qgen first-query checks for matrix rows 0..2, and TPC-H guide update. The comment-policy runner uses immutable base scanner files; source-level REVIEWED_PROCESS_ARGV changes cannot authorize a new argv in the same PR. Policy fixture worktree `fix/tpch-qgen-policy-fixture` has an exact source-AST fixture (digest b5d8dcf930f26fe39448d8a43f321620e011f54372256f44906a9d11deabdd63); policy check passed 0 violations and 19 native tests; preflight passed. Reviewer found no issues. The qgen test invokes literal `qgen` via PATH; bundled-qgen check passes. Full fast suite: 36,977 passed, 26 skipped, 4 subtests. Fixture commit amendment is running; source PR and cleanup follow after required merges. Both paths require oracle review.",
+  "context": "Work complete locally, blocked on red trunk. Fixture branch fix/tpch-qgen-policy-fixture committed f7e76e6e (policy-only, exact AST fixture digest b5d8dcf930f26fe39448d8a43f321620e011f54372256f44906a9d11deabdd63); policy check 0 violations, 19 native tests; preflight passed; reviewer no findings. Source worktree has tested qgen modulo fix + guide + reviewed-argv entry + PATH-based bundled test (fast suite 36,977 passed, 26 skipped). BLOCKER: make pr-open refuses, develop red since 2026-10-09 ~18:50Z; 8 consecutive trunk.yml failures, all dist-artifact Bind distributions with release_artifact_consumer.py wrong producer repository. Reproduced via API: workflow run repository.full_name is BenchBox-dev/benchbox but script REPOSITORY constant is BenchBox-dev/BenchBox; exact string compare fails every run (numeric id also checked, so casefold fix is safe). Spans SHAs 239aeedc..0a3c27f5, so no single PR revert will fix it; did not revert. Needs owner decision: fix the comparison (separate infra item) or other trunk repair, then open fixture PR first, then source PR.",
   "description": "benchbox/core/tpch/streams.py:234 passes `-p stream_id + 1` to qgen, while the Python permutation path indexes PERMUTATION_MATRIX[stream_id] (streams.py:202). The two paths disagree on which permutation a stream uses. _generate_stream_queries_qgen (line 204) is dead code today, so nothing is wrong at runtime, but it would produce the wrong ordering if wired in. Decide whether to delete the dead method or align the indexing, and prove the choice with a test.",
   "sessions": [
     {
@@ -72,6 +72,14 @@
       "client": "omp-coding-agent",
       "op": "update",
       "op_id": "5d14b0c124d4426fb50ff4aedee3ab29",
+      "session_id": "024527ae77c1405f86cdbdf1079f6e14"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396",
+      "at": "2026-10-10T00:58:48Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "3de26a90c6804753a90a911108eab0ac",
       "session_id": "024527ae77c1405f86cdbdf1079f6e14"
     }
   ]
