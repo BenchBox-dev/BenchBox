@@ -4,7 +4,7 @@
     "A fix lands on develop and a later nightly-v2 t3:perf run passes with the 82 ms floor in place",
     "Issue #2778 records the outcome"
   ],
-  "context": "Found during nightly-red handoff verification (run 38027036252). The new 82 ms aggregate floor works as designed: it passed the noisy +57.7 ms night and correctly fails this +93 ms night.",
+  "context": "2026-10-10: investigated. Same-host A/B (399d47cbc pre-#2852 vs develop with #2852, identical method): 0.639s vs 0.595s (-6.8%) — #2852 exonerated; its diff is record-plumbing outside the timed query path. The 640 ms night was host noise beyond the 7-sample envelope (8-sample spread now ~100 ms). Finding reported on #2778. Next: owner decides floor revision (re-derive from 8 samples, accept occasional reds, or pin hosts); verification needs a fresh nightly-v2 dispatch but the handoff run budget is exhausted (2/2). Owner: Joe Harris; next action: decide and authorize.",
   "description": "Nightly-v2 verification run 38027036252 on develop ab0c41b5 measured DuckDB TPC-H SF=0.01 at 640 ms against the 547 ms baseline (+16.97%, +93 ms), failing the aggregate gate even with the new 82 ms floor. The prior night (run 37944292492, 2026-10-09 14:27 UTC) measured 551 ms (+0.66%) on the same AMD EPYC 7763 runner class. The only execution-machinery change between them is #2852 (execution variants in schema 2.3, merged 2026-10-09 23:43 EDT); the per-query profile shows uniform +1-2 ms slowdowns across all 22 queries, consistent with added per-query recording overhead. Local replay with the new floor confirms the failure; artifacts: /tmp names in handoff ledger.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2778"
@@ -34,6 +34,14 @@
       "generation": "c23ba2a1849f441382b3e3e0a4919807",
       "op": "release",
       "op_id": "da5ea68e3a2e4dd685b99d7629fe78c1",
+      "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:8d0fa0e2ef22aacc5284a44c",
+      "at": "2026-10-10T05:29:49Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "ccf6ea8f2c8343f7b9152a9ddc678518",
       "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
     }
   ]
