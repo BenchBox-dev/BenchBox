@@ -7778,15 +7778,10 @@
       "title": "Fix stale counts, missing APIs and contradictions in benchmark and reference pages"
     },
     "docs-accuracy-guides-tutorials": {
-      "claim": {
-        "expires_at": "2026-10-11T03:01:33Z",
-        "generation": "a54b4519562d4419959a1d466bc227ba",
-        "renewals": 0,
-        "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:c5daffc9eae3c5f9ce6578f7"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Fix broken examples in user guides and tutorials"
     },
     "docs-accuracy-platforms": {
