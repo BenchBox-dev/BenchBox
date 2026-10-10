@@ -5077,17 +5077,12 @@
       "title": "Remove the deprecated execution-variant aliases after the deprecation window"
     },
     "core-exec-result-schema-2-3": {
-      "claim": {
-        "expires_at": "2026-10-10T21:19:13Z",
-        "generation": "8752f7c50a8447fc8a98a593d89369cb",
-        "renewals": 0,
-        "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:6e8a424eda2c7006605aa48b"
-      },
+      "claim": null,
       "needs": [
         "core-exec-framework-manifest"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Record execution variants in result bundles: schema 2.3 fields, legacy mapping, and anonymizer rules"
     },
     "corpus-65-bundles-carry-failed-queries": {
