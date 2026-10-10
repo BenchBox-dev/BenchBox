@@ -2014,6 +2014,7 @@ def _interactive_resolve_engine(s: types.SimpleNamespace) -> None:
 
 
 def _interactive_prompt_platform_options(s: types.SimpleNamespace) -> None:
+    _interactive_resolve_engine(s)
     if s.parsed_platform_options:
         return
 

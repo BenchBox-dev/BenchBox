@@ -76,3 +76,19 @@ class TestInteractiveEngineResolution:
 
         prompt.assert_not_called()
         assert s.ctx.exit.called
+
+    def test_explicit_engine_survives_populated_platform_options(self):
+        from benchbox.cli.commands.run import _interactive_prompt_platform_options
+
+        s = self._state(execution_engine="streaming")
+        s.parsed_platform_options = {"rechunk": True}
+        with (
+            patch("benchbox.cli.benchmarks.prompt_platform_options") as options,
+            patch("benchbox.cli.benchmarks.prompt_execution_engine") as prompt,
+        ):
+            _interactive_prompt_platform_options(s)
+
+        options.assert_not_called()
+        prompt.assert_not_called()
+        assert s.resolved_execution_engine == "streaming"
+        assert s.database_config.execution_engine == "streaming"
