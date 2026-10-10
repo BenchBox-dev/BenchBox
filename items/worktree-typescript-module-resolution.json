@@ -2,7 +2,7 @@
   "acceptance": [
     "node tests/unit/scripts/test_comment_syntax_js.cjs runs successfully in any linked worktree without requiring manual COMMENT_POLICY_TYPESCRIPT environment configuration when node_modules is installed in the primary clone."
   ],
-  "context": "Implemented in worktree branch feat/comment-scanner-enhancements (/Users/joe/Developer/BenchBox.wt-scanner-enhancements): 3-step TS resolution in scripts/comment_syntax_js.cjs (env, local node_modules, git-common-dir fallback), resolve_typescript_dir helper in scripts/comment_syntax.py, skip-check uses helper, 3 new unit tests. node --test 19/19 green in fresh worktree without env vars.\n\nTakeover progress: fixed the four current-head Oracle findings on the same PR and committed/pushed as 6cb8c1203fe71ccf2ec227d21968c5dace9f8beb. `make pr-preflight` passed 706 tests; `make comment-policy-check` scanned 5,749 source files with 0 violations and passed 19 native tests. Replied to and resolved all four old review threads. PR #2821 is open; current-head oracle-review and full CI are not yet complete. Do not arm or merge until the current-head review and required CI pass. The linked-worktree TypeScript resolution acceptance is exercised by the fresh-worktree Node test.\n\n2026-10-09 tracker review: the code for this item already sits in open PR #2821, and the item is claimed by a live worker (claim expires 2026-10-10T21:18:22Z). Any other work on it may duplicate that PR. Check the PR's state before starting anything new.",
+  "context": "Implemented in /Users/joe/Developer/BenchBox.wt-scanner-enhancements on feat/comment-scanner-enhancements: scripts/comment_syntax_js.cjs resolves TypeScript from COMMENT_POLICY_TYPESCRIPT, local results-explorer/node_modules, then the primary git-common-dir path; Python skip logic shares resolve_typescript_dir. Fresh linked-worktree Node test passed 19/19 without environment configuration. The item is not terminal until PR #2821 merges. Current PR head f4eed2d403ec53aa254b96e249c52bf232b09038; PR is open with required CI and Oracle review pending. Added a CI setup step for locked TypeScript in code-test and medium-test because current CI failed test_mdx_esm_intertoken_comments_are_reported when Node could not load typescript; local Node tests 19/19 and targeted MDX cases 4/4 passed. New Oracle findings D10-D12 also require scanner fixes before closeout. Claim is being released while the related scanner work proceeds under its stdin-pipeline tracker item; re-adopt after the PR merges and finish only with merged-head evidence.",
   "description": "Running node tests/unit/scripts/test_comment_syntax_js.cjs in a linked worktree fails with MODULE_NOT_FOUND for typescript unless COMMENT_POLICY_TYPESCRIPT is explicitly exported to point at the primary clone's results-explorer/node_modules. Update scripts/comment_syntax_js.cjs to fall back to the primary git repository root's results-explorer/node_modules when run in a linked worktree, or provide a worktree-init helper that symlinks or resolves node_modules.",
   "sessions": [
     {
@@ -71,6 +71,14 @@
       "generation": "80635d7d1d7944e6823be3d2b0b3acdb",
       "op": "take",
       "op_id": "bf06e7356d0e47e3865dee499fefadc5",
+      "session_id": "760b0930a01047bb8025dda090b79735"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:bd5956809339499407531943",
+      "at": "2026-10-10T19:15:20Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "3b1e8252731b43a2bd9f002eb9ec87fd",
       "session_id": "760b0930a01047bb8025dda090b79735"
     }
   ]
