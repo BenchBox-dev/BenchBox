@@ -5051,18 +5051,13 @@
       "title": "Require new platforms to declare execution engines, compute, deployment and gateways through the manifest"
     },
     "core-exec-polars-cli-mcp-adoption": {
-      "claim": {
-        "expires_at": "2026-10-11T18:51:18Z",
-        "generation": "b76f650e257c4f8f9d3aa9f0921a0172",
-        "renewals": 0,
-        "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:6e8a424eda2c7006605aa48b"
-      },
+      "claim": null,
       "needs": [
         "core-exec-framework-manifest",
         "core-exec-result-schema-2-3"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Replace the Polars engine option with the core --execution-engine setting across CLI, MCP, config and the Polars adapters"
     },
     "core-exec-polars-matrix-docs-refresh": {
