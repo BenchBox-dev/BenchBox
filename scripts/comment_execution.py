@@ -67,7 +67,7 @@ REVIEWED_PROCESS_ARGV: dict[tuple[str, str], str] = {
     ): "the executable is the bundled TPC-H dbgen data generator binary",
     (
         "benchbox/core/tpch/streams.py",
-        "[str(qgen_exe), '-p', str(stream_id + 1), '-s', str(self.scale_factor), '-r', str(self.rng_seed + stream_id), '-o', str(work_dir)]",
+        "[str(qgen_exe), '-p', str(stream_id % len(self.PERMUTATION_MATRIX)), '-s', str(self.scale_factor), '-r', str(self.rng_seed + stream_id), '-o', str(work_dir)]",
     ): "qgen_exe is the bundled TPC-H qgen query generator binary",
     (
         "scripts/_render_blog_charts.py",
