@@ -5,7 +5,7 @@
     "Stream numbering stays 1..S as decided for the throughput batch.",
     "make comment-policy-check passes."
   ],
-  "context": "Work complete locally, blocked on red trunk for PR publication. Fixture branch fix/tpch-qgen-policy-fixture committed f7e76e6e (reviewed, no findings; policy check 0 violations). Source branch fix/tpch-stream-qgen-permutation: 4 files staged and commit in flight (hook running); pre-publication reviewer rated the change correct with no findings (modulo alignment matches qgen SEQUENCE logic; argv mapping incl. 41->0 plus bundled first-query tests). Still needs: trunk repair (release-script full_name case mismatch), then fixture PR open/arm/merge, then source rebase + pr-open. Fast suite 36,977 passed; pr-preflight passed.",
+  "context": "Work complete locally; publication blocked on two external gates. (1) Source commit rejected by pre-commit comment-policy hook: streams.py:170 payload-error str(qgen_exe), 1 enforced failure in transition mode — expected until the fixture PR merges into the base; all other hooks passed (ruff, format, codespell, markdownlint, identity). Staged 4-file change intact on fix/tpch-stream-qgen-permutation. (2) Trunk red since Oct 9 ~18:50Z blocks make pr-open even after commit: dist-artifact wrong producer repository, API full_name BenchBox-dev/benchbox vs script constant BenchBox-dev/BenchBox. Fixture branch fix/tpch-qgen-policy-fixture committed f7e76e6e, reviewed clean. Order: trunk repair → fixture PR → source commit/PR. Fast suite 36,977 passed; pr-preflight passed.",
   "description": "benchbox/core/tpch/streams.py:234 passes `-p stream_id + 1` to qgen, while the Python permutation path indexes PERMUTATION_MATRIX[stream_id] (streams.py:202). The two paths disagree on which permutation a stream uses. _generate_stream_queries_qgen (line 204) is dead code today, so nothing is wrong at runtime, but it would produce the wrong ordering if wired in. Decide whether to delete the dead method or align the indexing, and prove the choice with a test.",
   "sessions": [
     {
@@ -88,6 +88,14 @@
       "client": "omp-coding-agent",
       "op": "update",
       "op_id": "0f3ed88fdfa542708723bc20a16faed2",
+      "session_id": "024527ae77c1405f86cdbdf1079f6e14"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396",
+      "at": "2026-10-10T01:11:02Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "136d66c79eef42d4a8b94973c92bdcf9",
       "session_id": "024527ae77c1405f86cdbdf1079f6e14"
     }
   ]
