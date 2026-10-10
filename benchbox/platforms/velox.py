@@ -104,6 +104,10 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
 
         self._dialect = "spark"
 
+        for spelling in ("deployment", "deployment_mode"):
+            raw = config.get(spelling)
+            if isinstance(raw, str) and raw.strip().lower() == "docker":
+                self._validate_deployment(raw)
         self.deployment = self._validate_deployment(select_adapter_deployment("velox", config, "local"))
         self.deployment_selected = self.deployment
         self.deployment_selected_class = deployment_class("velox", self.deployment)
