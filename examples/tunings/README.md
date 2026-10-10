@@ -49,7 +49,7 @@ benchbox run --platform duckdb --benchmark tpch \
   --tuning examples/tunings/duckdb/tpch_tuned.yaml
 
 benchbox run --platform polars --benchmark tpch --mode dataframe --tuning tuned
-benchbox run --platform polars --benchmark tpch --mode dataframe \
+benchbox run --platform polars --benchmark tpch --mode dataframe --execution-engine streaming \
   --tuning examples/tunings/dataframe/polars_streaming.yaml
 ```
 

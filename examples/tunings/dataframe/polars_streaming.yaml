@@ -12,5 +12,5 @@ _metadata:
   version: "1.0"
   format: dataframe_tuning
   platform: polars
-  description: Polars streaming configuration for large datasets
+  description: Polars memory profile for large datasets; pair with --execution-engine streaming
   generated_by: benchbox
