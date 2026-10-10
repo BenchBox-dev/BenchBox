@@ -13683,6 +13683,13 @@
       "status": "done",
       "title": "Make test_benchmark_capacity_tool_is_tenant_scoped wait for lease expiry instead of a fixed 60 ms sleep"
     },
+    "nightly-perf-gate-sensitivity-review-20261010": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Evaluate and document blind spots in nightly performance regression detection"
+    },
     "nightly-py310-dataframe-options-mock-target": {
       "claim": null,
       "needs": [],

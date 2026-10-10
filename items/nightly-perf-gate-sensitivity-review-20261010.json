@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Quantify and record the current gate's false-negative envelope with reproducible representative examples, including the 4.4 ms to 8.8 ms query case and aggregate floor interaction.",
+    "Assess runner-class baseline matching and the omission of run.total_duration_ms; distinguish intentional scope from missed regression coverage.",
+    "Record an owner decision on whether current limits are acceptable or need a relative/per-runner/orchestration signal, supported by measured noise and sensitivity evidence.",
+    "Update docs/development/perf-smoke.md and issue #2778 with the decision, examples and limits; if behavior changes are warranted, create a linked implementation TODO before closing this assessment."
+  ],
+  "context": "Origin: 2026-10-10 adversarial review of the nightly-red handoff, Solution fit L2/L3. This assessment is separate from t3-perf-execution-variants-regression-20261010, which investigates the unresolved hosted 640 ms result. Owner: Joe Harris (same owner recorded for the linked performance-gate decision); next action: evaluate the blind spots and decide/document policy.",
+  "description": "The adversarial review identified performance-gate detection limits that remain after the decimal-boundary fix: a query can double from 4.4 ms to 8.8 ms yet stay below the 7 ms per-query floor, while the +13.2 ms total increase stays below the 82 ms aggregate floor. A baseline measured on a slower runner class can also weaken sensitivity, and the current comparison does not include run.total_duration_ms, so orchestration overhead is outside its signal. The review called these explicit detection limits, not patch-introduced defects. Assess and record whether these omissions are accepted policy or product gaps requiring additional signals; preserve protection against host-noise false positives.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/issues/2778"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:1e26f95967dbd69b9450684a",
+      "at": "2026-10-10T18:54:03Z",
+      "client": "omp-coding-agent",
+      "op": "create",
+      "op_id": "c084a811798a4512a09893249f488acc",
+      "session_id": "375a0fea891d4422bf14885cd09fb269"
+    }
+  ]
+}
