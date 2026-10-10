@@ -1,11 +1,11 @@
 {
   "acceptance": [
-    "Corpus validation rejects committed throughput bundles when len(stream_results) differs from an integer run.streams, or config.streams when run.streams is absent; absent configured counts skip the check. The error names the bundle path and both counts.",
-    "Explorer pipeline and local result import withhold Throughput@Size when the configured count differs from stream_results length; pipeline entries use stream_count_mismatch when the primary exclusion would otherwise be missing_primary_metric.",
-    "Unit tests cover matching, absent configured counts, and mismatches in run.streams/config.streams across corpus validation, the Explorer pipeline, and local Explorer import."
+    "Corpus validation rejects completed throughput bundles when len(stream_results) differs from integer run.streams, or config.streams when run.streams is absent; absent configured counts skip the check. The error names the bundle path and both counts. Failed and partial phases with truncated results do not hard-fail corpus validation solely for the count mismatch.",
+    "Explorer pipeline and local result import withhold Throughput@Size when a completed phase's configured count differs from stream_results length; pipeline entries use stream_count_mismatch when the primary exclusion would otherwise be missing_primary_metric. Failed and partial phases retain the phase-failure exclusion instead of being relabeled as a count mismatch.",
+    "Unit tests cover matching counts, absent configured counts, run.streams/config.streams mismatches, and failed/partial truncation across corpus validation and Explorer ranking/import behavior."
   ],
-  "context": "PR #2894 is open at head 3fba17edd42a6a964ca9d3e591299eb8c088100a. The PR is intentionally unarmed pending the oracle's success review and required CI. Local acceptance: 323 Python tests and 49 Explorer Vitest tests passed; TypeScript typecheck, corpus validation (413 bundles, 61 ranked cohorts), docs build, comment-policy check, and make pr-preflight (471 mapped tests) passed. Browser smoke confirmed a 4-configured/3-recorded TPC-H bundle has no Throughput@Size card/value. The repo-wide ty check emitted warnings but none in changed Python files. PR creation warned of a merge-tree conflict with unrelated PR #2835 in .github/workflows/nightly-v2.yml, docs/internal/nightly-t3.md, and tests/unit/workflows/test_nightly_t3_workflow.py; this item changes none of those paths. Resume 2026-10-10: reviewed all eight PR files against the five-axis code rubric; no Critical or Required defects found. Live PR read: OPEN at the same head, no reviews or review threads; oracle-review failed with the expected wait-for-oracle message, and required CI checks remain pending. Do not arm until current-head benchbox-oracle review succeeds and required CI is green. PR #2889 for the separate decision-record task has merged; that task remains open because the record omits required per-caller timed-window effects, so it needs a docs-only follow-up before tracker completion.",
-  "description": "In results-data/validate_corpus.py (lines 97-101) and _project/scripts/explorer_pipeline/transformer.py (_stream_count), stream_count is derived solely as len(phases.throughput_test.stream_results). If a benchmark configuration specifies --streams S but fewer or more stream entries are recorded in the bundle, or if run.streams disagrees with stream_results, the discrepancy is silently masked rather than flagged as an invalid run.",
+  "context": "PR #2894 remains open on branch fix/throughput-stream-count-derived. Current-head Oracle review found two defects: corpus validation hard-failed legitimately truncated FAILED/PARTIAL throughput bundles, and Explorer relabeled those phases as stream_count_mismatch instead of preserving phase-failure exclusion. Both helpers now gate mismatches on COMPLETED status; tests cover FAILED/PARTIAL truncation for run/config counts and pipeline reason preservation. Hosted-results contract docs now clarify this status boundary. Focused tests passed: 328 across corpus and Explorer ranking modules. Final docs/style/comment checks are running in background job bg_57. After they pass, commit the fix, update the existing PR, then wait for current-head Oracle success and required CI before arming. PR #2894's earlier local evidence (323 targeted Python tests, 49 Explorer Vitest tests, TS typecheck, corpus validation, docs, comment policy, preflight, browser smoke) applies to the initial head; new tests supersede the relevant failure cases. Do not touch unrelated merge-tree conflicts from PR #2835.",
+  "description": "For completed throughput phases, compare configured --streams (run.streams, falling back to config.streams) with the number of recorded stream_results. Report a mismatch instead of ranking an invalid completed run. Failed or partial phases may legitimately record fewer streams and must be excluded by phase status rather than treated as configuration defects.",
   "sessions": [
     {
       "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:2a10096285872d23ac8a3bfe",
@@ -73,6 +73,14 @@
       "generation": "f135b10e82c44281a5c2f6c4403ce577",
       "op": "take",
       "op_id": "a8656bc2310548669b734f8f3cc5f83d",
+      "session_id": "024527ae77c1405f86cdbdf1079f6e14"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396",
+      "at": "2026-10-10T20:49:06Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "c611270c3c9042208f21d5de3914966e",
       "session_id": "024527ae77c1405f86cdbdf1079f6e14"
     }
   ]
