@@ -91,6 +91,17 @@
       "op": "update",
       "op_id": "7b0ed5f1d76c4b1cab684e0c1ee3637f",
       "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:34427fd6ff4639228ad9cd98",
+      "at": "2026-10-10T01:14:48Z",
+      "client": "omp-coding-agent",
+      "displaced": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de",
+      "generation": "076f227c028d4b5ba90c62ff23378474",
+      "op": "takeover",
+      "op_id": "15864f350ab34a039de75eb46cb6e794",
+      "reason": "Actor mapped to Claude 4a560440 transcript. Shutdown 01:08:25Z killed bb1mhgqyq/bn9otrzv3; current ps confirms controller 43239 and MCP 43309 absent. Remaining 44767/28217 are unrelated sessions. Prior writer cannot resume; no process killed here.",
+      "session_id": "8fa717097fcf438d8eac8a356ebf8686"
     }
   ]
 }

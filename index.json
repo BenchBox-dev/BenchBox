@@ -20096,10 +20096,10 @@
     },
     "site-split-30-rehearsal": {
       "claim": {
-        "expires_at": "2026-10-10T20:48:09Z",
-        "generation": "6d31c32f7b91408cb384c03d1a4b05d8",
+        "expires_at": "2026-10-11T01:14:48Z",
+        "generation": "076f227c028d4b5ba90c62ff23378474",
         "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de"
+        "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:34427fd6ff4639228ad9cd98"
       },
       "needs": [
         "site-split-25-shadow-parity"
