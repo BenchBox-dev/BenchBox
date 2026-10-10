@@ -4,7 +4,7 @@
     "continue-on-error and the quarantine suffix are removed from those two legs, with workflow tests updated",
     "Issues #2569 and #2570 are closed with run evidence, or each leg that stayed quarantined has its own tracker item"
   ],
-  "context": "2026-10-10: quarantine removal implemented and verified in worktree ../BenchBox.wt-unquarantine on branch fix/nightly-windows-unquarantine, commit bbcaa9a (2 insertions, 6 deletions in .github/workflows/nightly.yml only; Windows test legs untouched). Focused tests pass: tests/unit/scripts/test_scheduled_workflow_liveness.py 33 passed; no unit test asserts the old quarantine names. Evidence revalidated live: run 37967682464 shows every step success in both scheduled-workflow-liveness and integration-smoke (windows-latest, 3.12). Branch pushed. PR not opened: make pr-open refuses while develop is red (trunk.yml run 37995649876 failed in dist-artifact with 'Release artifact admission failed: wrong producer repository', unrelated to this change). Commit kept; will open/arm/monitor once trunk is green. Resumption notes: branch tracks origin/fix/nightly-windows-unquarantine; HEAD bbcaa9a.",
+  "context": "2026-10-10: PR #2860 opened from branch fix/nightly-windows-unquarantine at bbcaa9a and armed (auto-merge squash); oracle review requested. Implementation verified: run 37967682464 step evidence revalidated live, 33 liveness tests passed, diff nightly.yml-only. Resumption: watch checks once, rerun stale oracle gate if needed, resolve threads, ensure merge; on merge close #2569 and #2570 with run links, then finish this item.",
   "description": "Two legs of .github/workflows/nightly.yml are still non-blocking and now pass: the Windows integration-smoke leg (#2569) and scheduled-workflow-liveness (#2570). In every completed nightly.yml run from 2026-10-03 to 2026-10-09, all steps of both legs passed (for example run 37967682464). Judge each leg by step results, not job conclusion, because continue-on-error reports a failed job as success.\n\nFor each leg, remove continue-on-error and the quarantine suffix from its name, update any workflow tests that assert them, and close its issue with a comment linking the run and the fix. If a leg fails in a fresh dispatched run, it keeps its quarantine and gets a tracker item with the failing step.\n\nOut of scope: the Windows 'test' legs (#2568). Leave their quarantine in nightly.yml until dlv2-70 retires nightly.yml. Their coverage and the closing of #2568 moved to nightly-v2-windows-unit-leg-20261009.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2569",
@@ -76,6 +76,14 @@
       "generation": "6e075a45488b458d82f01cd2d745d48d",
       "op": "take",
       "op_id": "15a07fb1cd434b2e8be890313de9737c",
+      "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:8d0fa0e2ef22aacc5284a44c",
+      "at": "2026-10-10T01:46:48Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "124b58c6b2784bb6b5957146c93eae83",
       "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
     }
   ]
