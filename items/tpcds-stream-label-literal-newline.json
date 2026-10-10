@@ -5,7 +5,7 @@
     "The comment-policy fixture for the stream label in quality/comment-policy.json matches the new emitted text or is removed",
     "Throughput/stream tests pass"
   ],
-  "context": "Discovered on branch feat/comment-cleanup-program (comment cleanup effort, 2026-10-03). Do not change benchmark algorithms beyond the label/newline fix without review.",
+  "context": "Completed and confirmed by live GitHub reads: fixture PR #2824 merged 2026-10-09T17:08:12Z as 181c711f5f26d9a98c012eb9eeb4e56af6cb0557; implementation PR #2840 merged 2026-10-09T21:31:52Z as 34de720b8fca0eac9385ac51b11502ecf24ade67. Implementation emits real newlines; regression coverage executes stream SQL, preserves distinct multipart variants, and re-raises generator failures instead of SELECT 1 placeholders. Current-head oracle SHIP and required CI passed before merge. Resumed interrupted claim solely to close tracker after merged implementation.",
   "description": "benchbox/core/tpcds/streams.py (TPCDSStreamManager._generate_single_stream) builds stream SQL as f\"-- Query {query_id}{variant}\\\\n{base_query}\" and the failure path as f\"-- Query ... (generation failed: {e})\\\\nSELECT 1 AS placeholder_query;\". The source uses a literal backslash-n (\"\\\\n\"), not a newline, so the label and the whole query form one SQL comment line. Any consumer that executes stream_query.sql would run nothing. The pattern is on develop (present at ad79a381d and origin/develop), so it predates the comment cleanup. Found during the comment cleanup; the label is kept and registered as an emitted-output fixture there, so changing it needs that fixture updated too.",
   "links": [
     "benchbox/core/tpcds/streams.py",
@@ -38,6 +38,14 @@
       "op": "takeover",
       "op_id": "a62a5161a8e1458da5b419b20d9b797f",
       "reason": "User requested takeover of interrupted OpenCode session ses_ede6486e1ffe8uepPepFBcUVqT. Recovered transcript ended without closeout; predecessor session cannot resume here. Live GitHub reads confirm PRs #2824 and #2840 merged. Taking over to finish.",
+      "session_id": "024527ae77c1405f86cdbdf1079f6e14"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396",
+      "at": "2026-10-10T12:27:58Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "77845a3ff05145f0a8048ce8b049ce78",
       "session_id": "024527ae77c1405f86cdbdf1079f6e14"
     }
   ]
