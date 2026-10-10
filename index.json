@@ -22405,10 +22405,10 @@
     },
     "tpcds-stream-label-literal-newline": {
       "claim": {
-        "expires_at": "2026-10-10T13:26:58Z",
-        "generation": "8379d619c53c4b2db992b02aa01f629d",
+        "expires_at": "2026-10-11T12:27:45Z",
+        "generation": "99e3b111298244e08bcfa980b3e459f2",
         "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:2906c25958cf7ec6b6a2e880"
+        "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396"
       },
       "needs": [],
       "priority": "high",

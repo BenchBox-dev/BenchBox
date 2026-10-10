@@ -28,6 +28,17 @@
       "op": "take",
       "op_id": "13720e9370c24e1da59db9b9d41c58d7",
       "session_id": "ee5ce49e998f40a48cea024974294dcd"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396",
+      "at": "2026-10-10T12:27:45Z",
+      "client": "omp-coding-agent",
+      "displaced": "mcp:tbh:joe@joe-mac-mini.local:2906c25958cf7ec6b6a2e880",
+      "generation": "99e3b111298244e08bcfa980b3e459f2",
+      "op": "takeover",
+      "op_id": "a62a5161a8e1458da5b419b20d9b797f",
+      "reason": "User requested takeover of interrupted OpenCode session ses_ede6486e1ffe8uepPepFBcUVqT. Recovered transcript ended without closeout; predecessor session cannot resume here. Live GitHub reads confirm PRs #2824 and #2840 merged. Taking over to finish.",
+      "session_id": "024527ae77c1405f86cdbdf1079f6e14"
     }
   ]
 }
