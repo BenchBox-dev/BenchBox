@@ -5201,15 +5201,10 @@
       "title": "Add a continuous whole-corpus privacy gate, not just a changed-files scan"
     },
     "correct-misstated-p50-in-behind-pr-throughput-decision": {
-      "claim": {
-        "expires_at": "2026-10-11T12:28:24Z",
-        "generation": "2d17ad9d3e7849f7955fd257e27a6fbd",
-        "renewals": 0,
-        "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396"
-      },
+      "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "active",
+      "status": "open",
       "title": "Throughput decision record misstates the p50 interarrival in its own evidence file"
     },
     "correctness-gate-value-digest-fidelity-followups": {
