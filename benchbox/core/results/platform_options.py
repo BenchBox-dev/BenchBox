@@ -86,6 +86,7 @@ _INTERNAL_OPTION_KEYS = {
     "strict_plan_capture",
     "plan_queries",
     "execution_mode",
+    "execution_engine",
     "benchmark",
     "scale_factor",
     "tuning_config",

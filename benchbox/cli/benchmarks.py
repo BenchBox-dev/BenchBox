@@ -1254,6 +1254,31 @@ def prompt_platform_options(platform: str) -> dict[str, Any]:
     return options
 
 
+def prompt_execution_engine(platform: str) -> str:
+    from benchbox.core.execution_engine import supported_execution_engines
+    from benchbox.core.platform_manifest import DEFAULT_EXECUTION_ENGINE
+
+    engines = {
+        name: capability for name, capability in supported_execution_engines(platform).items() if capability.selectable
+    }
+    if not engines:
+        return DEFAULT_EXECUTION_ENGINE
+
+    console.print("\n[bold cyan]Execution Engine[/bold cyan]")
+    console.print("[dim]Which execution machinery runs the query.[/dim]")
+    for name, capability in sorted(engines.items()):
+        label = capability.display_name or name
+        console.print(f"  {name} - {label}")
+
+    selected = Prompt.ask(
+        "Select execution engine",
+        choices=[DEFAULT_EXECUTION_ENGINE, *sorted(engines)],
+        default=DEFAULT_EXECUTION_ENGINE,
+    )
+    console.print(f"[green]✓ Execution engine: {selected}[/green]")
+    return selected
+
+
 def prompt_query_subset(benchmark_id: str, num_queries: int) -> list[str] | None:
     console.print("\n[bold cyan]Query Selection[/bold cyan]")
     console.print(f"The benchmark has {num_queries} queries.")

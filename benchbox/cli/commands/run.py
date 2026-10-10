@@ -584,6 +584,7 @@ def _plan_capture_override_entries(s: types.SimpleNamespace) -> dict[str, Any]:
 def _tuning_override_entries(s: types.SimpleNamespace) -> dict[str, Any]:
     entries: dict[str, Any] = {"tuning_enabled": s.tuning_enabled, "force_upload": bool(s.force_upload)}
     entries.update(_plan_capture_override_entries(s))
+    entries["execution_engine"] = getattr(s, "resolved_execution_engine", None) or "default"
     if s.loaded_unified_config:
         entries["unified_tuning_configuration"] = s.loaded_unified_config
     if s.df_tuning_config:
@@ -1990,7 +1991,30 @@ def _interactive_collect_flags(
     _interactive_prompt_platform_options(s)
 
 
+def _interactive_resolve_engine(s: types.SimpleNamespace) -> None:
+    from benchbox.cli.benchmarks import prompt_execution_engine
+    from benchbox.core.execution_engine import UnsupportedExecutionEngineError, resolve_requested
+    from benchbox.core.platform_manifest import DEFAULT_EXECUTION_ENGINE
+
+    requested = getattr(s, "execution_engine", None)
+    if requested is None:
+        requested = prompt_execution_engine(s.database_config.type)
+    try:
+        resolved = resolve_requested(s.database_config.type, requested)
+    except UnsupportedExecutionEngineError as exc:
+        console.print(f"[red]❌ {exc}[/red]")
+        if s.logger:
+            s.logger.error(str(exc))
+        s.ctx.exit(1)
+        return
+    s.execution_engine = resolved
+    s.resolved_execution_engine = resolved
+    if resolved != DEFAULT_EXECUTION_ENGINE:
+        s.database_config.execution_engine = resolved
+
+
 def _interactive_prompt_platform_options(s: types.SimpleNamespace) -> None:
+    _interactive_resolve_engine(s)
     if s.parsed_platform_options:
         return
 
@@ -2000,6 +2024,7 @@ def _interactive_prompt_platform_options(s: types.SimpleNamespace) -> None:
 
         platform_opts = prompt_platform_options(s.database_config.type) or {}
         s._interactive_platform_options = platform_opts
+    _interactive_resolve_engine(s)
 
     if not platform_opts:
         return
@@ -2613,6 +2638,21 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     default=None,
     help="Execution mode: sql or dataframe",
 )
+@advanced_option(
+    "--execution-engine",
+    type=str,
+    default=None,
+    help="Execution engine: which execution machinery runs the query. "
+    "Allowed values depend on the platform (see the platform manifest); "
+    "'default' lets the platform or version decide.",
+)
+@advanced_option(
+    "--polars-streaming",
+    is_flag=True,
+    default=False,
+    hidden=True,
+    help="Deprecated alias for --execution-engine streaming on polars-df.",
+)
 @advanced_option("--seed", type=int, help="RNG seed for query parameter generation")
 @advanced_option(
     "--streams",
@@ -2729,6 +2769,7 @@ def run(
     platform_option_pairs: tuple[tuple[str, str], ...],
     benchmark_option_pairs: tuple[tuple[str, str], ...],
     mode: str | None,
+    execution_engine: str | None,
     seed: int | None,
     concurrency: int | None,
     iterations: int | None,
@@ -2744,7 +2785,13 @@ def run(
     client_region: str | None = None,
     client_cloud: str | None = None,
     no_link_probe: bool = False,
+    polars_streaming: bool = False,
 ) -> None:
+    if polars_streaming:
+        console.print("[yellow]--polars-streaming is deprecated; use --execution-engine streaming.[/yellow]")
+        if execution_engine not in (None, "default", "streaming"):
+            raise click.UsageError(f"--polars-streaming conflicts with --execution-engine {execution_engine}")
+        execution_engine = "streaming"
     s = types.SimpleNamespace(
         ctx=ctx,
         platform=platform,
@@ -2778,6 +2825,7 @@ def run(
         platform_option_pairs=platform_option_pairs,
         benchmark_option_pairs=benchmark_option_pairs,
         mode=mode,
+        execution_engine=execution_engine,
         seed=seed,
         concurrency=concurrency,
         iterations=iterations,

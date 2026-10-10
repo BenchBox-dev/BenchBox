@@ -40,6 +40,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `firebolt_mode`, DuckLake `deployment_mode`, pg-duckdb `deployment_mode`.
   Saved configurations and credential profiles holding these keys keep
   working. The aliases are removed in 0.6.0.
+- The core `execution_engine` setting selects which execution machinery runs a
+  query. `benchbox run --execution-engine` sits next to `--mode`, and MCP
+  `run_benchmark`/`start_benchmark` accept `execution_engine`; both validate
+  against the platform manifest and fail before any work on undeclared values.
+  Polars DataFrame runs record a receipt with requested, applied and observed
+  values, including literal collect arguments in published bundles. Tuning files
+  and deprecated streaming aliases record their selected engine as the request.
+  The Polars `engine` platform option is removed; the Polars
+  `streaming` option, `--polars-streaming` and the MCP Polars `streaming` key
+  are deprecated aliases for the streaming engine.
 
 ### Before you upgrade
 - Vendor compute names now warn once per run; move saved configurations and
@@ -57,6 +67,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   example `--platform firebolt:core --platform-option deployment_mode=cloud`)
   now fails before any work starts instead of silently picking one; pass one
   spelling. Unknown deployment values are rejected the same way.
+- **Polars automatic tuning no longer selects a streaming engine on small hosts.**
+  `--tuning auto` and `--tuning tuned` on Polars no longer switch to the
+  streaming engine on hosts under 16 GB; the engine stays at `default` on
+  every host. Use `--execution-engine streaming` instead. Tuning files you
+  wrote yourself that set `execution.engine_affinity` or
+  `execution.streaming_mode` are still honored.
 
 - **ClickHouse tuned runs are faster, and their results are not comparable with earlier ones.**
   The tuned session settings no longer switch the join algorithm to

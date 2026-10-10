@@ -95,7 +95,8 @@ class TestRuntimeSettingsRecorded:
 
         assert "POLARS_MAX_THREADS=6" in statements
         assert "streaming_chunk_size=100000" in statements
-        assert "streaming_mode=on" in statements
+        assert "streaming_mode=on" not in statements
+        assert adapter.get_platform_info()["execution_engine"]["resolution"] == "tuning_profile"
         for s in ledger.statements:
             assert s.phase == PHASE_SESSION
             assert s.mechanism == DATAFRAME_RUNTIME_MECHANISM
@@ -431,7 +432,7 @@ class TestWriteLayoutRecorded:
         session = [s for s in adapter._applied_tuning_ledger.statements if s.phase == PHASE_SESSION]
         assert len(post_load) == 1
         assert post_load[0].statement == "compression_level=9"
-        assert len(session) == 3
+        assert len(session) == 2
 
 
 def _run_no_phases(adapter, name: str = "tpch"):

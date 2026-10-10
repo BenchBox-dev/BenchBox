@@ -48,17 +48,35 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.1
 | Option | Default | Description |
 |--------|---------|-------------|
 | `execution_mode` | lazy | Execution mode (lazy, eager) |
-| `streaming` | false | Enable streaming execution for large datasets |
 | `n_threads` | auto | Number of threads for parallel execution |
 | `driver_version` | (latest) | Pin the polars package version (e.g. `1.36.1`) |
 | `driver_auto_install` | false | Auto-install the requested driver version via uv if missing |
+
+The SQL module accepts only the default execution engine. Engine selection and
+the deprecated streaming aliases apply only to DataFrame execution.
+
+### Execution Engine (DataFrame Mode: `polars-df`)
+
+Select the engine with the core `--execution-engine` option:
+
+```bash
+benchbox run --platform polars-df --benchmark tpch --scale 0.1 --execution-engine streaming
+```
+
+| Value | Meaning |
+|-------|---------|
+| `default` | Each Polars version's own default (`auto` on current releases) |
+| `auto` | Polars chooses the engine for each query |
+| `in-memory` | Materialize each query in memory |
+| `streaming` | Process each query in batches to bound memory |
+
+A version that cannot honour the value fails the run. The `streaming`
+platform option is a deprecated alias for `--execution-engine streaming`.
 
 ### Platform Options (DataFrame Mode: `polars-df`)
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `streaming` | false | Enable streaming mode for large datasets |
-| `engine` | `default` | Collect engine: `default` (each Polars version's own default), `in-memory` or `streaming`; a version that cannot honour the value fails the run |
 | `rechunk` | true | Rechunk data for better memory layout |
 | `n_rows` | - | Limit rows to read (for testing) |
 | `driver_version` | (latest) | Pin the polars package version (e.g. `1.36.1`) |
@@ -170,12 +188,12 @@ For immediate results without optimization:
 adapter = PolarsAdapter(execution_mode="eager")
 ```
 
-### Streaming Mode
+### Streaming Engine
 
-For datasets larger than memory:
+For datasets larger than memory, run DataFrame mode with the streaming engine:
 
-```python
-adapter = PolarsAdapter(streaming=True)
+```bash
+benchbox run --platform polars-df --benchmark tpch --scale 100 --execution-engine streaming
 ```
 
 ## Performance Characteristics
@@ -226,10 +244,10 @@ adapter = PolarsAdapter(streaming=True)
 
 ### Memory Errors
 
-Enable streaming for large datasets:
+Run DataFrame mode with the streaming engine for large datasets:
 
-```python
-adapter = PolarsAdapter(streaming=True)
+```bash
+benchbox run --platform polars-df --benchmark tpch --scale 100 --execution-engine streaming
 ```
 
 ### SQL Syntax Errors
@@ -286,13 +304,12 @@ result = (
 | Comparing with Pandas | `polars-df` (same paradigm) |
 | Maximum optimization control | `polars-df` (expression API) |
 
-### Streaming Mode for Large Data
+### Streaming Engine for Large Data
 
-Enable streaming for datasets larger than memory:
+Run with the streaming engine for datasets larger than memory:
 
 ```bash
-benchbox run --platform polars-df --benchmark tpch --scale 100 \
-  --platform-option streaming=true
+benchbox run --platform polars-df --benchmark tpch --scale 100 --execution-engine streaming
 ```
 
 ## Related Documentation

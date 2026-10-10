@@ -36,7 +36,8 @@ All parameters are keyword arguments (the signature is `(**config)`).
 | --- | --- | --- | --- |
 | `working_dir` | `str` or `Path` | `"./polars_working"` | Working directory. The constructor creates it, including missing parents. |
 | `execution_mode` | `str` | `"lazy"` | Stored as `execution_mode` and reported by `get_platform_info`. Any value is accepted and none changes how data is loaded. |
-| `streaming` | `bool` | `False` | Stored and reported; it does not change loading. |
+| `streaming` | `bool` | `False` | Deprecated; warns and is ignored. |
+| `execution_engine` | `str` | `"default"` | Only `default` is accepted; anything else fails before any work. |
 | `n_rows` | `int` or `None` | `None` | Row limit applied when delimited text files are scanned. `None` reads all rows. |
 | `rechunk` | `bool` | `True` | Passed to the Polars scan functions. |
 
@@ -81,7 +82,7 @@ Output on 0.4.1 with `polars` 1.44.2:
 ```text
 5 60175 ['customer', 'lineitem', 'nation']
 ['AFRICA', 'AMERICA', 'ASIA', 'EUROPE', 'MIDDLE EAST']
-{'working_dir': 'polars_work', 'execution_mode': 'lazy', 'streaming': False, 'n_rows_limit': None, 'rechunk': True, 'result_cache_enabled': False}
+{'working_dir': 'polars_work', 'execution_mode': 'lazy', 'execution_engine': {'requested': 'default', 'applied': None, 'applied_class': None, 'applied_native': {}, 'resolution': 'platform_default', 'observed': 'not_captured', 'observed_source': 'none'}, 'n_rows_limit': None, 'rechunk': True, 'rechunk_effective': True, 'result_cache_enabled': False}
 Polars SQL mode is not support
 ```
 
@@ -99,10 +100,10 @@ Polars SQL mode is not support
 **`__init__(**config)`**: Creates the adapter from keyword arguments. See Parameters above.
 
 <span id="benchbox.platforms.polars_platform.PolarsAdapter.from_config"></span>
-**`from_config(config: dict[str, Any])`** (class method): Builds an adapter from a unified configuration dictionary. `working_dir` is used when present and not empty. Otherwise `benchmark` and `scale_factor` are required (a missing key raises `KeyError`) and the working directory is `<output_dir>/<benchmark>_sf<token>/<benchmark>_sf<token>_notuning_noconstraints.polars`, created on the spot; for example `od/tpch_sf001/tpch_sf001_notuning_noconstraints.polars` for `output_dir="od"`. The keys `execution_mode` (default `"lazy"`), `streaming` (`False`), `n_rows` (`None`), `rechunk` (`True`) and `force` (stored as `force_recreate`, `False`) are read, along with these pass-through keys when present: `tuning_config`, `tuning_enabled`, `unified_tuning_configuration`, `tuning_source`, `tuning_source_file`, `verbose_enabled` and `very_verbose`. Other keys are dropped.
+**`from_config(config: dict[str, Any])`** (class method): Builds an adapter from a unified configuration dictionary. `working_dir` is used when present and not empty. Otherwise `benchmark` and `scale_factor` are required (a missing key raises `KeyError`) and the working directory is `<output_dir>/<benchmark>_sf<token>/<benchmark>_sf<token>_notuning_noconstraints.polars`, created on the spot; for example `od/tpch_sf001/tpch_sf001_notuning_noconstraints.polars` for `output_dir="od"`. The keys `execution_mode` (default `"lazy"`), `execution_engine` (only `"default"`), `n_rows` (`None`), `rechunk` (`True`) and `force` (stored as `force_recreate`, `False`) are read, along with these pass-through keys when present: `tuning_config`, `tuning_enabled`, `unified_tuning_configuration`, `tuning_source`, `tuning_source_file`, `verbose_enabled` and `very_verbose`. Other keys are dropped. A `streaming` key warns that the option is deprecated and is ignored.
 
 <span id="benchbox.platforms.polars_platform.PolarsAdapter.add_cli_arguments"></span>
-**`add_cli_arguments(parser) -> None`** (static method): Adds a `Polars Arguments` group to an `argparse.ArgumentParser`. The group defines `--polars-execution-mode` (`lazy` or `eager`, default `lazy`), `--polars-streaming` (flag, default off), `--polars-n-rows` (`int`, default `None`), `--polars-working-dir` (default `None`) and `--polars-rechunk` (flag, default `True`; it cannot be turned off from the command line).
+**`add_cli_arguments(parser) -> None`** (static method): Adds a `Polars Arguments` group to an `argparse.ArgumentParser`. The group defines `--polars-execution-mode` (`lazy` or `eager`, default `lazy`), `--polars-streaming` (deprecated flag, default off; warns and is ignored), `--polars-n-rows` (`int`, default `None`), `--polars-working-dir` (default `None`) and `--polars-rechunk` (flag, default `True`; it cannot be turned off from the command line).
 
 <span id="benchbox.platforms.polars_platform.PolarsAdapter.platform_name"></span>
 **`platform_name`** (property): Always the string `'Polars'`.
@@ -111,7 +112,7 @@ Polars SQL mode is not support
 **`get_target_dialect() -> str`**: Returns `'dataframe'`, not a SQL dialect.
 
 <span id="benchbox.platforms.polars_platform.PolarsAdapter.get_platform_info"></span>
-**`get_platform_info(connection: Any = None) -> dict[str, Any]`**: Returns a `dict` with `platform_type` (`'polars'`), `platform_name`, `connection_mode` (`'in-memory'`), `configuration` (`working_dir`, `execution_mode`, `streaming`, `n_rows_limit`, `rechunk` and `result_cache_enabled`, always `False`), and `client_library_version` and `platform_version`, both the installed Polars version.
+**`get_platform_info(connection: Any = None) -> dict[str, Any]`**: Returns a `dict` with `platform_type` (`'polars'`), `platform_name`, `connection_mode` (`'in-memory'`), `configuration` (`working_dir`, `execution_mode`, `execution_engine` (a receipt with `requested`, `applied`, `applied_class`, `applied_native`, `resolution`, `observed` and `observed_source`), `n_rows_limit`, `rechunk`, `rechunk_effective` and `result_cache_enabled`, always `False`), and `client_library_version` and `platform_version`, both the installed Polars version.
 
 #### Connection and schema
 
@@ -125,7 +126,7 @@ Polars SQL mode is not support
 **`configure_for_benchmark(connection: Any, benchmark_type: str) -> None`**: Does nothing except log a message, and returns `None`.
 
 <span id="benchbox.platforms.polars_platform.PolarsAdapter.validate_platform_capabilities"></span>
-**`validate_platform_capabilities(benchmark_type: str)`**: Returns a `ValidationResult` (`is_valid`, `errors`, `warnings`, `details`). `is_valid` is `True` when Polars is importable. `warnings` always holds one entry saying that SQL mode is not available; Polars versions older than 0.20 add another. `details` holds `platform`, `benchmark_type`, `dry_run_mode`, `polars_available`, `working_dir`, `execution_mode`, `streaming`, `sql_mode` (`False`) and `polars_version`.
+**`validate_platform_capabilities(benchmark_type: str)`**: Returns a `ValidationResult` (`is_valid`, `errors`, `warnings`, `details`). `is_valid` is `True` when Polars is importable. `warnings` always holds one entry saying that SQL mode is not available; Polars versions older than 0.20 add another. `details` holds `platform`, `benchmark_type`, `dry_run_mode`, `polars_available`, `working_dir`, `execution_mode`, `sql_mode` (`False`) and `polars_version`.
 
 #### Loading data into tables
 

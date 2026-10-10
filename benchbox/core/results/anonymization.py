@@ -44,7 +44,9 @@ _PUBLIC_DROP_CHILD_KEYS = {
     parent: frozenset(children) for parent, children in _ANONYMIZATION_SPECS["public_drop_child_keys"].items()
 }
 _OPTION_MAP_KEYS = frozenset(_ANONYMIZATION_SPECS["option_map_keys"])
-_PUBLIC_OPTION_VALUES = {key: frozenset(values) for key, values in _ANONYMIZATION_SPECS["public_option_values"].items()}
+_PUBLIC_OPTION_VALUES = {
+    key: frozenset(values) for key, values in (_ANONYMIZATION_SPECS.get("public_option_values") or {}).items()
+}
 _OPTION_SOURCE_LABELS = frozenset(
     {
         "registered_default",
@@ -521,6 +523,17 @@ class AnonymizationManager:
             and value in _PUBLIC_OPTION_VALUES.get(_compact_key(key_path[-1]), ())
         ):
             return value
+
+        if isinstance(value, str) and key_path[-4:] == (
+            "execution_engine",
+            "applied_native",
+            "collect_kwargs",
+            "engine",
+        ):
+            from benchbox.core.execution_engine import supported_execution_engines
+
+            if value in supported_execution_engines("polars"):
+                return value
 
         if isinstance(value, str) and self._looks_like_connection_string(value):
             return PUBLIC_REDACTED_VALUE

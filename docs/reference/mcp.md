@@ -227,6 +227,7 @@ modes remain available because they do not hold the request for execution.
 | `queries` | string or null | No | `null` | Comma-separated query IDs, for example `1,3,6`. |
 | `phases` | string or null | No | `null` | Comma-separated phases; execution defaults to `load,power` when omitted. |
 | `mode` | string or null | No | `null` | Execution mode: `sql`, `dataframe`, or `data_only`. |
+| `execution_engine` | string | No | `default` | Execution engine: which execution machinery runs the query, validated against the platform manifest; equivalent to the CLI `--execution-engine` flag. |
 | `capture_plans` | boolean | No | `false` | Capture query plans where the selected platform supports them. |
 | `dry_run` | boolean | No | `false` | Preview the run plan without executing queries. |
 | `validate_only` | boolean | No | `false` | Validate platform, benchmark, scale, and mode without executing. |
@@ -399,6 +400,7 @@ the same three categories as above.
 | `--result-source` | Omitted | not-yet-demanded | Result-source selection is a bounded provenance control with no client demand yet. |
 | `--client-region` | Omitted | not-yet-demanded | Attested client-region metadata is a bounded provenance field with no client demand yet. |
 | `--client-cloud` | Omitted | not-yet-demanded | Attested client-cloud metadata is a bounded provenance field with no client demand yet. |
+| `--polars-streaming` | Omitted | not-yet-demanded | Deprecated CLI alias for `--execution-engine streaming`; MCP exposes the canonical `execution_engine` parameter. |
 | Compute `compute_resource` / `compute_size` (`--platform-option`) | Omitted | security-scoped | Names or sizes a billable vendor compute object (warehouse, engine, workgroup, cluster, pool, application, service). Server operators select compute through local configuration; MCP requests must not name cloud resources or caller-chosen resource budgets. |
 
 The textcharts MCP server remains a separate-client integration, not a bundled or proxied part of `benchbox-mcp`. See `docs/design/textcharts-mcp-boundary.md` for the accepted separate textcharts configuration and the rejected bundle/proxy alternatives.

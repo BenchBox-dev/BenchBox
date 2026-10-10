@@ -1333,7 +1333,7 @@ class TestCloudWarehouseAndOutputLocation:
         assert "bucket" not in json.dumps(config["platform_options"])
 
     @pytest.mark.parametrize("engine", ["default", "in-memory", "streaming"])
-    def test_generic_engine_option_values_stay_readable(self, engine):
+    def test_generic_engine_option_values_are_hashed(self, engine):
         payload = {
             "config": {"platform_options": {"engine": engine}},
             "platform": {"raw_config": {"options": {"engine": engine}}},
@@ -1341,8 +1341,26 @@ class TestCloudWarehouseAndOutputLocation:
 
         anonymized = AnonymizationManager().anonymize_result_payload(payload)
 
-        assert anonymized["config"]["platform_options"]["engine"] == engine
-        assert anonymized["platform"]["raw_config"]["options"]["engine"] == engine
+        assert anonymized["config"]["platform_options"]["engine"].startswith("engine_")
+        assert anonymized["platform"]["raw_config"]["options"]["engine"].startswith("engine_")
+
+    @pytest.mark.parametrize("engine", ["auto", "in-memory", "streaming", "analytics-prod"])
+    def test_collect_receipt_preserves_only_declared_engine_values(self, engine):
+        payload = {
+            "platform": {
+                "execution_engine": {"applied_native": {"collect_kwargs": {"engine": engine}}},
+                "raw_config": {
+                    "execution_engine": {"applied_native": {"collect_kwargs": {"engine": engine}}},
+                    "options": {"engine": engine},
+                },
+            }
+        }
+
+        anonymized = AnonymizationManager().anonymize_result_payload(payload)["platform"]
+        for receipt in (anonymized["execution_engine"], anonymized["raw_config"]["execution_engine"]):
+            actual = receipt["applied_native"]["collect_kwargs"]["engine"]
+            assert actual == engine if engine != "analytics-prod" else actual.startswith("engine_")
+        assert anonymized["raw_config"]["options"]["engine"].startswith("engine_")
 
     def test_other_engine_values_and_locations_stay_hashed(self):
         payload = {

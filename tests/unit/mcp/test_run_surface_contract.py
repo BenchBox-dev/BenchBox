@@ -65,6 +65,7 @@ EXPECTED_RUN_PARAMS = {
     "queries": {"type": "string or null", "required": False, "default": None},
     "phases": {"type": "string or null", "required": False, "default": None},
     "mode": {"type": "string or null", "required": False, "default": None},
+    "execution_engine": {"type": "string", "required": False, "default": "default"},
     "capture_plans": {"type": "boolean", "required": False, "default": False},
     "dry_run": {"type": "boolean", "required": False, "default": False},
     "validate_only": {"type": "boolean", "required": False, "default": False},
@@ -79,6 +80,7 @@ MCP_TO_CLI_OPTIONS = {
     "queries": "--queries",
     "phases": "--phases",
     "mode": "--mode",
+    "execution_engine": "--execution-engine",
     "capture_plans": "--capture-plans",
     "dry_run": "--dry-run",
     "validate_only": None,
@@ -155,6 +157,7 @@ EXPECTED_OMISSION_TIERS = {
     "--client-cloud": "not-yet-demanded",
     "--tuning": "not-yet-demanded",
     "--validation": "not-yet-demanded",
+    "--polars-streaming": "not-yet-demanded",
 }
 
 _TABLE_SEPARATOR_CELL = re.compile(r"^:?-{3,}:?$")

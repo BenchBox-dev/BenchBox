@@ -22,7 +22,12 @@ from mcp.types import ToolAnnotations
 
 from benchbox.core.benchmark_registry import get_all_benchmarks
 from benchbox.core.throughput.containment import await_quiescence, track_outstanding_results, tracked_stream_ids
-from benchbox.mcp.schemas import MCPValidationError, validate_phases, validate_platform_options
+from benchbox.mcp.schemas import (
+    MCPValidationError,
+    validate_execution_engine,
+    validate_phases,
+    validate_platform_options,
+)
 from benchbox.mcp.security import (
     AUTHORIZATION_ERROR,
     JobLimits,
@@ -1066,6 +1071,7 @@ class DurableJobWorker:
         mode = request.get("mode")
         capture_plans = bool(request.get("capture_plans", False))
         link_probe = bool(request.get("link_probe", True))
+        execution_engine = request.get("execution_engine", "default")
         platform_options = request.get("platform_options")
         results_dir = staging
         execution_id = job.execution_id
@@ -1079,6 +1085,14 @@ class DurableJobWorker:
         except Exception as exc:
             from benchbox.mcp.errors import ErrorCode, make_error
 
+            resp = make_error(ErrorCode.VALIDATION_ERROR, str(exc), details={"platform": platform})
+            resp["execution_id"] = execution_id
+            resp["status"] = "failed"
+            return resp
+
+        try:
+            resolved_execution_engine = validate_execution_engine(platform, execution_engine)
+        except Exception as exc:
             resp = make_error(ErrorCode.VALIDATION_ERROR, str(exc), details={"platform": platform})
             resp["execution_id"] = execution_id
             resp["status"] = "failed"
@@ -1142,6 +1156,7 @@ class DurableJobWorker:
             phases=phases_list,
             resolved_mode=resolved_mode,
             capture_plans=capture_plans,
+            execution_engine=resolved_execution_engine,
             link_probe=link_probe,
             normalized_platform_options=normalized_platform_options,
             results_dir=results_dir,
@@ -1495,6 +1510,7 @@ def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> No
         queries: str | None = None,
         phases: str | None = None,
         mode: str | None = None,
+        execution_engine: str = "default",
         capture_plans: bool = False,
         link_probe: bool = True,
         platform_options: dict[str, object] | None = None,
@@ -1503,6 +1519,7 @@ def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> No
         principal = authenticated_principal()
         try:
             normalized_platform_options = validate_platform_options(platform, platform_options)
+            resolved_execution_engine = validate_execution_engine(platform, execution_engine)
             phases = validate_phases(phases)
         except MCPValidationError as exc:
             raise MCPError(-32602, str(exc)) from exc
@@ -1514,6 +1531,7 @@ def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> No
             "phases": phases,
             "mode": mode,
             "capture_plans": capture_plans,
+            "execution_engine": resolved_execution_engine,
             "link_probe": link_probe,
         }
         if normalized_platform_options:

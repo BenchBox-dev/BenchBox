@@ -19,6 +19,8 @@ from benchbox.cli.platform_hooks import PlatformHookRegistry, PlatformOptionErro
 from benchbox.cli.shared import console, set_quiet_output
 from benchbox.cli.verbose_logging import setup_verbose_logging
 from benchbox.core.benchmark_registry import get_benchmark_default_scale
+from benchbox.core.execution_engine import UnsupportedExecutionEngineError, resolve_requested
+from benchbox.core.platform_manifest import DEFAULT_EXECUTION_ENGINE
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.platforms import is_dataframe_platform, list_available_dataframe_platforms
 from benchbox.platforms.adapter_factory import _reject_removed_platform
@@ -294,8 +296,20 @@ def _validate_not_removed_platform(s: types.SimpleNamespace) -> bool:
     return True
 
 
+def _resolve_execution_engine(s: types.SimpleNamespace, platform_key: str) -> None:
+    requested = getattr(s, "execution_engine", None) or DEFAULT_EXECUTION_ENGINE
+    try:
+        s.resolved_execution_engine = resolve_requested(platform_key, requested)
+    except UnsupportedExecutionEngineError as exc:
+        console.print(f"[red]❌ {exc}[/red]")
+        if s.logger:
+            s.logger.error(str(exc))
+        s.ctx.exit(1)
+
+
 def _resolve_platform_mode(s: types.SimpleNamespace) -> None:
     s.resolved_mode = None
+    s.resolved_execution_engine = getattr(s, "execution_engine", None) or DEFAULT_EXECUTION_ENGINE
     if not _validate_not_removed_platform(s):
         return
     if not s.platform_key:
@@ -361,6 +375,7 @@ def _resolve_platform_mode(s: types.SimpleNamespace) -> None:
 
     if s.logger and s.resolved_mode:
         s.logger.debug(f"Resolved execution mode for {platform_key}: {s.resolved_mode}")
+    _resolve_execution_engine(s, platform_key)
 
 
 def _check_benchmark_platform_compatibility(s: types.SimpleNamespace) -> None:

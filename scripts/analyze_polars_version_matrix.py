@@ -90,8 +90,10 @@ def assess_record(spec: PolarsMatrixSpec, qualification: dict[str, Any], record:
         reasons.append(f"scale {record['scale']} differs from the qualification scale {qualification['scale_factor']}")
     if record.get("rechunk_effective") is not False:
         reasons.append("rechunk_effective is not false")
-    if record.get("engine_requested") != record["engine"]:
-        reasons.append(f"engine_requested {record.get('engine_requested')} differs from {record['engine']}")
+    receipt = record.get("execution_engine") if isinstance(record.get("execution_engine"), dict) else {}
+    requested = receipt.get("requested", record.get("engine_requested"))
+    if requested != record["engine"]:
+        reasons.append(f"engine_requested {requested} differs from {record['engine']}")
     if record.get("polars_version") != version or record.get("installed", {}).get("polars") != version:
         reasons.append("recorded Polars version differs from the cell version")
     if record.get("polars_runtime_version") not in (version, "absent"):

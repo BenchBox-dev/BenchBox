@@ -36,6 +36,7 @@ def generate_cli_command(
     table_format: str | None = None,
     compression: str | None = None,
     mode: str | None = None,
+    execution_engine: str | None = None,
     force: str | None = None,
     official: bool = False,
     capture_plans: bool = False,
@@ -87,6 +88,7 @@ def generate_cli_command(
         (table_format, "--table-format", None),
         (compression, "--compression", None),
         (mode, "--mode", None),
+        (execution_engine, "--execution-engine", None),
         (force, "--force", None),
         (validation, "--validation", None),
         (plan_config, "--plan-config", None),
@@ -277,6 +279,9 @@ def display_interactive_preview(
         benchmark_config.compression_type,
         benchmark_config.compression_level,
     )
+    display_engine = getattr(database_config, "execution_engine", None)
+    if display_engine == "default":
+        display_engine = None
 
     cli_cmd = generate_cli_command(
         platform=database_config.type,
@@ -291,6 +296,7 @@ def display_interactive_preview(
         table_format=table_format,
         compression=compression_str,
         mode=getattr(database_config, "execution_mode", None),
+        execution_engine=display_engine,
         force=force,
         official=official,
         capture_plans=capture_plans,

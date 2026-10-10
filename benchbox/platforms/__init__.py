@@ -8,6 +8,7 @@ import importlib.util
 from collections.abc import Iterable
 from typing import Optional, Type
 
+from benchbox.core.execution_engine import resolve_requested
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.utils.runtime_env import DriverResolution, DriverRuntimeStrategy, ensure_driver_version
 
@@ -267,6 +268,7 @@ def _apply_deployment_selector(platform_name: str, config: dict) -> tuple[str, d
 def get_platform_adapter(platform_name: str, **config) -> PlatformAdapter:
     platform_name, config = _apply_deployment_selector(platform_name, config)
     canonical_name = PlatformRegistry.resolve_platform_name(platform_name)
+    resolve_requested(canonical_name, config.get("execution_engine") or "default")
 
     try:
         adapter_class = PlatformRegistry.get_adapter_class(canonical_name)
@@ -654,7 +656,6 @@ singlestore|password|SingleStore password|{}
 polars|streaming|Enable streaming mode for large datasets|{'parser': 'parse_bool', 'default': 'false'}
 polars|rechunk|Rechunk data for better memory layout|{'parser': 'parse_bool', 'default': 'true'}
 polars|n_rows|Limit number of rows to read (for testing)|{'parser': 'int'}
-polars|engine|Polars collect engine: default (each version's own), in-memory, or streaming|{'choices': ('default', 'in-memory', 'streaming'), 'default': 'default'}
 pandas|dtype_backend|Backend for nullable dtypes|{'choices': ('numpy', 'numpy_nullable', 'pyarrow'), 'default': 'numpy_nullable'}
 cudf|device_id|CUDA device ID to use|{'parser': 'int', 'default': '0'}
 cudf|spill_to_host|Enable GPU memory spilling to host RAM|{'parser': 'parse_bool', 'default': 'true'}
