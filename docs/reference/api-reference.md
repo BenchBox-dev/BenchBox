@@ -135,7 +135,7 @@ tpch = TPCH(scale_factor=1.0, output_dir=None)
 
 - **Query Count**: 22 analytical queries (Q1-Q22)
 - **Tables**: 8 tables (customer, orders, lineitem, part, partsupp, supplier, nation, region)
-- **Scale Factors**: 0.001 to 1000+
+- **Scale Factors**: 0.01 to 100000
 - **Recommended Database**: DuckDB
 
 #### Example Usage
@@ -145,15 +145,12 @@ import duckdb
 from benchbox import TPCH
 
 conn = duckdb.connect(":memory:")
-tpch = TPCH(scale_factor=0.1)
+tpch = TPCH(scale_factor=0.1, output_dir="./tpch_data")
 
-data_files = tpch.generate_data()
-for file_path in data_files:
-    table_name = file_path.stem
-    conn.execute(f"""
-        CREATE TABLE {table_name} AS
-        SELECT * FROM read_csv('{file_path}', delimiter='|', header=false)
-    """)
+tpch.generate_data()
+conn.execute(tpch.get_create_tables_sql())
+for table, path in tpch.tables.items():
+    conn.execute(f"INSERT INTO {table} SELECT * FROM read_csv('{path}', delim='|', header=false)")
 
 result = conn.execute(tpch.get_query(1)).fetchall()
 ```
@@ -196,23 +193,23 @@ Get list of available query categories.
 
 **Example**:
 ```python
-categories = primitives.get_query_categories()
+categories = read_primitives.get_query_categories()
 ```
 
-The result is a list such as `["aggregation", "join", "filter", "sort", ...]`.
+The result is a list such as `["aggregation", "filter", "groupby", "orderby", ...]`.
 
 ##### `get_queries_by_category(category: str) -> Dict[str, str]`
 Get queries filtered by category.
 
 **Parameters**:
-- `category`: Category name ("aggregation", "join", "filter", etc.)
+- `category`: Category name ("aggregation", "filter", "groupby", etc.)
 
 **Returns**: Dictionary mapping query IDs to SQL strings.
 
 **Example**:
 ```python
-agg_queries = primitives.get_queries_by_category("aggregation")
-join_queries = primitives.get_queries_by_category("join")
+agg_queries = read_primitives.get_queries_by_category("aggregation")
+filter_queries = read_primitives.get_queries_by_category("filter")
 ```
 
 ### Other Benchmarks
@@ -222,9 +219,9 @@ join_queries = primitives.get_queries_by_category("join")
 - **H2ODB**: Data science benchmark
 - **ClickBench**: Analytical benchmark
 - **JoinOrder**: Canonical IMDb 2013 JOB benchmark for join-order optimization, fixed at `scale_factor=1.0`
-- **TPCDI**: Data integration benchmark
+- **TPCDI**: Data integration benchmark (`from benchbox import TPCDI`)
 - **WritePrimitives**: Write operation benchmark (INSERT, UPDATE, DELETE, MERGE, etc.)
-- **TPCHavoc**: TPC-H syntax variants
+- **TPCHavoc**: TPC-H syntax variants (`from benchbox import TPCHavoc`)
 
 All benchmarks follow the same basic interface as shown above.
 

@@ -48,15 +48,15 @@ Re-export existing benchmark results in different formats without re-running ben
 ```bash
 benchbox export --last --format csv
 
-benchbox export results/tpch_sf1_duckdb.json --format csv --format html
+benchbox export results/tpch_sf1_duckdb_sql_<timestamp>_<id>.json --format csv --format html
 
-benchbox export --last --benchmark tpc_h --format json --format csv --format html
+benchbox export --last --benchmark tpch --format json --format csv --format html
 
 benchbox export --last --platform duckdb --format html
 
 benchbox export --last --format csv --output-dir ./reports/
 
-benchbox export benchmark_runs/results/tpcds_sf10.json --format html --force
+benchbox export benchmark_runs/results/tpcds_sf10_duckdb_sql_<timestamp>_<id>.json --format html --force
 ```
 
 The commands, in order, export:
@@ -97,7 +97,7 @@ This exports all formats for comprehensive archival.
 ### Notes
 
 - The `export` command loads existing result files from `benchmark_runs/results/`
-- Schema versions 2.0, 2.1, and 2.2 are supported by current result tooling
+- Schema versions 2.0, 2.1, 2.2, and 2.3 are supported by current result tooling
 - Export preserves all metrics and metadata from original results
 - Large result files (TPC-DS at scale 100+) may take a few seconds to process
 - The --force flag skips confirmation prompts when overwriting existing files

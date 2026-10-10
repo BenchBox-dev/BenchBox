@@ -64,17 +64,19 @@ The first command runs in non-interactive mode for CI/CD. The second gives repro
 ## Performance Analysis
 
 ```bash
-benchbox run --platform snowflake --benchmark tpch --scale 1 \
+BENCHBOX_OUTPUT_DIR=./baseline benchbox run --platform snowflake --benchmark tpch --scale 1 \
   --tuning notuning --output ./baseline
 
-benchbox run --platform snowflake --benchmark tpch --scale 1 \
+BENCHBOX_OUTPUT_DIR=./optimized benchbox run --platform snowflake --benchmark tpch --scale 1 \
   --tuning tuned --output ./optimized
 
 benchbox compare \
-  baseline/results/*.json \
-  optimized/results/*.json \
+  ./baseline/results/*.json \
+  ./optimized/results/*.json \
   --format html --output tuning-comparison.html
+```
 
+```bash
 benchbox run --platform databricks --benchmark tpcds \
   --capture-plans --verbose --scale 0.1
 ```
@@ -84,11 +86,11 @@ The first two commands and the `compare` command compare tuning against a baseli
 ## CI/CD Integration
 
 ```bash
-benchbox run --platform duckdb --benchmark tpch --scale 0.1 \
+BENCHBOX_OUTPUT_DIR=./current-results benchbox run --platform duckdb --benchmark tpch --scale 0.1 \
   --output ./current-results
 
 benchbox compare \
-  ./baseline-results/results/*.json \
+  ./baseline-results.json \
   ./current-results/results/*.json \
   --fail-on-regression 10%
 ```
@@ -216,4 +218,4 @@ The first command enables detailed logging. The second is very verbose, for debu
 benchbox run --dry-run ./debug --platform databricks --benchmark tpch
 ```
 
-For additional support, see the [GitHub Issues](https://github.com/joeharris76/benchbox/issues) page.
+For additional support, see the [GitHub Issues](https://github.com/BenchBox-dev/BenchBox/issues) page.

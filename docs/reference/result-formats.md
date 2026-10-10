@@ -41,10 +41,11 @@ benchbox run --platform snowflake --benchmark tpch --output s3://bucket/results/
 
 The first command writes to a local directory and the second writes to cloud storage.
 
-## JSON Format (Schema v2.3)
+## JSON Format (Schema v2)
 
 The JSON export is the canonical schema-v2 result bundle containing complete
-benchmark details. BenchBox currently writes schema version `"2.3"` in the
+benchmark details. Schema v2 spans minors `"2.0"` through `"2.3"`. Example
+bundles in this guide show `"2.2"`, which is what current runs emit, in the
 top-level `result_schema_version` field. Readers accept
 `result_schema_version` -> `version` -> `schema_version` in that order, so
 bundles written before the rename keep loading.
@@ -63,7 +64,7 @@ Consumer policy is intentionally split by use case:
 
 ```json
 {
-  "result_schema_version": "2.3",
+  "result_schema_version": "2.2",
   "run": {
     "id": "tpch-duckdb-20260521",
     "timestamp": "2026-05-21T14:30:21.123456Z",
@@ -495,19 +496,17 @@ The HTML report includes:
 
 ## Visualizing Results
 
-Use `benchbox visualize` to generate ASCII charts from any result file:
+Use `benchbox visualize` to generate ASCII charts from result files:
 
 ```bash
-benchbox visualize
-
-benchbox visualize benchmark_runs/results/tpch_duckdb_sf0.01_20251212_143021.json
+benchbox visualize benchmark_runs/results/tpch_sf001_duckdb_sql_<timestamp>_<id>.json
 
 benchbox visualize benchmark_runs/results/*.json --chart-type performance_bar
 
 benchbox visualize benchmark_runs/results/*.json --no-color > charts.txt
 ```
 
-The first command auto-detects the latest result and renders all applicable charts. The second visualizes a specific result file, the third renders one chart type, and the last saves plain-text output to a file.
+The first command visualizes a specific result file, the second renders one chart type, and the last saves plain-text output to a file. Find file names with `benchbox results --limit`.
 
 See the [Visualization Guide](../visualization/overview.md) for chart types, templates, and customization options.
 
@@ -519,24 +518,27 @@ See the [Visualization Guide](../visualization/overview.md) for chart types, tem
 import json
 from pathlib import Path
 
-result_file = Path("benchmark_runs/results/tpch_duckdb_sf0.01_20251212_143021.json")
+result_file = Path("benchmark_runs/results/tpch_sf001_duckdb_sql_<timestamp>_<id>.json")
 with result_file.open() as f:
     results = json.load(f)
 
-print(f"Power at Size: {results['summary']['tpc_metrics']['power_at_size']}")
+tpc = results['summary']['tpc_metrics']
+print(f"Power at Size: {tpc.get('power_at_size')}")
 print(f"Total time: {results['summary']['timing']['total_ms']}ms")
 
 for query in results['queries']:
     print(f"{query['id']}: {query['ms']}ms")
 ```
 
-### Load into Pandas
+(`power_at_size` is absent when the run is unofficial or a query failed; use `.get()` as shown.)
 
 ```python
-import pandas as pd
+import glob
 import json
+import pandas as pd
 
-with open("benchmark_runs/results/tpch_duckdb_sf0.01_*.json") as f:
+paths = sorted(glob.glob("benchmark_runs/results/tpch_sf001_duckdb_sql_*.json"))
+with open(paths[-1]) as f:
     results = json.load(f)
 
 queries = results['queries']
@@ -551,11 +553,11 @@ print(df.groupby('id')['ms'].mean())
 ```python
 import pandas as pd
 
-df = pd.read_csv("benchmark_runs/results/tpch_duckdb_sf0.01_queries.csv")
+df = pd.read_csv("benchmark_runs/results/tpch_sf001_duckdb_<timestamp>_<id>.csv")
 
 print(f"Total queries: {len(df)}")
-print(f"Mean execution time: {df['ms'].mean():.2f}ms")
-print(f"Slowest query: {df.loc[df['ms'].idxmax(), 'id']}")
+print(f"Mean execution time: {df['execution_time_ms'].mean():.2f}ms")
+print(f"Slowest query: {df.loc[df['execution_time_ms'].idxmax(), 'query_id']}")
 ```
 
 ## Visualization Examples
@@ -563,7 +565,7 @@ print(f"Slowest query: {df.loc[df['ms'].idxmax(), 'id']}")
 ### CLI Visualization
 
 ```bash
-benchbox visualize benchmark_runs/results/tpch_duckdb_sf0.01_*.json
+benchbox visualize benchmark_runs/results/tpch_sf001_duckdb_sql_<timestamp>_<id>.json
 
 benchbox visualize duckdb_result.json sqlite_result.json --template head_to_head
 
@@ -599,10 +601,11 @@ export_ascii(
 
 ### Current Version: 2.3
 
-Schema v2.3 is the current producer version for BenchBox result bundles. It
+Schema v2.3 is the newest schema minor for BenchBox result bundles. It
 uses top-level `result_schema_version`, `run`, `benchmark`, `platform`,
 `summary`, `queries`, and optional companion blocks such as `phases`,
 `environment`, `normalized_cost`, `validation`, and `comparisons`.
+Example bundles in this guide show `"2.2"`, which is what current runs emit.
 
 Runtime loading and explorer generation intentionally accept only known v2
 minor versions (`"2.0"`, `"2.1"`, `"2.2"`, and `"2.3"`). The public submission validator accepts
