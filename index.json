@@ -21249,7 +21249,9 @@
     },
     "t3-perf-aggregate-gate-tolerance-decision-20261009": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "t3-perf-execution-variants-regression-20261010"
+      ],
       "priority": "high",
       "status": "open",
       "title": "Give the perf gate's aggregate check an absolute floor so host noise stops failing the nightly"
