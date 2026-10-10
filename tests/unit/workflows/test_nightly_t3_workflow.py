@@ -241,6 +241,8 @@ def test_perf_comparison_preserves_threshold_and_failure(tmp_path: Path, compare
         "10%",
         "--min-regression-delta",
         "7ms",
+        "--min-aggregate-regression-delta",
+        "82ms",
     ]
 
 
@@ -371,6 +373,7 @@ def test_perf_smoke_workflow_uses_the_same_regression_gate_options() -> None:
     for step in (compare, nightly):
         assert "--fail-on-regression 10%" in step["run"]
         assert "--min-regression-delta 7ms" in step["run"]
+        assert "--min-aggregate-regression-delta 82ms" in step["run"]
 
 
 def test_liveness_domain_runs_the_shared_script_with_read_only_actions_access() -> None:

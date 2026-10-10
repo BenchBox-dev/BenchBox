@@ -171,6 +171,61 @@ class TestMinRegressionDelta:
         assert "minimum query slowdown: 5 ms" in capsys.readouterr().out
 
 
+def _timed_metric(baseline_s: float, current_s: float) -> dict[str, Any]:
+    return {
+        "baseline": baseline_s,
+        "current": current_s,
+        "change_percent": (current_s - baseline_s) / baseline_s * 100.0,
+    }
+
+
+def _metric_comparison(**metrics: dict[str, Any]) -> dict[str, Any]:
+    return {"query_comparisons": [], "performance_changes": dict(metrics)}
+
+
+class TestMinAggregateRegressionDelta:
+    def test_exceeding_both_limits_is_a_regression(self):
+        comparison = _metric_comparison(total_execution_time=_timed_metric(0.547, 0.700))
+
+        assert _check_regression(comparison, 0.10, None, 82.0) is True
+
+    def test_exceeding_only_the_percentage_is_not_a_regression(self):
+        comparison = _metric_comparison(total_execution_time=_timed_metric(0.547, 0.605))
+
+        assert _check_regression(comparison, 0.10, None, 82.0) is False
+        assert _check_regression(comparison, 0.10) is True
+
+    def test_exceeding_only_the_floor_is_not_a_regression(self):
+        comparison = _metric_comparison(total_execution_time=_timed_metric(1.000, 1.060))
+
+        assert _check_regression(comparison, 0.10, None, 50.0) is False
+
+    def test_slowdown_equal_to_the_floor_is_not_a_regression(self):
+        comparison = _metric_comparison(total_execution_time=_timed_metric(1.0, 2.0))
+
+        assert _check_regression(comparison, 0.10, None, 1000.0) is False
+
+    def test_metric_without_timings_falls_back_to_the_percentage(self):
+        comparison = _metric_comparison(total_execution_time={"change_percent": 25.0})
+
+        assert _check_regression(comparison, 0.10, None, 82.0) is True
+
+    def test_large_slowdown_still_fails(self):
+        comparison = _metric_comparison(total_execution_time=_timed_metric(0.547, 1.200))
+
+        with pytest.raises(SystemExit) as exit_info:
+            _check_regression_threshold(comparison, 0.10, None, 82.0)
+
+        assert exit_info.value.code == 1
+
+    def test_floor_is_reported_in_the_verdict(self, capsys: pytest.CaptureFixture[str]):
+        _check_regression_threshold(
+            _metric_comparison(total_execution_time=_timed_metric(0.547, 0.605)), 0.10, None, 82.0
+        )
+
+        assert "minimum aggregate slowdown: 82" in capsys.readouterr().out
+
+
 class TestDurationParsing:
     @pytest.mark.parametrize(
         ("raw", "expected"),
