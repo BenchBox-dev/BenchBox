@@ -57,6 +57,15 @@
       "op_id": "6d206f32c25c4a79a59beb7ca8c9c808",
       "reason": "Session a51cb5bff4a449988fe0c1453a9c9f24 has no matching local process; Muse reports external_agent_ingress_closed. PR #2817 remains open with failing checks, so takeover is needed to finish its existing work.",
       "session_id": "f00fbcc194ab47a6a9508e7176243455"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:c5daffc9eae3c5f9ce6578f7",
+      "at": "2026-10-10T03:01:15Z",
+      "client": "omp-coding-agent",
+      "generation": "c461b76703e040e58b5976975d1b78a0",
+      "op": "take",
+      "op_id": "31087176c4d24257b24718a744c95d03",
+      "session_id": "f00fbcc194ab47a6a9508e7176243455"
     }
   ]
 }
