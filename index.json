@@ -20179,13 +20179,18 @@
       "title": "Run the owed agy adversarial review of the site-repo split plan and adjudicate its findings"
     },
     "skill-integrity-ci-lane-live-validation": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-11T00:05:54Z",
+        "generation": "034a09f706f64f9f82e53e07d0ae00df",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
+      },
       "needs": [
         "ci-baseline-representative-remeasure-sample",
         "skill-integrity-specialized-ci-lane"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Validate skill-only CI routing and derive a measured event-fanout budget"
     },
     "skill-integrity-local-preflight-routing": {
