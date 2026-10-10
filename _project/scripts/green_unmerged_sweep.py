@@ -66,7 +66,7 @@ CLI_DESCRIPTION = (
     "        PR's head SHA completed with conclusion `success`. Today that is\n"
     "        `ci-required-result`, `tooling`, `Results Explorer browser gate`,\n"
     "        `ruleset-drift`, and `Public-site visual acceptance`\n"
-    "        (docs/operations/repo-admin-settings.md; live ruleset\n"
+    "        (docs/internal/repo-admin-settings.md; live ruleset\n"
     "        develop-squash-only). Partial green (one context success, another\n"
     "        missing or red) is NOT required-green. Every required context\n"
     "        reports (path-aware skip still concludes success); a missing run\n"
@@ -319,7 +319,7 @@ def build_digest(
         "When the branch is final, arm via `make pr-arm` (or `make pr-open READY=1`, or draft → "
         "ready). Do **not** re-push expecting `synchronize` to re-arm -- that path no longer "
         "enables auto-merge. To hold a non-draft intentionally, apply "
-        f"the `{AUTO_MERGE_HOLD_LABEL}` label (or convert to draft). See docs/operations/pr-triage.md."
+        f"the `{AUTO_MERGE_HOLD_LABEL}` label (or convert to draft). See docs/internal/pr-triage.md."
     )
     lines.append(f"(repo: {repo})")
     return "\n".join(lines)

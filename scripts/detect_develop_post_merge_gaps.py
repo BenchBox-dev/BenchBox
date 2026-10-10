@@ -137,7 +137,7 @@ def format_report(
             "develop-post-merge run for that commit. The hourly schedule on "
             "develop-post-merge.yml re-gates the *tip* only (slim gates); this "
             "detector keeps intermediate push-drop SHAs visible until they age "
-            "out of the lookback window. See docs/operations/develop-post-merge-gaps.md."
+            "out of the lookback window. See docs/internal/develop-post-merge-gaps.md."
         )
     else:
         lines.append("  all checked develop commits have at least one post-merge run.")

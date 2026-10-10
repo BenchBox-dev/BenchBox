@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_RUNBOOK = REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md"
+DEFAULT_RUNBOOK = REPO_ROOT / "docs" / "internal" / "repo-admin-settings.md"
 
 sys.path.insert(0, str(REPO_ROOT / "_project" / "scripts"))
 

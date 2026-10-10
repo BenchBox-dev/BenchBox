@@ -8,7 +8,7 @@ import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-LEDGER = REPO_ROOT / "docs" / "development" / "dev-loop-property-ledger.md"
+LEDGER = REPO_ROOT / "docs" / "internal" / "dev-loop-property-ledger.md"
 
 WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 WORKFLOWS_TEST_DIR = REPO_ROOT / "tests" / "unit" / "workflows"

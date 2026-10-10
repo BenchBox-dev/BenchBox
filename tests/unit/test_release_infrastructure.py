@@ -387,8 +387,8 @@ class TestReleaseInfrastructure:
 
     def test_release_docs_name_required_contexts(self):
         docs_paths = [
-            REPO_ROOT / "docs" / "operations" / "release-guide.md",
-            REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md",
+            REPO_ROOT / "docs" / "internal" / "release-guide.md",
+            REPO_ROOT / "docs" / "internal" / "repo-admin-settings.md",
             REPO_ROOT / ".github" / "RELEASE_PR_TEMPLATE.md",
         ]
 
@@ -561,8 +561,8 @@ class TestReleaseInfrastructure:
 
     def test_release_docs_name_canary_and_ruleset_drift(self):
         docs_paths = [
-            REPO_ROOT / "docs" / "operations" / "release-guide.md",
-            REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md",
+            REPO_ROOT / "docs" / "internal" / "release-guide.md",
+            REPO_ROOT / "docs" / "internal" / "repo-admin-settings.md",
             REPO_ROOT / ".github" / "RELEASE_PR_TEMPLATE.md",
         ]
 
@@ -614,7 +614,7 @@ class TestReleaseInfrastructure:
 
     def test_release_finalize_docs_separate_premerge_and_postmerge_signals(self):
         makefile_content = _makefile_text()
-        release_guide = (REPO_ROOT / "docs" / "operations" / "release-guide.md").read_text(encoding="utf-8")
+        release_guide = (REPO_ROOT / "docs" / "internal" / "release-guide.md").read_text(encoding="utf-8")
         release_template = (REPO_ROOT / ".github" / "RELEASE_PR_TEMPLATE.md").read_text(encoding="utf-8")
 
         assert "Wait for CI green" not in makefile_content
@@ -636,7 +636,7 @@ class TestReleaseInfrastructure:
 
     def test_release_cut_generates_changelog_from_main_delta(self):
         recipe = _make_target_recipe("release-cut")
-        release_guide = (REPO_ROOT / "docs" / "operations" / "release-guide.md").read_text(encoding="utf-8")
+        release_guide = (REPO_ROOT / "docs" / "internal" / "release-guide.md").read_text(encoding="utf-8")
         release_template = (REPO_ROOT / ".github" / "RELEASE_PR_TEMPLATE.md").read_text(encoding="utf-8")
 
         assert "scripts/generate_changelog_entry.py --version $(VERSION) --since-ref origin/release" in recipe

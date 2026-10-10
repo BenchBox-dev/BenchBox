@@ -39,7 +39,7 @@ def main() -> int:
         print(
             f"::warning:: pylint duplicate-code: {cluster_count} cluster pairs "
             f"(+{delta} above baseline {BASELINE_CLUSTER_PAIRS}). "
-            f"See docs/development/duplication-residuals.md.",
+            f"See docs/internal/duplication-residuals.md.",
             file=sys.stderr,
         )
     else:

@@ -388,13 +388,13 @@ def test_visual_comparison_is_required_on_a_release_or_renderer_change() -> None
 def test_a_first_astro_deploy_without_a_receipted_generation_names_the_sphinx_precondition() -> None:
     fetch = _step("visual", "Fetch the last production artifact")["run"]
     assert "deploy and receipt a Sphinx generation before switching deploy/routes.yml to renderer: auto" in fetch
-    runbook = (ROOT / "docs" / "operations" / "site-deploy.md").read_text(encoding="utf-8")
+    runbook = (ROOT / "docs" / "internal" / "site-deploy.md").read_text(encoding="utf-8")
     cutover = runbook.split("### Cutover")[1].split("### Astro layout")[0]
     assert "a receipted Sphinx generation must be live before the switch" in " ".join(cutover.split())
 
 
 def test_runbook_states_the_pre_deploy_visual_scope_the_workflow_uses() -> None:
-    runbook = (ROOT / "docs" / "operations" / "site-deploy.md").read_text(encoding="utf-8")
+    runbook = (ROOT / "docs" / "internal" / "site-deploy.md").read_text(encoding="utf-8")
     section = runbook.split("## Visual comparison before deploy")[1].split("## Candidate and generation")[0]
     spec = (ROOT / "results-explorer" / "e2e" / "captures" / "public-site-pages.spec.ts").read_text(encoding="utf-8")
     captured = set(re.findall(r'slug:\s*"([^"]+)"', spec))

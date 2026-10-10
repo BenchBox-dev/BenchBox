@@ -389,7 +389,7 @@ class TestMakefileCommands:
         pr_workflow = (repo_root / ".github" / "workflows" / "ci.yml").read_text()
         test_workflow = (repo_root / ".github" / "workflows" / "test.yml").read_text()
         conftest_content = (repo_root / "tests" / "conftest.py").read_text()
-        policy_content = (repo_root / "docs" / "development" / "quality-gate-policy.md").read_text()
+        policy_content = (repo_root / "docs" / "internal" / "quality-gate-policy.md").read_text()
 
         assert "--cov-fail-under=70" in makefile_content
         assert "--cov-fail-under=70" in pr_workflow

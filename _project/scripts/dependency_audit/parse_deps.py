@@ -127,7 +127,7 @@ def render(root: pathlib.Path) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Parse pyproject.toml into docs/development/dependency-audit-raw.md.",
+        description="Parse pyproject.toml into docs/internal/dependency-audit-raw.md.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=CLI_EPILOG,
     )

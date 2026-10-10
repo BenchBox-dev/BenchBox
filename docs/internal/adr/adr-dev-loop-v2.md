@@ -149,7 +149,7 @@ success review of the current head, or the stand-in approval, with no unresolved
 review thread. The connector is no longer accepted and its App is uninstalled; the digest
 still counts connector reviews for merges before the cut-over (2026-10-09 00:16 UTC), so
 its history stays accurate. Wherever this section says "connector review", read "oracle
-review". See [`docs/operations/oracle-review-v2.md`](../../operations/oracle-review-v2.md).
+review". See [`docs/internal/oracle-review-v2.md`](../oracle-review-v2.md).
 
 ### D5: Retain agent write tooling, retire PR-loop scripts
 
