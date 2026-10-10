@@ -317,9 +317,9 @@ jobs:
           and has head ${MIRROR_HEAD_SHA}. If the accepted publication moves,
           rerun the mirror workflow instead of merging this stale proposal.
 
-          See [\`docs/development/adr/adr-published-results-slim-corpus-branch.md\`](https://github.com/${{ github.repository }}/blob/develop/docs/development/adr/adr-published-results-slim-corpus-branch.md)
+          See [\`docs/internal/adr/adr-published-results-slim-corpus-branch.md\`](https://github.com/${{ github.repository }}/blob/develop/docs/internal/adr/adr-published-results-slim-corpus-branch.md)
           for the slim-branch design and
-          [\`docs/operations/results-phase-2-runbook.md\`](https://github.com/${{ github.repository }}/blob/develop/docs/operations/results-phase-2-runbook.md)
+          [\`docs/internal/results-phase-2-runbook.md\`](https://github.com/${{ github.repository }}/blob/develop/docs/internal/results-phase-2-runbook.md)
           for the operating model.
           EOF
           )

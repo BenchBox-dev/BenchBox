@@ -96,5 +96,5 @@
   ],
   "current_workflow_fingerprint": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
   "authored_paths": ["benchbox/core/runner.py"],
-  "intervening_paths": ["docs/operations/repo-admin-settings.md"]
+  "intervening_paths": ["docs/internal/repo-admin-settings.md"]
 }

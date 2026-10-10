@@ -79,7 +79,7 @@ release evidence and records that checked SHA in `release-canary-summary.json`.
 Its blocking canary suite is the credential-free non-fast family:
 `(slow or resource_heavy) and not (stress or live_integration)`. The same
 workflow also runs `scripts/ruleset_drift_check.py` against
-`docs/operations/repo-admin-settings.md`, so ruleset drift makes the canary red
+`docs/internal/repo-admin-settings.md`, so ruleset drift makes the canary red
 instead of silently invalidating release assumptions. The ruleset drift check
 must use `RULESET_DRIFT_TOKEN`, a repository secret with enough ruleset
 visibility to expose bypass actors; the default `GITHUB_TOKEN` is insufficient

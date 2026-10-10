@@ -457,7 +457,7 @@ becomes a bottleneck. Indicators that Phase 3 is needed:
 - Richer APIs and embedded widgets
 
 The planned Phase 3 operating model is documented in
-[`../operations/results-phase-3-runbook.md`](../operations/results-phase-3-runbook.md).
+[`results-phase-3-runbook.md`](results-phase-3-runbook.md).
 
 ### Cost and Operational Complexity
 

@@ -121,7 +121,7 @@ CLI_EPILOG = (
     "See also:\n"
     "    _project/scripts/dependency_audit/plugin_cli_allowlist.yaml\n"
     "    _project/scripts/dependency_audit/guarded_optional_allowlist.yaml\n"
-    "    docs/development/dependency-inventory.md (Methodology section)\n"
+    "    docs/internal/dependency-inventory.md (Methodology section)\n"
 )
 
 
@@ -242,7 +242,7 @@ def run_check(root: pathlib.Path, verbose: bool = False) -> int:
             "  (a) Remove the declaration from pyproject.toml if the package is unused, or\n"
             "  (b) Add it to plugin_cli_allowlist.yaml (CLI/plugin tools), or\n"
             "  (c) Add it to guarded_optional_allowlist.yaml (guarded try/except imports).\n"
-            "\nSee docs/development/dependency-inventory.md for guidance."
+            "\nSee docs/internal/dependency-inventory.md for guidance."
         )
         return 1
 

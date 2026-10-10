@@ -229,7 +229,7 @@ See [PyPI](https://pypi.org/project/benchbox/) for published releases and
 [DISCLAIMER.md](DISCLAIMER.md) for project limitations. Release and versioning
 details live in the
 [backward-compatibility policy](docs/reference/backward-compatibility.md) and
-[release guide](docs/operations/release-guide.md).
+[release guide](docs/internal/release-guide.md).
 
 ## Contributing
 

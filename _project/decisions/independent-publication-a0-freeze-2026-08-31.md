@@ -163,14 +163,14 @@ restrictions remain in force:
 - `_project/analysis/ingest-architecture-design.md`: **extended**. Immutable raw
   bundles and rebuildable read models remain the future-state authority, while
   the accepted `published-results` archive is now an explicit migration input.
-- `docs/development/adr/adr-published-results-slim-corpus-branch.md`: **extended**.
+- `docs/internal/adr/adr-published-results-slim-corpus-branch.md`: **extended**.
   The complete accepted archive remains authoritative and published-only paths
   are preservation obligations, not missing backports.
-- `docs/development/benchbox-results-platform-strategy.md`: **extended**. The
+- `docs/internal/benchbox-results-platform-strategy.md`: **extended**. The
   static-first explorer remains the read contract during migration.
-- `docs/operations/release-guide.md`: **reused** for release SHA, workflow run,
+- `docs/internal/release-guide.md`: **reused** for release SHA, workflow run,
   deployment, and rollback evidence conventions.
-- `docs/operations/repo-admin-settings.md`: **extended** by the captured Pages
+- `docs/internal/repo-admin-settings.md`: **extended** by the captured Pages
   environment and branch-rule state.
 - `docs/reference/threat-model.md`: **extended**. Public artifacts remain derived;
   accepted raw bundles remain immutable source assets.

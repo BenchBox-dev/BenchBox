@@ -34,7 +34,9 @@ core:
   - "docs/**.j2"
   - "docs/agent/**"
   - "docs/development/dependency-audit-raw.md"
+  - "docs/internal/dependency-audit-raw.md"
   - "docs/operations/agent-instruction*.md"
+  - "docs/internal/agent-instruction*.md"
   - "landing/**.py"
   - "website/**.py"
 

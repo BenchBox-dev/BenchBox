@@ -93,7 +93,7 @@ def main(argv: list[str] | None = None) -> int:
         "::error::validate-submission.yml has drifted between develop and "
         "published-results. Open a sync PR against published-results, preserving "
         "the slim-branch `uv run --no-project --python 3.11` invocation (see "
-        "docs/development/adr/adr-published-results-slim-corpus-branch.md). "
+        "docs/internal/adr/adr-published-results-slim-corpus-branch.md). "
         "Normalized diff:",
         file=sys.stderr,
     )

@@ -69,7 +69,7 @@ Unit pins live in `tests/unit/workflows/test_stacked_pr_base_guard.py`.
 
 `published-results` carries only its own workflow, so the guard does not run
 there. Porting it is a manual maintainer step (see
-`docs/operations/results-phase-2-runbook.md`).
+`docs/internal/results-phase-2-runbook.md`).
 
 ## After a parent merges
 
@@ -97,7 +97,7 @@ own commits.
 
 ## "No checks" is not one failure mode
 
-Use REST `mergeable_state` vocabulary from `docs/operations/pr-triage.md`
+Use REST `mergeable_state` vocabulary from `docs/internal/pr-triage.md`
 (GraphQL `mergeable: CONFLICTING` is the same situation as REST `dirty`):
 
 | Symptom | Cause | What to do |

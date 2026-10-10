@@ -73,7 +73,7 @@ def run(
     print(
         "release curation dry run: FAILED. A test above fails on the release tree, usually because it reads a "
         "path that release-cut removes. Skip it when that specific file is absent, or add the test to the "
-        "release-cut strip list; see 'Tests on the release tree' in docs/operations/release-guide.md.",
+        "release-cut strip list; see 'Tests on the release tree' in docs/internal/release-guide.md.",
         file=sys.stderr,
     )
     return 1

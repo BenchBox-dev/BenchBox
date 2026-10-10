@@ -59,8 +59,8 @@ PR should update only live callers and active docs.
 | `tests/uat/phases/explorer_smoke.py:51` | UAT smoke | constructs `["benchbox", "explorer", "build", ...]` | Small helper update plus fast tests. |
 | `tests/uat/test_explorer_smoke.py` | UAT tests | asserts the legacy argv | Small assertion updates. |
 | `tests/unit/scripts/test_explorer_build_contract.py` (moved from `tests/unit/cli/`) | Contract tests | imports the migrated `_project.scripts.explorer_pipeline` contract | Relocated to mirror the migrated source. |
-| `docs/development/browser-test-architecture.md:35,119,130` | Developer docs | describes `benchbox explorer build` | Three doc replacements. |
-| `docs/operations/results-phase-2-runbook.md` | Operations runbook | describes rerunning Explorer build/deploy | Replace with maintainer command where applicable. |
+| `docs/internal/browser-test-architecture.md:35,119,130` | Developer docs | describes `benchbox explorer build` | Three doc replacements. |
+| `docs/internal/results-phase-2-runbook.md` | Operations runbook | describes rerunning Explorer build/deploy | Replace with maintainer command where applicable. |
 | `results-explorer/src/db.ts:196` | Runtime remediation string | tells users to run `benchbox explorer build` | Replace with published-snapshot guidance and maintainer-only command. |
 | `results-explorer/src/lib/__tests__/duckdbColumnGuard.test.ts:75` | Frontend test | asserts old remediation string | Update with the runtime message. |
 | `results-explorer/src/__tests__/userFacingStringHygiene.test.ts:117` | String hygiene test | allows a sample with old command | Update fixture text. |

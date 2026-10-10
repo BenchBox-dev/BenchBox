@@ -35,7 +35,7 @@ gate in `validate-base`, not by rerunning that suite on every release PR.
 
 `release-canary.yml` runs the credential-free non-fast canary
 `(slow or resource_heavy) and not (stress or live_integration)` and the
-ruleset drift check against `docs/operations/repo-admin-settings.md`.
+ruleset drift check against `docs/internal/repo-admin-settings.md`.
 Scheduled runs execute from the default branch, then check out `develop` and
 record the checked SHA in `release-canary-summary.json` for release-readiness.
 The first release that introduces the workflow may run the same evidence inline
@@ -79,4 +79,4 @@ If anything fails downstream, fix on a new branch, PR to `release`, squash-merge
 and bump to the next patch version (PyPI rejects re-uploads of an existing
 version).
 
-See `docs/operations/release-guide.md` for the full flow.
+See `docs/internal/release-guide.md` for the full flow.

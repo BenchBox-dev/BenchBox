@@ -9,7 +9,7 @@ from collections import defaultdict
 
 _HERE = pathlib.Path(__file__).resolve().parent
 _ROOT = _HERE.parents[2]
-_OUT_REL = "docs/development/dependency-audit-raw.md"
+_OUT_REL = "docs/internal/dependency-audit-raw.md"
 _GENERATOR_REL = "_project/scripts/dependency_audit/parse_deps.py"
 
 
@@ -127,7 +127,7 @@ def render(root: pathlib.Path) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Parse pyproject.toml into docs/development/dependency-audit-raw.md.",
+        description="Parse pyproject.toml into docs/internal/dependency-audit-raw.md.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=CLI_EPILOG,
     )

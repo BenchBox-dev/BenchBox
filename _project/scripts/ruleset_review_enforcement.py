@@ -227,7 +227,7 @@ def main(argv: list[str] | None = None) -> int:
             "Path to a JSON array of FULL ruleset objects (or '-' for stdin) to check "
             "v* tag-creation protection; e.g. "
             "`gh api repos/<owner>/<repo>/rulesets --jq '[.[] | .id] | map(...)'` -- see "
-            "docs/operations/repo-admin-settings.md for the exact fetch."
+            "docs/internal/repo-admin-settings.md for the exact fetch."
         ),
     )
     args = parser.parse_args(argv)

@@ -55,9 +55,9 @@ runtime evidence.
   must name those surfaces.
 - **Extension-cost.** Primary extension-cost metric: files/contracts to add one SQL
   platform, one DataFrame platform, and one benchmark family. McCabe/cloc
-  are hygiene (`docs/development/quality-gate-policy.md`).
+  are hygiene (`docs/internal/quality-gate-policy.md`).
 - **Prior-decision.** `[REVIEW-PLAN-RECON-001]` BenchBox decision surfaces are
   the future-state index/tiers, migration gates, readiness docs, and open tracker items.
 - **CI synchronize fan-out.** For savings/skip/path-filter plans, list every
   same-event workflow, split runner vs wall minutes, and change siblings or
-  lower the target. See `docs/operations/repo-admin-settings.md`.
+  lower the target. See `docs/internal/repo-admin-settings.md`.

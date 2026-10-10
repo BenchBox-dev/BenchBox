@@ -44,7 +44,7 @@ def _tag_ruleset(*, name="v-tag-restricted", enforcement="active", include=("ref
 
 
 def _develop_expected():
-    return parse_expected_rulesets((REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text())[
+    return parse_expected_rulesets((REPO_ROOT / "docs" / "internal" / "repo-admin-settings.md").read_text())[
         "develop-squash-only"
     ]
 
@@ -124,7 +124,7 @@ def test_develop_review_rule_can_be_warn_only_for_explicit_migration_override():
 
 
 def test_release_only_matches_runbook_expectations():
-    expected = parse_expected_rulesets((REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text())[
+    expected = parse_expected_rulesets((REPO_ROOT / "docs" / "internal" / "repo-admin-settings.md").read_text())[
         "release-only"
     ]
     live = {

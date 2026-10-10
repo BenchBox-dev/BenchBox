@@ -104,7 +104,7 @@
       ".gitattributes"
     ],
     "intervening_paths": [
-      "docs/operations/repo-admin-settings.md"
+      "docs/internal/repo-admin-settings.md"
     ]
   },
   "actual_lane_conclusions": {

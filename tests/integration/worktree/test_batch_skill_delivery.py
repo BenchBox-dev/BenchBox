@@ -69,7 +69,7 @@ def test_feature_mode_is_capability_gated_and_serial_remains_default() -> None:
             "AGENTS.md",
             "docs/agent/batch-feature-delivery.md",
             "docs/agent/review-protocol.md",
-            "docs/operations/dev-loop-worktrees.md",
+            "docs/internal/dev-loop-worktrees.md",
         )
     )
     normalized = docs.lower()

@@ -319,7 +319,7 @@ def test_docs_markdown_is_safe(rules: dict[str, list[str]]) -> None:
 
 
 def test_dependency_audit_inventory_runs_code_ci(rules: dict[str, list[str]]) -> None:
-    decision = classify_paths(["docs/development/dependency-audit-raw.md"], rules)
+    decision = classify_paths(["docs/internal/dependency-audit-raw.md"], rules)
 
     assert decision["needs_code_ci"] is True
     assert decision["safe_content_only"] is False

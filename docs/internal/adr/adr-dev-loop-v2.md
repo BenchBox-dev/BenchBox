@@ -6,10 +6,10 @@ Accepted (2026-09-28).
 
 Supersedes:
 
-- [`docs/operations/merge-queue-governance.md`](../../operations/merge-queue-governance.md)
-- [`docs/development/pr-base-branch-policy.md`](../pr-base-branch-policy.md)
-- [`docs/development/adr/adr-independent-publication-authorities.md`](adr-independent-publication-authorities.md) (per decision D2)
-- Version-branch release flow in [`docs/operations/release-guide.md`](../../operations/release-guide.md)
+- [`docs/internal/merge-queue-governance.md`](../merge-queue-governance.md)
+- [`docs/internal/pr-base-branch-policy.md`](../pr-base-branch-policy.md)
+- [`docs/internal/adr/adr-independent-publication-authorities.md`](adr-independent-publication-authorities.md) (per decision D2)
+- Version-branch release flow in [`docs/internal/release-guide.md`](../release-guide.md)
 
 ## Context
 
@@ -149,7 +149,7 @@ success review of the current head, or the stand-in approval, with no unresolved
 review thread. The connector is no longer accepted and its App is uninstalled; the digest
 still counts connector reviews for merges before the cut-over (2026-10-09 00:16 UTC), so
 its history stays accurate. Wherever this section says "connector review", read "oracle
-review". See [`docs/operations/oracle-review-v2.md`](../../operations/oracle-review-v2.md).
+review". See [`docs/internal/oracle-review-v2.md`](../oracle-review-v2.md).
 
 ### D5: Retain agent write tooling, retire PR-loop scripts
 
@@ -258,7 +258,7 @@ once corresponding preconditions and backups (per Guardrail G5) are satisfied:
 - **G2 Shadow parity:** Superseded by the canary set in G1 for the pull-request workflow.
   Post-merge evidence names exact commits. Scheduled workflows (nightly) still validate with dispatched runs
   before their predecessors retire.
-- **G3 Property ledger (`docs/development/dev-loop-property-ledger.md`):** Every safety
+- **G3 Property ledger (`docs/internal/dev-loop-property-ledger.md`):** Every safety
   property -> current guard -> new guard -> proof. Properties include: correctness oracle
   (digest arming, query discrimination, no-skip), SQL self-binding lint, monotonic-clock
   policy, submission validation, corpus trust boundary, artifact privacy, publication

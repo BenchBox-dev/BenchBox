@@ -13,7 +13,7 @@ CLI_DESCRIPTION = (
     "Detect develop commits that never got a develop-post-merge workflow run.\n"
     "\n"
     "GitHub has been observed to drop push delivery for consecutive develop merges\n"
-    "(see docs/operations/develop-post-merge-gaps.md). When that happens, the\n"
+    "(see docs/internal/develop-post-merge-gaps.md). When that happens, the\n"
     "push-triggered ``develop-post-merge.yml`` workflow never starts for those\n"
     "SHAs, so develop tip can sit un-gated until the next successful delivery or\n"
     "the scheduled sweep.\n"
@@ -137,7 +137,7 @@ def format_report(
             "develop-post-merge run for that commit. The hourly schedule on "
             "develop-post-merge.yml re-gates the *tip* only (slim gates); this "
             "detector keeps intermediate push-drop SHAs visible until they age "
-            "out of the lookback window. See docs/operations/develop-post-merge-gaps.md."
+            "out of the lookback window. See docs/internal/develop-post-merge-gaps.md."
         )
     else:
         lines.append("  all checked develop commits have at least one post-merge run.")

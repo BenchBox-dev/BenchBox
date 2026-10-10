@@ -13,10 +13,10 @@ ROOT = Path(__file__).resolve().parents[2]
 DECISION = ROOT / "_project/decisions/independent-publication-a0-freeze-2026-08-31.md"
 REQUIRED_SURFACES = (
     "_project/analysis/ingest-architecture-design.md",
-    "docs/development/adr/adr-published-results-slim-corpus-branch.md",
-    "docs/development/benchbox-results-platform-strategy.md",
-    "docs/operations/release-guide.md",
-    "docs/operations/repo-admin-settings.md",
+    "docs/internal/adr/adr-published-results-slim-corpus-branch.md",
+    "docs/internal/benchbox-results-platform-strategy.md",
+    "docs/internal/release-guide.md",
+    "docs/internal/repo-admin-settings.md",
     "docs/reference/threat-model.md",
     "docs/design/future-state/index.md",
 )

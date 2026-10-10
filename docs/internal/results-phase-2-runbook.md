@@ -2,7 +2,7 @@
 
 Phase 2 is the PR-based community submission flow for the BenchBox public results
 corpus. The product boundary and launch rationale live in
-[`docs/development/benchbox-results-platform-strategy.md`](../development/benchbox-results-platform-strategy.md).
+[`docs/internal/benchbox-results-platform-strategy.md`](benchbox-results-platform-strategy.md).
 This runbook documents the current operating model only: contributor PRs target
 `published-results`, CI validates them, maintainers review them, and the protected
 publication transaction is the normal path that rebuilds and deploys the static Explorer;
@@ -185,7 +185,7 @@ its trigger says. It cannot be added by the sync workflow either:
 `GITHUB_TOKEN` cannot push changes under `.github/workflows/` regardless of
 the `permissions:` block granted to it (a hard-coded GitHub Actions
 restriction — see the "workflow file itself is NOT auto-mirrored" section of
-[`adr-published-results-slim-corpus-branch.md`](../development/adr/adr-published-results-slim-corpus-branch.md),
+[`adr-published-results-slim-corpus-branch.md`](adr/adr-published-results-slim-corpus-branch.md),
 which already documents this exact restriction for `validate-submission.yml`
 edits). Porting the `base-guard` job (or any future repo-wide guard) onto
 `published-results` is therefore a **manual** maintainer step. Copy only the
@@ -387,7 +387,7 @@ submissions.
 `published-results` is a slim, corpus-only branch by design. The exact allowlist of
 paths that may live on it (and the matching exclusion list applied at the slim-down)
 is documented in
-[`docs/development/adr/adr-published-results-slim-corpus-branch.md`](../development/adr/adr-published-results-slim-corpus-branch.md).
+[`docs/internal/adr/adr-published-results-slim-corpus-branch.md`](adr/adr-published-results-slim-corpus-branch.md).
 A submission PR that adds files outside the allowlist should be redirected to
 `develop` instead.
 

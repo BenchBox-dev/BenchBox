@@ -1,7 +1,7 @@
 # Independent publication operations contract
 
 The governing architecture decision is
-[`docs/development/adr/adr-independent-publication-authorities.md`](../development/adr/adr-independent-publication-authorities.md).
+[`docs/internal/adr/adr-independent-publication-authorities.md`](adr/adr-independent-publication-authorities.md).
 This runbook defines operator-visible states and evidence. It does not activate a new
 workflow or modify the A0 freeze.
 

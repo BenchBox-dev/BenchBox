@@ -163,7 +163,7 @@ def report(verdicts: Sequence[Verdict], emit: Callable[[str], None]) -> int:
     if dead:
         emit(
             "::error::Scheduled workflow(s) with no recent scheduled run detected "
-            "(see docs/operations/repo-admin-settings.md 'Scheduled activation'):"
+            "(see docs/internal/repo-admin-settings.md 'Scheduled activation'):"
         )
         for verdict in dead:
             emit(f"::error::  {verdict.message}")

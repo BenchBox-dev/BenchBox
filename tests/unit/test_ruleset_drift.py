@@ -42,7 +42,7 @@ def _live_ruleset(ref: str, checks: list[str], *, strict: bool = False, bypass: 
 
 
 def test_parse_expected_rulesets_from_admin_runbook() -> None:
-    expected = parse_expected_rulesets((REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text())
+    expected = parse_expected_rulesets((REPO_ROOT / "docs" / "internal" / "repo-admin-settings.md").read_text())
 
     assert expected["develop-squash-only"].ref == "refs/heads/develop"
     assert expected["develop-squash-only"].required_checks == (
@@ -62,7 +62,7 @@ def test_parse_expected_rulesets_from_admin_runbook() -> None:
 
 
 def test_matching_ruleset_has_no_drift_findings() -> None:
-    expected = parse_expected_rulesets((REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text())[
+    expected = parse_expected_rulesets((REPO_ROOT / "docs" / "internal" / "repo-admin-settings.md").read_text())[
         "release-only"
     ]
     live = _live_ruleset("refs/heads/release", ["validate-base", "release-required-result"])
@@ -71,7 +71,7 @@ def test_matching_ruleset_has_no_drift_findings() -> None:
 
 
 def test_required_context_drift_is_reported() -> None:
-    expected = parse_expected_rulesets((REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text())[
+    expected = parse_expected_rulesets((REPO_ROOT / "docs" / "internal" / "repo-admin-settings.md").read_text())[
         "release-only"
     ]
     live = _live_ruleset("refs/heads/release", ["validate-base"])
@@ -84,7 +84,7 @@ def test_required_context_drift_is_reported() -> None:
 
 
 def test_ruleset_policy_drift_is_reported() -> None:
-    expected = parse_expected_rulesets((REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text())[
+    expected = parse_expected_rulesets((REPO_ROOT / "docs" / "internal" / "repo-admin-settings.md").read_text())[
         "release-only"
     ]
     live = _live_ruleset(
@@ -103,7 +103,7 @@ def test_ruleset_policy_drift_is_reported() -> None:
 
 
 def test_bypass_actor_visibility_can_be_required() -> None:
-    expected = parse_expected_rulesets((REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text())[
+    expected = parse_expected_rulesets((REPO_ROOT / "docs" / "internal" / "repo-admin-settings.md").read_text())[
         "release-only"
     ]
     live = _live_ruleset("refs/heads/release", ["validate-base", "release-required-result"])
@@ -246,7 +246,7 @@ def _verified_develop_queue() -> dict:
 
 
 def test_queue_policy_requires_all_develop_protections() -> None:
-    expected = parse_expected_rulesets((REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text())[
+    expected = parse_expected_rulesets((REPO_ROOT / "docs" / "internal" / "repo-admin-settings.md").read_text())[
         "develop-squash-only"
     ]
     live = _verified_develop_queue()
@@ -264,7 +264,7 @@ def test_queue_policy_requires_all_develop_protections() -> None:
     ],
 )
 def test_queue_policy_fails_closed_on_missing_or_drifted_protection(mutate, expected_text: str) -> None:
-    expected = parse_expected_rulesets((REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text())[
+    expected = parse_expected_rulesets((REPO_ROOT / "docs" / "internal" / "repo-admin-settings.md").read_text())[
         "develop-squash-only"
     ]
     live = _verified_develop_queue()

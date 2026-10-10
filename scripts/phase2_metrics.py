@@ -347,7 +347,7 @@ def render_report(
         lines.append(
             "See `_project/analysis/results-data-extraction-trigger.md` for the "
             "evaluation procedure. Open `evaluate-results-data-extraction-decision` "
-            "and copy `docs/development/adr/TEMPLATE-results-data-extraction.md` "
+            "and copy `docs/internal/adr/TEMPLATE-results-data-extraction.md` "
             "to start the ADR."
         )
     else:

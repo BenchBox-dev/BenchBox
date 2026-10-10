@@ -7,10 +7,10 @@
 > **Not implemented yet.** The Phase 3 surfaces in this document - the hosted
 > API at `api.benchbox.dev` and `benchbox admin ...` - are planned designs,
 > not shipped software. No `admin` command is registered on the CLI; see
-> `docs/operations/results-phase-3-runbook.md` for the same notice.
+> `docs/internal/results-phase-3-runbook.md` for the same notice.
 
 The accepted
-[`independent-publication-threat-model.md`](../development/independent-publication-threat-model.md)
+[`independent-publication-threat-model.md`](../internal/independent-publication-threat-model.md)
 governs the live Phase 1 static Explorer, Phase 2 PR contributions, publication
 control plane, artifacts, deployment, receipts, rollback, and takedown. This
 document adds the Phase 3 hosted API, metadata database, object-store, and auth

@@ -34,7 +34,7 @@ OWNER_LOGIN = "joeharris76"
 DEFAULT_REPO = "BenchBox-dev/BenchBox"
 DRAIN_LABEL = "awaiting-owner"
 DRAIN_LABEL_COLOR = "b60205"
-DRAIN_LABEL_DESCRIPTION = "Green, gated on owner review, parked >24h (see docs/operations/soundness-drain.md)"
+DRAIN_LABEL_DESCRIPTION = "Green, gated on owner review, parked >24h (see docs/internal/soundness-drain.md)"
 PINNED_ISSUE_TITLE = "Soundness-PR drain queue"
 DIGEST_BODY_MARKER = "<!-- soundness-drain-digest -->"
 IDLE_THRESHOLD_HOURS = 24.0
@@ -188,7 +188,7 @@ def build_digest(classified: list[ClassifiedPR], *, now: dt.datetime, repo: str)
     lines.append(
         f"The `{DRAIN_LABEL}` label above reflects this list exactly (added/removed to match). "
         "The soundness auto-merge gate itself is untouched by this report -- see "
-        "docs/operations/soundness-drain.md."
+        "docs/internal/soundness-drain.md."
     )
     lines.append(f"(repo: {repo})")
     return "\n".join(lines)
