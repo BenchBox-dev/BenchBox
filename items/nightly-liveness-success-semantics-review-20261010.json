@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Confirm and document that the liveness signal means scheduled-run cadence/creation, not successful execution; a recent failed run remains alive for liveness purposes.",
+    "Verify that nightly-v2 reports a failed scheduled run as an execution failure independently of the alive liveness result; add or update a behavior test covering that distinction.",
+    "Update docs/internal/nightly-t3.md and issue #2570 with the verified contract and evidence, or create a linked implementation TODO if the failure is not independently visible."
+  ],
+  "context": "Origin: 2026-10-10 adversarial review of the nightly-red handoff, Solution fit L3. This is a semantics/observability gap, not a reproduced defect in the liveness calculation. Related implementation item nightly-v2-liveness-port-20261008 is done; no current TODO explicitly tracks this distinction. Owner: Joe Harris; next action: verify report behavior and codify the contract.",
+  "description": "The adversarial review noted that the liveness check proves recent scheduled-run creation, not successful execution; by design, a recent failed scheduled run still counts as alive. That distinction is valid for schedule liveness but can mislead if the nightly report presents it as overall workflow health. Verify the consumer-facing nightly-v2 report exposes run success/failure independently, then document and test the contract. If failures are not visible independently, create an implementation follow-up to make them distinct without changing the liveness meaning.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/issues/2570"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:1e26f95967dbd69b9450684a",
+      "at": "2026-10-10T18:54:30Z",
+      "client": "omp-coding-agent",
+      "op": "create",
+      "op_id": "da6a64dc36e6407c9de64d19c70dfb6c",
+      "session_id": "375a0fea891d4422bf14885cd09fb269"
+    }
+  ]
+}
