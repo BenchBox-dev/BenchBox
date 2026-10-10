@@ -25,6 +25,24 @@ def parse_bool(value: str) -> bool:
     raise PlatformOptionError(f"Invalid boolean value '{value}'")
 
 
+def _warn_deprecated_compute_alias(platform: str, alias: str, canonical: str) -> None:
+    from benchbox.core.compute_resource import (
+        _manifest_key,
+        declares_compute,
+        get_compute_declaration,
+        warn_deprecated_compute_alias,
+    )
+    from benchbox.core.execution_engine import DEPRECATED_OPTION_ALIASES
+
+    key = alias.lower()
+    declaration = get_compute_declaration(platform) if declares_compute(platform) else None
+    known = declaration is not None and (key in declaration.resource_aliases or key in declaration.size_aliases)
+    if not known and (platform.lower(), key) not in DEPRECATED_OPTION_ALIASES:
+        if (_manifest_key(platform), key) not in DEPRECATED_OPTION_ALIASES:
+            return
+    warn_deprecated_compute_alias(platform, alias, canonical)
+
+
 @dataclass(frozen=True)
 class PlatformOptionSpec:
     name: str
@@ -102,8 +120,8 @@ class PlatformHookRegistry:
                 raise PlatformOptionError(
                     f"Unknown platform option '{key}' for platform '{platform}'. Available: {options_str}"
                 )
-            if canonical in resolved:
-                raise PlatformOptionError(f"Duplicate platform option '{canonical}' provided")
+            if key.lower() != canonical:
+                _warn_deprecated_compute_alias(platform, key, canonical)
             spec = specs[canonical]
             resolved[canonical] = spec.parse(raw)
 

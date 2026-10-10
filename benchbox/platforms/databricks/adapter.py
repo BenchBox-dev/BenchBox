@@ -275,6 +275,13 @@ class DatabricksAdapter(PlatformAdapter):
 
         self.server_hostname = config.get("server_hostname") or config.get("host")
         self.http_path = config.get("http_path")
+        self.compute_resource = config.get("compute_resource") or config.get("warehouse_id")
+        implied_warehouse_id = self._warehouse_id_from_http_path(self.http_path)
+        if self.compute_resource and implied_warehouse_id and self.compute_resource != implied_warehouse_id:
+            raise ValueError(
+                f"Conflicting Databricks compute settings: compute_resource='{self.compute_resource}' "
+                f"disagrees with the warehouse implied by http_path='{self.http_path}'. Keep only one."
+            )
         self.access_token = config.get("access_token") or config.get("token")
         self.catalog = config.get("catalog") or "main"
         self.schema = config.get("schema") or "benchbox"
@@ -467,6 +474,9 @@ class DatabricksAdapter(PlatformAdapter):
 
     @classmethod
     def from_config(cls, config: dict[str, Any]):
+        from benchbox.core.compute_resource import normalize_compute_options
+
+        config = normalize_compute_options("databricks", config)
         from benchbox.utils.database_naming import generate_database_name
 
         adapter_config = {}
@@ -496,6 +506,9 @@ class DatabricksAdapter(PlatformAdapter):
 
         for key in ["server_hostname", "http_path", "access_token"]:
             if config.get(key) and not is_placeholder(config.get(key)):
+                adapter_config[key] = config[key]
+        for key in ["compute_resource", "warehouse_id"]:
+            if config.get(key):
                 adapter_config[key] = config[key]
 
         adapter_config["catalog"] = config.get("catalog", "workspace")
@@ -895,7 +908,9 @@ class DatabricksAdapter(PlatformAdapter):
                 "collection_status": "available" if observed else "partial",
                 "workspace_host": config.get("server_hostname"),
                 "http_path": config.get("http_path"),
-                "warehouse_id": compute.get("warehouse_id") or config.get("warehouse_id"),
+                "warehouse_id": compute.get("warehouse_id")
+                or config.get("compute_resource")
+                or config.get("warehouse_id"),
                 "catalog": config.get("catalog"),
                 "schema": config.get("schema"),
             }
@@ -936,7 +951,7 @@ class DatabricksAdapter(PlatformAdapter):
                 "state",
             )
         )
-        warehouse_id = compute.get("warehouse_id") or config.get("warehouse_id")
+        warehouse_id = compute.get("warehouse_id") or config.get("compute_resource") or config.get("warehouse_id")
         serverless = cls._is_serverless_warehouse(compute)
         auto_stop_mins = (
             compute.get("auto_stop_mins")

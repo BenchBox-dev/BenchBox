@@ -67,7 +67,9 @@ class DatabendAdapter(PlatformAdapter):
         self.dsn = config.get("dsn") or os.environ.get("DATABEND_DSN")
         self.ssl = self._coerce_bool(config.get("ssl"), True)
 
-        self.warehouse = config.get("warehouse") or os.environ.get("DATABEND_WAREHOUSE")
+        self.warehouse = (
+            config.get("compute_resource") or config.get("warehouse") or os.environ.get("DATABEND_WAREHOUSE")
+        )
 
         self.disable_result_cache = self._coerce_bool(config.get("disable_result_cache"), True)
 
@@ -151,7 +153,17 @@ class DatabendAdapter(PlatformAdapter):
             **build_adapter_config(
                 config,
                 platform="databend",
-                fields=["host", "port", "username", "password", "dsn", "ssl", "warehouse", "disable_result_cache"],
+                fields=[
+                    "host",
+                    "port",
+                    "username",
+                    "password",
+                    "dsn",
+                    "ssl",
+                    "compute_resource",
+                    "warehouse",
+                    "disable_result_cache",
+                ],
                 include_none=False,
             )
         )

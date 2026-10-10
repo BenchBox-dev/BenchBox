@@ -24,8 +24,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 GRANDFATHERED_KEYS = frozenset(
     {
         ("polars", "engine"),
-        ("databend", "warehouse"),
-        ("fabric_dw", "warehouse"),
     }
 )
 CORE_VOCABULARY_KEYS = ("execution_engine", "compute_resource", "compute_size", "gateway")

@@ -54,8 +54,8 @@ class FabricWarehouseAdapter(PlatformAdapter):
 
         self.server = config.get("server")
         self.workspace = config.get("workspace")
-        self.warehouse = config.get("warehouse")
-        self.database = config.get("database")
+        self.database = config.get("database") or config.get("warehouse")
+        self.warehouse = self.database
         self.port = config.get("port") if config.get("port") is not None else 1433
 
         self.item_type = config.get("item_type", "Warehouse")
@@ -69,8 +69,10 @@ class FabricWarehouseAdapter(PlatformAdapter):
                 stacklevel=2,
             )
 
-        if not self.database and self.warehouse:
-            self.database = self.warehouse
+        if config.get("warehouse") and not config.get("database"):
+            from benchbox.core.compute_resource import warn_deprecated_compute_alias
+
+            warn_deprecated_compute_alias("fabric_dw", "warehouse", "database")
 
         self.auth_method = config.get("auth_method") or "default_credential"
         self.tenant_id = config.get("tenant_id")
@@ -137,8 +139,8 @@ class FabricWarehouseAdapter(PlatformAdapter):
             raise ConfigurationError(
                 "Fabric Warehouse requires a database/warehouse name.\n"
                 "Configure with:\n"
-                "  1. CLI option: --platform-option warehouse=<warehouse_name>\n"
-                "  2. CLI option: --platform-option database=<warehouse_name>\n"
+                "  1. CLI option: --platform-option database=<warehouse_name>\n"
+                "  2. CLI option: --platform-option warehouse=<warehouse_name> (deprecated alias)\n"
                 "\n"
                 "Find your warehouse name in the Fabric portal under your workspace."
             )
@@ -167,9 +169,9 @@ class FabricWarehouseAdapter(PlatformAdapter):
         fabric_group.add_argument(
             "--warehouse",
             type=str,
-            help="Fabric warehouse name (Warehouse items only; Lakehouse not supported)",
+            help="Deprecated alias of --database (removed in 0.6.0)",
         )
-        fabric_group.add_argument("--database", type=str, help="Database/warehouse name (alias for --warehouse)")
+        fabric_group.add_argument("--database", type=str, help="Database/warehouse name")
         fabric_group.add_argument(
             "--auth-method",
             type=str,

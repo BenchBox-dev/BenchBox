@@ -50,6 +50,7 @@ identifier_keys:
   cluster: cluster
   clusterid: cluster
   clustername: cluster
+  clusteridentifier: cluster
   database: database
   databasename: database
   dataset: dataset
@@ -85,7 +86,11 @@ identifier_keys:
   clientid: client
   machineid: machine
   applicationid: application
-  serviceaccount: serviceaccount
+  serviceid: service
+  servicename: service
+  sparkpool: pool
+  sparkpoolname: pool
+  lakehouseid: lakehouse
 endpoint_keys:
 - apiendpoint
 - endpoint

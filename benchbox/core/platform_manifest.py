@@ -144,6 +144,7 @@ def _validate_capabilities(key: str, capabilities: object) -> None:
         if defaults != [default_deployment]:
             raise ValueError(f"Platform {key!r} must mark exactly its default deployment: {default_deployment!r}")
 
+    _validate_compute(key, capabilities.get("compute", {}))
     _validate_execution_engines(key, capabilities.get("execution_engines", {}))
 
 
@@ -166,6 +167,45 @@ def _validate_execution_engines(key: str, engines: object) -> None:
             raise ValueError(f"Platform {key!r} execution engine {name!r} dependencies must be a list of strings")
         if not isinstance(engine["selectable"], bool):
             raise ValueError(f"Platform {key!r} execution engine {name!r} selectable must be a boolean")
+
+
+COMPUTE_RESOURCE_KINDS: tuple[str, ...] = (
+    "warehouse",
+    "engine",
+    "workgroup",
+    "cluster",
+    "pool",
+    "application",
+    "service",
+)
+
+
+def _validate_compute(key: str, compute: object) -> None:
+    if not isinstance(compute, dict):
+        raise ValueError(f"Platform {key!r} compute must be an object")
+    if not compute:
+        return
+    if set(compute) != {"resource_kind", "native_resource_keys", "native_size_keys"}:
+        raise ValueError(
+            f"Platform {key!r} compute must have exactly: resource_kind, native_resource_keys, native_size_keys"
+        )
+    kind = compute["resource_kind"]
+    if (
+        kind is not None
+        and kind not in COMPUTE_RESOURCE_KINDS
+        and not (
+            isinstance(kind, dict)
+            and kind
+            and all(isinstance(alias, str) and value in COMPUTE_RESOURCE_KINDS for alias, value in kind.items())
+        )
+    ):
+        raise ValueError(f"Platform {key!r} compute resource_kind must name a known kind")
+    for field in ("native_resource_keys", "native_size_keys"):
+        keys = compute[field]
+        if not isinstance(keys, list) or not all(isinstance(item, str) and item for item in keys):
+            raise ValueError(f"Platform {key!r} compute {field} must be a list of strings")
+    if isinstance(kind, dict) and set(kind) - set(compute["native_resource_keys"]):
+        raise ValueError(f"Platform {key!r} compute resource_kind keys must be native resource keys")
 
 
 def _parse_adapter(key: str, adapter_data: object) -> AdapterImportSpec | None:
@@ -907,6 +947,11 @@ _PLATFORM_MANIFEST_JSON = """[
       "platform_family": "clickhouse",
       "inherits_from": "clickhouse",
       "cost_class": "paid_compute",
+      "compute": {
+        "resource_kind": "service",
+        "native_resource_keys": ["service_id"],
+        "native_size_keys": ["compute_size"]
+      },
       "default_deployment": "managed",
       "deployment_modes": {
         "managed": {
@@ -1023,7 +1068,12 @@ _PLATFORM_MANIFEST_JSON = """[
       "supports_sql": true,
       "supports_dataframe": true,
       "default_mode": "sql",
-      "cost_class": "paid_credits"
+      "cost_class": "paid_credits",
+      "compute": {
+        "resource_kind": "warehouse",
+        "native_resource_keys": ["warehouse_id"],
+        "native_size_keys": []
+      }
     },
     "required_credentials": [
       "server_hostname",
@@ -1072,7 +1122,12 @@ _PLATFORM_MANIFEST_JSON = """[
       "supports_sql": true,
       "supports_dataframe": true,
       "default_mode": "dataframe",
-      "cost_class": "paid_credits"
+      "cost_class": "paid_credits",
+      "compute": {
+        "resource_kind": "cluster",
+        "native_resource_keys": ["cluster_id"],
+        "native_size_keys": []
+      }
     },
     "support_status": "experimental"
   },
@@ -1114,7 +1169,12 @@ _PLATFORM_MANIFEST_JSON = """[
       "supports_sql": true,
       "supports_dataframe": false,
       "default_mode": "sql",
-      "cost_class": "paid_credits"
+      "cost_class": "paid_credits",
+      "compute": {
+        "resource_kind": "warehouse",
+        "native_resource_keys": ["warehouse"],
+        "native_size_keys": ["warehouse_size"]
+      }
     },
     "required_credentials": [
       "account",
@@ -1166,7 +1226,12 @@ _PLATFORM_MANIFEST_JSON = """[
       "supports_sql": true,
       "supports_dataframe": false,
       "default_mode": "sql",
-      "cost_class": "paid_compute"
+      "cost_class": "paid_compute",
+      "compute": {
+        "resource_kind": {"workgroup_name": "workgroup", "cluster_identifier": "cluster"},
+        "native_resource_keys": ["workgroup_name", "cluster_identifier"],
+        "native_size_keys": []
+      }
     },
     "required_credentials": [
       "host",
@@ -1955,6 +2020,11 @@ _PLATFORM_MANIFEST_JSON = """[
       "default_mode": "sql",
       "platform_family": "firebolt",
       "cost_class": "paid_compute",
+      "compute": {
+        "resource_kind": "engine",
+        "native_resource_keys": ["engine_name"],
+        "native_size_keys": ["engine_size", "compute_size"]
+      },
       "default_deployment": "core",
       "deployment_modes": {
         "core": {
@@ -2084,6 +2154,11 @@ _PLATFORM_MANIFEST_JSON = """[
       "default_mode": "sql",
       "platform_family": "databend",
       "cost_class": "paid_compute",
+      "compute": {
+        "resource_kind": "warehouse",
+        "native_resource_keys": ["warehouse"],
+        "native_size_keys": []
+      },
       "default_deployment": "cloud",
       "deployment_modes": {
         "cloud": {
@@ -2439,7 +2514,12 @@ _PLATFORM_MANIFEST_JSON = """[
       "supports_sql": true,
       "supports_dataframe": false,
       "default_mode": "sql",
-      "cost_class": "paid_credits"
+      "cost_class": "paid_credits",
+      "compute": {
+        "resource_kind": "workgroup",
+        "native_resource_keys": ["workgroup"],
+        "native_size_keys": []
+      }
     },
     "required_credentials": [
       "s3_staging_dir",
@@ -2520,7 +2600,12 @@ _PLATFORM_MANIFEST_JSON = """[
       "supports_sql": true,
       "supports_dataframe": true,
       "default_mode": "sql",
-      "cost_class": "paid_compute"
+      "cost_class": "paid_compute",
+      "compute": {
+        "resource_kind": "application",
+        "native_resource_keys": ["application_id"],
+        "native_size_keys": []
+      }
     },
     "support_status": "experimental"
   },
@@ -2559,7 +2644,12 @@ _PLATFORM_MANIFEST_JSON = """[
       "supports_sql": true,
       "supports_dataframe": true,
       "default_mode": "sql",
-      "cost_class": "paid_compute"
+      "cost_class": "paid_compute",
+      "compute": {
+        "resource_kind": "workgroup",
+        "native_resource_keys": ["workgroup"],
+        "native_size_keys": []
+      }
     },
     "support_status": "experimental"
   },
@@ -2603,7 +2693,12 @@ _PLATFORM_MANIFEST_JSON = """[
       "supports_sql": true,
       "supports_dataframe": true,
       "default_mode": "sql",
-      "cost_class": "paid_compute"
+      "cost_class": "paid_compute",
+      "compute": {
+        "resource_kind": "cluster",
+        "native_resource_keys": ["cluster_name"],
+        "native_size_keys": []
+      }
     },
     "support_status": "experimental"
   },
@@ -2696,7 +2791,12 @@ _PLATFORM_MANIFEST_JSON = """[
       "supports_sql": true,
       "supports_dataframe": true,
       "default_mode": "sql",
-      "cost_class": "paid_compute"
+      "cost_class": "paid_compute",
+      "compute": {
+        "resource_kind": "pool",
+        "native_resource_keys": ["spark_pool_name"],
+        "native_size_keys": []
+      }
     },
     "support_status": "experimental"
   },
@@ -2794,7 +2894,12 @@ _PLATFORM_MANIFEST_JSON = """[
       "supports_sql": true,
       "supports_dataframe": true,
       "default_mode": "sql",
-      "cost_class": "paid_compute"
+      "cost_class": "paid_compute",
+      "compute": {
+        "resource_kind": "pool",
+        "native_resource_keys": ["spark_pool_name"],
+        "native_size_keys": []
+      }
     },
     "support_status": "experimental"
   },
@@ -3014,7 +3119,12 @@ _PLATFORM_MANIFEST_JSON = """[
       "supports_sql": true,
       "supports_dataframe": true,
       "default_mode": "dataframe",
-      "cost_class": "paid_credits"
+      "cost_class": "paid_credits",
+      "compute": {
+        "resource_kind": "warehouse",
+        "native_resource_keys": ["warehouse"],
+        "native_size_keys": ["warehouse_size"]
+      }
     },
     "support_status": "experimental"
   },
@@ -3063,6 +3173,11 @@ _PLATFORM_MANIFEST_JSON = """[
       "default_mode": "sql",
       "platform_family": "spark",
       "cost_class": "paid_compute",
+      "compute": {
+        "resource_kind": null,
+        "native_resource_keys": [],
+        "native_size_keys": ["cluster_size"]
+      },
       "default_deployment": "managed",
       "deployment_modes": {
         "managed": {
@@ -3304,7 +3419,7 @@ def get_adapter_imports() -> tuple[tuple[str, str, str], ...]:
 
 __all__ = [
     "AdapterImportSpec",
-    "AliasScope",
+    "COMPUTE_RESOURCE_KINDS",
     "DEFAULT_EXECUTION_ENGINE",
     "DefaultMode",
     "EXECUTION_ENGINE_CLASSES",
