@@ -3,7 +3,7 @@
     "t3:docker pulls its images without hitting the anonymous rate limit (authenticated or mirrored), shown by a passing dispatched run.",
     "The codespell job no longer builds a Docker Hub container, or pulls it authenticated."
   ],
-  "context": "Found in the 2026-10-09 tracker review. Blocks dlv2-22-nightly-t3-shadow green runs.\n\nDecision (owner, 2026-10-09): no Docker Hub secret. Official images use public.ecr.aws/docker/library; vendor images use a verified non-Docker-Hub vendor registry, otherwise a pinned GHCR mirror workflow with GITHUB_TOKEN packages:write. Preserve pinned digests. Replace the codespell Docker action with uv installation. Native implementation is in fix/ci-registry-pulls; one combined nightly-v2 run_drift=true verification dispatch follows merged Docker/drift/perf fixes. Parent owns tracker; no external agents used.\n\nCheckpoint 2026-10-10: PR #2888 is open at cccec335475cc35bc2f2c1c828989e47d009af5e; auto-merge is disabled. The prior fast suite failed only because mirror-ci-images.yml lacked a row in docs/internal/dev-loop-property-ledger.md (37193 passed, 26 skipped, 1 failed). Added the product-safety row and confirmed tests/unit/test_ledger_coverage.py passes all 10 tests. Current-head required checks are pending; oracle-verdict run 38078775770 is queued. The live GHCR publication and authorized combined nightly-v2 dispatch remain outstanding; do not finish the item until dispatch acceptance is proven.",
+  "context": "Found in the 2026-10-09 tracker review. Blocks dlv2-22-nightly-t3-shadow green runs.\n\nDecision (owner, 2026-10-09): no Docker Hub secret. Official images use public.ecr.aws/docker/library; vendor images use a verified non-Docker-Hub vendor registry, otherwise a pinned GHCR mirror workflow with GITHUB_TOKEN packages:write. Preserve pinned digests. Replace the codespell Docker action with uv installation. Native implementation is in fix/ci-registry-pulls; one combined nightly-v2 run_drift=true verification dispatch follows merged Docker/drift/perf fixes. Parent owns tracker; no external agents used.\n\nCheckpoint 2026-10-10: PR #2888 remains open at cccec335475cc35bc2f2c1c828989e47d009af5e, base develop@80874df43806c8d57ca2c03a15a0ce5e8fbebd4b; auto-merge disabled. Current CI run 38078777975 succeeded on that exact head. Exact-head Oracle verdict run 38078775770 completed with SHIP_WITH_FIXES and three findings: (1) tag mirror existence checks do not compare upstream digest; (2) ClickHouse/Trino GHCR overrides are not checked against Compose defaults in nightly-v2 and docker-integration; (3) mirror-cedardb is a hard need of a combined DuckDB/CedarDB throughput job, so mirror failure skips unrelated DuckDB evidence. These findings are confirmed.\n\nRemediation authorized by the user's request to complete the handoff: compare source and GHCR digests on every mirror run and fail visibly on drift; add a focused behavioral mirror test and a parity contract covering both image consumers; split DuckDB and CedarDB throughput into independent jobs, with the commit status still reflecting either job's failure. Native-only subagents completed bounded read-only analysis; no external harness was used. After changes, rerun proving tests and PR gates, then exact-head Oracle. Keep the item open until the passing dispatched Docker verification and the codespell acceptance are demonstrated.",
   "description": "Docker Hub refuses unauthenticated pulls with \"429 Too Many Requests\" / \"toomanyrequests\". This failed all three nightly-v2 t3:docker jobs (postgres, trino, clickhouse) in dispatch 37991400931, and the codespell job in Documentation runs 37991354788 and 37994012169 (the codespell-project/actions-codespell container build). The codespell job is continue-on-error, but t3:docker failures block a green nightly-v2.\n\nUse authenticated pulls (a read-only Docker Hub token), a registry mirror such as ghcr.io copies of the images, or for codespell an install through uv instead of the Docker action.",
   "sessions": [
     {
@@ -64,6 +64,14 @@
       "generation": "1275a3d0092e417faaff5447290c1067",
       "op": "take",
       "op_id": "8d3b5127b7b24327bdb5530ede1f5d82",
+      "session_id": "12a278318efc4205bf01aa4132116f81"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:0b65b59dfd5ecfabcfde36b0",
+      "at": "2026-10-10T19:51:21Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "f4552040dfc94e2a8ffbb68e40333a42",
       "session_id": "12a278318efc4205bf01aa4132116f81"
     }
   ]
