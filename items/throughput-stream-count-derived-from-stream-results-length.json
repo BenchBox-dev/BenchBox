@@ -1,8 +1,8 @@
 {
   "acceptance": [
-    "validate_corpus.py verifies that len(stream_results) matches the configured stream count in run.streams (or config.streams) when present",
-    "Explorer pipeline transformer validates stream_results length against run.streams and raises/flags mismatches",
-    "Unit tests cover matching, missing, and mismatched stream count payloads"
+    "Corpus validation rejects committed throughput bundles when len(stream_results) differs from an integer run.streams, or config.streams when run.streams is absent; absent configured counts skip the check. The error names the bundle path and both counts.",
+    "Explorer pipeline and local result import withhold Throughput@Size when the configured count differs from stream_results length; pipeline entries use stream_count_mismatch when the primary exclusion would otherwise be missing_primary_metric.",
+    "Unit tests cover matching, absent configured counts, and mismatches in run.streams/config.streams across corpus validation, the Explorer pipeline, and local Explorer import."
   ],
   "context": "Opus review finding O1 on PR #2761 (feat/throughput-corpus-three-engines).",
   "description": "In results-data/validate_corpus.py (lines 97-101) and _project/scripts/explorer_pipeline/transformer.py (_stream_count), stream_count is derived solely as len(phases.throughput_test.stream_results). If a benchmark configuration specifies --streams S but fewer or more stream entries are recorded in the bundle, or if run.streams disagrees with stream_results, the discrepancy is silently masked rather than flagged as an invalid run.",
@@ -31,6 +31,14 @@
       "generation": "996ba84ad1994af8ad4af10a07cc1d56",
       "op": "take",
       "op_id": "af563a9041874428b73007beaa34aad4",
+      "session_id": "024527ae77c1405f86cdbdf1079f6e14"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396",
+      "at": "2026-10-10T19:46:14Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "9fda1b072cf640279b55c34b831a6245",
       "session_id": "024527ae77c1405f86cdbdf1079f6e14"
     }
   ]
