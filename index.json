@@ -13712,17 +13712,12 @@
       "title": "Operator: confirm nightly throughput-uat green with gating (workflow_dispatch)"
     },
     "nightly-v2-liveness-port-20261008": {
-      "claim": {
-        "expires_at": "2026-10-11T05:22:34Z",
-        "generation": "34eb09ba671c40afb805e643852e49be",
-        "renewals": 0,
-        "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:8d0fa0e2ef22aacc5284a44c"
-      },
+      "claim": null,
       "needs": [
         "nightly-liveness-diagnose-harden-20261008"
       ],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Port the scheduled-workflow-liveness check to nightly-v2 before nightly.yml is retired"
     },
     "nightly-v2-throughput-uat-port-20261009": {
