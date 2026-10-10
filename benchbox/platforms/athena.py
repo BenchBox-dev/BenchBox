@@ -69,7 +69,7 @@ class AthenaAdapter(PlatformAdapter):
         self.aws_secret_access_key = config.get("aws_secret_access_key")
         self.aws_profile = config.get("aws_profile")
 
-        self.workgroup = config.get("workgroup") or "primary"
+        self.workgroup = config.get("compute_resource") or config.get("workgroup") or "primary"
         self.database = config.get("database") or "default"
         self.catalog = config.get("catalog") or "AwsDataCatalog"
 
@@ -232,6 +232,7 @@ class AthenaAdapter(PlatformAdapter):
                     "aws_access_key_id",
                     "aws_secret_access_key",
                     "aws_profile",
+                    "compute_resource",
                     "workgroup",
                     "catalog",
                     "s3_output_location",
