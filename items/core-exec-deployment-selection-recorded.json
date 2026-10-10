@@ -7,7 +7,7 @@
     "Platform docs and the new-platform checklist describe deployment selection only through the manifest selector; compat-docs-check passes; CHANGELOG [Unreleased] lists the deprecations",
     "PR merged through the normal flow; split per platform family if over about 600 lines"
   ],
-  "context": "Decision gates:\n- G1 Start after core-exec-result-schema-2-3.\n- G2 If a legacy key's values do not map one-to-one onto manifest modes (for example ducklake's four values, or a key that mixes deployment with storage), stop and decide the mapping with the user before coding.\n- G3 No live cloud runs; mock the cloud paths.\n\nVerification rubric: unit tests per alias family; make platform-manifest-check; compat-docs-check; make pr-preflight.\n\nGuardrails: shared core-exec guardrails (see core-exec-d0-vocabulary-adr context).",
+  "context": "Done. PR https://github.com/BenchBox-dev/BenchBox/pull/2866 merged as 5be6b2f61aab775f3f683d270e919eb1a8898423 (single PR, 430 production lines). Landed core deployment.py selector/alias resolution with warn-once and fail-closed conflicts; factory-resolved selected/selected_class recording; CLI :suffix handling for 7 families; influxdb core/cloud manifest modes; pg-duckdb/lakesail specs; parity grandfather drops for clickhouse/influxdb mode; DuckLake aliased per S7 with no ADR amendment. Verification: 41 deployment unit tests + parity/factory/CLI/ducklake suites, lint/comment-policy/manifest/compat-docs checks, full CI green, mock/local smoke per family. No live cloud calls. Items 4 and 10 must rebase past this merge.",
   "description": "Deployment is already a core concept (manifest deployment_modes with local/self-hosted/managed classes, selected with --platform name:deployment, platforms/adapter_factory.py:104-122), but results never record which mode was selected (platform.deployment.deployment_type is guessed from endpoints in platforms/base/runtime_metadata.py:358-389), and several platforms carry their own duplicate keys.\n\nWork:\n1. Record platform.deployment.selected (manifest mode name) and selected_class from the factory's resolution.\n2. Duplicate keys become deprecated aliases of the selector, with a warning, per ADR D12/D13: velox `deployment` (local|remote), lakesail `sail_mode` (local|distributed; currently unregistered and ignored), influxdb `mode` (core|cloud), clickhouse `deployment_mode` and its alias `mode`, firebolt `deployment_mode`/`firebolt_mode`, ducklake `deployment_mode`, pg-duckdb `deployment_mode` (self-hosted|motherduck). Declare any missing modes in the manifest first.\n3. MCP: the clickhouse `deployment_mode` key is allowlisted (mcp/schemas.py ~:97 and contract ~:184) and the connection_profile validation depends on it (~:315). MCP keeps accepting it as a deprecated alias that resolves through the same core selector; update the contract entry and the connection_profile check.\n4. Saved YAML configs and credential profiles that hold these keys keep working (tested) per ADR D13.\n5. Update the parity test's handling of these keys per ADR D12 (aliases during the deprecation window) and add the deployment section to docs/development/new-platform-acceptance-checklist.md.\n6. Docs for each affected platform show --platform name:mode; CHANGELOG [Unreleased] lists the deprecations.",
   "links": [
     "benchbox/platforms/adapter_factory.py",
@@ -40,6 +40,14 @@
       "generation": "05886167abe5462fbf5122bf368ff255",
       "op": "take",
       "op_id": "d417cbaa3a544955bb84c6d5b4e0b96b",
+      "session_id": "5d4da70321324b3c9a505b143813724f"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:6e8a424eda2c7006605aa48b",
+      "at": "2026-10-10T07:07:01Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "9fd7c7a0addd4567901c6154cce2f58f",
       "session_id": "5d4da70321324b3c9a505b143813724f"
     }
   ]
