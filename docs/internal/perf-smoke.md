@@ -36,11 +36,13 @@ above the 4 ms level at which a flat 5 ms floor stops being safe, so the
 floor is 1.25 times the largest spread rounded up to a whole millisecond:
 7 ms. Recompute it from fresh artifacts whenever the baseline is refreshed.
 
-The aggregate floor uses the same 1.25 rule on the same-runner-class totals:
-the six EPYC 7763 totals on record were 539.8, 542.9, 546.4, 548.9, 586.1 and
-604.7 ms, a spread of 64.9 ms, so the floor is 1.25 times 64.9 rounded up to
-a whole millisecond: 82 ms. With the 547 ms baseline it lets the noisiest
-observed night (+57.7 ms) pass while a uniform 2x slowdown still fails.
+The aggregate floor uses the same 1.25 rule on the same-runner-class totals.
+Five come from the sources ledger next to the baseline (highest 586.1 ms); the sixth,
+604.7 ms, is the `t3-perf-result` of dispatched nightly-v2 verification run 37991400931,
+also on AMD EPYC 7763. Together they span 539.8 to 604.7 ms, a spread of 64.9 ms, so the
+floor is 1.25 times 64.9 rounded up to a whole millisecond: 82 ms. With the 547 ms
+baseline it lets the noisiest observed night (+57.7 ms) pass while a uniform 2x slowdown
+still fails.
 
 ## Skipping the check
 
