@@ -4,15 +4,19 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import click
 
+from benchbox.cli.output import ResultExporter
 from benchbox.cli.shared import console
 from benchbox.core.publishing.admission import publish_admission
 from benchbox.core.publishing.bundle_publisher import COMPANION_SUFFIXES, VALID_LABELS, BundlePublisher
 from benchbox.core.publishing.store import PublicationStore
 from benchbox.core.results.loader import ResultLoadError, UnsupportedSchemaError, load_result_file
+from benchbox.validation.bundle import unanonymized_plans_findings, unanonymized_tuning_findings
 
 
 @click.group(
@@ -111,10 +115,18 @@ def publish_run(ctx, result_file, target, label, last, benchmark, platform, dry_
             console.print(f"  + {companion_count} companion file(s)")
         return
 
-    store = PublicationStore()
-    publisher = BundlePublisher(destination=target, store=store, label=label)
-    result = publisher.publish(source_path)
-
+    publish_source, scratch = _redacted_publish_source(source_path)
+    if publish_source is None:
+        console.print("[red]Publish refused:[/red] result carries unanonymized tuning diagnostics.")
+        raise SystemExit(1)
+    companion_count = _count_companions(publish_source)
+    try:
+        store = PublicationStore()
+        publisher = BundlePublisher(destination=target, store=store, label=label)
+        result = publisher.publish(publish_source, record_source=source_path)
+    finally:
+        if scratch is not None:
+            scratch.cleanup()
     if not result.success:
         for err in result.errors:
             console.print(f"[red]Error:[/red] {err}")
@@ -124,13 +136,12 @@ def publish_run(ctx, result_file, target, label, last, benchmark, platform, dry_
         for err in result.errors:
             console.print(f"[yellow]Warning:[/yellow] {err}")
 
-    console.print(f"[green]Published:[/green] {source_path.name}")
+    console.print(f"[green]Published:[/green] {publish_source.name}")
     if result.record:
         console.print(f"  ID:        {result.record.pub_id}")
     console.print(f"  Reference: {result.reference}")
     console.print(f"  Label:     {label}")
 
-    companion_count = _count_companions(source_path)
     if companion_count:
         console.print(f"  + {companion_count} companion file(s) also published")
 
@@ -280,6 +291,57 @@ def _resolve_source(
     return None
 
 
+def _redacted_publish_source(source_bundle: Path) -> tuple[Path | None, TemporaryDirectory[str] | None]:
+    source = Path(source_bundle)
+    try:
+        payload = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return source, None
+    if (
+        payload.get("export", {}).get("anonymized") is True
+        and not unanonymized_tuning_findings(payload)
+        and not unanonymized_plans_findings(payload)
+    ):
+        for suffix in COMPANION_SUFFIXES:
+            companion = source.parent / (source.stem + suffix)
+            if not companion.exists():
+                continue
+            try:
+                companion_payload = json.loads(companion.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                return None, None
+            if unanonymized_tuning_findings(companion_payload) or unanonymized_plans_findings(companion_payload):
+                break
+        else:
+            return Path(source_bundle), None
+    try:
+        loaded, _ = load_result_file(source_bundle)
+    except (ResultLoadError, UnsupportedSchemaError, FileNotFoundError, OSError, ValueError):
+        return None, None
+    scratch = TemporaryDirectory(prefix="benchbox-publish-")
+    try:
+        loaded.output_filename = Path(source_bundle).name
+        exported = ResultExporter(output_dir=scratch.name, anonymize=True).export_result(loaded, ["json"])
+    except Exception:
+        scratch.cleanup()
+        return None, None
+    redacted = exported.get("json")
+    if redacted is None:
+        scratch.cleanup()
+        return None, None
+    redacted_path = Path(redacted)
+    for suffix in COMPANION_SUFFIXES:
+        if not (source.parent / (source.stem + suffix)).exists():
+            continue
+        if suffix in (".tuning.json", ".applied.json"):
+            continue
+        if (redacted_path.parent / (redacted_path.stem + suffix)).exists():
+            continue
+        scratch.cleanup()
+        return None, None
+    return redacted_path, scratch
+
+
 def _count_companions(source: Path) -> int:
     stem = source.stem
     return sum(1 for s in COMPANION_SUFFIXES if (source.parent / (stem + s)).exists())
@@ -317,9 +379,17 @@ def publish_bundle(
     except (ResultLoadError, UnsupportedSchemaError, FileNotFoundError):
         pass
 
-    store = PublicationStore()
-    publisher = BundlePublisher(destination=target, store=store, label=label)
-    result = publisher.publish(source_bundle)
+    publish_source, scratch = _redacted_publish_source(Path(source_bundle))
+    if publish_source is None:
+        console.print("[red]Publish refused:[/red] result carries unanonymized tuning diagnostics.")
+        return None
+    try:
+        store = PublicationStore()
+        publisher = BundlePublisher(destination=target, store=store, label=label)
+        result = publisher.publish(publish_source, record_source=Path(source_bundle))
+    finally:
+        if scratch is not None:
+            scratch.cleanup()
 
     if not result.success:
         for err in result.errors:
