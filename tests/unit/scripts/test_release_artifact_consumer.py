@@ -190,6 +190,19 @@ def test_refuses_foreign_run_repository(metadata, field):
         consumer.select_producer(SHA, metadata["api"])
 
 
+def test_repository_name_matches_without_regard_to_case(metadata):
+    for record in (metadata["repository"], metadata["run"]["repository"], metadata["run"]["head_repository"]):
+        record["full_name"] = "BenchBox-dev/benchbox"
+    run, _job, _artifact = consumer.select_producer(SHA, metadata["api"])
+    assert run["id"] == 7
+
+
+def test_refuses_run_from_another_repository_name(metadata):
+    metadata["repository"]["full_name"] = "attacker/benchbox"
+    with pytest.raises(ValueError, match="wrong repository"):
+        consumer.select_producer(SHA, metadata["api"])
+
+
 def test_never_uses_old_green_run_after_new_failed_run(metadata):
     older = copy.deepcopy(metadata["run"])
     older.update(id=6, created_at="2026-09-29T00:00:00Z")

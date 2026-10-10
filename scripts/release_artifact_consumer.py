@@ -110,6 +110,10 @@ def _require(condition: bool, message: str) -> None:
         raise ValueError(message)
 
 
+def _is_repository(name: Any) -> bool:
+    return isinstance(name, str) and name.casefold() == REPOSITORY.casefold()
+
+
 def _positive(value: Any) -> bool:
     return type(value) is int and value > 0
 
@@ -175,7 +179,7 @@ def _run_identity(run: dict[str, Any], sha: str, repository_id: int) -> None:
         repository = run.get(field)
         _require(isinstance(repository, dict), "missing producer repository")
         _require(
-            repository.get("id") == repository_id and repository.get("full_name") == REPOSITORY,
+            repository.get("id") == repository_id and _is_repository(repository.get("full_name")),
             "wrong producer repository",
         )
     _require(_positive(run.get("id")) and _positive(run.get("run_attempt")), "invalid producer run identity")
@@ -183,7 +187,7 @@ def _run_identity(run: dict[str, Any], sha: str, repository_id: int) -> None:
 
 def select_producer(sha: str, api: Api = github_json) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     repository = api("")
-    _require(repository.get("full_name") == REPOSITORY, "wrong repository")
+    _require(_is_repository(repository.get("full_name")), "wrong repository")
     runs = _pages(
         api,
         f"actions/workflows/trunk.yml/runs?head_sha={sha}&event={PRODUCER_EVENT}&branch={PRODUCER_BRANCH}",
