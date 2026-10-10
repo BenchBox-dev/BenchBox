@@ -14148,15 +14148,10 @@
       "title": "Oracle absence details are not redacted, newer quota messages get no reset time, and the muse quota table is empty"
     },
     "oracle-agy-reviewer-calibration-20261008": {
-      "claim": {
-        "expires_at": "2026-10-11T00:05:25Z",
-        "generation": "ad04f9b6013d49cf9a404b196070b5cd",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653"
-      },
+      "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "active",
+      "status": "done",
       "title": "agy cannot read files as a headless oracle reviewer"
     },
     "oracle-author-family-labels-never-applied-20261009": {
