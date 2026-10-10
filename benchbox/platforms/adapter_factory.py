@@ -5,6 +5,7 @@
 import warnings
 from typing import Any, Literal, Optional
 
+from benchbox.core.execution_engine import resolve_requested
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.platforms.base.adapter import check_isolation_capability
 from benchbox.platforms.clickhouse.deployment_mode import (
@@ -120,6 +121,9 @@ def get_adapter(
 
     if resolved_deployment is not None:
         config["deployment_mode"] = resolved_deployment
+
+    requested_engine = config.pop("execution_engine", None) or "default"
+    resolve_requested(base_platform, requested_engine)
 
     if resolved_mode == "sql":
         return _get_sql_adapter(base_platform, **config)

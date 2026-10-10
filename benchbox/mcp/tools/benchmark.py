@@ -33,6 +33,7 @@ from benchbox.mcp.errors import (
 from benchbox.mcp.schemas import (
     MCPValidationError,
     resolve_clickhouse_connection_profile,
+    validate_execution_engine,
     validate_phases,
     validate_platform_options,
 )
@@ -102,6 +103,7 @@ def register_benchmark_tools(
         queries: str | None = None,
         phases: str | None = None,
         mode: str | None = None,
+        execution_engine: str = "default",
         capture_plans: bool = False,
         dry_run: bool = False,
         validate_only: bool = False,
@@ -110,6 +112,7 @@ def register_benchmark_tools(
     ) -> dict[str, Any]:
         try:
             normalized_platform_options = validate_platform_options(platform, platform_options)
+            resolved_execution_engine = validate_execution_engine(platform, execution_engine)
         except MCPValidationError as exc:
             response = make_error(ErrorCode.VALIDATION_ERROR, str(exc), details={"platform": platform})
             response["status"] = "failed"
@@ -148,6 +151,7 @@ def register_benchmark_tools(
             mode,
             capture_plans,
             link_probe=link_probe,
+            execution_engine=resolved_execution_engine,
             platform_options=normalized_platform_options,
             results_dir=resolve_path_provider(results_dir),
             anonymize=anonymize_results,
@@ -278,6 +282,7 @@ def _execute_mcp_run_via_core(
     phases: list[str],
     resolved_mode: str,
     capture_plans: bool,
+    execution_engine: str = "default",
     link_probe: bool = True,
     normalized_platform_options: Mapping[str, object],
     results_dir: Path,
@@ -293,6 +298,14 @@ def _execute_mcp_run_via_core(
     )
     from benchbox.core.schemas import BenchmarkConfig, DatabaseConfig, ExecutionContext
     from benchbox.core.system import SystemProfiler
+
+    try:
+        resolved_execution_engine = validate_execution_engine(platform, execution_engine)
+    except MCPValidationError as exc:
+        return _make_failed_response(
+            make_error(ErrorCode.VALIDATION_ERROR, str(exc), details={"platform": platform}),
+            execution_id,
+        )
 
     data_only = resolved_mode == "data_only"
     data_dir = get_benchmark_runs_datagen_path(benchmark, scale_factor, results_dir / "datagen") if data_only else None
@@ -351,6 +364,7 @@ def _execute_mcp_run_via_core(
             type=platform.lower(),
             name=f"mcp_{platform.lower()}",
             execution_mode=resolved_mode,
+            execution_engine=resolved_execution_engine,
             options=dict(adapter_options),
         )
     profiler = SystemProfiler()
@@ -390,6 +404,7 @@ def _execute_mcp_run_via_core(
                 verbose=False,
                 very_verbose=False,
                 tuning_config=benchmark_config.options.get("df_tuning_config") if benchmark_config.options else None,
+                execution_engine=database_config.execution_engine,
                 **dataframe_options,
             )
 
@@ -500,6 +515,7 @@ def _run_benchmark_impl(
     capture_plans: bool = False,
     link_probe: bool = True,
     *,
+    execution_engine: str = "default",
     platform_options: Mapping[str, object] | None = None,
     results_dir: Path,
     execution_id: str | None = None,
@@ -510,6 +526,7 @@ def _run_benchmark_impl(
 
     try:
         normalized_platform_options = validate_platform_options(platform, platform_options)
+        resolved_execution_engine = validate_execution_engine(platform, execution_engine)
         benchmark_lower = benchmark.lower()
         all_benchmarks = get_all_benchmarks()
 
@@ -547,6 +564,7 @@ def _run_benchmark_impl(
             phases=phases_list,
             resolved_mode=resolved_mode,
             capture_plans=capture_plans,
+            execution_engine=resolved_execution_engine,
             link_probe=link_probe,
             normalized_platform_options=normalized_platform_options,
             results_dir=results_dir,

@@ -584,6 +584,7 @@ def _plan_capture_override_entries(s: types.SimpleNamespace) -> dict[str, Any]:
 def _tuning_override_entries(s: types.SimpleNamespace) -> dict[str, Any]:
     entries: dict[str, Any] = {"tuning_enabled": s.tuning_enabled, "force_upload": bool(s.force_upload)}
     entries.update(_plan_capture_override_entries(s))
+    entries["execution_engine"] = getattr(s, "resolved_execution_engine", None) or "default"
     if s.loaded_unified_config:
         entries["unified_tuning_configuration"] = s.loaded_unified_config
     if s.df_tuning_config:
@@ -2609,6 +2610,14 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     default=None,
     help="Execution mode: sql or dataframe",
 )
+@advanced_option(
+    "--execution-engine",
+    type=str,
+    default=None,
+    help="Execution engine: which execution machinery runs the query. "
+    "Allowed values depend on the platform (see the platform manifest); "
+    "'default' lets the platform or version decide.",
+)
 @advanced_option("--seed", type=int, help="RNG seed for query parameter generation")
 @advanced_option(
     "--streams",
@@ -2725,6 +2734,7 @@ def run(
     platform_option_pairs: tuple[tuple[str, str], ...],
     benchmark_option_pairs: tuple[tuple[str, str], ...],
     mode: str | None,
+    execution_engine: str | None,
     seed: int | None,
     concurrency: int | None,
     iterations: int | None,
@@ -2774,6 +2784,7 @@ def run(
         platform_option_pairs=platform_option_pairs,
         benchmark_option_pairs=benchmark_option_pairs,
         mode=mode,
+        execution_engine=execution_engine,
         seed=seed,
         concurrency=concurrency,
         iterations=iterations,

@@ -8,6 +8,7 @@ import importlib.util
 from collections.abc import Iterable
 from typing import Optional, Type
 
+from benchbox.core.execution_engine import resolve_requested
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.utils.runtime_env import DriverResolution, DriverRuntimeStrategy, ensure_driver_version
 
@@ -218,6 +219,7 @@ from benchbox.platforms.adapter_factory import (
 
 def get_platform_adapter(platform_name: str, **config) -> PlatformAdapter:
     canonical_name = PlatformRegistry.resolve_platform_name(platform_name)
+    resolve_requested(canonical_name, config.get("execution_engine") or "default")
 
     try:
         adapter_class = PlatformRegistry.get_adapter_class(canonical_name)
