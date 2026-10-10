@@ -20467,10 +20467,15 @@
       "title": "Add delta/iceberg/hudi loading to SparkDataLoadMixin and close shared Spark loader gaps"
     },
     "spark-session-config-model": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-11T07:22:46Z",
+        "generation": "f80ad3710a9242739defbfece9d6281d",
+        "renewals": 0,
+        "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:7e55d16b199130b0978d8efa"
+      },
       "needs": [],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Add validated spark session-config map to PlatformOptimizationConfiguration"
     },
     "spark-session-config-runtime": {
