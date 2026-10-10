@@ -4,7 +4,7 @@
     "Explorer pipeline and local result import withhold Throughput@Size when a completed phase's configured count differs from stream_results length; pipeline entries use stream_count_mismatch when the primary exclusion would otherwise be missing_primary_metric. Failed and partial phases retain the phase-failure exclusion instead of being relabeled as a count mismatch.",
     "Unit tests cover matching counts, absent configured counts, run.streams/config.streams mismatches, and failed/partial truncation across corpus validation and Explorer ranking/import behavior."
   ],
-  "context": "PR #2894 remains open on branch fix/throughput-stream-count-derived. Current-head Oracle review found two defects: corpus validation hard-failed legitimately truncated FAILED/PARTIAL throughput bundles, and Explorer relabeled those phases as stream_count_mismatch instead of preserving phase-failure exclusion. Both helpers now gate mismatches on COMPLETED status; tests cover FAILED/PARTIAL truncation for run/config counts and pipeline reason preservation. Hosted-results contract docs now clarify this status boundary. Focused tests passed: 328 across corpus and Explorer ranking modules. Final docs/style/comment checks are running in background job bg_57. After they pass, commit the fix, update the existing PR, then wait for current-head Oracle success and required CI before arming. PR #2894's earlier local evidence (323 targeted Python tests, 49 Explorer Vitest tests, TS typecheck, corpus validation, docs, comment policy, preflight, browser smoke) applies to the initial head; new tests supersede the relevant failure cases. Do not touch unrelated merge-tree conflicts from PR #2835.",
+  "context": "PR #2894 remains open on branch fix/throughput-stream-count-derived. Current-head Oracle review found two defects: corpus validation hard-failed legitimately truncated FAILED/PARTIAL throughput bundles, and Explorer relabeled those phases as stream_count_mismatch instead of preserving phase-failure exclusion. Both helpers now gate mismatches on COMPLETED status; tests cover FAILED/PARTIAL truncation for run/config counts and pipeline reason preservation. Hosted-results contract docs clarify the status boundary. Focused tests passed: 328 across corpus and Explorer ranking modules; `git diff --check` passed, with only the expected five files modified. Final `make ci-docs`, `make comment-policy-check`, and Ruff format/lint checks are running in background job bg_57. After they pass, commit the fix, update the existing PR, then wait for current-head Oracle success and required CI before arming. Earlier local evidence (323 targeted Python tests, 49 Explorer Vitest tests, TS typecheck, corpus validation, docs, comment policy, preflight, browser smoke) applies to the initial head; new tests replace the relevant failed-phase case. Do not touch unrelated merge-tree conflicts from PR #2835.",
   "description": "For completed throughput phases, compare configured --streams (run.streams, falling back to config.streams) with the number of recorded stream_results. Report a mismatch instead of ranking an invalid completed run. Failed or partial phases may legitimately record fewer streams and must be excluded by phase status rather than treated as configuration defects.",
   "sessions": [
     {
@@ -81,6 +81,14 @@
       "client": "omp-coding-agent",
       "op": "update",
       "op_id": "c611270c3c9042208f21d5de3914966e",
+      "session_id": "024527ae77c1405f86cdbdf1079f6e14"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396",
+      "at": "2026-10-10T20:49:46Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "a18f4d8241d643e3b4b39b6cc333f7f8",
       "session_id": "024527ae77c1405f86cdbdf1079f6e14"
     }
   ]
