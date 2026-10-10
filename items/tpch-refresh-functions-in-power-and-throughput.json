@@ -1,9 +1,12 @@
 {
   "acceptance": [
-    "Power@Size includes RF1 and RF2 times per spec, with tests",
-    "The throughput test runs a concurrent refresh stream of S RF pairs inside Ts, with tests",
-    "Official QphH@Size export is re-enabled only when both are present",
-    "Docs describe the spec-conformant metric"
+    "Refresh is opt-in via `tpch_refresh_functions=false` by default; `tpch_refresh_first_set` defaults to 1. Register both through the existing benchmark-option mechanism. Requests fail clearly on unsupported platforms and DataFrame engines; capability is false by default and enabled for DuckDB, SQLite, and supported generic maintenance DML adapters.",
+    "A single `benchbox/core/tpch/refresh.py` engine generates dbgen update sets in a temporary directory outside the timer, applies RF1/RF2 from `orders.tbl.u<k>`, `lineitem.tbl.u<k>`, and `delete.<k>`, and executes each function in one transaction with 1,000-row chunks. RF1 rejects already-applied keys; RF2 verifies all delete keys existed. Set F is used for power, F+1..F+S for throughput. `TPCHMaintenanceTest` delegates to it; synthetic generators are removed; dry-run preview statements and the standalone maintenance phase remain functional.",
+    "With refresh enabled, Power runs RF1(set F), the 22 queries, then RF2(set F) on a separate session, applying refresh only in the final measurement iteration. Power@Size uses the geometric mean of all 24 terms. The power phase records RF1/RF2 update set, duration, row count, status, and error without adding refresh rows to queries[].",
+    "With refresh enabled, throughput starts one separate refresh stream with the query streams. It runs S RF1/RF2 pairs serially on sets F+1..F+S. Ts spans the earliest query/refresh start to latest query/refresh end. Any refresh failure records an error and withholds Throughput@Size. The throughput phase records pair count, first set, start/end, and per-function evidence.",
+    "Result fields are additive optional phase fields and follow `benchbox/core/results/schema_policy.py`; schema models/exporters and references change together. Power@Size includes RF1/RF2 times when present. QphH@Size is rounded to 0.1 and exported only for official compliance with successful power set F, S successful throughput pairs on F+1..F+S, no failed query, and minimum stream count. Otherwise omit it and include `qphh_unavailable` reasons; add `tpc_metrics.refresh_included`. Separate files produce QphH only when both carry refresh data and sets are consecutive. `benchbox metrics qphh` applies the same gate and explains refusal.",
+    "Tests cover fake-connection statement shapes, chunking, safety failures, set disjointness, formulae, Ts boundaries, each QphH refusal condition, and unsupported platforms. In-memory DuckDB and SQLite SF0.01 integrations prove inserted row counts and deleted keys. DuckDB SF0.01 end-to-end records refresh data but withholds the composite for unofficial_subscale; DuckDB SF1 with two streams exports QphH only when all conditions hold.",
+    "Documentation covers opt-in options/defaults, set numbering and next-unused-set repeat runs, final-iteration behavior, verified platform support, QphH conditions, and deviations not implemented: 0.01-second refresh rounding, 1000x clamp, Ts rounding, and two-run lower-score rule."
   ],
   "description": "Scope moved here from tpch-qphh-missing-refresh-functions by owner decision on 2026-10-04: suppress the official QphH label first, and implement the spec later. Per the TPC-H spec, Power@Size uses the 24th root over the 22 query times plus RF1 and RF2, and the throughput test runs a refresh stream of S RF1/RF2 pairs concurrently with the S query streams, inside Ts. Currently neither test runs refresh functions (tpch/power_test.py, tpch/throughput_test.py), and maintenance runs afterwards with concurrent_with_queries=False (execution.py:692-698).",
   "links": [
@@ -27,6 +30,14 @@
       "generation": "aba6c6c727bc4fe19387418d1e980834",
       "op": "take",
       "op_id": "0e96b163a6fb46de85ea26cfa77a635c",
+      "session_id": "024527ae77c1405f86cdbdf1079f6e14"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396",
+      "at": "2026-10-10T21:11:32Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "4c9f607b185f4c029d32bc7380ae7720",
       "session_id": "024527ae77c1405f86cdbdf1079f6e14"
     }
   ]
