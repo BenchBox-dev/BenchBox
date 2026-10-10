@@ -4,7 +4,7 @@
     "Fake-driver save/load round-trip per adapter passes.",
     "DataFusion tuned run logs no 'Failed to save tuning metadata'."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P3.1 (A1.3, N-5).",
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P3.1 (A1.3, N-5).\n\nParallel scout 2026-10-10 reconfirmed follow-up scope on origin/develop, no change vs brief-6.md: _platform_key() metadata.py:186; plain set 415-427; T-SQL set line 428; branch logic 505-528; manifest keys synapse/fabric_dw/pg-duckdb; hand-written DDL test list tests/unit/core/tuning/test_tuning_metadata.py:312-332 with stub forcing fallback path.",
   "deferrals": [
     {
       "created_at": "2026-10-08T11:40:49Z",
@@ -81,6 +81,14 @@
       "op": "release",
       "op_id": "c3fc32606abc4013b75a39d608199855",
       "session_id": "0b049bb7b35344849c3bc1ea57ed95a2"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:7e55d16b199130b0978d8efa",
+      "at": "2026-10-10T01:12:22Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "851a53ac20f1434cb2738ebab069f36f",
+      "session_id": "4dbe22cfa4cf47a5bab075c4c3ac203f"
     }
   ]
 }
