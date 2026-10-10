@@ -521,7 +521,7 @@ jq -e '.summary.tpc_metrics.throughput_at_size > 100' ./ci_data/results/*.json
 for sf in 1.0 10.0; do
   benchbox run --official --platform duckdb --benchmark tpcds --scale $sf --seed 42 --output ./official_data
 done
-```
+
 benchbox results --limit 3
 ```
 

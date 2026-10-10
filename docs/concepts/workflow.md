@@ -172,6 +172,7 @@ jobs:
 ```
 
 **Benefits**:
+- Catch performance regressions before merge
 - Validate query compatibility across platforms
 - Track performance trends over time
 

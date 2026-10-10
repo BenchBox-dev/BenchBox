@@ -24,13 +24,15 @@ export function publishLegacyFiles(files: LegacyFiles, docsRoot: string, out: st
     const target = path.join(out, copy.to);
     mkdirSync(path.dirname(target), { recursive: true });
     cpSync(copy.from, target);
-    if (copy.from.includes("tpc-ds") || copy.from.includes("tpc-h") || copy.from.includes("tpcdi")) {
-      const eulaSrc = copy.from.includes("tpc-h")
+    const sourcePath = path.relative(docsRoot, copy.from).split(path.sep).join("/");
+    const eulaSource = sourcePath.startsWith("../_sources/tpc-ds/")
+      ? path.resolve(docsRoot, "../_sources/tpc-ds/EULA.txt")
+      : sourcePath.startsWith("../benchbox/_binaries/tpc-h/")
         ? path.resolve(docsRoot, "../_sources/tpc-h/EULA.txt")
-        : path.resolve(docsRoot, "../_sources/tpc-ds/EULA.txt");
-      if (existsSync(eulaSrc)) {
-        cpSync(eulaSrc, path.join(path.dirname(target), "TPC_EULA.txt"));
-      }
+        : undefined;
+    if (eulaSource !== undefined) {
+      if (!existsSync(eulaSource)) throw new Error(`TPC EULA is missing: ${eulaSource}`);
+      cpSync(eulaSource, path.join(path.dirname(target), "TPC_EULA.txt"));
     }
   }
   return copies.length;

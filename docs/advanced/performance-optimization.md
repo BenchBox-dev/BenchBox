@@ -56,6 +56,7 @@ results = adapter.run_benchmark(benchmark)
 ```
 
 This configuration partitions `lineitem` on the ship date and adds clustering on frequently joined columns.
+
 ### ClickHouse Local Optimizations
 
 ```python
@@ -83,6 +84,7 @@ results = adapter.run_benchmark(benchmark)
 ```
 
 This configuration partitions `lineitem` by ship date and sorts it by common filter columns.
+
 ### Databricks Delta Lake Optimizations
 
 ```python
@@ -129,6 +131,8 @@ results = adapter.run_benchmark(benchmark)
 
 Z-ordering gives multi-dimensional clustering. Auto-optimize handles background compaction, and auto-compact merges small files. Bloom filters help on high-cardinality columns.
 
+### Snowflake Clustering Optimizations
+
 ```python
 from benchbox.tpch import TPCH
 from benchbox.platforms.snowflake import SnowflakeAdapter
@@ -167,6 +171,8 @@ results = adapter.run_benchmark(benchmark)
 
 Clustering keys cover frequently filtered columns, large tables are partitioned, and `LARGE_WH` is a larger warehouse.
 
+### BigQuery Optimizations
+
 ```python
 from benchbox.tpch import TPCH
 from benchbox.platforms.bigquery import BigQueryAdapter
@@ -198,6 +204,8 @@ results = adapter.run_benchmark(benchmark)
 ```
 
 This uses native BigQuery partitioning on a date column and clustering for multi-column optimization.
+
+## Tuning Configuration
 
 ### Comprehensive Tuning Strategy
 
@@ -249,6 +257,8 @@ results = adapter.run_benchmark(benchmark)
 
 For TPC-DS, the function partitions each fact table by date, clusters it by primary key, and enables primary-key and foreign-key constraints.
 
+### Constraint-Based Optimization
+
 ```python
 from benchbox.tpch import TPCH
 from benchbox.platforms.duckdb import DuckDBAdapter
@@ -265,6 +275,8 @@ results = adapter.run_benchmark(benchmark)
 ```
 
 Primary keys are defined for referential integrity. Foreign keys enable join optimizations.
+
+## Query Optimization
 
 ### Query Subset Selection
 

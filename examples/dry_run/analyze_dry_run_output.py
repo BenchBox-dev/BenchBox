@@ -41,7 +41,7 @@ def analyze_dry_run_output(dry_run_dir: str):
 
     query_dirs = sorted(dry_run_path.glob("*_queries_*"))
     if query_dirs:
-        query_files = list(query_dirs[0].glob("*.sql"))
+        query_files = list(query_dirs[-1].glob("*.sql"))
         print("\nQueries:")
         print(f"  - Total: {len(query_files)}")
 
