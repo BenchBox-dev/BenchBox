@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    ".github/soundness-paths.txt lists .github/workflows/oracle-verdict.yml",
+    "A test shows a PR changing only oracle-verdict.yml is classified as soundness (the required oracle-review check then needs an oracle decision)",
+    "Merged through the normal oracle PR flow (the list itself is a soundness path)"
+  ],
+  "context": "Found 2026-10-09 while writing the CI and dev-loop batch handoff. .github/oracle-reviewers.yml gate_paths (classifier tier) already lists oracle-verdict.yml; only the soundness list lacks it.",
+  "description": ".github/soundness-paths.txt lists the required checker (.github/workflows/oracle-review.yml, _project/scripts/oracle_review_check.py), the reviewer package (_project/scripts/oracle_reviewers/) and the policy (.github/oracle-reviewers.yml), but not .github/workflows/oracle-verdict.yml, the workflow that runs the reviewers with their credentials and posts the App review the required check reads. It was not listed under its old name (oracle-review-shadow.yml) either when #2758 made the oracle required. A PR that changes only oracle-verdict.yml therefore needs no oracle review and passes the required check without one, although the change alters every later review.\n\nAdd `file .github/workflows/oracle-verdict.yml` to .github/soundness-paths.txt and update the tests that pin the list. Adding a path only strengthens the gate.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-10T01:10:38Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "fc9678ab11ad4bfcb504dd6b302ba331",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}
