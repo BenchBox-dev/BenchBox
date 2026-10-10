@@ -25149,9 +25149,9 @@
     },
     "worktree-typescript-module-resolution": {
       "claim": {
-        "expires_at": "2026-10-10T21:18:22Z",
-        "generation": "542b804d9c0042799f617e65f6b391b0",
-        "renewals": 0,
+        "expires_at": "2026-10-11T19:07:39Z",
+        "generation": "80635d7d1d7944e6823be3d2b0b3acdb",
+        "renewals": 1,
         "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:bd5956809339499407531943"
       },
       "needs": [],
