@@ -134,9 +134,32 @@ def test_deprecated_alias_warns_once() -> None:
     assert len([item for item in seen if issubclass(item.category, DeprecationWarning)]) == 1
 
 
-def test_canonical_value_wins_over_native_alias() -> None:
-    resolved = normalize_compute_options("snowflake", {"compute_resource": "NEW_WH", "warehouse": "COMPUTE_WH"})
-    assert resolved["compute_resource"] == "NEW_WH"
+def test_canonical_and_native_disagreement_fails() -> None:
+    with pytest.raises(PlatformOptionError, match="Keep only one spelling"):
+        PlatformHookRegistry.parse_options("snowflake", [("compute_resource", "NEW_WH"), ("warehouse", "COMPUTE_WH")])
+
+
+def test_native_and_canonical_disagreement_fails_reversed() -> None:
+    with pytest.raises(PlatformOptionError, match="Keep only one spelling"):
+        PlatformHookRegistry.parse_options("snowflake", [("warehouse", "COMPUTE_WH"), ("compute_resource", "NEW_WH")])
+
+
+def test_matching_spellings_agree() -> None:
+    parsed = PlatformHookRegistry.parse_options("snowflake", [("compute_resource", "W"), ("warehouse", "W")])
+    assert parsed["compute_resource"] == "W"
+
+
+def test_two_alias_disagreement_fails() -> None:
+    with pytest.raises(PlatformOptionError, match="Keep only one spelling"):
+        PlatformHookRegistry.parse_options("redshift", [("workgroup_name", "wg"), ("cluster_identifier", "cl")])
+
+
+def test_quanton_size_keeps_choices_and_default() -> None:
+    specs = PlatformHookRegistry.list_option_specs("quanton")
+    assert specs["compute_size"].choices == ("small", "medium", "large", "xlarge")
+    assert specs["compute_size"].default == "small"
+    with pytest.raises(PlatformOptionError, match="Invalid value"):
+        PlatformHookRegistry.parse_options("quanton", [("compute_size", "xxlarge")])
 
 
 def test_conflicting_native_aliases_fail() -> None:
@@ -159,7 +182,7 @@ def test_matching_native_aliases_agree() -> None:
         ("quanton", {"cluster_size": "small"}, None),
         ("redshift", {"workgroup_name": "wg"}, "workgroup"),
         ("redshift", {"cluster_identifier": "c"}, "cluster"),
-        ("redshift", {"compute_resource": "wg"}, "workgroup"),
+        ("redshift", {"compute_resource": "wg"}, None),
         ("duckdb", {"warehouse": "W"}, None),
     ],
 )
