@@ -1,5 +1,5 @@
 {
-  "context": "PR #2883 opened and armed on branch docs/throughput-p50-erratum with commit 22e8e2d5e6d3cb8f1947c33cd199e10f773d0f37. Recomputed audit history confirmed (0dd61b48b 31.3 -> fe3b352c0 27.5 across 33 gaps). Corrected _project/decisions/behind-pr-occurrence-throughput-2026-08-16.md and _project/decisions/skill-integrity-ci-lane-validation-2026-08-18.md with dated errata sections. Preserved 31.4 min gate duration and frozen baseline digest in _project/analysis/pr-process-acceptance-baseline.json while explicitly superseding the citation. make ci-docs passed, smoke tests verified, pr-preflight clean. Awaiting squash-merge to close.",
+  "context": "Closed after confirmed merge: PR #2883 squashed into develop at 2026-10-10T13:17:49Z with commit 22e8e2d5e6d3cb8f1947c33cd199e10f773d0f37. Recomputed audit history verified across commits 0dd61b48b and fe3b352c0. Corrected _project/decisions/behind-pr-occurrence-throughput-2026-08-16.md and _project/decisions/skill-integrity-ci-lane-validation-2026-08-18.md with dated errata sections; preserved 31.4 min gate duration and frozen baseline digest in _project/analysis/pr-process-acceptance-baseline.json while explicitly superseding the citation.",
   "description": "_project/decisions/behind-pr-occurrence-throughput-2026-08-16.md line 19 states \"p50 31.3 min\". Its cited evidence, _project/audits/behind-pr-occurrence-throughput-2026-08-16.md line 41, states 27.5. The decision also says \"50% of gaps under 31 min\" where the audit says 51.5%.\n\nThis is a STALENESS defect, not a day-one misread. Both files originally said 31.3 over 32 gaps (0dd61b48b, PR #1756). PR #1774 (fe3b352c0) recomputed the audit to 27.5 over 33 gaps and left the sibling decision record untouched. So the miss belongs to #1774's follow-up sweep, and any correction should say so rather than implying the 2026-08-16 author wrote 31.3 against a 27.5 table.\n\nBeware a near-miss in the same paragraph: 31.4 is a required-gate DURATION, not the interarrival p50. Do not \"correct\" it.\n\nDiscovered 2026-08-20 while revalidating why green develop PRs go BEHIND. The concrete harm is that the decision record is the summary readers quote; the wrong figure was propagated into a session report before the audit was checked. Priority is low because 27.5 vs 31.3 does not change the decision's conclusion that gate duration is a material fraction of interarrival.\n\nBoth files are Accepted records, so correct by dated erratum rather than a silent overwrite of history.",
   "legacy": {
     "item_meta": {
@@ -107,6 +107,14 @@
       "generation": "270665d4a56e4e39a87a4478d0b66139",
       "op": "take",
       "op_id": "c665abb9c3ea4ec18236d92977ea17dc",
+      "session_id": "024527ae77c1405f86cdbdf1079f6e14"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396",
+      "at": "2026-10-10T17:58:18Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "c7b03f71590a41ceaec148b2114c424d",
       "session_id": "024527ae77c1405f86cdbdf1079f6e14"
     }
   ]
