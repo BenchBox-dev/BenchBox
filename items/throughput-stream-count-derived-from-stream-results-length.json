@@ -4,7 +4,7 @@
     "Explorer pipeline and local result import withhold Throughput@Size when the configured count differs from stream_results length; pipeline entries use stream_count_mismatch when the primary exclusion would otherwise be missing_primary_metric.",
     "Unit tests cover matching, absent configured counts, and mismatches in run.streams/config.streams across corpus validation, the Explorer pipeline, and local Explorer import."
   ],
-  "context": "PR #2894 is open at head 3fba17edd42a6a964ca9d3e591299eb8c088100a. The PR is intentionally unarmed pending the oracle's success review and required CI. Local acceptance: 323 Python tests and 49 Explorer Vitest tests passed; TypeScript typecheck, corpus validation (413 bundles, 61 ranked cohorts), docs build, comment-policy check, and make pr-preflight (471 mapped tests) passed. Browser smoke confirmed a 4-configured/3-recorded TPC-H bundle has no Throughput@Size card/value. The repo-wide ty check emitted warnings but none in changed Python files. PR creation warned of a merge-tree conflict with unrelated PR #2835 in .github/workflows/nightly-v2.yml, docs/internal/nightly-t3.md, and tests/unit/workflows/test_nightly_t3_workflow.py; this item changes none of those paths.",
+  "context": "PR #2894 is open at head 3fba17edd42a6a964ca9d3e591299eb8c088100a. The PR is intentionally unarmed pending the oracle's success review and required CI. Local acceptance: 323 Python tests and 49 Explorer Vitest tests passed; TypeScript typecheck, corpus validation (413 bundles, 61 ranked cohorts), docs build, comment-policy check, and make pr-preflight (471 mapped tests) passed. Browser smoke confirmed a 4-configured/3-recorded TPC-H bundle has no Throughput@Size card/value. The repo-wide ty check emitted warnings but none in changed Python files. PR creation warned of a merge-tree conflict with unrelated PR #2835 in .github/workflows/nightly-v2.yml, docs/internal/nightly-t3.md, and tests/unit/workflows/test_nightly_t3_workflow.py; this item changes none of those paths. Resume 2026-10-10: reviewed all eight PR files against the five-axis code rubric; no Critical or Required defects found. Live PR read: OPEN at the same head, no reviews or review threads; oracle-review failed with the expected wait-for-oracle message, and required CI checks remain pending. Do not arm until current-head benchbox-oracle review succeeds and required CI is green. PR #2889 for the separate decision-record task has merged; that task remains open because the record omits required per-caller timed-window effects, so it needs a docs-only follow-up before tracker completion.",
   "description": "In results-data/validate_corpus.py (lines 97-101) and _project/scripts/explorer_pipeline/transformer.py (_stream_count), stream_count is derived solely as len(phases.throughput_test.stream_results). If a benchmark configuration specifies --streams S but fewer or more stream entries are recorded in the bundle, or if run.streams disagrees with stream_results, the discrepancy is silently masked rather than flagged as an invalid run.",
   "sessions": [
     {
@@ -47,6 +47,14 @@
       "client": "omp-coding-agent",
       "op": "update",
       "op_id": "cef94366f8484fdfb6e4e0b9604e306f",
+      "session_id": "024527ae77c1405f86cdbdf1079f6e14"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396",
+      "at": "2026-10-10T20:22:05Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "449df6a58f5a4600aec9a3b5e1efc5ee",
       "session_id": "024527ae77c1405f86cdbdf1079f6e14"
     }
   ]
