@@ -7771,15 +7771,10 @@
       "title": "Run the stop-the-world flip: swap required checks and merge the flip PR"
     },
     "docs-accuracy-benchmarks-reference": {
-      "claim": {
-        "expires_at": "2026-10-11T05:27:40Z",
-        "generation": "414478aab7e443069c56d326eddeccdf",
-        "renewals": 0,
-        "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:c5daffc9eae3c5f9ce6578f7"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Fix stale counts, missing APIs and contradictions in benchmark and reference pages"
     },
     "docs-accuracy-guides-tutorials": {
