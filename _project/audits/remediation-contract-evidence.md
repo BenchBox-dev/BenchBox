@@ -188,3 +188,62 @@ The behavioral instances in
 These instances and the existing complete-receipt round trip passed together
 with CLI export and Explorer transformer tests: 230 passed. Replay with
 `uv run -- python -m pytest tests/unit/core/results/test_execution_variant_schema.py tests/unit/cli/test_cli_output.py tests/unit/test_results_exporter.py tests/unit/scripts/explorer_pipeline/test_transformer.py -q`.
+## PR #2821 scanner review findings
+
+The nine Oracle findings were reproduced on the pre-fix branch. Each fix keeps
+the original source as the durable input; the scanner adapter output is consumed
+by the comment-policy parser and its finding rows.
+
+- Shell pipeline masking: the shell source producer writes
+  `echo 'pass' | python3 # explanation`; `mask_embedded_sources` now masks
+  embedded heredocs only, leaving the shell line for the tokenizer. The
+  consumer test is
+  `tests/unit/scripts/test_comment_policy.py::test_piped_interpreter_masking_preserves_trailing_shell_comment`;
+  it requires the trailing comment and rejects embedded payload leakage.
+- Static `echo` and `printf` output: bashlex supplies producer arguments,
+  `piped_producer_text` reconstructs supported bytes and formats, and the
+  interpreter scanner consumes the reconstructed source. Positive cases,
+  including octal escapes, `echo -e`, `%s`, and empty `printf` formats, run in
+  `test_piped_producer_payloads_reach_stdin_interpreters` and
+  `test_piped_printf_format_is_evaluated`; `test_piped_node_source_reports_javascript_comment`
+  exercises the Node consumer. The rejected `%d` conversion and dynamic or
+  unsupported producers are controls in
+  `test_piped_dynamic_or_unmodeled_stdin_fails_closed`.
+- MDX ESM shape recognition: the original MDX source is retained after
+  block-comment-tolerant shape validation; `javascript_requests` sends the
+  complete statement to the TypeScript scanner. Both inter-token forms are
+  exercised end-to-end by `test_mdx_esm_intertoken_comments_are_reported`;
+  `test_mdx_prose_import_lookalikes_are_not_code` rejects prose lookalikes.
+- Static runner paths with spaces: the shell command AST feeds
+  `PythonBindings.runner_payload`, which now tests executable basenames rather
+  than rejecting whitespace anywhere in an absolute path. The positive
+  `/opt/My Tools/python3` case is in
+  `test_python_runner_command_strings_are_scanned`; non-source application
+  arguments remain covered by `test_shell_application_arguments_are_not_executable_source`.
+- Absolute interpreter paths in pipelines: `SHELL_INLINE_INTERPRETER` now
+  admits recognized executable basenames behind a path prefix, so
+  `echo '# hidden' | /usr/bin/python3` reaches the consumer scanner. The
+  regression is in `test_piped_producer_payloads_reach_stdin_interpreters`.
+- Pipeline redirects: descriptor analysis preserves consumer stdout and
+  stderr plus producer stderr, while requiring coverage for a consumer stdin
+  override. The positive and fail-closed controls are
+  `test_piped_unrelated_redirections_preserve_stdin` and
+  `test_piped_consumer_stdin_redirection_fails_closed`.
+- Bash `echo -e` octal escapes: the decoder treats `\0` followed by up to three
+  octal digits as one escape, separately from the `printf` format path.
+  `test_piped_producer_payloads_reach_stdin_interpreters` exercises
+  `\0043 hidden` as `# hidden`.
+- Runner command string ordering: Python runner payloads now scan a complete
+  static shell command string before matching an interpreter basename at its
+  suffix. `test_python_runner_command_strings_are_scanned` covers a comment
+  followed by `/usr/bin/python3`.
+- Multiline MDX block comments: statement extraction tracks block-comment
+  boundaries before shape validation and passes the complete statement to the
+  TypeScript scanner. The multiline case in
+  `test_mdx_esm_intertoken_comments_are_reported` requires the comment.
+
+
+The original focused scanner regressions passed 36 tests; the five additional
+fix groups passed 25 tests. The full policy unit file passed 716 tests with
+`-n 0`. `make comment-policy-check` scanned 5,749 files with zero violations
+and passed all 19 native syntax tests.
