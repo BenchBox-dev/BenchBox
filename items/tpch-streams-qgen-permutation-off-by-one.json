@@ -5,7 +5,7 @@
     "Stream numbering stays 1..S as decided for the throughput batch.",
     "make comment-policy-check passes."
   ],
-  "context": "Work complete locally; publication blocked on two external gates. (1) Source commit rejected by pre-commit comment-policy hook: streams.py:170 payload-error str(qgen_exe), 1 enforced failure in transition mode — expected until the fixture PR merges into the base; all other hooks passed (ruff, format, codespell, markdownlint, identity). Staged 4-file change intact on fix/tpch-stream-qgen-permutation. (2) Trunk red since Oct 9 ~18:50Z blocks make pr-open even after commit: dist-artifact wrong producer repository, API full_name BenchBox-dev/benchbox vs script constant BenchBox-dev/BenchBox. Fixture branch fix/tpch-qgen-policy-fixture committed f7e76e6e, reviewed clean. Order: trunk repair → fixture PR → source commit/PR. Fast suite 36,977 passed; pr-preflight passed.",
+  "context": "Trunk recovered: latest three trunk runs passed on resumption. Policy fixture PR #2882 opened from fix/tpch-qgen-policy-fixture at f7e76e6e4331accc6ccac235fa404faee3f21ca8; awaiting CI and current-head oracle review. Fixture reviewed clean, policy check 0 violations/19 native tests, preflight passed. Source 4-file change remains staged in BenchBox.wt-tpch-stream-qgen-permutation; commit hook requires fixture first. Fast suite 36,977 passed; source reviewed clean and preflight passed. Next: merge #2882, rebase source onto origin/develop, commit and publish source PR; remove obsolete temporary fixture once base scanner recognizes reviewed argv. Releasing claim while hosted gates run so merged item1 can be reconciled.",
   "description": "benchbox/core/tpch/streams.py:234 passes `-p stream_id + 1` to qgen, while the Python permutation path indexes PERMUTATION_MATRIX[stream_id] (streams.py:202). The two paths disagree on which permutation a stream uses. _generate_stream_queries_qgen (line 204) is dead code today, so nothing is wrong at runtime, but it would produce the wrong ordering if wired in. Decide whether to delete the dead method or align the indexing, and prove the choice with a test.",
   "sessions": [
     {
@@ -96,6 +96,14 @@
       "client": "omp-coding-agent",
       "op": "update",
       "op_id": "136d66c79eef42d4a8b94973c92bdcf9",
+      "session_id": "024527ae77c1405f86cdbdf1079f6e14"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396",
+      "at": "2026-10-10T12:26:59Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "db92069fad44453d8fd559a68d812ffe",
       "session_id": "024527ae77c1405f86cdbdf1079f6e14"
     }
   ]
