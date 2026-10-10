@@ -2920,12 +2920,17 @@
       "title": "ClickHouse Delta support via conversion or external tooling"
     },
     "clickhouse-docker-connection-warning-capture-20261008": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-11T08:36:22Z",
+        "generation": "7e7b76992fc44c67956622e78fe007d1",
+        "renewals": 0,
+        "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:7e55d16b199130b0978d8efa"
+      },
       "needs": [
         "conftest-leak-guard-warningregistry-20261008"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Capture and resolve ClickHouse live connection warning in Docker suite"
     },
     "clickhouse-error-message-capture": {
