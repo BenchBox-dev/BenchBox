@@ -50,7 +50,7 @@ class DatabricksDataFrameAdapter(DatabricksAdapter):
     plan_capture_phase_eligible = True
 
     def __init__(self, **config: Any) -> None:
-        self.cluster_id = config.pop("cluster_id", None)
+        self.cluster_id = config.pop("compute_resource", None) or config.pop("cluster_id", None)
         self.execution_mode = config.pop("execution_mode", "dataframe")
 
         if _normalize_table_format(config) == "hudi":
@@ -84,9 +84,12 @@ class DatabricksDataFrameAdapter(DatabricksAdapter):
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> DatabricksDataFrameAdapter:
+        from benchbox.core.compute_resource import normalize_compute_options
+
+        config = normalize_compute_options("databricks-df", config)
         adapter_config = dict(config)
         adapter_config["execution_mode"] = config.get("execution_mode", "dataframe")
-        adapter_config["cluster_id"] = config.get("cluster_id")
+        adapter_config["cluster_id"] = config.get("compute_resource") or config.get("cluster_id")
 
         return cls(**adapter_config)
 

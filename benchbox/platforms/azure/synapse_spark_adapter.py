@@ -544,9 +544,12 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> SynapseSparkAdapter:
+        from benchbox.core.compute_resource import normalize_compute_options
+
+        config = normalize_compute_options("synapse-spark", config)
         params: dict[str, Any] = {
             "workspace_name": config.get("workspace_name"),
-            "spark_pool_name": config.get("spark_pool_name"),
+            "spark_pool_name": config.get("compute_resource") or config.get("spark_pool_name"),
             "storage_account": config.get("storage_account"),
             "storage_container": config.get("storage_container"),
             "storage_path": config.get("storage_path"),
