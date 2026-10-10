@@ -16,14 +16,14 @@ uv pip install benchbox
 
 benchbox run --benchmark tpch --platform duckdb --scale 0.1
 
-cat benchmark_runs/tpch_0.1_duckdb_*/results.json
+benchbox results --limit 1
 ```
 
 **What happens**:
 1. BenchBox generates TPC-H data at scale factor 0.1 (~100MB)
-2. Loads data into DuckDB (an in-memory database)
+2. Loads data into DuckDB (stored in a database file in the runs root)
 3. Executes all 22 TPC-H queries
-4. Saves timing results to `benchmark_runs/` directory
+4. Saves the result JSON in the runs root `results/` directory
 
 **Time to complete**: ~2-3 minutes
 
@@ -67,10 +67,10 @@ for platform in duckdb clickhouse-local; do
     --output benchmark_runs/tpch_1_${platform}
 done
 
-benchbox compare \
-  benchmark_runs/tpch_1_duckdb/results.json \
-  benchmark_runs/tpch_1_clickhouse-local/results.json
+benchbox results --limit 2
 ```
+
+Find the two result files with `benchbox results` and pass them to `benchbox compare`.
 
 **Output**:
 - Side-by-side query timing comparison
@@ -93,11 +93,9 @@ benchbox run --benchmark tpcds --platform databricks --scale 1 \
 benchbox run --benchmark tpcds --platform databricks --scale 1 \
   --platform-option uc_catalog=hive_metastore \
   --platform-option uc_schema=benchbox_test
-
-cat benchmark_runs/tpcds_1_databricks_*/results.json
 ```
 
-The steps are: set the cloud credentials, preview the queries without executing them (to avoid costs), run the benchmark, and read the results. Review the generated queries in `./preview/queries/` before the real run, because the second command executes queries and incurs costs. The saved results include cloud execution metadata.
+The steps are: set the cloud credentials, preview the queries without executing them (to avoid costs), run the benchmark, and read the results with `benchbox results`. Review the generated queries under `./preview/<benchmark>_<platform>_queries_<timestamp>/` before the real run, because the second command executes queries and incurs costs. The saved results include cloud execution metadata.
 
 **External Table Mode**:
 
@@ -110,7 +108,7 @@ benchbox run --benchmark tpch --platform snowflake --scale 1 \
 ```
 
 This is useful for quick file-based comparisons across engines without paying for
-data loading. Not compatible with `--tuning tuned`. See the
+data loading. See the
 [Platform Comparison Guide](../guides/platform-comparison.md) for supported platforms.
 
 **Cost Control**:
@@ -129,12 +127,10 @@ Preview benchmark execution without running queries:
 benchbox run --benchmark tpcds --platform bigquery --scale 10 \
   --dry-run ./preview
 
-tree ./preview
-
-cat ./preview/summary.json
+ls ./preview
 ```
 
-The dry run writes generated queries and configuration. The preview directory holds `queries/` (one `.sql` file per query, such as `q1.sql`), `schema/` (DDL files such as `store_sales.ddl`) and `summary.json`.
+The dry run writes generated queries and configuration into `./preview/`: one `.sql` file per query under `<benchmark>_<platform>_queries_<timestamp>/` (such as `query_18.sql`), a matching schema file, the DDL preview, and timestamped JSON/YAML run previews.
 
 **Use Cases**:
 - Query validation before cloud execution
@@ -171,7 +167,7 @@ jobs:
         run: |
           benchbox compare \
             baseline/tpch_0.01_duckdb.json \
-            results/results.json \
+            $(benchbox results --paths | tail -1) \
             --fail-on-regression 10%
 ```
 
@@ -234,22 +230,23 @@ benchbox run --benchmark tpcds --platform clickhouse-local --scale 10 \
   --tuning tunings/clickhouse_tpcds.yaml \
   --output tuned/
 
-benchbox compare baseline/results.json tuned/results.json
+benchbox results --limit 2
 ```
 
-The first run is the baseline with no tunings. The second applies tunings (partitioning, sorting, indexes), and the last command compares the results.
+The first run is the baseline with no tunings. The second applies tunings, and `benchbox compare` (with the two result files from `benchbox results`) compares them. List built-in templates with `benchbox tuning list` or generate a starter file with `benchbox tuning init --platform clickhouse`.
 
-**Example Tuning Config** (`tunings/clickhouse_tpcds.yaml`):
+**Example Tuning Config** (`tunings/clickhouse_tpcds.yaml`, excerpt — see `examples/tunings/clickhouse/tpcds_tuned.yaml` for the full file):
 ```yaml
-tables:
-  store_sales:
-    partition_by: ss_sold_date_sk
-    order_by: [ss_customer_sk, ss_item_sk]
-    primary_key: [ss_item_sk, ss_ticket_number]
-
-  customer:
-    order_by: c_customer_sk
-    primary_key: c_customer_sk
+table_tunings:
+  STORE_SALES:
+    table_name: STORE_SALES
+    sorting:
+    - name: SS_ITEM_SK
+      type: INTEGER
+      order: 1
+    - name: SS_TICKET_NUMBER
+      type: INTEGER
+      order: 2
 ```
 
 See: [Performance Guide](../advanced/performance.md)
@@ -284,15 +281,17 @@ Verifying benchmark results for correctness:
 
 ```bash
 benchbox run --benchmark tpch --platform duckdb --scale 0.1 \
-  --validation strict
+  --validation full
 ```
 
-Validation checks row counts, result checksums, data type compliance and constraint satisfaction.
+Validation compares query row counts against expected values:
 
 **Validation Modes**:
-- `none`: No validation (fastest)
-- `basic`: Row count checks only
-- `strict`: Full result validation (slowest, most thorough)
+- `disabled`: No validation (fastest)
+- `loose`: Row-count checks with scale tolerance
+- `exact`: Exact row-count match
+- `range`: Row count must fall within the expected min/max
+- `full`: Full result validation (slowest, most thorough)
 
 See: [TPC Validation Guide](../guides/tpc/tpc-validation-guide.md)
 
@@ -334,10 +333,10 @@ benchbox run --benchmark tpch --platform duckdb --scale 0.01 \
   --verbose \
   --show-plans
 
-benchbox shell --platform duckdb --database benchmark.duckdb
+benchbox shell --platform duckdb --last
 ```
 
-The first command enables debug logging and uses the shell to redirect output to a file. The second runs a single query with maximum detail, and `--show-plans` shows the query plan. The last command opens an interactive SQL shell to inspect database state.
+The first command enables debug logging and uses the shell to redirect output to a file. The second runs a single query with maximum detail, and `--show-plans` shows the query plan. The last command opens an interactive SQL shell on the most recent database to inspect its state.
 
 **Common Issues**:
 - Data generation failures → Check disk space, permissions
@@ -364,17 +363,8 @@ class MyBenchmark(BaseBenchmark):
             "q2": "SELECT ...",
         }
 
-    def get_query(self, query_id, params=None):
-        queries = self.get_queries()
-        return queries[query_id]
-
-from benchbox.platforms.duckdb import DuckDBAdapter
-
-benchmark = MyBenchmark(scale_factor=0.1)
-adapter = DuckDBAdapter()
-results = benchmark.run_with_platform(adapter)
-
-print(f"Completed in {results.duration_seconds:.2f}s")
+    def get_query(self, query_id):
+        return self.get_queries()[query_id]
 ```
 
 See: [Custom Benchmarks Guide](../advanced/custom-benchmarks.md)
