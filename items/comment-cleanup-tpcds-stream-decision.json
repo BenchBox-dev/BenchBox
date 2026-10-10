@@ -6,7 +6,7 @@
     "Approved/no-change/rejected disposition is explicit. Any accepted algorithm change waits for later authorization and separate scoped implementation; source-only cleanup remains unchanged.",
     "Completed historical tracker claims are reconciled with current implementation rather than silently reopened or treated as live proof."
   ],
-  "context": "PR #2889 merged the original decision record. During resumed acceptance review, the record was found incomplete: it lacked caller-specific timed-window effects and overstated the opt-in query-sequence path as full specification conformance. Follow-up branch `docs/tpcds-legacy-stream-timing-effects` in `/Users/joe/Developer/BenchBox.wt-tpcds-legacy-stream-timing-effects` now adds caller-specific raw-identity/comparability and timing boundaries, options evaluation including dsqgen failure behavior, and a documentation-only downstream contract. `make ci-docs` passed before the final wording changes; `make pr-preflight` exited 0 and reported no mapped test files for this doc-only path. A final `make ci-docs` is running as background job `bg_54`; wait for its completion before committing. No source or public-schema changes. After verification, commit the decision-only correction, publish a docs PR, and merge it before finishing this item.",
+  "context": "PR #2889 merged the original decision record. Follow-up branch `docs/tpcds-legacy-stream-timing-effects` in `/Users/joe/Developer/BenchBox.wt-tpcds-legacy-stream-timing-effects` adds caller-specific raw-identity/comparability and timing boundaries, options evaluation including dsqgen failure behavior, and a documentation-only downstream contract; no source or public-schema changes. Final `make ci-docs` passed (job bg_54), `git diff --check` passed, and the earlier `make pr-preflight` exited 0 with no mapped tests for this docs-only path. `make comment-policy-check` is running as job bg_58. Only the decision record is modified. Effective worktree identity is Joe Harris <joeharris76@gmail.com>. After the comment-policy result, commit the decision-only correction, publish a docs PR, and merge it before finishing this item.",
   "description": "Read-only decision task. Evaluate all current legacy permutation/parameter callers in tpcds power tests, benchmark runner, throughput and dataframe query_resolution, including global random.seed effects. Prior completed items tpcds-throughput-permutation-compliance and dataframe-parameter-substitution-parity are historical context, not proof that all current callers migrated. Compare smallest viable retained/corrected/replaced design against official dsqgen ordered multi-stream output and public compatibility.\n\nDecision must disclose ordering, substitutions, seeds, RNG isolation, raw identity, result comparability and timed-window effects per caller. Text cleanup deletes false equivalence claims but preserves current algorithms. A migration requires later explicit behavior-change approval and separate implementation tasks/PRs, never hidden in comment removal. Execution guard: creation of this TODO is planning, not approval to execute the reviewed cleanup. Obtain later implementation authorization. Use a separate linked worktree and agent-write-preflight; preserve unrelated work. Freeze nonoverlapping code/test/doc paths with the integrator before dispatch. Ordinary independent PRs target develop; serialize shared test-lock checks and integration, not module edits. Required native/external soundness review remains mandatory, with no auto-merge bypass. No live cloud/stress, deployment, publication, historical-result rewriting, or unapproved external-repository writes.",
   "sessions": [
     {
@@ -76,6 +76,14 @@
       "generation": "093dcc505f6e419da48ec27bd3a26792",
       "op": "take",
       "op_id": "26a9783d45c14a328d1cf2018c1c9e3e",
+      "session_id": "024527ae77c1405f86cdbdf1079f6e14"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:cf29857b7864377c27f69396",
+      "at": "2026-10-10T20:52:08Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "ef2869c6b0bc4833a9718695f5a4fbbe",
       "session_id": "024527ae77c1405f86cdbdf1079f6e14"
     }
   ]
