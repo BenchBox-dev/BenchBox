@@ -71,7 +71,9 @@ class ClickHouseDiagnosticsMixin:
 
                 return db_name in databases
             finally:
-                client.disconnect()
+                disconnect = getattr(client, "disconnect", None)
+                if callable(disconnect):
+                    disconnect()
 
         except AttributeError:
             raise
@@ -88,7 +90,9 @@ class ClickHouseDiagnosticsMixin:
                 db_name = connection_config.get("database", self.database)
                 client.execute(f"DROP DATABASE IF EXISTS {db_name}")
             finally:
-                client.disconnect()
+                disconnect = getattr(client, "disconnect", None)
+                if callable(disconnect):
+                    disconnect()
 
         except Exception as e:
             raise RuntimeError(f"Failed to drop ClickHouse database: {e}") from e
