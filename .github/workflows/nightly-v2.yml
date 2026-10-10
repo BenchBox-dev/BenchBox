@@ -709,6 +709,34 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  liveness:
+    name: "t3:liveness | scheduled workflow liveness"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout develop (scheduled runs come from the default branch)
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: develop
+
+      - name: Assert every scheduled workflow has a recent scheduled run
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/scheduled_workflow_liveness.py | tee liveness.log
+
+      - name: Upload liveness log
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: t3-liveness
+          path: liveness.log
+          if-no-files-found: ignore
+          retention-days: 14
+
   durations-refresh:
     name: "t3:durations | duration refresh"
     runs-on: ubuntu-latest
@@ -803,6 +831,7 @@ jobs:
       - drift
       - quarantine
       - linkcheck
+      - liveness
       - durations-refresh
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
@@ -820,7 +849,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for job in docker cloud perf matrix browser extension install drift quarantine linkcheck durations-refresh; do
+          for job in docker cloud perf matrix browser extension install drift quarantine linkcheck liveness durations-refresh; do
             case "$job" in
               durations-refresh) domain=durations ;;
               *) domain="$job" ;;

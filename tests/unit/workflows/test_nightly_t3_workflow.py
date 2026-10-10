@@ -31,6 +31,7 @@ DOMAIN_JOBS = {
     "drift": "t3:drift",
     "quarantine": "t3:quarantine",
     "linkcheck": "t3:linkcheck",
+    "liveness": "t3:liveness",
     "durations-refresh": "t3:durations",
 }
 
@@ -370,3 +371,19 @@ def test_perf_smoke_workflow_uses_the_same_regression_gate_options() -> None:
     for step in (compare, nightly):
         assert "--fail-on-regression 10%" in step["run"]
         assert "--min-regression-delta 7ms" in step["run"]
+
+
+def test_liveness_domain_runs_the_shared_script_with_read_only_actions_access() -> None:
+    job = _load()["jobs"]["liveness"]
+
+    assert job["permissions"] == {"actions": "read", "contents": "read"}
+    assert "python3 scripts/scheduled_workflow_liveness.py" in _run_text(job)
+    assert "GITHUB_TOKEN" in str([step.get("env") for step in _steps(job)])
+
+
+def test_liveness_domain_checks_out_the_default_branch_that_scheduled_runs_come_from() -> None:
+    checkout = next(
+        step for step in _steps(_load()["jobs"]["liveness"]) if "actions/checkout@" in str(step.get("uses"))
+    )
+
+    assert checkout["with"]["ref"] == "develop"
