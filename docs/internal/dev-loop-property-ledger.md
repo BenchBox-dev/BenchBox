@@ -75,6 +75,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `extension-smoke.yml` | product-safety | Extension smoke coverage |
 | `gitignore-lint.yml` | tooling | Hygiene; standalone, not part of the ci.yml units |
 | `lint.yml` | tooling | Lint gate |
+| `mirror-ci-images.yml` | product-safety | Seeds pinned images in GHCR for nightly pulls that must avoid Docker Hub rate limits |
 | `nightly.yml` | product-safety | Scheduled validation; replaced by nightly T3; Windows legs, scheduled-workflow liveness and the Postgres throughput cell are non-blocking; ruleset drift runs as advisory |
 | `nightly-v2.yml` | product-safety | Nightly T3: platform matrix, docker engines, cross-browser, extension, install, drift, external documentation links |
 | `oracle-review.yml` | product-safety | Result-affecting changes need a success review of the head from the `benchbox-oracle` App, whose Bot identity only the owner controls, or a stand-in approval comment from an attester account posted after the oracle's latest review; that account is also the one local automation uses, so the stand-in records who vouched, not that a human read it |
