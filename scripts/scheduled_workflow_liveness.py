@@ -228,12 +228,15 @@ class GitHubApi:
             payload = self._get_json(f"{self.api_url}/repos/{self.repository}/actions/workflows/{workflow_file}")
             if isinstance(payload, dict):
                 anchors.append(parse_timestamp(payload.get("created_at")))
+        except LivenessError:
+            pass
+        try:
             path = urllib.parse.quote(f".github/workflows/{workflow_file}")
             commits = self._get_json(f"{self.api_url}/repos/{self.repository}/commits?path={path}&per_page=1")
             if isinstance(commits, list) and commits:
                 anchors.append(parse_timestamp(commits[0].get("commit", {}).get("committer", {}).get("date")))
         except LivenessError:
-            return None
+            pass
         known = [anchor for anchor in anchors if anchor is not None]
         return max(known) if known else None
 

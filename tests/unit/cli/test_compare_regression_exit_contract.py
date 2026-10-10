@@ -141,6 +141,16 @@ class TestMinRegressionDelta:
 
         assert _check_regression(comparison, 0.10, 5.0) is False
 
+    def test_decimal_slowdown_equal_to_the_floor_is_not_a_regression(self):
+        comparison = _timed_comparison(_timed_query(9.6, 16.6))
+
+        assert _check_regression(comparison, 0.10, 7.0) is False
+
+    def test_decimal_slowdown_just_above_the_floor_is_a_regression(self):
+        comparison = _timed_comparison(_timed_query(9.6, 16.7))
+
+        assert _check_regression(comparison, 0.10, 7.0) is True
+
     def test_large_slowdown_on_a_long_query_still_fails(self):
         comparison = _timed_comparison(_timed_query(5000.0, 5600.0))
 
@@ -204,6 +214,16 @@ class TestMinAggregateRegressionDelta:
         comparison = _metric_comparison(total_execution_time=_timed_metric(1.0, 2.0))
 
         assert _check_regression(comparison, 0.10, None, 1000.0) is False
+
+    def test_decimal_slowdown_equal_to_the_floor_is_not_a_regression(self):
+        comparison = _metric_comparison(total_execution_time=_timed_metric(0.600, 0.682))
+
+        assert _check_regression(comparison, 0.10, None, 82.0) is False
+
+    def test_decimal_slowdown_just_above_the_floor_is_a_regression(self):
+        comparison = _metric_comparison(total_execution_time=_timed_metric(0.600, 0.683))
+
+        assert _check_regression(comparison, 0.10, None, 82.0) is True
 
     def test_metric_without_timings_falls_back_to_the_percentage(self):
         comparison = _metric_comparison(total_execution_time={"change_percent": 25.0})

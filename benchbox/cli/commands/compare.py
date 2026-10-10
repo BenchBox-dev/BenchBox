@@ -1406,7 +1406,10 @@ def _query_slowdown_exceeds(query: dict[str, Any], min_delta_ms: float | None) -
     current_ms = query.get("current_time_ms")
     if baseline_ms is None or current_ms is None:
         return True
-    return (current_ms - baseline_ms) > min_delta_ms
+    diff_ms = current_ms - baseline_ms
+    if math.isclose(diff_ms, min_delta_ms, rel_tol=1e-9, abs_tol=1e-9):
+        return False
+    return diff_ms > min_delta_ms
 
 
 def _metric_slowdown_exceeds(metric_data: dict[str, Any], min_aggregate_delta_ms: float | None) -> bool:
@@ -1416,7 +1419,10 @@ def _metric_slowdown_exceeds(metric_data: dict[str, Any], min_aggregate_delta_ms
     current_s = metric_data.get("current")
     if baseline_s is None or current_s is None:
         return True
-    return (current_s - baseline_s) * 1000.0 > min_aggregate_delta_ms
+    diff_ms = (current_s - baseline_s) * 1000.0
+    if math.isclose(diff_ms, min_aggregate_delta_ms, rel_tol=1e-9, abs_tol=1e-9):
+        return False
+    return diff_ms > min_aggregate_delta_ms
 
 
 def _check_regression(
