@@ -308,12 +308,11 @@ class TestExecutionEngineResolution:
         assert receipt["applied"] == "streaming"
         assert receipt["resolution"] == "tuning_profile"
 
-    def test_tuning_in_memory_is_honored_over_streaming_mode(self):
+    def test_conflicting_tuning_engine_selections_fail(self):
         tuning = _tuning_config(engine_affinity="in-memory", streaming_mode=True)
 
-        adapter = PolarsDataFrameAdapter(tuning_config=tuning)
-
-        assert adapter.get_platform_info()["execution_engine"]["applied"] == "in-memory"
+        with pytest.raises(ValueError, match="Conflicting tuning execution engines"):
+            PolarsDataFrameAdapter(tuning_config=tuning)
 
     def test_affinity_records_native_collect_kwargs_and_environment(self, monkeypatch, caplog):
         monkeypatch.setenv("POLARS_ENGINE_AFFINITY", "streaming")

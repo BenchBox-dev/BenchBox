@@ -161,13 +161,7 @@ class PolarsAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         self.rechunk = config.get("rechunk", True)
         self._engine_receipt = self.resolve_execution_engine(config.get("execution_engine") or "default")
         if config.get("streaming", False):
-            import warnings
-
-            warnings.warn(
-                "The Polars streaming option is deprecated and has no effect on SQL execution",
-                DeprecationWarning,
-                stacklevel=2,
-            )
+            self._engine_receipt = self.resolve_execution_engine("streaming")
 
         self._table_schemas: dict[str, dict] = {}
 

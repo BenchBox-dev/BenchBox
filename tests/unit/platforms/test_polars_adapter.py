@@ -38,14 +38,13 @@ class TestPolarsAdapterBasics:
             )
             assert adapter.rechunk is True
 
-    def test_initialization_custom_config(self, recwarn):
+    def test_initialization_custom_config(self):
         from benchbox.platforms.polars_platform import PolarsAdapter
 
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = PolarsAdapter(
                 working_dir=tmpdir,
                 execution_mode="eager",
-                streaming=True,
                 n_rows=1000,
                 rechunk=False,
             )
@@ -53,7 +52,14 @@ class TestPolarsAdapterBasics:
             assert adapter.execution_mode == "eager"
             assert adapter.n_rows == 1000
             assert adapter.rechunk is False
-            assert any(issubclass(warning.category, DeprecationWarning) for warning in recwarn.list)
+
+    def test_initialization_rejects_unsupported_streaming_alias(self):
+        from benchbox.core.execution_engine import UnsupportedExecutionEngineError
+        from benchbox.platforms.polars_platform import PolarsAdapter
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with pytest.raises(UnsupportedExecutionEngineError, match="Allowed: default$"):
+                PolarsAdapter(working_dir=tmpdir, streaming=True)
 
     def test_sql_adapter_rejects_non_default_engine(self):
         from benchbox.core.execution_engine import UnsupportedExecutionEngineError
@@ -116,22 +122,14 @@ class TestPolarsAdapterFromConfig:
             assert adapter.platform_name == "Polars"
             assert adapter.execution_mode == "lazy"
 
-    def test_from_config_with_execution_mode(self, recwarn):
+    def test_from_config_rejects_unsupported_streaming_alias(self):
+        from benchbox.core.execution_engine import UnsupportedExecutionEngineError
         from benchbox.platforms.polars_platform import PolarsAdapter
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            config = {
-                "working_dir": tmpdir,
-                "benchmark": "tpch",
-                "scale_factor": 1.0,
-                "execution_mode": "eager",
-                "streaming": True,
-            }
-
-            adapter = PolarsAdapter.from_config(config)
-
-            assert adapter.execution_mode == "eager"
-            assert any(issubclass(warning.category, DeprecationWarning) for warning in recwarn.list)
+            config = {"working_dir": tmpdir, "benchmark": "tpch", "scale_factor": 1.0, "streaming": True}
+            with pytest.raises(UnsupportedExecutionEngineError, match="Allowed: default$"):
+                PolarsAdapter.from_config(config)
 
 
 class TestPolarsDataFrameContext:

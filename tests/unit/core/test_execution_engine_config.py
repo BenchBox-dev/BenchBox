@@ -135,24 +135,3 @@ class TestCliEngineResolution:
 
         assert "execution_engine" in _active_non_replayable_options(types.SimpleNamespace(execution_engine="streaming"))
         assert "execution_engine" not in _active_non_replayable_options(types.SimpleNamespace(execution_engine=None))
-
-    def test_deprecated_cli_flag_forwards_the_legacy_streaming_request(self, monkeypatch):
-        import importlib
-
-        from click.testing import CliRunner
-
-        module = importlib.import_module("benchbox.cli.commands.run")
-        captured = []
-
-        def prepare(state):
-            captured.append(state)
-            state.dry_run = True
-
-        monkeypatch.setattr(module, "_prepare_run_state", prepare)
-        monkeypatch.setattr(module, "_run_dry_run", lambda state: None)
-
-        result = CliRunner().invoke(module.run, ["--platform", "polars-df", "--polars-streaming"])
-
-        assert result.exit_code == 0
-        assert "deprecated" in result.output
-        assert captured[0].platform_option_pairs == (("streaming", "true"),)

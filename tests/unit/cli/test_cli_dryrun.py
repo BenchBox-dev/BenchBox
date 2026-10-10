@@ -1103,6 +1103,19 @@ class TestGenerateCliCommandNewParams:
         assert "--platform-option driver_version=1.2.0" in cmd
         assert "--platform-option warehouse=MY_WH" in cmd
 
+    def test_execution_engine_renders_as_canonical_cli_option(self):
+        from benchbox.cli.dryrun import generate_cli_command
+
+        command = generate_cli_command(
+            platform="polars-df",
+            benchmark="tpch",
+            scale=0.01,
+            execution_engine="streaming",
+        )
+
+        assert "--execution-engine streaming" in command
+        assert "--platform-option streaming=true" not in command
+
     def test_platform_options_omitted_when_none(self):
         from benchbox.cli.dryrun import generate_cli_command
 
@@ -1309,6 +1322,7 @@ class TestGenerateCliCommandCompleteness:
             "help",
             "help_topic",
             "concurrency",
+            "polars_streaming",
         }
     )
 

@@ -2789,7 +2789,9 @@ def run(
 ) -> None:
     if polars_streaming:
         console.print("[yellow]--polars-streaming is deprecated; use --execution-engine streaming.[/yellow]")
-        platform_option_pairs = (*platform_option_pairs, ("streaming", "true"))
+        if execution_engine not in (None, "default", "streaming"):
+            raise click.UsageError(f"--polars-streaming conflicts with --execution-engine {execution_engine}")
+        execution_engine = "streaming"
     s = types.SimpleNamespace(
         ctx=ctx,
         platform=platform,

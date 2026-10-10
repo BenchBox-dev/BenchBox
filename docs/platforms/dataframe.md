@@ -562,13 +562,13 @@ gpu:
 
 When you use `--tuning auto`, BenchBox detects your system profile and applies appropriate settings:
 
-| System Profile | Memory | Typical Settings Applied |
-|----------------|--------|--------------------------|
-| Very Low | <4GB | Streaming mode, small chunks (10K), spill to disk |
-| Low | 4-8GB | Streaming mode, moderate chunks (50K), memory-mapped I/O |
-| Medium | 8-32GB | Lazy evaluation, moderate chunks (100K), pyarrow backend |
-| High | >32GB | In-memory processing, no streaming, large chunks |
-| GPU Available | N/A | GPU enabled, managed pool, spill to host |
+| System Profile | Memory | Base Memory Settings (Before Platform Overrides) |
+|----------------|--------|-----------------------------------------------|
+| Very Low | <4GB | `streaming_mode=true`; `chunk_size=50K` |
+| Low | 4GB to <8GB | `streaming_mode=true`; `chunk_size=100K` |
+| Medium | 8GB to <32GB | `chunk_size=500K` |
+| High | 32GB or more | `streaming_mode=false` |
+| GPU Available | N/A | GPU enabled with managed pool (cuDF) |
 
 #### System Detection
 

@@ -243,19 +243,17 @@ class TestPolarsAdapterInitialization:
             assert adapter.n_rows is None
             assert adapter.rechunk is True
 
-    def test_custom_config_values(self, recwarn):
+    def test_custom_config_values(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = PolarsAdapter(
                 working_dir=tmpdir,
                 execution_mode="eager",
-                streaming=True,
                 n_rows=500,
                 rechunk=False,
             )
             assert adapter.execution_mode == "eager"
             assert adapter.n_rows == 500
             assert adapter.rechunk is False
-            assert any(issubclass(warning.category, DeprecationWarning) for warning in recwarn.list)
 
 
 class TestPolarsAdapterConnectionAndInfo:
@@ -277,15 +275,14 @@ class TestPolarsAdapterConnectionAndInfo:
             assert info["client_library_version"] == pl.__version__
             assert info["platform_version"] == pl.__version__
 
-    def test_platform_info_configuration_section(self, recwarn):
+    def test_platform_info_configuration_section(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            adapter = PolarsAdapter(working_dir=tmpdir, execution_mode="eager", streaming=True)
+            adapter = PolarsAdapter(working_dir=tmpdir, execution_mode="eager")
             info = adapter.get_platform_info()
             config = info["configuration"]
             assert config["execution_mode"] == "eager"
             assert config["execution_engine"]["resolution"] == "platform_default"
             assert config["result_cache_enabled"] is False
-            assert any(issubclass(warning.category, DeprecationWarning) for warning in recwarn.list)
 
 
 class TestPolarsSchemaCreation:

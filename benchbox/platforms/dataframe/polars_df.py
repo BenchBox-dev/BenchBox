@@ -98,7 +98,12 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
 
         affinity = self._tuning_config.execution.engine_affinity
         if affinity is not None:
-            return resolve_requested("polars", affinity)
+            resolved = resolve_requested("polars", affinity)
+            if self._tuning_config.execution.streaming_mode and resolved != "streaming":
+                raise ValueError(
+                    f"Conflicting tuning execution engines: engine_affinity={affinity!r} and streaming_mode=True"
+                )
+            return resolved
         if self._tuning_config.execution.streaming_mode:
             return "streaming"
         return None

@@ -92,3 +92,59 @@ class TestInteractiveEngineResolution:
         prompt.assert_not_called()
         assert s.resolved_execution_engine == "streaming"
         assert s.database_config.execution_engine == "streaming"
+
+
+def test_polars_streaming_cli_alias_sets_execution_engine_without_platform_option():
+    import importlib
+
+    from click.testing import CliRunner
+
+    run_module = importlib.import_module("benchbox.cli.commands.run")
+    captured = {}
+
+    def prepare(state):
+        captured["execution_engine"] = state.execution_engine
+        captured["platform_option_pairs"] = state.platform_option_pairs
+        state.dry_run = True
+
+    with (
+        patch.object(run_module, "_prepare_run_state", prepare),
+        patch.object(run_module, "_run_dry_run"),
+    ):
+        result = CliRunner().invoke(
+            run_module.run,
+            ["--platform", "polars-df", "--benchmark", "tpch", "--polars-streaming"],
+            obj={},
+        )
+
+    assert result.exit_code == 0, result.output
+    assert "deprecated" in result.output
+    assert captured["execution_engine"] == "streaming"
+    assert ("streaming", "true") not in captured["platform_option_pairs"]
+
+
+def test_polars_streaming_cli_alias_rejects_conflicting_execution_engine():
+    import importlib
+
+    from click.testing import CliRunner
+
+    run_module = importlib.import_module("benchbox.cli.commands.run")
+
+    with patch.object(run_module, "_prepare_run_state") as prepare:
+        result = CliRunner().invoke(
+            run_module.run,
+            [
+                "--platform",
+                "polars-df",
+                "--benchmark",
+                "tpch",
+                "--execution-engine",
+                "in-memory",
+                "--polars-streaming",
+            ],
+            obj={},
+        )
+
+    assert result.exit_code == 2
+    assert "conflicts with --execution-engine in-memory" in result.output
+    prepare.assert_not_called()
