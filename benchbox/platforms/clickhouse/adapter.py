@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+from benchbox.core.deployment import deployment_class, select_adapter_deployment
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
 from benchbox.utils.dependencies import check_platform_dependencies, get_dependency_error_message
 
@@ -38,6 +39,10 @@ class ClickHouseAdapter(
 
         is_cloud_subclass = config.get("_is_cloud_subclass", False)
         self.deployment_mode = resolve_clickhouse_deployment_mode(config, allow_cloud=is_cloud_subclass)
+        if not is_cloud_subclass:
+            select_adapter_deployment("clickhouse", config, self.deployment_mode)
+        self.deployment_selected = self.deployment_mode
+        self.deployment_selected_class = deployment_class("clickhouse", self.deployment_mode)
 
         valid_modes = set(CLICKHOUSE_DEPLOYMENT_MODE_VALUES)
         if is_cloud_subclass:

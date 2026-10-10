@@ -33,7 +33,12 @@ class DeprecatedOptionAlias:
     removed_in: str
 
 
-DEPRECATED_OPTION_ALIASES: Mapping[tuple[str, str], DeprecatedOptionAlias] = MappingProxyType({})
+DEPRECATED_OPTION_ALIASES: Mapping[tuple[str, str], DeprecatedOptionAlias] = MappingProxyType(
+    {
+        ("clickhouse", "mode"): DeprecatedOptionAlias(target="deployment", removed_in="0.6.0"),
+        ("influxdb", "mode"): DeprecatedOptionAlias(target="deployment", removed_in="0.6.0"),
+    }
+)
 
 
 class UnsupportedExecutionEngineError(ValueError):

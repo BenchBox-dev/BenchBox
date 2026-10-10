@@ -216,7 +216,56 @@ from benchbox.platforms.adapter_factory import (
 )
 
 
+def _deployment_selector_config(config: dict) -> tuple[str | None, dict[str, object], set[str] | None]:
+    nested = config.get("options")
+    nested_options = dict(nested) if isinstance(nested, dict) else {}
+    values: dict[str, object] = {**nested_options, **config}
+    marker = values.get("_explicit_platform_options")
+    explicit = set(marker.keys()) if isinstance(marker, dict) else None
+    raw_selector = values.get("_deployment_selector")
+    selector = str(raw_selector) if raw_selector is not None else None
+    return selector, values, explicit
+
+
+def _apply_deployment_selector(platform_name: str, config: dict) -> tuple[str, dict]:
+    from benchbox.core.deployment import DEPLOYMENT_ALIAS_KEYS, resolve_deployment
+
+    lowered = platform_name.lower().strip()
+    if ":" in lowered:
+        from benchbox.platforms.clickhouse.deployment_mode import (
+            CLICKHOUSE_LEGACY_SELECTOR_MAP,
+            clickhouse_legacy_selector_warning,
+        )
+
+        if lowered in CLICKHOUSE_LEGACY_SELECTOR_MAP:
+            import warnings
+
+            target = CLICKHOUSE_LEGACY_SELECTOR_MAP[lowered]
+            warnings.warn(clickhouse_legacy_selector_warning(platform_name, target), DeprecationWarning, stacklevel=2)
+            return target, config
+        base, suffix = lowered.rsplit(":", 1)
+        if base in DEPLOYMENT_ALIAS_KEYS:
+            platform_name = base
+            if config.get("_deployment_selector") is None:
+                config = {**config, "_deployment_selector": suffix}
+            elif str(config["_deployment_selector"]).strip().lower() != suffix:
+                raise ValueError(
+                    f"Deployment selector '{lowered}' conflicts with "
+                    f"explicit deployment '{config['_deployment_selector']}'. "
+                    "Use one deployment selection."
+                )
+    selector, values, explicit = _deployment_selector_config(config)
+    base_key = platform_name.lower().strip()
+    if base_key not in DEPLOYMENT_ALIAS_KEYS:
+        return platform_name, config
+    resolution = resolve_deployment(base_key, selector, values, explicit)
+    if resolution.explicit and resolution.selected is not None:
+        config = {**config, "deployment_mode": resolution.selected}
+    return platform_name, config
+
+
 def get_platform_adapter(platform_name: str, **config) -> PlatformAdapter:
+    platform_name, config = _apply_deployment_selector(platform_name, config)
     canonical_name = PlatformRegistry.resolve_platform_name(platform_name)
 
     try:
@@ -410,7 +459,7 @@ trino|catalog|Trino catalog to use (e.g., hive, iceberg, memory). Auto-discovere
 trino|staging_root|Cloud storage path for staging data (e.g., s3://..., gs://..., abfss://...)|{}
 trino|table_format|Table format for creating tables (memory, hive, iceberg, delta)|{'default': 'memory'}
 trino|source_catalog|Source catalog for external data loading (e.g., hive connector)|{}
-firebolt|deployment_mode|Explicit Firebolt mode: 'core' for local Docker, 'cloud' for managed Firebolt|{'aliases': ('firebolt_mode',), 'choices': ('core', 'cloud')}
+firebolt|deployment_mode|Deprecated alias of the platform selector: 'core' for local Docker, 'cloud' for managed Firebolt|{'aliases': ('firebolt_mode',), 'choices': ('core', 'cloud')}
 firebolt|url|Firebolt Core endpoint URL (default: http://localhost:3473)|{'default': 'http://localhost:3473'}
 firebolt|client_id|Firebolt Cloud OAuth client ID|{}
 firebolt|client_secret|Firebolt Cloud OAuth client secret|{}
@@ -470,10 +519,11 @@ pg-duckdb|max_parallel_workers_per_gather|PostgreSQL max_parallel_workers_per_ga
 pg-duckdb|force_execution|Force DuckDB execution engine for all queries|{'parser': 'parse_bool', 'default': True}
 pg-duckdb|postgres_scan_threads|Threads for parallel PostgreSQL table scanning (0 = auto)|{'parser': 'int', 'default': 0}
 pg-duckdb|compare_native|Run native DuckDB comparison for matched queries|{'parser': 'parse_bool', 'default': False}
+pg-duckdb|deployment_mode|Deprecated alias of the platform selector: 'self-hosted' for local PostgreSQL, 'motherduck' for MotherDuck cloud offload|{'choices': ('self-hosted', 'motherduck')}
 pg-duckdb|duckdb_db_path|Path to the DuckDB database file pg_duckdb attaches|{}
 ducklake|metadata_path|DuckLake catalog metadata file path (.ducklake)|{}
 ducklake|data_path|DuckLake Parquet data directory (local path or cloud URI: s3://, gs://, az://)|{}
-ducklake|deployment_mode|DuckLake deployment mode: local, local_catalog_s3, postgres_catalog, or postgres_catalog_s3|{'choices': ('local', 'local_catalog_s3', 'postgres_catalog', 'postgres_catalog_s3')}
+ducklake|deployment_mode|Deprecated alias of the platform selector: local, local_catalog_s3, postgres_catalog, or postgres_catalog_s3|{'choices': ('local', 'local_catalog_s3', 'postgres_catalog', 'postgres_catalog_s3')}
 ducklake|catalog|DuckLake catalog backend: duckdb, sqlite, or postgres|{'choices': ('duckdb', 'sqlite', 'postgres'), 'default': 'duckdb'}
 ducklake|pg_host|PostgreSQL hostname for the postgres catalog backend|{'default': 'localhost'}
 ducklake|pg_port|PostgreSQL port for the postgres catalog backend|{'parser': 'int', 'default': 5432}
@@ -650,7 +700,8 @@ snowflake|staging_root|Cloud storage path for staging data|{}
 snowflake|iceberg_external_volume|Snowflake EXTERNAL VOLUME name for Iceberg tables|{}
 lakesail|endpoint|Spark Connect server endpoint (for example, sc://localhost:50051)|{'default': 'sc://localhost:50051'}
 lakesail|adaptive_enabled|Enable or disable LakeSail Adaptive Query Execution (AQE)|{'parser': 'parse_bool', 'default': 'true'}
-velox|deployment|Deployment mode: 'local' (in-process SparkSession, Linux only) or 'remote' (Spark-Connect server)|{'choices': ('local', 'remote'), 'default': 'local'}
+lakesail|deployment_mode|Deprecated alias of the platform selector: 'local' for single-node, 'distributed' for a Rust worker cluster|{'choices': ('local', 'distributed'), 'aliases': ('sail_mode',)}
+velox|deployment|Deprecated alias of the platform selector: 'local' (in-process SparkSession, Linux only) or 'remote' (Spark-Connect server)|{'choices': ('local', 'remote'), 'default': 'local'}
 velox|endpoint|Spark-Connect endpoint for remote mode (e.g., sc://localhost:50051)|{'default': 'sc://localhost:50051'}
 velox|gluten_jar_path|Absolute path to the Gluten Velox bundle jar (required for local mode)|{'aliases': ('jar',)}
 velox|offheap_size|Off-heap memory for Velox native engine (e.g., '8g', '16g')|{'default': '8g'}

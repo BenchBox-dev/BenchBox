@@ -58,6 +58,14 @@ def build_platform_config(
         if consume_explicit_options
         else overrides.get("_explicit_platform_options", {})
     )
+    from collections.abc import MutableMapping
+
+    from benchbox.core.deployment import DEPLOYMENT_ALIAS_KEYS
+
+    if isinstance(explicit_options, MutableMapping):
+        for key in DEPLOYMENT_ALIAS_KEYS.get(platform_type.lower(), ()):
+            if saved_creds.get(key) is not None:
+                explicit_options.setdefault(key, saved_creds[key])
 
     merged_options: dict[str, Any] = dict(base_options or {})
     merged_options.update(options)

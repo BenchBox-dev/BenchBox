@@ -643,8 +643,9 @@ class TestDuckLakeDeploymentModeIsApplied:
         assert adapter._data_path_is_cloud is True
         assert "implies" not in caplog.text
 
-    def test_unknown_mode_is_ignored_rather_than_crashing(self, tmp_path):
-        assert self._from_config(tmp_path, deployment_mode="not-a-mode").catalog == "duckdb"
+    def test_unknown_mode_fails_closed(self, tmp_path):
+        with pytest.raises(ValueError, match="does not support deployment mode"):
+            self._from_config(tmp_path, deployment_mode="not-a-mode")
 
     def test_every_registered_mode_is_mapped(self):
         from benchbox.core.platform_registry import PlatformRegistry

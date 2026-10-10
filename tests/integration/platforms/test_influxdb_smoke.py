@@ -81,7 +81,7 @@ def test_influxdb_requires_valid_mode(monkeypatch):
             database="test",
         )
 
-    assert "Invalid InfluxDB mode" in str(excinfo.value)
+    assert "does not support deployment mode" in str(excinfo.value)
 
 
 @pytest.mark.integration

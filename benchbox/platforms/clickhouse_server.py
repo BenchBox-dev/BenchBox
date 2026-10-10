@@ -16,6 +16,8 @@ class ClickHouseServerAdapter(ClickHouseAdapter):
     def __init__(self, **config: Any) -> None:
         config["deployment_mode"] = "server"
         super().__init__(**config)
+        self.deployment_selected = "self-hosted"
+        self.deployment_selected_class = "self-hosted"
 
     @property
     def platform_name(self) -> str:

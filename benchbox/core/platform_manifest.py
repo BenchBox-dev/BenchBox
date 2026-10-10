@@ -2302,12 +2302,27 @@ _PLATFORM_MANIFEST_JSON = """[
       "supports_sql": true,
       "supports_dataframe": false,
       "default_mode": "sql",
-      "default_deployment": "self-hosted",
+      "default_deployment": "cloud",
       "deployment_modes": {
-        "self-hosted": {
+        "core": {
           "mode": "self-hosted",
-          "display_name": "InfluxDB Self-Hosted",
-          "description": "Self-hosted InfluxDB server",
+          "display_name": "InfluxDB Core",
+          "description": "Self-hosted InfluxDB Core server",
+          "requires_credentials": true,
+          "requires_cloud_storage": false,
+          "requires_network": true,
+          "default_for_platform": false,
+          "dependencies": [
+            "influxdb3"
+          ],
+          "auth_methods": [
+            "password"
+          ]
+        },
+        "cloud": {
+          "mode": "managed",
+          "display_name": "InfluxDB Cloud",
+          "description": "InfluxDB Cloud managed service",
           "requires_credentials": true,
           "requires_cloud_storage": false,
           "requires_network": true,
@@ -2316,7 +2331,7 @@ _PLATFORM_MANIFEST_JSON = """[
             "influxdb3"
           ],
           "auth_methods": [
-            "password"
+            "token"
           ]
         }
       }

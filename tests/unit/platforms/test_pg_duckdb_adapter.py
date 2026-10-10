@@ -302,7 +302,7 @@ class TestPgDuckDBMotherDuckMode:
         assert adapter.motherduck_token == "env_token_456"
 
     def test_invalid_deployment_mode_raises(self, pg_duckdb_stubs):
-        with pytest.raises(ValueError, match="Invalid pg_duckdb deployment mode"):
+        with pytest.raises(ValueError, match="does not support deployment mode"):
             PgDuckDBAdapter(deployment_mode="invalid")
 
     def test_create_connection_sets_motherduck_token(self, pg_duckdb_stubs, monkeypatch):

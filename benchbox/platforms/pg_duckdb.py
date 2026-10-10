@@ -10,6 +10,8 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
+from benchbox.core.deployment import deployment_class, select_adapter_deployment
+
 from .base.config_utils import (
     POSTGRES_FAMILY_BASE_OPTIONS,
     POSTGRES_FAMILY_PLATFORM_FIELDS,
@@ -101,14 +103,19 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
         adapter_config["postgres_scan_threads"] = config.get("postgres_scan_threads", 0)
         adapter_config["compare_native"] = config.get("compare_native", False)
         adapter_config["duckdb_db_path"] = config.get("duckdb_db_path")
-        adapter_config["deployment_mode"] = config.get("deployment_mode", "self-hosted")
+        nested_options = config.get("options") if isinstance(config.get("options"), dict) else {}
+        adapter_config["deployment_mode"] = (
+            config.get("deployment_mode") or nested_options.get("deployment_mode") or "self-hosted"
+        )
         if config.get("motherduck_token"):
             adapter_config["motherduck_token"] = config["motherduck_token"]
         return cls(**adapter_config)
 
     def __init__(self, **config):
-        deployment_mode = config.get("deployment_mode", "self-hosted")
+        deployment_mode = select_adapter_deployment("pg-duckdb", config, config.get("deployment_mode", "self-hosted"))
         self.deployment_mode = deployment_mode.lower()
+        self.deployment_selected = self.deployment_mode
+        self.deployment_selected_class = deployment_class("pg-duckdb", self.deployment_mode)
 
         valid_modes = {"self-hosted", "motherduck"}
         if self.deployment_mode not in valid_modes:
@@ -338,6 +345,7 @@ _build_pg_duckdb_config = make_platform_config_builder(
         "postgres_scan_threads",
         "compare_native",
         "duckdb_db_path",
+        "deployment_mode",
     ),
     base_options={
         **POSTGRES_FAMILY_BASE_OPTIONS,

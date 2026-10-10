@@ -45,7 +45,7 @@ def _register_clickhouse() -> None:
             name="deployment_mode",
             parser=_parse_clickhouse_mode,
             default="server",
-            help="Deployment mode for ClickHouse (server or local).",
+            help="Deprecated alias of the platform selector: deployment mode for ClickHouse (server or local).",
             choices=["server", "local"],
             aliases=("mode",),
         ),

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from benchbox.core.config_inheritance import resolve_dialect_for_query_translation
+from benchbox.core.deployment import deployment_class, select_adapter_deployment
 from benchbox.platforms.base.data_loading import escape_sql_string_literal
 from benchbox.platforms.base.ddl_helpers import strip_primary_keys
 from benchbox.utils.cloud_storage import get_cloud_path_info, is_cloud_path
@@ -320,6 +321,11 @@ class DuckLakeAdapter(DuckDBAdapter):
     def __init__(self, **config):
         super().__init__(**config)
         self._expected_benchmark = config.get("benchmark")
+        self.deployment_mode = select_adapter_deployment("ducklake", config, None)
+        self.deployment_selected = self.deployment_mode
+        self.deployment_selected_class = (
+            deployment_class("ducklake", self.deployment_mode) if self.deployment_mode else None
+        )
         self._expected_scale_factor = config.get("scale_factor")
 
         metadata_path = config.get("metadata_path")

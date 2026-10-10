@@ -181,7 +181,11 @@ _CLICKHOUSE_PROFILE_CONTRACT = _contract(
 MCP_PLATFORM_OPTION_CONTRACT: dict[str, dict[str, MCPPlatformOptionContract]] = {
     "clickhouse": {
         "connection_profile": _CLICKHOUSE_PROFILE_CONTRACT,
-        "deployment_mode": _contract("ClickHouseAdapter.from_config(deployment_mode)", "connection"),
+        "deployment_mode": _contract(
+            "Deprecated alias of --platform clickhouse:local|server, resolved through the core deployment selector",
+            "connection",
+            aliases=("mode",),
+        ),
     },
     "clickhouse-server": {
         "connection_profile": _CLICKHOUSE_PROFILE_CONTRACT,

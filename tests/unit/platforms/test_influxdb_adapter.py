@@ -86,7 +86,7 @@ class TestInfluxDBAdapterInitialization:
 
     def test_initialization_invalid_mode(self):
         try:
-            with pytest.raises(ValueError, match="Invalid InfluxDB mode"):
+            with pytest.raises(ValueError, match="does not support deployment mode"):
                 InfluxDBAdapter(token="test", mode="invalid")
         except ImportError:
             pytest.skip("InfluxDB client not installed")

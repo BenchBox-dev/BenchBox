@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from benchbox.core.deployment import deployment_class
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
 from benchbox.utils.dependencies import (
     check_platform_dependencies,
@@ -40,6 +41,12 @@ class InfluxDBAdapter(
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
 
+    @classmethod
+    def from_config(cls, config: dict[str, Any]) -> InfluxDBAdapter:
+        nested = config.get("options")
+        merged = {**nested, **config} if isinstance(nested, dict) else dict(config)
+        return cls(**merged)
+
     def __init__(self, **config):
         super().__init__(**config)
 
@@ -58,6 +65,8 @@ class InfluxDBAdapter(
 
         if self.mode not in ("core", "cloud"):
             raise ValueError(f"Invalid InfluxDB mode '{self.mode}'. Must be 'core' or 'cloud'.")
+        self.deployment_selected = self.mode
+        self.deployment_selected_class = deployment_class("influxdb", self.mode)
 
         if self.mode == "core":
             protocol = "http" if not self.ssl else "https"

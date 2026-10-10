@@ -33,10 +33,11 @@ try:
     PlatformHookRegistry.register_option_specs(
         "influxdb",
         PlatformOptionSpec(
-            name="mode",
+            name="deployment_mode",
             choices=["core", "cloud"],
             default="cloud",
-            help="InfluxDB deployment mode: 'core' for self-hosted OSS, 'cloud' for managed service",
+            aliases=("mode",),
+            help="Deprecated alias of --platform influxdb:core|cloud: 'core' for self-hosted OSS, 'cloud' for managed service",
         ),
         PlatformOptionSpec(
             name="host",

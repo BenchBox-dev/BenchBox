@@ -57,21 +57,19 @@ print(f"InfluxDB support available: {INFLUXDB_AVAILABLE}")
 ### CLI Usage
 
 ```bash
-benchbox run --platform influxdb \
+benchbox run --platform influxdb:cloud \
   --benchmark tsbs-devops \
   --platform-option host=us-east-1-1.aws.cloud2.influxdata.com \
   --platform-option token=$INFLUXDB_TOKEN \
   --platform-option org=my-org \
-  --platform-option database=benchmarks \
-  --platform-option mode=cloud
+  --platform-option database=benchmarks
 
-benchbox run --platform influxdb \
+benchbox run --platform influxdb:core \
   --benchmark tsbs-devops \
   --platform-option host=localhost \
   --platform-option port=8086 \
   --platform-option token=$INFLUXDB_TOKEN \
-  --platform-option database=benchmarks \
-  --platform-option mode=core
+  --platform-option database=benchmarks
 ```
 
 The first command targets InfluxDB Cloud. The second targets a local InfluxDB Core server. All options are passed as `--platform-option KEY=VALUE`.
@@ -85,7 +83,7 @@ The first command targets InfluxDB Cloud. The second targets a local InfluxDB Co
 | `token` | - | Authentication token (or set `INFLUXDB_TOKEN` env var) |
 | `org` | - | Organization name |
 | `database` | `benchbox` | Database (bucket) name |
-| `mode` | `cloud` | Deployment mode: `core` or `cloud` |
+| `deployment_mode` | `cloud` | Deprecated alias of `--platform influxdb:core\|cloud`; `mode` is an alias of this option |
 | `ssl` | `true` | Use SSL/TLS connection. The CLI passes option values as strings, so disabling SSL from the CLI is not supported; use the Python API with `ssl=False` for plaintext local servers (see below) |
 
 ### Python API
@@ -98,7 +96,7 @@ adapter = InfluxDBAdapter(
     token="your-token",
     org="your-org",
     database="benchmarks",
-    mode="cloud",
+    deployment_mode="cloud",
 )
 
 adapter = InfluxDBAdapter(
@@ -106,7 +104,7 @@ adapter = InfluxDBAdapter(
     port=8086,
     token="your-token",
     database="benchmarks",
-    mode="core",
+    deployment_mode="core",
     ssl=False,
 )
 
@@ -166,7 +164,7 @@ config = {
     "org": "your-org",
     "database": "benchmarks",
     "ssl": False,
-    "mode": "core",
+    "deployment_mode": "core",
 }
 
 adapter = InfluxDBAdapter.from_config(config)

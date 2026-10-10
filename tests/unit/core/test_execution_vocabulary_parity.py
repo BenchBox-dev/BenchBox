@@ -26,8 +26,6 @@ GRANDFATHERED_KEYS = frozenset(
         ("polars", "engine"),
         ("databend", "warehouse"),
         ("fabric_dw", "warehouse"),
-        ("clickhouse", "mode"),
-        ("influxdb", "mode"),
     }
 )
 CORE_VOCABULARY_KEYS = ("execution_engine", "compute_resource", "compute_size", "gateway")
