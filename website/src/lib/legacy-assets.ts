@@ -24,6 +24,14 @@ export function publishLegacyFiles(files: LegacyFiles, docsRoot: string, out: st
     const target = path.join(out, copy.to);
     mkdirSync(path.dirname(target), { recursive: true });
     cpSync(copy.from, target);
+    if (copy.from.includes("tpc-ds") || copy.from.includes("tpc-h") || copy.from.includes("tpcdi")) {
+      const eulaSrc = copy.from.includes("tpc-h")
+        ? path.resolve(docsRoot, "../_sources/tpc-h/EULA.txt")
+        : path.resolve(docsRoot, "../_sources/tpc-ds/EULA.txt");
+      if (existsSync(eulaSrc)) {
+        cpSync(eulaSrc, path.join(path.dirname(target), "TPC_EULA.txt"));
+      }
+    }
   }
   return copies.length;
 }

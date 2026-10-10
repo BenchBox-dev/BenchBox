@@ -167,12 +167,11 @@ jobs:
         run: |
           benchbox compare \
             baseline/tpch_0.01_duckdb.json \
-            $(benchbox results --paths | tail -1) \
+            $(benchbox results --paths --limit 1) \
             --fail-on-regression 10%
 ```
 
 **Benefits**:
-- Catch performance regressions before merge
 - Validate query compatibility across platforms
 - Track performance trends over time
 

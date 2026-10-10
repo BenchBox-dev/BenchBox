@@ -402,6 +402,7 @@ Run with certification parameters, using an appropriate number of streams:
 
 ```python
 config = TPCHOfficialBenchmarkConfig(
+    scale_factor=benchmark.scale_factor,
     num_streams=8,
     validation_enabled=True,
     audit_trail=True,
@@ -545,12 +546,11 @@ def run_multiple_benchmarks():
 
     for sf in scale_factors:
         benchmark = TPCH(scale_factor=sf)
-        config = TPCHOfficialBenchmarkConfig(num_streams=2)
+        config = TPCHOfficialBenchmarkConfig(scale_factor=sf, num_streams=2)
         result = benchmark.run_official_benchmark(
             connection_factory, config, adapter=adapter
         )
         results.append(result)
-
     return results
 ```
 

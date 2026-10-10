@@ -50,8 +50,7 @@ def validate_benchmark_changes():
                 print("  ❌ Summary file not found")
                 validation_results.append({"benchmark": benchmark["name"], "passed": False})
                 continue
-            summary_file = candidates[0]
-
+            summary_file = candidates[-1]
             with open(summary_file, encoding="utf-8") as f:
                 summary = json.load(f)
 

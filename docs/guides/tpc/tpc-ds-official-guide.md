@@ -120,9 +120,9 @@ dialect; `dialect=` applies to the power and maintenance phases only. For suppor
 ### Complete Benchmark
 
 ```bash
-benchbox run --official --platform duckdb --benchmark tpcds --scale 10 --seed 42 --streams 4 --output ./official_data
+benchbox run --official --platform duckdb --benchmark tpcds --scale 10 --seed 42 \
+  --phases power,throughput --streams 4 --output ./official_data
 ```
-
 ### Individual Phases
 
 The first command runs the Power Test only. The second runs the Throughput Test only.
@@ -518,10 +518,10 @@ jq -e '.summary.tpc_metrics.throughput_at_size > 100' ./ci_data/results/*.json
 ### Batch Processing
 
 ```bash
-for sf in 0.1 1.0 10.0; do
+for sf in 1.0 10.0; do
   benchbox run --official --platform duckdb --benchmark tpcds --scale $sf --seed 42 --output ./official_data
 done
-
+```
 benchbox results --limit 3
 ```
 
@@ -577,12 +577,11 @@ print(f"Success rate: {raw['summary']['queries']['passed']}/{raw['summary']['que
 
 ### Debug Mode
 
-Enable verbose output:
+Enable verbose output with an official scale factor:
 
 ```bash
-benchbox run --official --platform duckdb --benchmark tpcds --scale 0.01 --seed 42 -vv --output ./official_data
+benchbox run --official --platform duckdb --benchmark tpcds --scale 1 --seed 42 -vv --output ./official_data
 ```
-
 ### Error Recovery
 
 Retry a failed run from the shell, waiting 60 seconds between attempts:

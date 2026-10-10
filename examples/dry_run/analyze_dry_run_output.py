@@ -19,8 +19,7 @@ def analyze_dry_run_output(dry_run_dir: str):
     if not candidates:
         print(f"❌ Summary file not found in: {dry_run_dir}")
         return
-    summary_file = candidates[0]
-
+    summary_file = candidates[-1]
     with open(summary_file, encoding="utf-8") as f:
         summary = json.load(f)
 

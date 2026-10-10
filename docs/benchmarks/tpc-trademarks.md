@@ -23,5 +23,13 @@ When you publish numbers from BenchBox, describe them as derived from the
 benchmark, for example "TPC-H-derived" or "based on TPC-DS", and do not compare
 them with official TPC results as if they were equivalent.
 
-If you plan to redistribute TPC query templates or data generator output, or to
-publish results commercially, read the TPC's own terms first.
+## Redistribution of TPC Materials
+
+THE TPC SOFTWARE IS AVAILABLE WITHOUT CHARGE FROM TPC.
+
+Query templates and source specifications derived from TPC materials are subject
+to the TPC End User License Agreement (EULA v2.2). Complete copies of the license
+accompany bundled tool sources under `_sources/` in the BenchBox repository. If you plan
+to redistribute TPC query templates, source specifications, or data generator output,
+or to publish results commercially, review the TPC's terms and policies at
+[tpc.org](https://www.tpc.org/).

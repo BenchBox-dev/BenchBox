@@ -44,12 +44,10 @@ The first command writes to a local directory and the second writes to cloud sto
 ## JSON Format (Schema v2)
 
 The JSON export is the canonical schema-v2 result bundle containing complete
-benchmark details. Schema v2 spans minors `"2.0"` through `"2.3"`. Example
-bundles in this guide show `"2.2"`, which is what current runs emit, in the
-top-level `result_schema_version` field. Readers accept
+benchmark details. Schema v2 spans minors `"2.0"` through `"2.3"`. Current runs emit
+`"2.3"` in the top-level `result_schema_version` field. Readers accept
 `result_schema_version` -> `version` -> `schema_version` in that order, so
 bundles written before the rename keep loading.
-
 Consumer policy is intentionally split by use case:
 
 | Consumer | Accepted versions | Behavior |
@@ -505,8 +503,7 @@ benchbox visualize benchmark_runs/results/*.json --chart-type performance_bar
 
 benchbox visualize benchmark_runs/results/*.json --no-color > charts.txt
 ```
-
-The first command visualizes a specific result file, the second renders one chart type, and the last saves plain-text output to a file. Find file names with `benchbox results --limit`.
+The first command visualizes a specific result file, the second renders one chart type, and the last saves plain-text output to a file. Find file names with `benchbox results` or `benchbox results --paths`.
 
 See the [Visualization Guide](../visualization/overview.md) for chart types, templates, and customization options.
 
@@ -601,12 +598,11 @@ export_ascii(
 
 ### Current Version: 2.3
 
-Schema v2.3 is the newest schema minor for BenchBox result bundles. It
+Schema v2.3 is the newest schema minor for BenchBox result bundles, emitted by current runs. It
 uses top-level `result_schema_version`, `run`, `benchmark`, `platform`,
 `summary`, `queries`, and optional companion blocks such as `phases`,
 `environment`, `normalized_cost`, `validation`, and `comparisons`.
-Example bundles in this guide show `"2.2"`, which is what current runs emit.
-
+Example bundles in this guide illustrate the v2 bundle structure.
 Runtime loading and explorer generation intentionally accept only known v2
 minor versions (`"2.0"`, `"2.1"`, `"2.2"`, and `"2.3"`). The public submission validator accepts
 numeric `2.x` versions to allow forward-compatible submissions, but it rejects
@@ -671,29 +667,19 @@ exporter = ResultExporter(anonymize=True, anonymization_config=config)
 
 `machine_id_salt` scopes pseudonyms derived from raw values to your organization, so the same machine publishes different pseudonyms under different salts. See the salt-rotation note below for what this does not cover. `custom_sanitizers` lists extra regexes stripped from free-text fields, on top of the built-in IP, email and SSN patterns.
 
-#### Default salt and residual confirmation oracle
+#### Default salt configuration
 
-`machine_id_salt` defaults to empty. With the empty default, anyone who knows
-the documented algorithm can confirm candidate values against published
-`<kind>_<12 hex>` tokens. Unread identifier fields are omitted entirely (see
-`docs/development/adr/adr-published-identifier-field-set.md`). Retained fields
-(`endpoint`, `database_name`, `submission_path`) still publish pseudonyms, so
-under the empty default those fields remain confirmable this way.
+`machine_id_salt` defaults to empty in local usage. Unread identifier fields are omitted entirely
+(see `docs/development/adr/adr-published-identifier-field-set.md`). Retained fields
+(`endpoint`, `database_name`, `submission_path`) publish pseudonyms.
 
-A non-empty salt closes the oracle only if it is **not** shipped in the public
-tree. Operators who will publish community submissions must set
-`machine_id_salt` or the `BENCHBOX_MACHINE_ID_SALT` environment variable to a
-deployment-private value **before the first public export**, so retained-field
-tokens are salted when they are minted. `ResultExporter(anonymize=True)`
-soft-reads `BENCHBOX_MACHINE_ID_SALT` when present; without it, public-shaped
-export still succeeds with the empty default (local/private use).
+Operators who publish community submissions configure `machine_id_salt` or the
+`BENCHBOX_MACHINE_ID_SALT` environment variable to a deployment-private value
+before public export, so retained-field tokens are salted when minted.
+`ResultExporter(anonymize=True)` soft-reads `BENCHBOX_MACHINE_ID_SALT` when present.
 
-`benchbox submit` refuses to run when that salt env is unset or empty. It
-does **not** re-hash already-exported files: tokens that are already
-pseudonyms pass through unchanged, so setting salt only at submit time does
-not protect bundles that were exported earlier without salt. Do not use a salt
-committed to a public repository; it is not private.
-
+`benchbox submit` requires that the salt environment variable is set to a non-empty value
+for community submissions.
 #### Salt rotation
 
 The salt applies when a **raw** value is hashed. A value that is already a
