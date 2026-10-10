@@ -56,7 +56,7 @@ export EMR_RELEASE_LABEL=emr-7.0.0
 
 ```bash
 benchbox run --platform emr-serverless --benchmark tpch --scale 1.0 \
-  --platform-option application_id=00f12345abc67890 \
+  --platform-option compute_resource=00f12345abc67890 \
   --platform-option s3_staging_dir=s3://bucket/benchbox/ \
   --platform-option execution_role_arn=arn:aws:iam::123456789012:role/EMRRole
 
@@ -91,7 +91,7 @@ The first command runs against an existing application, the second creates a new
 from benchbox.platforms.aws import EMRServerlessAdapter
 
 adapter = EMRServerlessAdapter(
-    application_id="00f12345abc67890",
+    compute_resource="00f12345abc67890",
     s3_staging_dir="s3://my-bucket/benchbox/",
     execution_role_arn="arn:aws:iam::123456789012:role/EMRRole",
     region="us-east-1",
@@ -135,7 +135,7 @@ For sub-second startup, configure pre-initialized workers:
 
 ```python
 adapter = EMRServerlessAdapter(
-    application_id="00f12345abc67890",
+    compute_resource="00f12345abc67890",
     s3_staging_dir="s3://bucket/benchbox/",
     execution_role_arn="arn:aws:iam::123456789012:role/EMRRole",
     initial_capacity={

@@ -71,7 +71,7 @@ benchbox run --platform snowpark-connect --benchmark tpch --scale 1.0 \
   --platform-option account=xy12345.us-east-1 \
   --platform-option user=my_user \
   --platform-option password=my_password \
-  --platform-option warehouse=BENCHMARK_WH
+  --platform-option compute_resource=BENCHMARK_WH
 
 benchbox run --platform snowpark-connect --benchmark tpch --dry-run ./preview \
   --platform-option account=xy12345.us-east-1 \
@@ -88,13 +88,13 @@ The first command is basic usage, the second uses a custom warehouse, and the th
 | `account` | *required* | Snowflake account identifier |
 | `user` | *required* | Snowflake username |
 | `password` | - | Password (required unless using key auth) |
-| `warehouse` | COMPUTE_WH | Virtual warehouse name |
+| `compute_resource` | COMPUTE_WH | Named compute resource (Snowflake warehouse; deprecated alias: `warehouse`, removed in 0.6.0) |
 | `database` | BENCHBOX | Database name |
 | `schema` | PUBLIC | Schema name |
 | `role` | - | Role to use for session |
 | `authenticator` | - | Auth method (snowflake, externalbrowser, oauth) |
 | `private_key_path` | - | Path to private key for key-pair auth |
-| `warehouse_size` | MEDIUM | Warehouse size for scaling |
+| `compute_size` | MEDIUM | Compute size for scaling (deprecated alias: `warehouse_size`, removed in 0.6.0) |
 
 ## Python API
 
@@ -105,7 +105,7 @@ adapter = SnowparkConnectAdapter(
     account="xy12345.us-east-1",
     user="my_user",
     password="my_password",
-    warehouse="COMPUTE_WH",
+    compute_resource="COMPUTE_WH",
     database="BENCHBOX",
 )
 
