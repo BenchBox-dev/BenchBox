@@ -112,6 +112,7 @@ class PlatformHookRegistry:
             raise PlatformOptionError(f"Platform '{platform}' does not accept platform-specific options")
 
         resolved: dict[str, Any] = {}
+        seen: dict[str, tuple[str, Any]] = {}
         for key, raw in provided:
             canonical = cls._resolve_option_name(platform, key)
             if canonical not in specs:
@@ -123,7 +124,17 @@ class PlatformHookRegistry:
             if key.lower() != canonical:
                 _warn_deprecated_compute_alias(platform, key, canonical)
             spec = specs[canonical]
-            resolved[canonical] = spec.parse(raw)
+            value = spec.parse(raw)
+            if canonical in seen:
+                first_key, first_value = seen[canonical]
+                if value != first_value:
+                    raise PlatformOptionError(
+                        f"Conflicting values for platform option '{canonical}' on platform '{platform}': "
+                        f"'{first_key}={first_value}' disagrees with '{key}={value}'. Keep only one spelling."
+                    )
+            else:
+                seen[canonical] = (key, value)
+            resolved[canonical] = value
 
         defaults = cls.get_default_options(platform)
         defaults.update(resolved)

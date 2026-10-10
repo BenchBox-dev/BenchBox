@@ -86,6 +86,7 @@ identifier_keys:
   clientid: client
   machineid: machine
   applicationid: application
+  serviceaccount: serviceaccount
   serviceid: service
   servicename: service
   sparkpool: pool

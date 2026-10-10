@@ -185,10 +185,19 @@ def _validate_compute(key: str, compute: object) -> None:
         raise ValueError(f"Platform {key!r} compute must be an object")
     if not compute:
         return
-    if set(compute) != {"resource_kind", "native_resource_keys", "native_size_keys"}:
+    required = {"resource_kind", "native_resource_keys", "native_size_keys"}
+    allowed = required | {"size_choices", "size_default"}
+    if not required <= set(compute) <= allowed:
         raise ValueError(
             f"Platform {key!r} compute must have exactly: resource_kind, native_resource_keys, native_size_keys"
         )
+    if "size_choices" in compute and (
+        not isinstance(compute["size_choices"], list)
+        or not all(isinstance(item, str) and item for item in compute["size_choices"])
+    ):
+        raise ValueError(f"Platform {key!r} compute size_choices must be a list of strings")
+    if "size_default" in compute and not isinstance(compute["size_default"], str):
+        raise ValueError(f"Platform {key!r} compute size_default must be a string")
     kind = compute["resource_kind"]
     if (
         kind is not None
@@ -3176,7 +3185,9 @@ _PLATFORM_MANIFEST_JSON = """[
       "compute": {
         "resource_kind": null,
         "native_resource_keys": [],
-        "native_size_keys": ["cluster_size"]
+        "native_size_keys": ["cluster_size"],
+        "size_choices": ["small", "medium", "large", "xlarge"],
+        "size_default": "small"
       },
       "default_deployment": "managed",
       "deployment_modes": {

@@ -17,6 +17,8 @@ class ComputeDeclaration:
     resource_kind: str | dict[str, str] | None
     resource_aliases: tuple[str, ...]
     size_aliases: tuple[str, ...]
+    size_choices: tuple[str, ...] = ()
+    size_default: str | None = None
 
 
 def _manifest_key(platform: str) -> str:
@@ -48,6 +50,8 @@ def get_compute_declaration(platform: str) -> ComputeDeclaration | None:
         resource_kind=raw.get("resource_kind"),
         resource_aliases=resource_aliases,
         size_aliases=size_aliases,
+        size_choices=tuple(raw.get("size_choices", ())),
+        size_default=raw.get("size_default"),
     )
 
 
@@ -110,10 +114,6 @@ def resolve_resource_kind(platform: str, merged: Mapping[str, Any]) -> str | Non
     for alias in declaration.resource_aliases:
         if merged.get(alias) is not None and alias in kind:
             return kind[alias]
-    if merged.get(COMPUTE_RESOURCE_OPTION) is not None:
-        for alias in declaration.resource_aliases:
-            if alias in kind:
-                return kind[alias]
     return None
 
 
@@ -149,11 +149,15 @@ def register_compute_specs() -> None:
                 )
             )
         if size_aliases:
+            size_choices = tuple(raw.get("size_choices", ())) if isinstance(raw, Mapping) else ()
+            size_default = raw.get("size_default") if isinstance(raw, Mapping) else None
             specs.append(
                 PlatformOptionSpec(
                     name=COMPUTE_SIZE_OPTION,
                     help=f"Compute size for the named compute resource ({entry.key}).",
                     aliases=tuple(alias for alias in size_aliases if alias != COMPUTE_SIZE_OPTION),
+                    choices=size_choices or None,
+                    default=size_default,
                 )
             )
         existing = PlatformHookRegistry.list_option_specs(entry.key)
