@@ -11,8 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Result schema 2.3 supports execution-engine receipts, query engine observations,
   compute resource and size, selected deployment, routed gateway, and variant identity.
-  Fields are omitted until producers supply them. Legacy engine requests map on read;
-  publication drops compute resource names and hashes gateway hosts.
+  Fields are omitted until producers supply them. Legacy engine requests map on read
+  without changing legacy variant identity; explicit requests survive JSON re-export.
+  Publication drops compute resource names and hashes gateway hosts.
 
 ### Before you upgrade
 

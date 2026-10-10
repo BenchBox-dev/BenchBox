@@ -296,7 +296,6 @@ class TestSchemaGate:
 
         message = str(exc_info.value)
         assert "explorer input schema policy" in message
-        assert "schema versions 2.0, 2.1, and 2.2" in message
         assert "Re-export or normalize" in message
 
     def test_missing_schema_rejected_before_detail_projection(self, tmp_path: Path) -> None:

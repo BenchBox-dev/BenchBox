@@ -102,6 +102,7 @@ def test_schema_fields_are_ordered_and_round_trip():
     loaded = reconstruct_benchmark_results(payload)
     assert loaded.execution_engine == platform["execution_engine"]
     assert build_result_payload(loaded)["queries"][0]["execution_engine"] == "streaming"
+    assert build_result_payload(loaded)["platform"]["execution_engine"] == platform["execution_engine"]
 
 
 def test_absent_producers_do_not_fill_new_fields():
@@ -117,6 +118,49 @@ def test_absent_producers_do_not_fill_new_fields():
     assert "resource" not in PlatformComputeMetadata().to_dict()
     assert "selected" not in PlatformDeploymentMetadata().to_dict()
     assert "execution_engine" not in RunConfigInput().to_dict()
+
+
+@pytest.mark.parametrize("engine", ["default", "in-memory", "streaming"])
+def test_current_polars_producer_request_defines_variant(engine, tmp_path):
+    from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+
+    adapter = PolarsDataFrameAdapter(engine=engine, working_dir=tmp_path)
+    result = make_benchmark_results(
+        platform="polars-df",
+        platform_info={"configuration": adapter.get_platform_info()},
+    )
+    payload = build_result_payload(result)
+    expected = "polars-df" if engine == "default" else f"polars-df+{engine}"
+    assert payload["platform"]["variant"] == expected
+    assert "execution_engine" not in payload["platform"]
+
+
+@pytest.mark.parametrize("engine", ["default", "in-memory", "streaming"])
+def test_config_only_engine_request_survives_load_export(engine):
+    bundle = make_v2_result_dict(version="2.3", platform="polars-df", config={"execution_engine": engine})
+    original = copy.deepcopy(bundle)
+    loaded = reconstruct_benchmark_results(bundle)
+    exported = build_result_payload(loaded)
+    SchemaV2Validator().validate(exported)
+    assert exported["config"]["execution_engine"] == engine
+    assert "execution_engine" not in exported["platform"]
+    assert reconstruct_benchmark_results(exported).execution_engine == loaded.execution_engine
+    assert bundle == original
+
+
+@pytest.mark.parametrize("recorded_variant", [None, "polars-df"])
+def test_legacy_engine_request_keeps_existing_identity(recorded_variant):
+    bundle = make_v2_result_dict(version="2.2", platform="polars-df")
+    bundle["platform"]["config"] = {"engine_requested": "streaming"}
+    if recorded_variant:
+        bundle["platform"]["variant"] = recorded_variant
+    else:
+        bundle["platform"].pop("variant", None)
+    original = copy.deepcopy(bundle)
+    loaded = reconstruct_benchmark_results(bundle)
+    assert loaded.execution_engine["requested"] == "streaming"
+    assert build_result_payload(loaded)["platform"]["variant"] == "polars-df"
+    assert bundle == original
 
 
 def test_native_receipt_cannot_leak_credentials_at_producer_boundary():
