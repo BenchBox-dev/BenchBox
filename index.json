@@ -13812,10 +13812,15 @@
       "title": "Decide whether the new nightly gets a Windows unit-test leg before the legacy nightly.yml is retired"
     },
     "nightly-windows-unquarantine-20261008": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-11T01:08:57Z",
+        "generation": "f39a1c84f3804e0a94c924f6a52ed825",
+        "renewals": 0,
+        "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:8d0fa0e2ef22aacc5284a44c"
+      },
       "needs": [],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Remove the quarantines from the nightly.yml Windows integration-smoke and scheduled-workflow-liveness legs"
     },
     "nightly-windows-utf8-reads-20261008": {
