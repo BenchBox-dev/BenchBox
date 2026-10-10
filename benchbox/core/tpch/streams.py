@@ -157,7 +157,7 @@ class TPCHStreams(VerbosityMixin):
         cmd = [
             str(qgen_exe),
             "-p",
-            str(stream_id + 1),
+            str(stream_id % len(self.PERMUTATION_MATRIX)),
             "-s",
             str(self.scale_factor),
             "-r",

@@ -164,7 +164,7 @@ The Throughput Test measures multi-stream performance by executing multiple conc
 
 **Key characteristics:**
 - Concurrent execution of multiple query streams
-- Each stream uses TPC-H permutation matrix for query ordering
+- qgen-backed generation selects the same permutation-matrix row as the built-in generator
 - Stream-specific parameter generation
 - Measures multi-user concurrent processing capability
 - Contributes to Throughput@Size calculation
