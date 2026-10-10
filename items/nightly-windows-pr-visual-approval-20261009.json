@@ -4,7 +4,7 @@
     "PR #2835 merges into develop",
     "The merge head is recorded for the dependent Windows verification"
   ],
-  "context": "Created while closing the nightly-red handoff; no bypass or repository-setting change was attempted.\n\nCheckpoint 2026-10-10: PR #2835 remains open with remote head 3d902ba85d85ae855780dd8c725635934fdc04c8 and stale base d6b966b486bcd60dcbc047df232c8d2f0ca9a9a8. Local worktree /Users/joe/Developer/BenchBox.wt-nv2domains contains the already-rebased, tested change at 547dd1f44fabff7836a0cabafb59c7dc6ad96127 based on develop@04ed696; it has not been pushed. Target tests passed 50; Ruff check/format passed; the amend hook passed. Current develop is 48d50f593e64387cad9f81272625378c2cab415b. Docs push run 38077971686 succeeded and uploaded exact baseline public-site-visual-baseline-48d50f593e64387cad9f81272625378c2cab415b (16,223,735 bytes). Next rebase local PR changes onto current develop, verify visual result at current head, and push with --force-with-lease. Apply D-A2 only for proved uncaused captures; merge both Windows and liveness changes together if green.",
+  "context": "Created while closing the nightly-red handoff; no bypass or repository-setting change was attempted.\n\nCheckpoint 2026-10-10: PR #2835 remains open with remote head 3d902ba85d85ae855780dd8c725635934fdc04c8 and stale base d6b966b486bcd60dcbc047df232c8d2f0ca9a9a8. Local worktree /Users/joe/Developer/BenchBox.wt-nv2domains contains the rebase at 6fa4a4ccb7a34b1409133c24623d52df8887ab84 based on develop@48d50f593e64387cad9f81272625378c2cab415b; it has not been pushed. `make pr-preflight` passed Ruff and all 50 focused workflow tests. Current develop is 80874df43806c8d57ca2c03a15a0ce5e8fbebd4b; docs push run 38080189484 for that head is still in progress.\n\nA native read-only review of the local diff found no Critical/Required defects. Material risk: issue #2568 records 38 Windows fast-test failures on a legacy nightly, and the first current-head t3:windows run has not been observed; do not confuse this deferred nightly verification with the visual-gate acceptance. The previous remote visual failure was on old head 3d902 and old base. Auto-merge is disabled. Once a protected baseline for the exact current base exists (or D2 PR #2890 merges), refresh develop, rebase, force-with-lease push, then assess the new visual artifacts. Apply D-A2 only for a proved uncaused visual diff, never a missing capture.",
   "description": "PR #2835 has passing oracle and code checks, but the protected public-site visual comparison reports four changed getting-started captures at widths 390, 768, 1280 and 1600 after the base baseline was rebuilt. The changes are outside this batch's intended surface. Resolve the visual difference in the appropriate docs workflow or obtain the owner-controlled approval so the Windows and liveness changes can merge.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/pull/2835"
@@ -33,6 +33,14 @@
       "client": "omp-coding-agent",
       "op": "update",
       "op_id": "d1d3658a6f944939994edbd281624d75",
+      "session_id": "12a278318efc4205bf01aa4132116f81"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:0b65b59dfd5ecfabcfde36b0",
+      "at": "2026-10-10T19:37:50Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "5aa2205b076b488d87a1fbb87840d223",
       "session_id": "12a278318efc4205bf01aa4132116f81"
     }
   ]
