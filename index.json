@@ -23089,12 +23089,17 @@
       "title": "Define what the tuned mode promises, and record the owner's decisions on per-query settings, merge-wait symmetry and unmeasured templates"
     },
     "tuning-evidence-unmeasured-template-label-20261008": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-11T05:49:29Z",
+        "generation": "d825d78464614052a6af12509d4cd25b",
+        "renewals": 0,
+        "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:7e55d16b199130b0978d8efa"
+      },
       "needs": [
         "tuning-evidence-tuned-mode-promise-20261008"
       ],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Record each tuned template's benefit-evidence state, and warn when a run uses an unmeasured template"
     },
     "tuning-explorer-consume-bundle-hashes-20260716": {
