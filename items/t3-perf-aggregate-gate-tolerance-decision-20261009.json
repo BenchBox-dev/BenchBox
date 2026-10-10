@@ -6,7 +6,7 @@
     "t3:perf passes in a nightly-v2 verification dispatch after the change",
     "docs/development/perf-smoke.md no longer says the workflow runs per PR, and its advice to re-run once matches the decision"
   ],
-  "context": "2026-10-10: rebased onto develop 399d47cbc (doc moved to docs/internal by #2817; liveness tests from merged #2857 kept alongside the new gate assertion; conflict resolved additively). Rebased tree verified: 153 focused tests green, ruff check/format clean. Force-pushed as 2ceb20eb9, re-armed, re-review requested. Oracle thread on sixth-sample provenance replied and resolved before rebase. Resumption: watch checks once, ensure merge.",
+  "context": "2026-10-10: develop moved (#2852 results schema) under the branch; rebased cleanly (no conflicts), re-verified rebased tree green (332 tests incl. surface guard, ruff check/format clean), force-pushed as eaf632535, re-armed, re-review requested. Prior oracle SHIP + resolved thread carry over as evidence; new head awaits fresh review + CI.",
   "description": "Decision (owner, 2026-10-09): option (c). The aggregate check (Total Execution Time and Average Query Time) fails only when the aggregate is both more than the percentage threshold slower and more than an absolute number of milliseconds slower. Keep the 10% threshold and the per-query gate (10% and 7 ms) unchanged.\n\nWork:\n- Add an aggregate floor to `benchbox compare` (benchbox/cli/commands/compare.py; today --min-regression-delta applies to per-query checks only, compare.py:284 \"Aggregate metrics are judged by percentage alone\"), for example `--min-aggregate-regression-delta`.\n- Derive the floor from the same-runner-class spread and record the method next to the baseline (docs/development/perf-smoke.md). Same-class totals so far: 539.8, 542.9, 546.4, 548.9, 586.1 and 604.7 ms, a spread of about 65 ms.\n- Pass the floor in nightly-v2.yml (lines 213-214) and perf-smoke.yml (lines 59-60).\n\nOptions considered and not chosen: keep 10% alone (red most nights); raise to 15% (as arbitrary as 10% with six samples); report-only aggregates (loses the uniform-slowdown signal); rolling same-class history or two consecutive red nights (more machinery, delays signal); larger scale factor or more iterations (more runner time). Revisit (e) if the floor still fails on noise once more same-class samples exist.\n\nEvidence:\n- The aggregate is the sum of the same 66 per-query timings (22 queries x 3 iterations, about 8 ms each) that the per-query check judges.\n- In run 37991400931 all 22 queries slowed together (+2.7% to +45.8%) on the baseline's own runner class (AMD EPYC 7763): host noise, not a code regression.\n- The gate does not measure orchestration overhead: run.total_duration_ms is not compared.\n- perf-smoke.yml runs only on pull requests to the release branch (perf-smoke.yml:3-5), so the \"Per-PR\" title and wording in docs/development/perf-smoke.md are wrong.\n- t3:perf failed in 11 of the last 12 nightly-v2 runs.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2778"
@@ -76,6 +76,14 @@
       "client": "omp-coding-agent",
       "op": "update",
       "op_id": "71228a4e193f41698c355bfbc48c1fc7",
+      "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:8d0fa0e2ef22aacc5284a44c",
+      "at": "2026-10-10T04:56:05Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "2798300fb6d742b28958299879650cf3",
       "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
     }
   ]
