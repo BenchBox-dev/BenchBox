@@ -206,6 +206,8 @@ class PlatformDeploymentMetadata:
     endpoint_class: EndpointClass = "unknown"
     metadata_source: MetadataSource = "unavailable"
     collection_status: CollectionStatus = "unavailable"
+    selected: str | None = None
+    selected_class: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return _compact(asdict(self))
@@ -243,6 +245,9 @@ class PlatformComputeMetadata:
     result_cache_enabled: bool | None = None
     source: MetadataSource = "unavailable"
     collection_status: CollectionStatus = "unavailable"
+    resource: str | None = None
+    resource_kind: str | None = None
+    size: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return _compact(asdict(self))

@@ -4,7 +4,7 @@ import type { PrimaryMetric } from "@/lib/displayEligibility";
 
 export const MAX_LOCAL_RESULT_BYTES = 10 * 1024 * 1024;
 
-const SUPPORTED_SCHEMA_VERSIONS = new Set(["2.0", "2.1", "2.2"]);
+const SUPPORTED_SCHEMA_VERSIONS = new Set(["2.0", "2.1", "2.2", "2.3"]);
 const PASS_STATUSES = new Set(["SUCCESS", "PASS", "pass", "success"]);
 const NON_FAILED_QUERY_ROW_STATUSES = new Set(["SUCCESS", "SKIPPED"]);
 const EXECUTION_RUN_TYPES = new Set(["measurement", "warmup"]);
@@ -91,7 +91,7 @@ export async function parseLocalResultText(text: string, fileName = "local-resul
   const version = requiredString(versionValue, "result_schema_version");
   if (!SUPPORTED_SCHEMA_VERSIONS.has(version)) {
     throw new LocalResultImportError(
-      `Schema ${version} is not supported. Local preview accepts BenchBox result schemas 2.0, 2.1, and 2.2.`,
+      `Schema ${version} is not supported. Local preview accepts BenchBox result schemas 2.0, 2.1, 2.2, and 2.3.`,
     );
   }
 

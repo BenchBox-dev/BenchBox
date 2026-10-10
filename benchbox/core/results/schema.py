@@ -11,10 +11,13 @@ from typing import TYPE_CHECKING, Any
 import yaml
 
 from benchbox.core.cost.models import normalized_cost_allows_direct_total
+from benchbox.core.execution_variant import VariantIdError, derive_variant_id, resolve_variant_platform_id
+from benchbox.core.platform_manifest import DEFAULT_EXECUTION_ENGINE
 from benchbox.core.results.environment import (
     build_environment_payload,
     build_platform_metadata_payload,
 )
+from benchbox.core.results.execution_variant import execution_engine_payload, gateway_payload
 from benchbox.core.results.metrics import UNOFFICIAL_COMPLIANCE_CLASSES, percentile_ms
 from benchbox.core.results.platform_options import sanitize_platform_options
 from benchbox.core.results.query_execution import (
@@ -30,6 +33,7 @@ from benchbox.core.results.schema_policy import (
     ROW_COUNT_VALIDATION_SCHEMA_VERSION,
     RUNTIME_SCHEMA_POLICY,
     result_schema_version_value,
+    supports_row_count_validation,
 )
 from benchbox.validation.bundle import REQUIRED_TOP_KEYS
 
@@ -51,6 +55,11 @@ CANONICAL_KEY_ORDER = list(_SCHEMA_SPECS["canonical_key_order"])
 QUERY_KEY_ORDER = list(_SCHEMA_SPECS["query_key_order"])
 CONFIG_KEY_ORDER = list(_SCHEMA_SPECS["config_key_order"])
 PHASE_KEY_ORDER = list(_SCHEMA_SPECS["phase_key_order"])
+PLATFORM_KEY_ORDER = list(_SCHEMA_SPECS["platform_key_order"])
+PLATFORM_EXECUTION_ENGINE_KEY_ORDER = list(_SCHEMA_SPECS["platform_execution_engine_key_order"])
+PLATFORM_GATEWAY_KEY_ORDER = list(_SCHEMA_SPECS["platform_gateway_key_order"])
+PLATFORM_COMPUTE_LEAD_KEYS = tuple(_SCHEMA_SPECS["platform_compute_lead_keys"])
+PLATFORM_DEPLOYMENT_LEAD_KEYS = tuple(_SCHEMA_SPECS["platform_deployment_lead_keys"])
 DRIVER_METADATA_KEYS = tuple(_SCHEMA_SPECS["driver_metadata_keys"])
 ENGINE_VERSION_KEYS = tuple(_SCHEMA_SPECS["engine_version_keys"])
 _DRIVER_PLATFORM_KEYS = [tuple(item) for item in _SCHEMA_SPECS["driver_platform_keys"]]
@@ -67,6 +76,11 @@ def order_dict(d: dict[str, Any], key_order: list[str]) -> dict[str, Any]:
         if key not in ordered:
             ordered[key] = d[key]
     return ordered
+
+
+def lead_keys(d: Mapping[str, Any], keys: tuple[str, ...]) -> dict[str, Any]:
+    leading = {key: d[key] for key in keys if key in d}
+    return {**leading, **{key: value for key, value in d.items() if key not in leading}}
 
 
 def _normalize_query_result(qr: Any) -> QueryExecution:
@@ -153,10 +167,10 @@ class SchemaV2Validator:
         for index, query in enumerate(queries):
             if not isinstance(query, Mapping) or "row_count_validation" not in query:
                 continue
-            if version != ROW_COUNT_VALIDATION_SCHEMA_VERSION:
+            if not supports_row_count_validation(version):
                 raise SchemaV2ValidationError(
                     f"queries[{index}].row_count_validation requires schema version "
-                    f"{ROW_COUNT_VALIDATION_SCHEMA_VERSION}"
+                    f"{ROW_COUNT_VALIDATION_SCHEMA_VERSION} or later"
                 )
             try:
                 normalize_row_count_validation(query.get("row_count_validation"), rows_returned=query.get("rows"))
@@ -206,23 +220,7 @@ def build_result_payload(result: BenchmarkResults, *, sanitize_platform_secrets:
             run, ["id", "timestamp", "total_duration_ms", "query_time_ms", "iterations", "streams", "query_subset"]
         ),
         "benchmark": order_dict(benchmark, ["id", "name", "scale_factor", "test_type"]),
-        "platform": order_dict(
-            platform,
-            [
-                "name",
-                "version",
-                "client_version",
-                "variant",
-                "config",
-                "deployment",
-                "cloud",
-                "compute",
-                "storage",
-                "raw_config",
-                "raw_metadata",
-                "tuning",
-            ],
-        ),
+        "platform": order_dict(platform, PLATFORM_KEY_ORDER),
         "config": order_dict(config_block, CONFIG_KEY_ORDER),
         "summary": order_dict(summary, ["queries", "timing", "data", "cost", "validation", "tpc_metrics"]),
         "phases": order_dict(phases_block, PHASE_KEY_ORDER),
@@ -466,9 +464,6 @@ def _build_platform_section(
         client_version = result.platform_info.get("client_library_version")
         platform["version"] = version or "unknown"
         platform["client_version"] = client_version or "unknown"
-        variant = result.platform_info.get("variant")
-        if variant:
-            platform["variant"] = variant
 
         config = _extract_platform_config(result.platform_info)
 
@@ -494,6 +489,7 @@ def _build_platform_section(
             platform["config"] = public_config
 
     platform.update(metadata_payload)
+    _add_execution_variant_fields(platform, result)
 
     for src_key, dest_key in _DRIVER_PLATFORM_KEYS:
         if driver_metadata.get(src_key):
@@ -515,6 +511,83 @@ def _build_platform_section(
         platform["tuning"] = tuning
 
     return platform
+
+
+def _platform_info_entry(platform_info: Mapping[str, Any], key: str) -> Any:
+    if key in platform_info:
+        return platform_info[key]
+    configuration = platform_info.get("configuration")
+    return configuration.get(key) if isinstance(configuration, Mapping) else None
+
+
+def _requested_execution_engine(result: BenchmarkResults, engine_block: Mapping[str, Any]) -> str:
+    if engine_block.get("requested"):
+        return str(engine_block["requested"])
+    metadata = result.execution_metadata if isinstance(result.execution_metadata, Mapping) else {}
+    run_config = metadata.get("run_config")
+    requested = run_config.get("execution_engine") if isinstance(run_config, Mapping) else None
+    if requested:
+        return str(requested)
+    execution_engine = getattr(result, "execution_engine", None)
+    if isinstance(execution_engine, Mapping) and execution_engine.get("requested"):
+        return str(execution_engine["requested"])
+    platform_info = result.platform_info if isinstance(result.platform_info, Mapping) else {}
+    requested = _platform_info_entry(platform_info, "engine_requested")
+    return str(requested) if requested else DEFAULT_EXECUTION_ENGINE
+
+
+def _variant_id(
+    result: BenchmarkResults,
+    platform: Mapping[str, Any],
+    engine_block: Mapping[str, Any],
+    gateway_block: Mapping[str, Any],
+) -> str | None:
+    platform_info = result.platform_info if isinstance(result.platform_info, Mapping) else {}
+    if platform_info.get("variant"):
+        return str(platform_info["variant"])
+    metadata = result.execution_metadata if isinstance(result.execution_metadata, Mapping) else {}
+    execution_mode = platform_info.get("execution_mode") or metadata.get("mode")
+    platform_id = resolve_variant_platform_id(
+        (
+            platform_info.get("platform_type"),
+            platform_info.get("platform_name"),
+            platform_info.get("platform"),
+            platform.get("name"),
+        ),
+        execution_mode,
+    )
+    if platform_id is None:
+        return None
+    deployment = platform.get("deployment")
+    try:
+        return derive_variant_id(
+            platform_id,
+            deployment.get("selected") if isinstance(deployment, Mapping) else None,
+            _requested_execution_engine(result, engine_block),
+            gateway_block.get("name"),
+        )
+    except VariantIdError as exc:
+        logger.warning("Result bundle has no platform variant: %s", exc)
+        return None
+
+
+def _add_execution_variant_fields(platform: dict[str, Any], result: BenchmarkResults) -> None:
+    platform_info = result.platform_info if isinstance(result.platform_info, Mapping) else {}
+    engine_block = sanitize_platform_options(
+        execution_engine_payload(_platform_info_entry(platform_info, "execution_engine"))
+    )
+    if engine_block:
+        platform["execution_engine"] = order_dict(engine_block, PLATFORM_EXECUTION_ENGINE_KEY_ORDER)
+    gateway_block = gateway_payload(_platform_info_entry(platform_info, "gateway"))
+    if gateway_block:
+        platform["gateway"] = order_dict(gateway_block, PLATFORM_GATEWAY_KEY_ORDER)
+    for key, lead in (("compute", PLATFORM_COMPUTE_LEAD_KEYS), ("deployment", PLATFORM_DEPLOYMENT_LEAD_KEYS)):
+        block = platform.get(key)
+        if isinstance(block, Mapping):
+            platform[key] = lead_keys(block, lead)
+    variant = _variant_id(result, platform, engine_block, gateway_block)
+    if variant:
+        platform["variant"] = variant
 
 
 def _add_comparisons_section(payload: dict[str, Any], result: BenchmarkResults) -> None:
@@ -769,6 +842,7 @@ def _shorten_benchmark_name(name: str) -> str:
 
 _CONFIG_CTX_OR_RUN = ["seed", "phases", "query_subset"]
 _CONFIG_RUN_ONLY = [
+    "execution_engine",
     "platform_options",
     "platform_option_sources",
     "tuning_mode",
@@ -1533,6 +1607,8 @@ def _extract_platform_config(platform_info: dict[str, Any]) -> dict[str, Any]:
     exclude_keys = {
         "version",
         "variant",
+        "execution_engine",
+        "gateway",
         "name",
         "platform",
         "adapter_name",

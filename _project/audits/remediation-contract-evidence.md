@@ -158,3 +158,33 @@ companion, and `compare_query_plans` consumes the rehydrated DAGs.
   `run` has no `--streams` flag in two passages; both now document the
   canonical `--streams` spelling with `--concurrency` as alias, and a
   docs-wide grep finds no remaining `has no --streams` claim.
+
+## Execution-engine provenance through result export
+
+The review of `7eff3646dfa3e9dea10a6be0e3bee32982759a0d` identified two
+accepted defects: current Polars engine requests did not affect newly derived
+variant identity, and config-only requests disappeared during load/re-export.
+The repairs use existing producer evidence without changing published bundles
+or assigning new engine suffixes to legacy identities.
+
+The behavioral instances in
+`tests/unit/core/results/test_execution_variant_schema.py` are:
+
+- `test_current_polars_producer_request_defines_variant[default]`,
+  `[in-memory]`, and `[streaming]`: the actual adapter writes
+  `configuration.engine_requested`; the result exporter consumes it to persist
+  distinct requested-engine variants. The default control has no engine suffix,
+  and no case invents an adapter receipt.
+- `test_config_only_engine_request_survives_load_export[default]`,
+  `[in-memory]`, and `[streaming]`: `config.execution_engine` is loaded into
+  run configuration, persisted by JSON export, and consumed by a second load.
+  All requests and unknown applied/observed values survive; no platform receipt
+  is synthesized, and the source bundle remains unchanged.
+- `test_legacy_engine_request_keeps_existing_identity[None]` and
+  `[polars-df]`: legacy explicit streaming evidence remains readable, but both
+  missing and already-recorded legacy identity stay `polars-df`, not
+  `polars-df+streaming`; source bundles remain unchanged.
+
+These instances and the existing complete-receipt round trip passed together
+with CLI export and Explorer transformer tests: 230 passed. Replay with
+`uv run -- python -m pytest tests/unit/core/results/test_execution_variant_schema.py tests/unit/cli/test_cli_output.py tests/unit/test_results_exporter.py tests/unit/scripts/explorer_pipeline/test_transformer.py -q`.

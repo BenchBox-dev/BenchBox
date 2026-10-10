@@ -41,10 +41,10 @@ benchbox run --platform snowflake --benchmark tpch --output s3://bucket/results/
 
 The first command writes to a local directory and the second writes to cloud storage.
 
-## JSON Format (Schema v2.2)
+## JSON Format (Schema v2.3)
 
 The JSON export is the canonical schema-v2 result bundle containing complete
-benchmark details. BenchBox currently writes schema version `"2.2"` in the
+benchmark details. BenchBox currently writes schema version `"2.3"` in the
 top-level `result_schema_version` field. Readers accept
 `result_schema_version` -> `version` -> `schema_version` in that order, so
 bundles written before the rename keep loading.
@@ -53,17 +53,17 @@ Consumer policy is intentionally split by use case:
 
 | Consumer | Accepted versions | Behavior |
 | --- | --- | --- |
-| Producer/exporter | `"2.2"` | New bundles are written with the current producer version. |
-| Runtime loader and exporter listing | `"2.0"`, `"2.1"`, `"2.2"` | Unknown versions fail closed and should be re-exported. |
-| Normalizer | `"2.0"`, `"2.1"`, `"2.2"` as v2; other shapes as legacy | Known v2 bundles use exact v2 field mapping; v1.x and unknown shapes use legacy best-effort extraction. |
+| Producer/exporter | `"2.3"` | New bundles are written with the current producer version. |
+| Runtime loader and exporter listing | `"2.0"`, `"2.1"`, `"2.2"`, `"2.3"` | Unknown versions fail closed and should be re-exported. |
+| Normalizer | `"2.0"`, `"2.1"`, `"2.2"`, `"2.3"` as v2; other shapes as legacy | Known v2 bundles use exact v2 field mapping; v1.x and unknown shapes use legacy best-effort extraction. |
 | Public submission validator | Numeric `2.x` | Forward-compatible for schema-v2 minor versions, but missing or malformed versions are rejected. |
-| Explorer pipeline input | `"2.0"`, `"2.1"`, `"2.2"` | Unsupported bundles are rejected before explorer read-model projection. |
+| Explorer pipeline input | `"2.0"`, `"2.1"`, `"2.2"`, `"2.3"` | Unsupported bundles are rejected before explorer read-model projection. |
 
 ### Schema Structure
 
 ```json
 {
-  "result_schema_version": "2.2",
+  "result_schema_version": "2.3",
   "run": {
     "id": "tpch-duckdb-20260521",
     "timestamp": "2026-05-21T14:30:21.123456Z",
@@ -127,7 +127,7 @@ Consumer policy is intentionally split by use case:
 
 | Field | Type | Description |
 | ------- | ------ | ------------- |
-| `result_schema_version` | string | Result bundle schema version. Current producer version is `"2.2"`. |
+| `result_schema_version` | string | Result bundle schema version. Current producer version is `"2.3"`. |
 | `version` | string | Compatibility alias emitted with `result_schema_version` during the schema-v2 transition; accepted as a fallback when the new key is absent. If both keys are present, they must match. |
 | `schema_version` | string | Oldest key, accepted as a last-resort fallback for pre-rename bundles. |
 
@@ -156,6 +156,36 @@ where possible. Current canonical locations are `platform.*` for platform
 facets and raw platform metadata, `phases.<stage>` for lifecycle-stage
 summaries, and `comparisons.*` for cross-engine comparison data. New top-level
 keys require a public-contract update and consumer tests.
+
+##### Execution variants (schema 2.3)
+
+These fields are optional and omitted until a producer supplies them. Missing
+values are not filled with nulls. Display labels are separate from identity.
+
+| Field | Meaning |
+|-------|---------|
+| `config.execution_engine` | Requested engine name; `default` leaves the choice to the platform. |
+| `platform.execution_engine` | Adapter receipt, ordered as `requested`, `applied`, `applied_class`, `applied_native`, `resolution`, `observed`, `observed_source`. |
+| `queries[].execution_engine` | Observed query engine name, or `unknown` when capture produced no receipt. |
+| `platform.compute.resource`, `resource_kind`, `size` | Named compute object, its kind, and its size, in that order. Publication drops `resource`; kind and size remain readable. |
+| `platform.deployment.selected`, `selected_class` | Selected manifest deployment and its class, before other deployment metadata. |
+| `platform.gateway` | Routed gateway receipt, ordered as `name`, `routed`; omitted for native runs. |
+| `platform.variant` | `<platform_id>[~<deployment>][+<requested_engine>][@<gateway>]`; default deployment and engine and native gateway add no suffix. |
+
+Receipt resolution is `explicit`, `tuning_profile`, `legacy_option`,
+`version_default`, or `platform_default`. Run-level observation may be a
+name, `mixed`, or `not_captured`; its source is `explain`, `vendor_log`,
+`session_var`, or `none`. Native arguments remain subject to publication
+privacy rules. Engine and gateway vocabulary stays readable; gateway hosts
+are hashed as endpoints.
+
+The loader reads older bundles as requested `default`, with applied and
+observed `unknown`. Legacy `config.platform_options.streaming=true` maps to
+requested `streaming` and resolution `legacy_option`.
+`platform.config.engine_requested` maps to its recorded value and resolution
+`explicit`, except `default`, which uses `version_default`. Athena's legacy
+`platform.compute.engine` reads as `product`. These mappings happen in memory;
+published bytes and result IDs are unchanged.
 
 ##### `platform.config` (optional)
 
@@ -567,15 +597,15 @@ export_ascii(
 
 ## Schema Versioning
 
-### Current Version: 2.2
+### Current Version: 2.3
 
-Schema v2.2 is the current producer version for BenchBox result bundles. It
+Schema v2.3 is the current producer version for BenchBox result bundles. It
 uses top-level `result_schema_version`, `run`, `benchmark`, `platform`,
 `summary`, `queries`, and optional companion blocks such as `phases`,
 `environment`, `normalized_cost`, `validation`, and `comparisons`.
 
 Runtime loading and explorer generation intentionally accept only known v2
-minor versions (`"2.0"`, `"2.1"`, and `"2.2"`). The public submission validator accepts
+minor versions (`"2.0"`, `"2.1"`, `"2.2"`, and `"2.3"`). The public submission validator accepts
 numeric `2.x` versions to allow forward-compatible submissions, but it rejects
 missing values and malformed strings such as `"2.x"`. Legacy v1.x result shapes
 are not runtime-loadable; they are handled only by the normalizer's best-effort
@@ -585,6 +615,7 @@ compatibility path.
 
 | Version | Changes |
 | --------- | --------- |
+| 2.3 | Added optional execution-engine receipts, compute resource and size, selected deployment, gateway, and variant identity; legacy reads preserve published bundles |
 | 2.2 | Added bounded per-query `row_count_validation` evidence; top-level version key renamed to `result_schema_version` with `version`/`schema_version` fallback reads |
 | 2.1 | Added typed result and companion metadata used by the previous producer |
 | 2.0 | First schema-v2 bundle contract consumed by loader, submissions, and explorer |

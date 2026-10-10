@@ -294,7 +294,7 @@ class TestAthenaAdapter:
         assert metadata["platform_cloud"]["provider"] == "aws"
         assert metadata["platform_cloud"]["region"] == "eu-west-1"
         assert metadata["platform_compute"]["service_model"] == "serverless"
-        assert metadata["platform_compute"]["engine"] == "athena"
+        assert metadata["platform_compute"]["product"] == "athena"
         assert metadata["platform_compute"]["workgroup"] == "analytics"
         assert metadata["platform_compute"]["query_timeout"] == 300
         assert metadata["platform_storage"]["table_format"] == "CSV"

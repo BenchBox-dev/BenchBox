@@ -40,6 +40,9 @@ _MOUNT_PATH_KEYS = set(_ANONYMIZATION_SPECS["mount_path_keys"])
 _LOCAL_ENDPOINT_VALUES = set(_ANONYMIZATION_SPECS["local_endpoint_values"])
 _MESSAGE_KEYS = set(_ANONYMIZATION_SPECS["message_keys"])
 _PUBLIC_DROP_KEYS = frozenset(_ANONYMIZATION_SPECS["public_drop_keys"])
+_PUBLIC_DROP_CHILD_KEYS = {
+    parent: frozenset(children) for parent, children in _ANONYMIZATION_SPECS["public_drop_child_keys"].items()
+}
 _OPTION_MAP_KEYS = frozenset(_ANONYMIZATION_SPECS["option_map_keys"])
 _PUBLIC_OPTION_VALUES = {key: frozenset(values) for key, values in _ANONYMIZATION_SPECS["public_option_values"].items()}
 _OPTION_SOURCE_LABELS = frozenset(
@@ -470,8 +473,10 @@ class AnonymizationManager:
     def _anonymize_public_value(self, value: Any, key_path: tuple[str, ...]) -> Any:
         if isinstance(value, dict):
             anonymized: dict[str, Any] = {}
+            dropped_children = _PUBLIC_DROP_CHILD_KEYS.get(_compact_key(key_path[-1]), frozenset()) if key_path else ()
             for key, child in value.items():
-                if _compact_key(str(key)) in _PUBLIC_DROP_KEYS:
+                compact = _compact_key(str(key))
+                if compact in _PUBLIC_DROP_KEYS or compact in dropped_children:
                     continue
                 child_path = (*key_path, str(key))
                 if self._is_secret_metadata_key(child_path):

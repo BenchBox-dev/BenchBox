@@ -474,6 +474,7 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
                     tuning_config=run_cfg.get("tuning_config"),
                     platform_options=run_cfg.get("platform_options"),
                     table_mode=run_cfg.get("table_mode"),
+                    execution_engine=run_cfg.get("execution_engine"),
                 )
             )
 

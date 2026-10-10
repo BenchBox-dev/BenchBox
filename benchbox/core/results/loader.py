@@ -7,6 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from benchbox.core.execution_variant import resolve_variant_platform_id
+from benchbox.core.results.execution_variant import read_execution_engine, read_platform_compute
 from benchbox.core.results.models import (
     BenchmarkResults,
     ExecutionPhases,
@@ -28,6 +30,7 @@ from benchbox.core.results.schema_policy import (
     ROW_COUNT_VALIDATION_SCHEMA_VERSION,
     is_loader_supported_result_schema,
     result_schema_version_value,
+    supports_row_count_validation,
 )
 from benchbox.validation.bundle import COMPANION_SUFFIXES
 
@@ -142,14 +145,14 @@ def _load_companion_file(main_file: Path, suffix: str) -> tuple[dict[str, Any] |
 
 def _validate_versioned_query_extensions(data: dict[str, Any]) -> None:
     version = str(result_schema_version_value(data) or "")
-    if version == ROW_COUNT_VALIDATION_SCHEMA_VERSION:
+    if supports_row_count_validation(version):
         return
 
     for index, query in enumerate(data.get("queries", [])):
         if isinstance(query, dict) and "row_count_validation" in query:
             raise ValueError(
                 f"queries[{index}].row_count_validation requires schema version "
-                f"{ROW_COUNT_VALIDATION_SCHEMA_VERSION}, got {version!r}"
+                f"{ROW_COUNT_VALIDATION_SCHEMA_VERSION} or later, got {version!r}"
             )
 
 
@@ -173,6 +176,18 @@ def reconstruct_benchmark_results(
     timing = _extract_timing_metrics(summary_section)
     tpc = _extract_tpc_metrics(summary_section)
     platform_info = _extract_platform_info(platform_section)
+    config_section = data.get("config", {})
+    if result_schema_version_value(data) in ("2.0", "2.1", "2.2") and not platform_info.get("variant"):
+        platform_info["variant"] = resolve_variant_platform_id(
+            (platform_section.get("name"),), config_section.get("mode") or platform_info.get("execution_mode")
+        )
+    execution_metadata = _extract_execution_metadata(execution_section)
+    if isinstance(config_section.get("execution_engine"), str) and config_section["execution_engine"]:
+        execution_metadata = execution_metadata or {}
+        execution_metadata["run_config"] = {
+            **execution_metadata.get("run_config", {}),
+            "execution_engine": config_section["execution_engine"],
+        }
     tuning = _extract_tuning_info(platform_section, tuning_data)
     environment_section = data.get("environment", {})
     system_profile = _extract_system_profile(environment_section)
@@ -212,11 +227,11 @@ def reconstruct_benchmark_results(
         geometric_mean_execution_time=tpc["geometric_mean_execution_time"],
         test_execution_type=benchmark_section.get("mode", "standard"),
         validation_status=summary_section.get("validation", "NOT_RUN"),
-        execution_metadata=_extract_execution_metadata(execution_section),
+        execution_metadata=execution_metadata,
         execution_environment=execution_environment,
         platform_deployment=platform_section.get("deployment"),
         platform_cloud=platform_section.get("cloud"),
-        platform_compute=platform_section.get("compute"),
+        platform_compute=read_platform_compute(platform_section),
         platform_storage=platform_section.get("storage"),
         platform_raw_config=platform_section.get("raw_config"),
         platform_raw_metadata=platform_section.get("raw_metadata"),
@@ -246,6 +261,7 @@ def reconstruct_benchmark_results(
         data_archive_hash=benchmark_section.get("data_archive_hash"),
         funding=provenance_section.get("funding"),
         result_source=provenance_section.get("source"),
+        execution_engine=read_execution_engine(data),
     )
 
 
@@ -321,6 +337,9 @@ def _extract_platform_info(platform_section: dict[str, Any]) -> dict[str, Any]:
     }
     if platform_section.get("config"):
         info.update(platform_section["config"])
+    for key in ("execution_engine", "gateway"):
+        if isinstance(platform_section.get(key), dict):
+            info[key] = platform_section[key]
     return info
 
 

@@ -28,6 +28,7 @@ COMPACT_V2_QUERY_FIELDS = frozenset(
         "row_count_validation",
         "dataframe_skip_summary",
         "plan_capture_error",
+        "execution_engine",
     }
 )
 
@@ -181,6 +182,7 @@ LEGACY_QUERY_FIELDS = frozenset(
         "result_digest",
         "digest",
         "test_type",
+        "execution_engine",
     }
 )
 
@@ -417,6 +419,7 @@ def validate_query_execution(execution: QueryExecution) -> QueryExecution:
         result_digest=execution.result_digest,
         test_type=execution.test_type,
         error_type=execution.error_type,
+        execution_engine=execution.execution_engine,
     )
 
 
@@ -473,6 +476,7 @@ def legacy_query_execution_mapping(value: Any) -> Mapping[str, Any]:
         "result_digest",
         "digest",
         "test_type",
+        "execution_engine",
     )
     extracted = {field: getattr(value, field) for field in contract_fields if hasattr(value, field)}
     if extracted:
@@ -589,6 +593,7 @@ def query_execution_from_legacy_dict(
         result_digest=result_digest,
         test_type=source.get("test_type"),
         error_type=source.get("error_type"),
+        execution_engine=source.get("execution_engine"),
     )
 
 
@@ -630,6 +635,7 @@ def query_execution_to_legacy_dict(
         "dataframe_skip_summary",
         "result_digest",
         "test_type",
+        "execution_engine",
     )
     for field in optional_fields:
         value = getattr(execution, field)
@@ -670,6 +676,8 @@ def query_execution_to_compact_v2(execution: QueryExecution) -> dict[str, Any]:
     if execution.test_type is not None:
         result["test_type"] = execution.test_type
     result["status"] = execution.status
+    if execution.execution_engine is not None:
+        result["execution_engine"] = execution.execution_engine
     if execution.result_digest is not None:
         result["digest"] = execution.result_digest
     row_count_validation = normalize_row_count_validation(
