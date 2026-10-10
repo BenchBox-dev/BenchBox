@@ -97,6 +97,8 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         self.username = config.get("username")
         self.password = config.get("password")
         self.cluster_identifier = config.get("cluster_identifier")
+        self.workgroup_name = config.get("compute_resource") or config.get("workgroup_name")
+        self.compute_resource = config.get("compute_resource")
 
         self.admin_database = config.get("admin_database") or "dev"
 
@@ -236,6 +238,8 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     "aws_session_token",
                     "aws_region",
                     "cluster_identifier",
+                    "compute_resource",
+                    "workgroup_name",
                     "admin_database",
                     "connect_timeout",
                     "statement_timeout",
