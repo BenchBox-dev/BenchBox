@@ -1,6 +1,6 @@
 <!-- Copyright 2026 Joe Harris / BenchBox Project. Licensed under the MIT License. -->
 
-# CoffeeShop Benchmark
+# CoffeeShop Example Dataset
 
 ```{tags} beginner, concept, coffeeshop, custom-benchmark
 ```
@@ -11,7 +11,7 @@
 
 ## Overview
 
-The CoffeeShop benchmark provides a realistic point-of-sale and retail analytics workload based on a coffee shop business model. It features a compact star schema with temporal, regional, and pricing dynamics that mirror real-world retail operations.
+The CoffeeShop example dataset provides a realistic point-of-sale and retail analytics workload based on a coffee shop business model. It is a bundled example, not a formal benchmark standard. It features a compact star schema with temporal, regional, and pricing dynamics that mirror real-world retail operations.
 
 ## Key Features
 
@@ -19,7 +19,7 @@ The CoffeeShop benchmark provides a realistic point-of-sale and retail analytics
 - **Temporal Dynamics**: Time-series data with seasonal patterns and trends
 - **Regional Analysis**: Multi-region support with geographic metadata and regional weights
 - **Product Catalog**: Canonical product catalog with seasonal availability
-- **Comprehensive Query Suite**: 20+ analytical queries across sales, products, trends, and quality checks
+- **Query Suite**: 11 analytical queries across sales, products, trends, and quality checks (`SA*`, `PR*`, `QC*`)
 
 ## Schema
 
@@ -98,15 +98,15 @@ Exploded fact table with 1-5 lines per order.
 ```python
 from benchbox import CoffeeShop
 
-benchmark = CoffeeShop(scale_factor=1.0)
+benchmark = CoffeeShop(scale_factor=0.01, output_dir="./coffeeshop_data")
 
-benchmark.generate_data()
-
-schema = benchmark.get_schema()
+data_files = benchmark.generate_data()
 
 import duckdb
 conn = duckdb.connect(":memory:")
-benchmark.load_data_to_database(conn)
+conn.execute(benchmark.get_create_tables_sql())
+for table, path in data_files.items():
+    conn.execute(f"INSERT INTO {table} SELECT * FROM read_csv('{path}', header=false)")
 
 query = benchmark.get_query("SA1", params={"start_date": "2023-01-01", "end_date": "2023-01-31"})
 result = conn.execute(query).fetchdf()

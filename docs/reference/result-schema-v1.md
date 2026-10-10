@@ -1,12 +1,9 @@
-# Benchmark Result Schema (v1.1)
+# Benchmark Result Schema (v1.1, Legacy)
 
 ```{tags} reference, validation
 ```
 
-The canonical JSON schema describes every benchmark export produced by BenchBox.
-It applies uniformly to CLI and platform execution flows now that all pipelines
-emit the lifecycle-aware `BenchmarkResults` model, replacing the legacy
-`BenchmarkResult` payloads.
+This page documents the legacy v1.1 result shape. Current benchmark exports use schema v2 (see [Result Formats](result-formats.md)); v1.x bundles are only read through the normalizer's best-effort compatibility path. Keep this page for interpreting old files, not for new readers.
 
 ## Top-Level Structure
 
@@ -38,8 +35,7 @@ emit the lifecycle-aware `BenchmarkResults` model, replacing the legacy
 | `details` | Ordered list of per-query metrics. |
 | `definitions` | Optional nested mapping of query definitions (present when `BenchmarkResults.query_definitions` is populated). |
 
-Each entry of `details` uses the following fields (missing values are omitted). This nested array replaces the
-legacy top-level `query_details` payload that existed in the v2/v3 exports.
+Each entry of `details` uses the following fields (missing values are omitted).
 
 - `id` (query identifier, e.g., `Q1`)
 - `name`
@@ -131,9 +127,9 @@ schema validation because the payload is transformed before `CanonicalResultVali
 
 ## Compatibility Notes
 
-- Legacy `schema_version` values (`"2.0"`, `"3.0"`) and their supporting fields (e.g.,
-  `benchmark_info`, `performance_metrics`, top-level `query_results`) have been removed.
-- Consumers must migrate to the canonical layout before the first public release.
+- The `"2.0"`/`"3.0"` labels predate the current v2 minors (`"2.0"`–`"2.3"`) and their supporting fields (e.g.,
+  `benchmark_info`, `performance_metrics`, top-level `query_results`) do not exist in current bundles.
+- Consumers of current bundles should read the [Result Formats](result-formats.md) layout instead.
 - Version 1.1 adds optional `iteration` and `run_type` fields to `results.queries.details` so
   consumers can distinguish warm-up runs from measurement runs while keeping the payload
   backward compatible for clients that ignore unknown keys.

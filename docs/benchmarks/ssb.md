@@ -264,10 +264,9 @@ print(query_1_1)
 
 ```python
 ssb_small = SSB(scale_factor=0.1, output_dir="ssb_small")
-data_files = ssb_small.generate_data()
+ssb_small.generate_data()
 
-available_tables = ssb_small.get_available_tables()
-print(f"Available tables: {available_tables}")
+print(f"Available tables: {sorted(ssb_small.tables)}")
 
 schema = ssb_small.get_schema()
 for table in schema:
@@ -287,24 +286,14 @@ conn = duckdb.connect("ssb.duckdb")
 schema_sql = ssb.get_create_tables_sql()
 conn.execute(schema_sql)
 
-table_mappings = {
-    'date': 'date.csv',
-    'customer': 'customer.csv',
-    'supplier': 'supplier.csv',
-    'part': 'part.csv',
-    'lineorder': 'lineorder.csv'
-}
+table_mappings = ssb.tables
 
-for table_name, file_name in table_mappings.items():
-    file_path = ssb.output_dir / file_name
-    if file_path.exists():
-        conn.execute(f"""
-            INSERT INTO {table_name}
-            SELECT * FROM read_csv('{file_path}',
-                                  header=true,
-                                  auto_detect=true)
-        """)
-        print(f"Loaded {table_name}")
+for table_name, file_path in table_mappings.items():
+    conn.execute(f"""
+        INSERT INTO {table_name}
+        SELECT * FROM read_csv('{file_path}', delim='|', header=false)
+    """)
+    print(f"Loaded {table_name}")
 
 flight_1_queries = ["Q1.1", "Q1.2", "Q1.3"]
 for query_id in flight_1_queries:
@@ -353,7 +342,7 @@ class SSBPerformanceTester:
 
             times = []
             for iteration in range(iterations):
-                query_sql = self.ssb.get_query(query_id, seed=42)
+                query_sql = self.ssb.get_query(query_id)
 
                 start_time = time.time()
                 result = self.connection.execute(query_sql).fetchall()

@@ -311,9 +311,7 @@ load_start = time.time()
 conn.execute(f"""
     INSERT INTO hits
     SELECT * FROM read_csv('{hits_file}',
-                          header=true,
-                          auto_detect=true,
-                          ignore_errors=true)
+                          delim='|', header=false, nullstr='__NULL__')
 """)
 load_time = time.time() - load_start
 
@@ -760,21 +758,13 @@ if successful_queries:
 
 ### Advanced-level Configuration
 
-The data generation options are `date_range_days` (the range of event dates), `user_count` (the number of unique
-users) and `enable_compression` (compress output files). The performance options are `partition_by_date` (partition
-by EventDate), `create_indices` (create performance indices) and `optimize_for_analytics` (analytics-configured
-generation).
+Generation is controlled by `scale_factor` and `output_dir`. Date ranges, user counts, partitioning, and indices are
+fixed by the workload definition, not constructor options:
 
 ```python
 clickbench = ClickBench(
     scale_factor=1.0,
     output_dir="clickbench_data",
-    date_range_days=365,
-    user_count=10000000,
-    enable_compression=True,
-    partition_by_date=True,
-    create_indices=True,
-    optimize_for_analytics=True
 )
 ```
 
@@ -831,15 +821,11 @@ SELECT * FROM (
 
 **Issue: Slow data loading**
 
-Solution: use configured loading strategies. `compression='gzip'` compresses data for faster I/O, `batch_size`
-optimizes the batch size, and `parallel_loading=True` loads in parallel.
+Solution: load with a single `COPY`/`INSERT ... SELECT` per file instead of row-by-row inserts, and generate once at the target scale rather than regenerating per run.
 ```python
 clickbench = ClickBench(
     scale_factor=1.0,
     output_dir="clickbench_data",
-    compression='gzip',
-    batch_size=100000,
-    parallel_loading=True
 )
 ```
 

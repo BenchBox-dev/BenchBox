@@ -1,6 +1,6 @@
 <!-- Copyright 2026 Joe Harris / BenchBox Project. Licensed under the MIT License. -->
 
-# NYC Taxi OLAP Benchmark
+# NYC Taxi OLAP Example Dataset
 
 ```{tags} intermediate, concept, nyctaxi, custom-benchmark
 ```
@@ -11,9 +11,9 @@
 
 ## Overview
 
-The NYC Taxi OLAP Benchmark uses real-world NYC Taxi & Limousine Commission (TLC) trip record data for comprehensive OLAP analytics testing. Unlike synthetic benchmarks, this benchmark leverages actual transportation data from New York City, providing realistic distributions, seasonal patterns, and geographic analytics opportunities.
+The NYC Taxi OLAP example dataset uses real-world NYC Taxi & Limousine Commission (TLC) trip record data for OLAP analytics testing. It is a bundled example, not a formal benchmark standard. Unlike synthetic benchmarks, it leverages actual transportation data from New York City, providing realistic distributions, seasonal patterns, and geographic analytics opportunities.
 
-The benchmark is ideal for testing analytical database performance on real-world data patterns, particularly for organizations dealing with transportation, logistics, or time-series geospatial data.
+The dataset is ideal for testing analytical database performance on real-world data patterns, particularly for organizations dealing with transportation, logistics, or time-series geospatial data.
 
 ## Key Features
 
