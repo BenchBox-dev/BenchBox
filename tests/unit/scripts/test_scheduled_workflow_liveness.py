@@ -303,9 +303,33 @@ def test_registration_uses_the_latest_of_workflow_creation_and_last_commit(monke
 
 
 def test_registration_is_unknown_when_the_api_is_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
-    api, _, _ = _api(monkeypatch, [_http_error(403)])
+    api, _, _ = _api(monkeypatch, [_http_error(403), _http_error(403)])
 
     assert api.registered_at("a.yml") is None
+
+
+def test_registration_preserves_creation_when_commits_request_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    api, _, _ = _api(
+        monkeypatch,
+        [
+            {"created_at": "2026-10-09T00:00:00Z"},
+            _http_error(403),
+        ],
+    )
+
+    assert api.registered_at("a.yml") == datetime(2026, 10, 9, tzinfo=timezone.utc)
+
+
+def test_registration_preserves_commit_date_when_workflow_request_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    api, _, _ = _api(
+        monkeypatch,
+        [
+            _http_error(403),
+            [{"commit": {"committer": {"date": "2026-10-09T00:00:00Z"}}}],
+        ],
+    )
+
+    assert api.registered_at("a.yml") == datetime(2026, 10, 9, tzinfo=timezone.utc)
 
 
 def test_the_nightly_job_runs_the_script_instead_of_an_inline_program() -> None:
