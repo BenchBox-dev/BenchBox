@@ -244,7 +244,7 @@ All 274 PRs merged to `develop` between 2026-08-17 and 2026-09-06 were examined 
 | all-workflow wall time | 28.5–33.0 min | 1.65 min (99s) | 5.0–14.0 min |
 | successful runner-minutes | 80.4–83.7 min | 2.80 min (synchronize; 2.22 min merge-group) | 12.0–35.0 min |
 | cancelled runner-minutes | variable (superseded runs) | 0.0 min | variable |
-| interarrival by lane | p50 31.3 min (all develop merges) | N/A (single skill sample) | variable |
+| interarrival by lane | p50 27.5 min (all develop merges) | N/A (single skill sample) | variable |
 | open-stale vs in-flight | in-flight staleness frequent | current at open, 0 in-flight drift | open-stale occasionally |
 | BEHIND causes | full-product merge arrivals | 0 full-product PRs became BEHIND | publication merge arrivals |
 | time to refresh | 15–45 min queue turnaround | 0 min (no refresh required) | 5–15 min |
@@ -394,3 +394,12 @@ additional sample is counted for it.
 - **Next review date:** `2026-09-20`.
 - **Durable budget:** Unmeasured. Two samples are insufficient to publish a
   budget or change the `SHADOW_ONLY` status of 07a/07b.
+
+## Correction (2026-10-09)
+
+The system-throughput table previously quoted
+“p50 31.3 min (all develop merges)” from the original PR #1756 baseline.
+PR #1774 (`fe3b352c0`) recomputed that audit over 33 gaps to a p50
+of 27.5 minutes and 51.5% of gaps under 31 minutes.
+The table now uses the revised audit. Required-gate durations,
+sample counts, and the `INSUFFICIENT SAMPLE` conclusion are unchanged.
