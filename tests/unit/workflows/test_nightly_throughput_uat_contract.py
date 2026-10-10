@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -160,13 +161,16 @@ def test_cedardb_cell_keeps_the_throughput_workload_and_a_bounded_timeout() -> N
 
 def test_cedardb_image_is_pinned_by_digest() -> None:
     compose = yaml.safe_load((REPO_ROOT / "docker" / "cedardb" / "docker-compose.yml").read_text(encoding="utf-8"))
-    assert compose["services"]["cedardb"]["image"] == (
-        "cedardb/cedardb@sha256:dbbacb16b24421a9a123cd1d065e2a049c60b7cc6060d7db2f3cccbf69f5ff62"
-    )
+    digest = "@sha256:dbbacb16b24421a9a123cd1d065e2a049c60b7cc6060d7db2f3cccbf69f5ff62"
+    default_image = compose["services"]["cedardb"]["image"]
+    ci_image = _jobs()["throughput-uat"]["env"]["CEDARDB_IMAGE"]
+    assert re.findall(r"@sha256:[0-9a-f]{64}", default_image) == [digest]
+    assert re.findall(r"@sha256:[0-9a-f]{64}", ci_image) == [digest]
 
 
-def test_throughput_job_grants_only_contents_and_actions_read() -> None:
-    assert _jobs()["throughput-uat"]["permissions"] == {"contents": "read", "actions": "read"}
+def test_throughput_job_has_only_read_permissions() -> None:
+    permissions = _jobs()["throughput-uat"]["permissions"]
+    assert permissions == {"contents": "read", "actions": "read", "packages": "read"}
     assert "actions" not in (yaml.safe_load(NIGHTLY.read_text(encoding="utf-8")).get("permissions") or {})
 
 

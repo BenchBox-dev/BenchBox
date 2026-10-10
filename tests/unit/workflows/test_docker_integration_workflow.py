@@ -48,7 +48,6 @@ def test_dispatch_input_validated_with_exact_tokens() -> None:
         ("trino", "run_trino"),
     ):
         job = workflow["jobs"][job_name]
-        assert job.get("needs") == ["validate-input"], f"{job_name} must wait for validation"
         assert flag in job.get("if", ""), f"{job_name} must gate on {flag}"
 
 

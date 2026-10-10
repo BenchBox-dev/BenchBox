@@ -104,6 +104,20 @@ def test_docker_covers_all_three_services() -> None:
     assert docker["strategy"]["fail-fast"] is False
 
 
+def test_docker_attempts_pulls_after_mirror_failure_without_authenticating_postgres() -> None:
+    jobs = _load()["jobs"]
+    docker = jobs["docker"]
+    assert str(docker["if"]).replace(" ", "") == "${{!cancelled()}}"
+    needs = docker["needs"]
+    assert "mirror-images" in ([needs] if isinstance(needs, str) else needs)
+    login = next(step for step in _steps(docker) if "docker login ghcr.io" in str(step.get("run", "")))
+    assert str(login["if"]).replace(" ", "") == "${{matrix.service!='postgres'}}"
+    assert "mirror-images" in jobs["report"]["needs"]
+    mirror = _load(WORKFLOWS_DIR / "mirror-ci-images.yml")
+    assert "concurrency" not in mirror
+    assert all("concurrency" not in job for job in mirror["jobs"].values())
+
+
 def test_wheel_matrix_covers_python_versions_and_operating_systems() -> None:
     job = _load()["jobs"]["matrix"]
     matrix = job["strategy"]["matrix"]
@@ -328,25 +342,79 @@ def test_default_permissions_are_read_only() -> None:
     assert _load()["permissions"] == {"contents": "read"}
 
 
-def test_only_report_job_holds_issue_write() -> None:
+def test_write_permissions_are_scoped_to_reporting_and_image_publication() -> None:
     jobs = _load()["jobs"]
-    writers = {
-        name for name, job in jobs.items() if "write" in {str(v) for v in (job.get("permissions") or {}).values()}
-    }
-    assert writers == {"report"}
+    issue_writers = {name for name, job in jobs.items() if (job.get("permissions") or {}).get("issues") == "write"}
+    package_writers = {name for name, job in jobs.items() if (job.get("permissions") or {}).get("packages") == "write"}
+    assert issue_writers == {"report"}
+    assert package_writers == {"mirror-images"}
     assert jobs["report"]["permissions"] == {"contents": "read", "issues": "write"}
+    assert jobs["mirror-images"]["permissions"] == {"contents": "read", "packages": "write"}
+    assert jobs["docker"]["permissions"] == {"contents": "read", "packages": "read"}
+    for name in DOMAIN_JOBS:
+        assert "write" not in (jobs[name].get("permissions") or {}).values()
 
 
-def test_report_job_covers_every_domain_and_label() -> None:
-    report = _load()["jobs"]["report"]
-    assert set(report["needs"]) == set(DOMAIN_JOBS)
-    assert "always()" in str(report["if"])
-    text = _run_text(report)
-    for job in DOMAIN_JOBS:
-        assert re.search(rf"\b{re.escape(job)}\b", text), f"report loop omits {job}"
-    assert 'label="t3:${domain}"' in text
-    assert "durations-refresh) domain=durations" in text
-    assert "gh issue create" in text and "gh issue close" in text and "gh issue comment" in text
+@pytest.mark.parametrize(
+    "mirror_result, docker_result, existing, expected_action",
+    [
+        ("failure", "skipped", False, "create"),
+        ("failure", "success", False, "create"),
+        ("failure", "success", True, "comment"),
+        ("success", "failure", False, "create"),
+        ("success", "success", True, "close"),
+        ("success", "skipped", True, None),
+    ],
+)
+def test_report_keeps_mirror_failures_visible_and_optional_skips_unchanged(
+    tmp_path: Path, mirror_result: str, docker_result: str, existing: bool, expected_action: str | None
+) -> None:
+    if shutil.which("jq") is None:
+        pytest.skip("report execution requires jq")
+    gh = tmp_path / "gh"
+    gh.write_text(
+        f"#!{sys.executable}\n"
+        "import json, os, sys\n"
+        "from pathlib import Path\n"
+        "args = sys.argv[1:]\n"
+        "with Path(os.environ['GH_CALLS']).open('a') as output:\n"
+        "    output.write(json.dumps(args) + '\\n')\n"
+        "if args[:2] == ['issue', 'list'] and 't3:docker' in args and os.environ['EXISTING'] == 'true':\n"
+        "    print('42')\n",
+        encoding="utf-8",
+    )
+    gh.chmod(0o755)
+    needs = {job: {"result": "skipped"} for job in DOMAIN_JOBS}
+    needs["docker"]["result"] = docker_result
+    needs["mirror-images"] = {"result": mirror_result}
+    call_path = tmp_path / "gh-calls.jsonl"
+    result = _run_workflow_script(
+        _load()["jobs"]["report"]["steps"][0]["run"],
+        tmp_path,
+        {
+            "NEEDS_JSON": json.dumps(needs),
+            "GH_CALLS": str(call_path),
+            "EXISTING": str(existing).lower(),
+            "GITHUB_REPOSITORY": "example/repo",
+            "GITHUB_RUN_ID": "123",
+            "GITHUB_SHA": "abc",
+            "RUN_URL": "https://example.test/run/123",
+            "DOC_URL": "https://example.test/docs",
+        },
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = [json.loads(line) for line in call_path.read_text(encoding="utf-8").splitlines()]
+    mutations = [args for args in calls if args[:2] in [["issue", "create"], ["issue", "comment"], ["issue", "close"]]]
+    if expected_action is None:
+        assert mutations == []
+    else:
+        assert any(args[:2] == ["issue", expected_action] for args in mutations)
+        assert all("t3:docker" in args or "42" in args for args in mutations)
+    if mirror_result == "failure":
+        assert not any(args[:2] == ["issue", "close"] for args in mutations)
+        body = next(args[args.index("--body") + 1] for args in mutations if "--body" in args)
+        assert "Image mirror infrastructure failed" in body
+        assert f"database test job result: {docker_result}" in body
 
 
 def test_actions_are_pinned_by_sha() -> None:

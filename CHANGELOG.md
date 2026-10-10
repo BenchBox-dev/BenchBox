@@ -228,6 +228,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CI database images no longer depend on repeated anonymous Docker Hub pulls.**
+  PostgreSQL uses Amazon ECR Public. ClickHouse, Trino, and nightly CedarDB
+  consumers wait for authenticated GHCR mirrors that retain their pinned
+  versions and CedarDB's digest. CI and Documentation spellcheck install the
+  same pinned codespell version with uv instead of building a Docker action.
+
 - **The `--tuning tuned` fallback names what each platform applies.** The
   message said "using basic constraints" everywhere. It now says "engine
   runtime defaults (streaming)" for Polars and "OLAP session pack" for

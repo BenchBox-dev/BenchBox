@@ -409,7 +409,7 @@ jobs:
       BENCHBOX_TEST_TIER: t3
     services:
       postgres:
-        image: postgres:17
+        image: public.ecr.aws/docker/library/postgres:17
         env:
           POSTGRES_USER: benchbox
           POSTGRES_PASSWORD: benchbox
@@ -700,15 +700,26 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 scripts/scheduled_workflow_liveness.py
 
+  mirror-cedardb:
+    uses: ./.github/workflows/mirror-ci-images.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      images: '["cedardb"]'
+
   throughput-uat:
+    needs: mirror-cedardb
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
       contents: read
       actions: read
+      packages: read
     outputs:
       cedardb_sweep_outcome: ${{ steps.cedardb-sweep.outcome }}
     env:
+      CEDARDB_IMAGE: ghcr.io/benchbox-dev/cedardb@sha256:dbbacb16b24421a9a123cd1d065e2a049c60b7cc6060d7db2f3cccbf69f5ff62
       THROUGHPUT_FLOOR_MEDIAN: ${{ vars.THROUGHPUT_FLOOR_MEDIAN }}
       THROUGHPUT_FLOOR_MAX_DROP_FRACTION: ${{ vars.THROUGHPUT_FLOOR_MAX_DROP_FRACTION }}
       THROUGHPUT_BASELINE_MIN_RECORDED_AT: ${{ vars.THROUGHPUT_BASELINE_MIN_RECORDED_AT }}
@@ -736,6 +747,11 @@ jobs:
         id: duckdb-sweep
         run: |
           make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml
+
+      - name: Authenticate to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
 
       - name: Run CedarDB throughput UAT cell (TPC-H SF1, run-official --streams 3)
         id: cedardb-sweep
