@@ -182,12 +182,16 @@ def test_matching_native_aliases_agree() -> None:
         ("quanton", {"cluster_size": "small"}, None),
         ("redshift", {"workgroup_name": "wg"}, "workgroup"),
         ("redshift", {"cluster_identifier": "c"}, "cluster"),
-        ("redshift", {"compute_resource": "wg"}, None),
         ("duckdb", {"warehouse": "W"}, None),
     ],
 )
 def test_resource_kind_resolution(platform: str, merged: dict, expected: str | None) -> None:
     assert resolve_resource_kind(platform, merged) == expected
+
+
+def test_resource_kind_dict_canonical_only_fails() -> None:
+    with pytest.raises(PlatformOptionError, match="could be 'workgroup_name', 'cluster_identifier'"):
+        resolve_resource_kind("redshift", {"compute_resource": "wg"})
 
 
 class TestSnowflakeComputeUnification:
@@ -650,7 +654,7 @@ class TestQuantonComputeUnification:
 
 
 class TestRedshiftComputeUnification:
-    def test_canonical_workgroup_from_config(self):
+    def test_native_workgroup_from_config(self):
         from benchbox.platforms.redshift import RedshiftAdapter
 
         try:
@@ -660,7 +664,7 @@ class TestRedshiftComputeUnification:
                     "database": "dev",
                     "username": "u",
                     "password": "p",
-                    "compute_resource": "wg",
+                    "workgroup_name": "wg",
                     "benchmark": "tpch",
                     "scale_factor": 0.01,
                 }
@@ -668,6 +672,25 @@ class TestRedshiftComputeUnification:
         except ImportError:
             pytest.skip("Redshift drivers not installed")
         assert adapter.workgroup_name == "wg"
+
+    def test_generic_only_from_config_fails(self):
+        from benchbox.platforms.redshift import RedshiftAdapter
+
+        try:
+            with pytest.raises(PlatformOptionError, match="could be 'workgroup_name', 'cluster_identifier'"):
+                RedshiftAdapter.from_config(
+                    {
+                        "host": "h",
+                        "database": "dev",
+                        "username": "u",
+                        "password": "p",
+                        "compute_resource": "wg",
+                        "benchmark": "tpch",
+                        "scale_factor": 0.01,
+                    }
+                )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
 
 
 class TestAthenaComputeUnification:
