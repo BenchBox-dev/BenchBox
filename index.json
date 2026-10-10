@@ -23077,12 +23077,17 @@
       "title": "Build an internal harness that measures a tuned template against notuning with calibrated noise"
     },
     "tuning-evidence-merge-settle-recorded-20261008": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-11T09:27:56Z",
+        "generation": "f3554acfdc364234b5c26322b49d6a55",
+        "renewals": 0,
+        "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:7e55d16b199130b0978d8efa"
+      },
       "needs": [
         "tuning-evidence-tuned-mode-promise-20261008"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Record the ClickHouse merge-settle wait in the result and apply it in the modes the owner chose"
     },
     "tuning-evidence-tuned-mode-promise-20261008": {
