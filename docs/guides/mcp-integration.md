@@ -212,7 +212,7 @@ If `benchbox-mcp` isn't in PATH, use the full path or uv:
 
 #### Verifying Installation
 
-Ask ChatGPT: "What MCP tools are available?" - it should list BenchBox tools including `list_platforms`, `run_benchmark`, etc.
+Ask ChatGPT: "What MCP tools are available?" - it should list BenchBox tools including `list_available`, `run_benchmark`, etc.
 
 ---
 
@@ -291,7 +291,7 @@ Once configured, Claude Code can use BenchBox tools through natural language. Ex
 
 > "What database platforms are available in BenchBox?"
 
-Claude will use `list_platforms()` to show available platforms with their capabilities.
+Claude will use `list_available("platforms")` to show available platforms with their capabilities.
 
 ### Running Benchmarks
 
@@ -303,13 +303,13 @@ Claude will use `run_benchmark(platform="duckdb", benchmark="tpch", scale_factor
 
 > "Can I run TPC-DS on Polars with scale factor 10?"
 
-Claude will use `validate_config()` to check if the configuration is valid.
+Claude will use `check_dependencies(platform="polars")` to check if the configuration is valid.
 
 ### Analyzing Results
 
 > "Show me the slowest queries from my last benchmark run"
 
-Claude will use `list_recent_runs()` and `get_results()` to analyze performance.
+Claude will use `get_results()` to list recent runs, then `get_results(result_file="...")` to analyze performance.
 
 ## Using MCP Prompts
 

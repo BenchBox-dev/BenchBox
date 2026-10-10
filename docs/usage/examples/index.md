@@ -12,14 +12,14 @@ The BenchBox examples are organized into six categories to help you learn progre
 ## Example Categories
 
 ### 1. [Getting Started Examples](../../../examples/getting_started/README.md)
-**5 examples** | **Beginner-friendly** | **5-10 minutes each**
+**Walkthroughs** | **Beginner-friendly** | **5-10 minutes each**
 
 Zero to working benchmark in minutes. Includes local (DuckDB) and cloud (Databricks, BigQuery) examples with clear progression.
 
 **Start here if:** You're new to BenchBox
 
 ### 2. [Feature Examples](../../../examples/features/README.md)
-**8 examples** | **Intermediate** | **10-15 minutes each**
+**9 examples** | **Intermediate** | **10-15 minutes each**
 
 Learn specific BenchBox capabilities in isolation: test types, query subsetting, tuning, multi-platform execution, and more.
 
@@ -40,9 +40,9 @@ Interactive Jupyter notebooks for each platform plus analysis patterns. Perfect 
 **Start here if:** You prefer interactive development
 
 ### 5. [Configuration Templates](../../../examples/tunings/README.md)
-**49 files** | **Reference** | **Copy-paste ready**
+**55 files** | **Reference** | **Copy-paste ready**
 
-Platform configurations (15 files) and benchmark tuning configs (34 files) for all supported platforms.
+Platform configurations (10 files) and benchmark tuning configs (45 files) for all supported platforms.
 
 **Start here if:** You need platform setup or tuning references
 

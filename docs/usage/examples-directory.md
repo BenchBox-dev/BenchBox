@@ -3,7 +3,7 @@
 ```{tags} beginner, reference
 ```
 
-The BenchBox repository includes a comprehensive `examples/` directory with over 40 practical examples, organized to help you get started quickly and learn advanced patterns progressively.
+The BenchBox repository includes an `examples/` directory with over 50 practical examples, organized to help you get started quickly and learn advanced patterns progressively.
 
 ## Quick Navigation
 
@@ -30,7 +30,7 @@ examples/
 │   ├── cloud/               # Databricks & BigQuery examples
 │   └── intermediate/        # Targeted patterns
 │
-├── features/                # Single-feature examples (8 examples)
+├── features/                # Single-feature examples (9 examples)
 │   ├── test_types.py       # Power, Throughput, Maintenance tests
 │   ├── query_subset.py     # Run specific queries only
 │   ├── tuning_comparison.py
@@ -38,6 +38,7 @@ examples/
 │   ├── multi_platform.py
 │   ├── export_formats.py
 │   ├── data_validation.py
+│   ├── maintenance_workflow.py
 │   └── performance_monitoring.py
 │
 ├── use_cases/               # Real-world patterns (4 examples)
@@ -53,15 +54,16 @@ examples/
 │   ├── platform_comparison.ipynb
 │   └── ... (7 more)
 │
-├── config/                  # Platform configuration templates (15 files)
+├── config/                  # Platform configuration templates (10 files)
 │   ├── duckdb.yaml
 │   ├── databricks.yaml
 │   ├── snowflake.yaml
-│   └── ... (12 more)
-│
-├── tunings/                 # Benchmark tuning configurations (34 files)
-│   ├── duckdb/             # 24 configs
-│   └── databricks/         # 10 configs
+│   └── ... (7 more)
+
+├── tunings/                 # Benchmark tuning configurations (45 files)
+│   ├── duckdb/             # 18 configs
+│   ├── databricks/         # 12 configs
+│   └── clickhouse, dataframe, snowflake dirs
 │
 ├── INDEX.md                 # Detailed multi-level navigation
 ├── PATTERNS.md              # 8 proven workflow patterns
@@ -124,7 +126,7 @@ For comprehensive documentation of each category:
 
 ## Example Categories Explained
 
-### 1. Getting Started (7 examples)
+### 1. Getting Started
 **Purpose:** Get from zero to working benchmark in 5 minutes
 
 **Local Examples (no config required):**
@@ -140,7 +142,7 @@ For comprehensive documentation of each category:
 
 **Start here if:** You're new to BenchBox
 
-### 2. Feature Examples (8 examples)
+### 2. Feature Examples (9 examples)
 **Purpose:** Learn specific BenchBox capabilities in isolation
 
 **Topics covered:**
@@ -151,6 +153,7 @@ For comprehensive documentation of each category:
 - Multi-platform execution
 - Export formats
 - Data validation
+- Maintenance workflows
 - Performance monitoring
 
 **Start here if:** You know the basics and want to learn a specific feature
@@ -176,7 +179,7 @@ For comprehensive documentation of each category:
 
 **Start here if:** You prefer interactive exploration
 
-### 5. Configuration Templates (15 files)
+### 5. Configuration Templates (10 files)
 **Purpose:** Platform setup references
 
 **Includes:**
@@ -186,13 +189,13 @@ For comprehensive documentation of each category:
 
 **Start here if:** You need to configure a platform
 
-### 6. Tuning Configurations (34 files)
+### 6. Tuning Configurations (45 files)
 **Purpose:** Benchmark-specific optimizations
 
 **Includes:**
 - Tuned vs. notuning configurations
 - Platform-specific optimizations
-- DuckDB (24 configs), Databricks (10 configs)
+- DuckDB (18 configs), Databricks (12 configs), plus dataframe, ClickHouse, and Snowflake dirs
 
 **Start here if:** You want to optimize query performance
 
@@ -228,8 +231,10 @@ python databricks_tpch_power.py
 
 ```bash
 cd examples/features
-python query_subset.py --queries 1,3,6 --platform duckdb
+python query_subset.py
 ```
+
+The script runs its own query-subset demonstrations. To pass query subsets to a real run, use `benchbox run --queries 1,3,6 --platform duckdb`.
 
 ### Use a Notebook
 
