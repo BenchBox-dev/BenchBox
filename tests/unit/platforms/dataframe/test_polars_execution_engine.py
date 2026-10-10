@@ -314,14 +314,16 @@ class TestExecutionEngineResolution:
 
         assert adapter.get_platform_info()["execution_engine"]["applied"] == "in-memory"
 
-    def test_affinity_records_native_collect_kwargs_and_environment(self, monkeypatch):
+    def test_affinity_records_native_collect_kwargs_and_environment(self, monkeypatch, caplog):
         monkeypatch.setenv("POLARS_ENGINE_AFFINITY", "streaming")
 
-        adapter = PolarsDataFrameAdapter(execution_engine="streaming")
+        with caplog.at_level("WARNING", logger="benchbox.platforms.dataframe.polars_df"):
+            adapter = PolarsDataFrameAdapter(execution_engine="streaming")
 
         native = adapter.get_platform_info()["execution_engine"]["applied_native"]
         assert native["collect_kwargs"] == {"engine": "streaming"}
         assert native["POLARS_ENGINE_AFFINITY"] == "streaming"
+        assert any("POLARS_ENGINE_AFFINITY" in message for message in caplog.messages)
 
 
 class TestEngineMetadata:

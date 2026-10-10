@@ -1991,19 +1991,39 @@ def _interactive_collect_flags(
     _interactive_prompt_platform_options(s)
 
 
+def _interactive_resolve_engine(s: types.SimpleNamespace) -> None:
+    from benchbox.cli.benchmarks import prompt_execution_engine
+    from benchbox.core.execution_engine import UnsupportedExecutionEngineError, resolve_requested
+    from benchbox.core.platform_manifest import DEFAULT_EXECUTION_ENGINE
+
+    requested = getattr(s, "execution_engine", None)
+    if requested is None:
+        requested = prompt_execution_engine(s.database_config.type)
+    try:
+        resolved = resolve_requested(s.database_config.type, requested)
+    except UnsupportedExecutionEngineError as exc:
+        console.print(f"[red]❌ {exc}[/red]")
+        if s.logger:
+            s.logger.error(str(exc))
+        s.ctx.exit(1)
+        return
+    s.execution_engine = resolved
+    s.resolved_execution_engine = resolved
+    if resolved != DEFAULT_EXECUTION_ENGINE:
+        s.database_config.execution_engine = resolved
+
+
 def _interactive_prompt_platform_options(s: types.SimpleNamespace) -> None:
     if s.parsed_platform_options:
         return
 
     platform_opts = getattr(s, "_interactive_platform_options", None)
     if platform_opts is None:
-        from benchbox.cli.benchmarks import prompt_execution_engine, prompt_platform_options
+        from benchbox.cli.benchmarks import prompt_platform_options
 
         platform_opts = prompt_platform_options(s.database_config.type) or {}
         s._interactive_platform_options = platform_opts
-        engine = prompt_execution_engine(s.database_config.type)
-        s.execution_engine = engine
-        s.database_config.execution_engine = engine
+    _interactive_resolve_engine(s)
 
     if not platform_opts:
         return

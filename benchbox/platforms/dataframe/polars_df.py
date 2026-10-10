@@ -127,11 +127,18 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
                 "Conflicting execution engine sources: "
                 + " vs ".join(f"{source} requests {value!r}" for source, value, _ in present)
             )
+        affinity = collect_affinity()
         if tuning is not None:
             logger.warning(
                 "Tuning [%s]: tuning file selects execution engine %r; runs with different engines may not be comparable",
                 self.platform_name,
                 tuning,
+            )
+        if affinity is not None:
+            logger.warning(
+                "Tuning [%s]: %s is set; runs with different engines may not be comparable",
+                self.platform_name,
+                ENGINE_AFFINITY_KEY,
             )
         if legacy is not None:
             warnings.warn(
@@ -152,7 +159,7 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         engines = supported_execution_engines("polars")
         collect_kwargs = collect_engine_option(selected) if collect_accepts_engine() else {}
         applied_native: dict[str, Any] = {"collect_kwargs": collect_kwargs}
-        applied_native[ENGINE_AFFINITY_KEY] = collect_affinity()
+        applied_native[ENGINE_AFFINITY_KEY] = affinity
         return ExecutionEngineReceipt(
             requested=resolved,
             applied=selected,
