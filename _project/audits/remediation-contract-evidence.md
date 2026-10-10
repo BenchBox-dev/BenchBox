@@ -2,8 +2,8 @@
 develop_sha: 2eb03f3e67ec8f7f1347738f29696fa39ed5f526
 measured_at_sha: dd20aed2d53a87a4c34ae74c73a187cfa9bf3c5e
 checked_sha: dd20aed2d53a87a4c34ae74c73a187cfa9bf3c5e
-replay_sha: 59e3cf8f914b857db649de1e07a6e648b1da53e4
-replay_scope: PR 2888 mirror, consumer parity, throughput signal contract tests and full fast suite at source revision 59e3cf8f914b857db649de1e07a6e648b1da53e4
+replay_sha: 8405f5e3c76ecb679e46079c737083d36494ba57
+replay_scope: PR 2888 mirror, parity, throughput contract tests and full fast suite at replay tree 8405f5e3c76ecb679e46079c737083d36494ba57
 ---
 
 # Remediation contract evidence
@@ -193,7 +193,7 @@ with CLI export and Explorer transformer tests: 230 passed. Replay with
 
 ## PR #2888 review remediations
 
-Replay source revision: `59e3cf8f914b857db649de1e07a6e648b1da53e4`.
+Code source commit: `45b2751364e00e8d71d1c9ed907bb841b944ce76`.
 This is a replay of the contract tests and full fast suite; it does not replace
 the original measurements bound by this file's `checked_sha`.
 
@@ -201,7 +201,7 @@ The accepted Oracle findings were on PR #2888 head
 `cccec335475cc35bc2f2c1c828989e47d009af5e`: mutable tag mirrors could diverge
 from upstream content, ClickHouse/Trino consumer overrides could drift from
 Compose, and CedarDB mirror failure could suppress DuckDB throughput evidence.
-The fixes below are in the checked source commit.
+The fixes below are in source commit `45b2751364e00e8d71d1c9ed907bb841b944ce76`.
 
 ### Digest-pinned ClickHouse and Trino mirrors
 
@@ -296,7 +296,7 @@ and checks the emitted commit-status fields.
 A real nightly dispatch on merged `develop` is still required to verify actual
 GitHub job outputs, artifacts, and status contexts.
 
-### Verification at the checked source tree
+### Verification at the rebased replay tree
 
 Focused workflow tests passed 105:
 
@@ -304,8 +304,8 @@ Focused workflow tests passed 105:
 uv run -- python -m pytest tests/unit/workflows/test_nightly_t3_workflow.py tests/unit/workflows/test_docker_integration_workflow.py tests/unit/workflows/test_nightly_throughput_uat_contract.py -q
 ```
 
-The full configured verifier passed: 37,220 tests passed, 26 skipped, and 4
-subtests passed; `ty check` exited 0.
+The full configured verifier passed: 37,273 tests passed, 26 skipped, 857
+warnings, and 4 subtests passed; `ty check` reported 669 diagnostics and exited 0.
 
 ```bash
 uv run -- ruff check . && uv run ty check && uv run -- python -m pytest -m fast -q
