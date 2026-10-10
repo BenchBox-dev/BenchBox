@@ -6,7 +6,7 @@
     "t3:perf passes in a nightly-v2 verification dispatch after the change",
     "docs/development/perf-smoke.md no longer says the workflow runs per PR, and its advice to re-run once matches the decision"
   ],
-  "context": "Created from the nightly-red handoff section 0.4. No gate change is authorized without the owner's decision.\n\n2026-10-09 tracker review: replaced the three-option list with options (a) to (f) and added the evidence. The earlier acceptance that referred to t3-perf-baseline-refresh was replaced by \"t3:perf passes in a nightly-v2 verification dispatch\" (moved from that item, which is being closed). New acceptance: fix the \"Per-PR\" title and the re-run-once advice in docs/development/perf-smoke.md to match the decision.\n\n2026-10-09: the owner accepted the recommendation; option (c), an absolute floor on the aggregate check, is decided. The item is now implementation work.",
+  "context": "2026-10-10: implemented and verified in ../BenchBox.wt-aggfloor on branch feat/compare-aggregate-regression-floor, commit 9702ff90c (6 files +135 -20). New --min-aggregate-regression-delta threads through CLI, interactive and file paths; aggregates need both 10% and the floor (seconds-to-ms conversion); 7 contract tests added; both perf gates pass 82ms; docs record derivation and fix the release-branch wording. Verification: 329-test focused suite green, ruff check/format clean, self-compare passes, 604.7ms-night class covered by unit case. PR #2859 opened and armed; oracle review requested, CI pending. Resumption: watch checks once, resolve review threads, ensure merge; then nightly-v2 verification dispatch for t3:perf.",
   "description": "Decision (owner, 2026-10-09): option (c). The aggregate check (Total Execution Time and Average Query Time) fails only when the aggregate is both more than the percentage threshold slower and more than an absolute number of milliseconds slower. Keep the 10% threshold and the per-query gate (10% and 7 ms) unchanged.\n\nWork:\n- Add an aggregate floor to `benchbox compare` (benchbox/cli/commands/compare.py; today --min-regression-delta applies to per-query checks only, compare.py:284 \"Aggregate metrics are judged by percentage alone\"), for example `--min-aggregate-regression-delta`.\n- Derive the floor from the same-runner-class spread and record the method next to the baseline (docs/development/perf-smoke.md). Same-class totals so far: 539.8, 542.9, 546.4, 548.9, 586.1 and 604.7 ms, a spread of about 65 ms.\n- Pass the floor in nightly-v2.yml (lines 213-214) and perf-smoke.yml (lines 59-60).\n\nOptions considered and not chosen: keep 10% alone (red most nights); raise to 15% (as arbitrary as 10% with six samples); report-only aggregates (loses the uniform-slowdown signal); rolling same-class history or two consecutive red nights (more machinery, delays signal); larger scale factor or more iterations (more runner time). Revisit (e) if the floor still fails on noise once more same-class samples exist.\n\nEvidence:\n- The aggregate is the sum of the same 66 per-query timings (22 queries x 3 iterations, about 8 ms each) that the per-query check judges.\n- In run 37991400931 all 22 queries slowed together (+2.7% to +45.8%) on the baseline's own runner class (AMD EPYC 7763): host noise, not a code regression.\n- The gate does not measure orchestration overhead: run.total_duration_ms is not compared.\n- perf-smoke.yml runs only on pull requests to the release branch (perf-smoke.yml:3-5), so the \"Per-PR\" title and wording in docs/development/perf-smoke.md are wrong.\n- t3:perf failed in 11 of the last 12 nightly-v2 runs.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2778"
@@ -43,6 +43,14 @@
       "generation": "c7f7175d87f049e6986b7227954357fd",
       "op": "take",
       "op_id": "3d08256ed7224d389bb288a28242d57b",
+      "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:8d0fa0e2ef22aacc5284a44c",
+      "at": "2026-10-10T01:44:52Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "b327ff48215746fb94f6cb6a2919c421",
       "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
     }
   ]
