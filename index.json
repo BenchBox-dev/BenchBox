@@ -2483,9 +2483,9 @@
     },
     "ci-docker-hub-unauthenticated-pulls-20261009": {
       "claim": {
-        "expires_at": "2026-10-11T19:50:27Z",
+        "expires_at": "2026-10-11T20:35:58Z",
         "generation": "1275a3d0092e417faaff5447290c1067",
-        "renewals": 0,
+        "renewals": 1,
         "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:0b65b59dfd5ecfabcfde36b0"
       },
       "needs": [],
