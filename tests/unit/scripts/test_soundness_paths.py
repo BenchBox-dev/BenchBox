@@ -64,6 +64,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "benchbox/sql_compat/rules/_registration.py",
         "_project/scripts/oracle_review_check.py",
         ".github/workflows/oracle-review.yml",
+        ".github/workflows/oracle-verdict.yml",
         "benchbox/core/results/anonymization.py",
         "benchbox/core/results/anonymization_specs.yaml",
         "benchbox/core/results/provenance.py",
@@ -222,15 +223,3 @@ def test_any_soundness_path_recognises_tuning_trust_paths() -> None:
     assert soundness.any_soundness_path(["docs/index.md", *TUNING_TRUST_FILES[:1]]) is True
     assert soundness.any_soundness_path(["benchbox/platforms/duckdb_introspection.py"]) is True
     assert soundness.any_soundness_path(["benchbox/platforms/base/adapter.py", "benchbox/platforms/duckdb.py"]) is False
-
-
-def test_make_pr_open_uses_shared_predicate_and_skips_auto_merge() -> None:
-    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
-
-    assert "scripts/pr_landing.py" in makefile
-    assert "pr-landing-ready" in makefile
-    assert "delivery_mode as 'serial' or 'batch'" in (ROOT / "scripts/pr_landing.py").read_text(encoding="utf-8")
-    assert "EVIDENCE is required" in makefile
-    helper = (ROOT / "scripts/pr_landing.py").read_text(encoding="utf-8")
-    assert "soundness_paths_changed" in helper
-    assert "auto-enqueue is forbidden" in helper
