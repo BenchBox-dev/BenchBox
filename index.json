@@ -23640,7 +23640,7 @@
         "uat-preflight-disk-headroom-gate"
       ],
       "priority": "low",
-      "status": "blocked",
+      "status": "dropped",
       "title": "UAT release-gate re-run: enforce ordering, fresh root, and an explicit approval gate"
     },
     "uat-certification-wording-charter-decision": {
