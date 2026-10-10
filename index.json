@@ -4969,17 +4969,12 @@
       "title": "Gate: approve an ADR that defines BenchBox's core execution-variant vocabulary (engine, compute, deployment, gateway)"
     },
     "core-exec-deployment-selection-recorded": {
-      "claim": {
-        "expires_at": "2026-10-11T07:06:50Z",
-        "generation": "05886167abe5462fbf5122bf368ff255",
-        "renewals": 0,
-        "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:6e8a424eda2c7006605aa48b"
-      },
+      "claim": null,
       "needs": [
         "core-exec-result-schema-2-3"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Record the selected deployment mode in results and fold per-platform deployment keys into the manifest selector"
     },
     "core-exec-engine-declarations-existing": {
