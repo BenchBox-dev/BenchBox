@@ -3,7 +3,7 @@
     "Test: a local result written per D-3 contains receipt statements/reasons; publish/export output stays redacted.",
     "Console summary asserted in a CLI test for a DuckDB tuned run."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P5.3 (R-7). 2026-10-08: also step 2 ('make every tuning visible') of the tuning-evidence plan. The console summary should also show the template evidence state once tuning-evidence-unmeasured-template-label-20261008 lands; that is not a prerequisite.",
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P5.3 (R-7). 2026-10-08: also step 2 ('make every tuning visible') of the tuning-evidence plan. The console summary should also show the template evidence state once tuning-evidence-unmeasured-template-label-20261008 lands; that is not a prerequisite.\n\n2026-10-10 implementation (native worker PartialHippopotamus, closed out by orchestrator): PR #2863 OPEN unarmed, head 5c01056f0, local==remote==PR, worktree BenchBox.wt-tuning-local-diagnosability, committed as Joe Harris <joeharris76@gmail.com> (worktree-pinned). Change: exporter defaults anonymize False (local files keep statements/reasons, username redaction retained); export/compare pin True; publish re-exports unanonymized sources (temp cleaned in all paths) or refuses; submission validation + artifact privacy check reject unanonymized diagnostics; console summary after every run (status, verdict counts, top 3 reasons, dropped intents). +R privacy review: 2 Required fixed (temp-dir leak, companion count on original). anonymization.py/specs untouched. Evidence: new unit tests 15 + live DuckDB CLI test, real-bundle smoke (local 20 statements/reasons; publish/export redacted; privacy + submission reject exit 1 with 138 findings). Gates: fast 36995 pass/26 skip, ruff/fmt clean, comment-policy 0, ty 666 pre-existing, commit hooks pass, pr-preflight 76 pass. Soundness section in PR body (scripts/publication/ path). Worker note: content-based (not flag-based) rejection kept — a notuning local file still passes submission (recommendation, in PR body). Blockers: oracle review, CI, soundness + owner merge. No completion claimed.",
   "description": "## Problem\nThe user's local result file redacts receipt statements and reasons (`exporter.py:105` defaults `anonymize=True`), and the console prints no verification summary.\n\n## Change (per gate D-3)\n- Apply the decided local-file anonymization default or flag.\n- After every run, print status, counts by verdict, the top 3 reasons, and the dropped intents.\n\n## Guardrails (must preserve)\n- Publish and public export stay fully anonymized.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
   "links": [
     "benchbox/core/results/exporter.py",
@@ -33,6 +33,14 @@
       "generation": "453063dc94f54ed09c62a563178967d0",
       "op": "take",
       "op_id": "fc8af422ad1e4eedba3aa41be234e609",
+      "session_id": "4dbe22cfa4cf47a5bab075c4c3ac203f"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:7e55d16b199130b0978d8efa",
+      "at": "2026-10-10T04:33:56Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "bfecfdfa712f4a19831a465aa20796b5",
       "session_id": "4dbe22cfa4cf47a5bab075c4c3ac203f"
     }
   ]
