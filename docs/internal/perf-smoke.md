@@ -99,7 +99,8 @@ uv run -- python scripts/perf_smoke_baseline.py \
 # 3. Replay every source result with the gate options. Each one must pass
 #    unless it carries a real slowdown, which the pull request names.
 uv run -- benchbox compare _project/baselines/perf_smoke_duckdb_tpch_001.json \
-  <path> --fail-on-regression 10% --min-regression-delta <floor>ms
+  <path> --fail-on-regression 10% --min-regression-delta <floor>ms \
+  --min-aggregate-regression-delta <aggregate-floor>ms
 
 # 4. Stage both files. _project/ is ignored, so a first-time sources
 #    record needs `git add -f`; edits to the tracked files do not.
