@@ -21248,10 +21248,15 @@
       "title": "Fix the nightly-v2 t3:durations job, which fails with no successful pytest verdict"
     },
     "t3-perf-aggregate-gate-tolerance-decision-20261009": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-11T01:31:19Z",
+        "generation": "c7f7175d87f049e6986b7227954357fd",
+        "renewals": 0,
+        "worker": "mcp:omp-coding-agent:joe@joe-mac-mini.local:8d0fa0e2ef22aacc5284a44c"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Give the perf gate's aggregate check an absolute floor so host noise stops failing the nightly"
     },
     "t3-perf-baseline-refresh-20261008": {
