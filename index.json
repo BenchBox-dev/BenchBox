@@ -21268,6 +21268,13 @@
       "status": "done",
       "title": "Add an absolute-delta floor to benchbox compare --fail-on-regression so sub-15ms queries stop tripping the perf gate"
     },
+    "t3-perf-execution-variants-regression-20261010": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "TPC-H perf regressed ~17% after execution-variants schema change"
+    },
     "table-format-integration-ci-coverage": {
       "claim": null,
       "needs": [],
