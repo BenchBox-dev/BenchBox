@@ -9,7 +9,7 @@ This guide provides systematic documentation for the TPC-H official benchmark im
 
 ## Overview
 
-The TPC-H official benchmark implementation provides a complete, certification-ready TPC-H benchmark that coordinates all three test phases and reports Power@Size and Throughput@Size. It does not report the composite QphH@Size (Queries per Hour @ Size).
+The TPC-H official benchmark implementation provides a complete TPC-H benchmark that coordinates all three test phases and reports Power@Size and Throughput@Size. It does not report the composite QphH@Size (Queries per Hour @ Size). See the deviation note above before planning a certification submission.
 
 ### What is TPC-H?
 
@@ -33,7 +33,7 @@ A result with any failed query, or whose throughput phase failed, carries no Thr
 - **Complete TPC-H Implementation**: All 22 queries with proper parameterization
 - **Three Test Phases**: Power Test, Throughput Test, and Maintenance Test
 - **Power@Size and Throughput@Size**: reported separately; no composite QphH@Size
-- **Certification Ready**: Meets all TPC-H specification requirements
+- **Structured for Audit**: Power and throughput phases with validation, audit trail, and reporting
 - **Comprehensive Reporting**: HTML, text, and CSV report generation
 - **Result Validation**: Automatic validation against TPC-H specification
 - **Audit Trail**: Complete audit trail for certification submissions
@@ -56,8 +56,8 @@ The implementation follows the TPC-H specification requirements:
 
 ### Prerequisites
 
-- Python 3.8 or higher
-- Database system (SQLite, PostgreSQL, MySQL, etc.)
+- Python 3.11 or higher
+- Database system (DuckDB, SQLite, PostgreSQL, Snowflake, etc.)
 - TPC-H data generation tools (included with BenchBox)
 
 ### Installation
@@ -66,60 +66,27 @@ The implementation follows the TPC-H specification requirements:
 uv add benchbox
 ```
 
-### Database Setup
-
-The benchmark works with any database supported by Python. The examples below show a connection factory for SQLite (for testing), PostgreSQL, and MySQL:
-
-```python
-import sqlite3
-def connection_factory():
-    return sqlite3.connect("tpch.db")
-
-import psycopg2
-def connection_factory():
-    return psycopg2.connect("host=localhost dbname=tpch user=postgres")
-
-import mysql.connector
-def connection_factory():
-    return mysql.connector.connect(
-        host="localhost",
-        database="tpch",
-        user="root",
-        password="password"
-    )
-```
-
 ## Quick Start
 
-Here's a minimal example to run the official TPC-H benchmark:
+Run the official TPC-H benchmark with the CLI (this SF1 DuckDB run completes in about a minute and reports a compliant `official` result):
+
+```bash
+benchbox run --official --platform duckdb --benchmark tpch --scale 1 --seed 42 --output ./official_data
+```
+
+Then read the metrics back programmatically:
 
 ```python
-from benchbox import TPCH
-import sqlite3
+from benchbox.core.results.loader import load_result_file
 
-benchmark = TPCH(
-    scale_factor=1.0,
-    output_dir="./tpch_benchmark",
-    verbose=True
-)
+results, raw = load_result_file("<runs-root>/results/tpch_sf1_duckdb_sql_<timestamp>_<id>.json")
 
-benchmark.generate_data()
-
-def connection_factory():
-    conn = sqlite3.connect("tpch.db")
-    return conn
-
-result = benchmark.run_official_benchmark(
-    connection_factory=connection_factory,
-    num_streams=2,
-    validate_results=True,
-    audit_trail=True
-)
-
-print(f"Power@Size: {result.power_test.power_at_size:.2f}")
-print(f"Throughput@Size: {result.throughput_test.throughput_at_size:.2f}")
-print(f"Certification Ready: {result.certification_ready}")
+print(f"Power@Size: {results.power_at_size:.2f}")
+print(f"Throughput@Size: {results.throughput_at_size}")
+print(f"Success: {raw['summary']['validation']}")
 ```
+
+(`results.throughput_at_size` is `None` here because the default official run covers the power phase; add `--phases throughput` for the throughput test.)
 
 ## Detailed Usage
 
@@ -127,9 +94,7 @@ print(f"Certification Ready: {result.certification_ready}")
 
 The parameters are:
 - `scale_factor`: the scale factor (1.0 is about 1 GB).
-- `output_dir`: the output directory.
-- `verbose`: enables verbose output.
-- `parallel`: the number of parallel data generation workers.
+- `output_dir`: the directory for generated data.
 
 ```python
 from benchbox import TPCH
@@ -137,57 +102,55 @@ from benchbox import TPCH
 benchmark = TPCH(
     scale_factor=1.0,
     output_dir="./output",
-    verbose=True,
-    parallel=4
 )
 ```
 
 ### Running the Official Benchmark
 
-The parameters are:
-- `connection_factory`: the database connection factory.
-- `num_streams`: the number of concurrent streams.
-- `output_dir`: the results output directory.
-- `verbose`: enables verbose logging.
-- `validate_results`: enables result validation.
-- `audit_trail`: enables the audit trail.
+Configure the run with `TPCHOfficialBenchmarkConfig`, then execute. An adapter is required so per-stream sessions apply:
 
 ```python
-result = benchmark.run_official_benchmark(
-    connection_factory=connection_factory,
+from benchbox.core.tpch.official_benchmark import TPCHOfficialBenchmark, TPCHOfficialBenchmarkConfig
+
+config = TPCHOfficialBenchmarkConfig(
     num_streams=2,
-    output_dir="./benchmark_results",
-    verbose=True,
-    validate_results=True,
-    audit_trail=True
+    seed=42,
+    validation_enabled=True,
+    audit_trail=True,
 )
+
+official = TPCHOfficialBenchmark(scale_factor=1.0, output_dir="./output")
+result = official.run_official_benchmark(connection_factory, config, adapter=adapter)
 ```
+
+The parameters are:
+- `connection_factory`: the database connection factory.
+- `config`: a `TPCHOfficialBenchmarkConfig` (stream count, seed, validation, audit trail).
+- `adapter`: the platform adapter (required for stream isolation).
 
 ### Accessing Results
 
-The result object holds the overall results, the Power Test results, the Throughput Test results, and the validation results:
+The result object holds the overall metrics plus per-phase results:
 
 ```python
 print(f"Success: {result.success}")
-print(f"Total Time: {result.total_benchmark_time}")
+print(f"Total Time: {result.total_time}")
 
-print(f"Power Test Time: {result.power_test.total_time}")
-print(f"Power@Size: {result.power_test.power_at_size}")
-print(f"Query Times: {result.power_test.query_times}")
+print(f"Power@Size: {result.power_at_size}")
+print(f"Power queries executed: {result.power_test_result.queries_executed}")
 
-print(f"Throughput Test Time: {result.throughput_test.total_time}")
-print(f"Throughput@Size: {result.throughput_test.throughput_at_size}")
-print(f"Stream Times: {result.throughput_test.stream_times}")
+print(f"Throughput@Size: {result.throughput_at_size}")
+print(f"Streams: {result.throughput_test_result.streams_successful}/{result.throughput_test_result.streams_executed}")
 
-print(f"Certification Ready: {result.certification_ready}")
-print(f"Validation Errors: {result.validation_errors}")
+print(f"Compliance validated: {result.compliance_validated}")
+print(f"Errors: {result.errors}")
 ```
 
 ## Test Phases
 
 ### Power Test
 
-The Power Test measures single-stream performance by executing all 22 TPC-H queries sequentially. The Power Test runs automatically as part of the official benchmark. It executes queries 1-22 in order with fixed parameters.
+The Power Test measures single-stream performance by executing all 22 TPC-H queries sequentially. The Power Test runs automatically as part of the official benchmark. It executes the 22 queries in stream permutation order with a fixed seed for reproducible parameters.
 
 **Key characteristics:**
 - Sequential execution of all 22 queries
@@ -226,21 +189,21 @@ real-world data warehouse operations.
 RF1 simulates processing of new sales orders by inserting data into the database:
 
 **Operations:**
-- Inserts new ORDERS records (~0.1% of scale factor)
-  - For SF=1: ~1,500 new orders with unique order keys
+- Inserts new ORDERS records (`max(1, int(scale_factor × 1.5))` per refresh pair)
+  - For SF=1: 1 new order with a unique order key
 - Inserts corresponding LINEITEM records (1-7 items per order)
-  - For SF=1: ~6,000-10,500 lineitems (average 4-6 per order)
-- Uses TPC-H compliant data generation (proper dates, prices, quantities)
+  - For SF=1: 1-7 lineitems
+- Uses generated data (proper dates, prices, quantities)
 - All insertions are committed to the database
 
 **Data Volume by Scale Factor:**
 
 | Scale Factor | Orders Inserted | Lineitems Inserted (approx) |
 |--------------|-----------------|------------------------------|
-| 0.01         | 15              | 60-105                       |
-| 0.1          | 150             | 600-1,050                    |
-| 1            | 1,500           | 6,000-10,500                 |
-| 10           | 15,000          | 60,000-105,000               |
+| 0.01         | 1               | 1-7                          |
+| 0.1          | 1               | 1-7                          |
+| 1            | 1               | 1-7                          |
+| 10           | 15              | 15-105                       |
 
 #### Refresh Function 2 (RF2): Delete Old Sales
 
@@ -250,7 +213,7 @@ RF2 simulates purging of old sales data by deleting records:
 - Identifies oldest orders by `O_ORDERDATE`
 - **CRITICAL:** Deletes LINEITEM records first (maintains referential integrity)
 - Then deletes corresponding ORDERS records
-- Deletes same volume as RF1 (~0.1% of scale factor)
+- Deletes same volume as RF1 (see the table above)
 - All deletions are committed to the database
 
 **Referential Integrity:**
@@ -262,8 +225,8 @@ reflects real-world database constraints where line items reference parent order
 **The Maintenance Test permanently modifies database contents:**
 
 1. **Data Changes Are Committed**
-   - RF1 inserts ~1,500 orders + ~6,000-10,500 lineitems (at SF=1)
-   - RF2 deletes ~1,500 orders + their corresponding lineitems
+   - RF1 inserts 1 order + 1-7 lineitems (at SF=1)
+   - RF2 deletes 1 order + its corresponding lineitems
    - Changes are committed and permanent
 
 2. **Query Results Will Differ**
@@ -322,9 +285,9 @@ Incorrect: generate → load → maintenance → power → throughput  ❌ (powe
 
 **Key characteristics:**
 - Executes real INSERT and DELETE SQL operations
-- Modifies ~0.1% of database rows (insert and delete)
-- Tests system's ability to handle concurrent data modifications
-- Required for complete TPC-H compliance and certification
+- Modifies a small fixed number of rows per refresh pair (insert and delete)
+- Tests the system's ability to handle data modifications
+- Runs after the power and throughput tests, not concurrently with them
 
 ## Power@Size and Throughput@Size Calculation
 
@@ -353,7 +316,7 @@ For a throughput test with:
 throughput_at_size = 22 * 2 * 3600 * 1.0 / 150
 ```
 
-The results are `power_at_size = 36.0`, `throughput_at_size = 48.0`, and `qphh_at_size = (36.0 * 48.0) ** 0.5 = 41.57`.
+With a 150-second throughput test at SF1 and 2 streams, `throughput_at_size = 1056.0`. (BenchBox exports the two component metrics only, never the QphH composite.)
 
 ## Reporting and Validation
 
@@ -383,11 +346,11 @@ csv_report = report_generator.generate_performance_csv(result=result)
 The benchmark automatically validates results against TPC-H specification:
 
 ```python
-if result.certification_ready:
+if result.success and result.compliance_validated:
     print("Benchmark is certification ready!")
 else:
     print("Validation issues found:")
-    for error in result.validation_errors:
+    for error in result.errors:
         print(f"  - {error}")
 ```
 
@@ -420,7 +383,6 @@ Use an appropriate, certified scale factor for certification:
 benchmark = TPCH(
     scale_factor=100.0,
     output_dir="./certification_data",
-    verbose=True
 )
 ```
 
@@ -439,12 +401,12 @@ Set up a production database with proper configuration. Use a database system ap
 Run with certification parameters, using an appropriate number of streams:
 
 ```python
-result = benchmark.run_official_benchmark(
-    connection_factory=connection_factory,
+config = TPCHOfficialBenchmarkConfig(
     num_streams=8,
-    validate_results=True,
-    audit_trail=True
+    validation_enabled=True,
+    audit_trail=True,
 )
+result = benchmark.run_official_benchmark(connection_factory, config, adapter=adapter)
 ```
 
 ### 5. Report Generation
@@ -457,7 +419,7 @@ cert_report = report_generator.generate_certification_report(result=result)
 ### 6. Validation
 
 ```python
-if result.certification_ready:
+if result.success and result.compliance_validated:
     print("Ready for certification submission")
 else:
     print("Address validation issues before certification")
@@ -536,13 +498,13 @@ Enable verbose logging for detailed debugging:
 
 ```python
 benchmark = TPCH(verbose=True)
+config = TPCHOfficialBenchmarkConfig(verbose=True)
 result = benchmark.run_official_benchmark(
-    connection_factory=connection_factory,
-    verbose=True
+    connection_factory, config, adapter=adapter
 )
 ```
 
-Check audit trail logs. Audit trail files are created in `output_dir`. Check the `benchmark_audit_*.log` files for detailed execution logs.
+Check audit trail logs. With `audit_trail=True`, a `<benchmark>_audit_trail_<timestamp>.txt` file is written to the run output directory.
 
 ### Performance Optimization
 
@@ -568,8 +530,8 @@ def custom_connection_factory():
 
 ```python
 def custom_validate_result(result):
-    if result.throughput_test.throughput_at_size < 100:
-        result.validation_errors.append("Throughput@Size below minimum threshold")
+    if (result.throughput_at_size or 0) < 100:
+        result.errors.append("Throughput@Size below minimum threshold")
     return result
 ```
 
@@ -577,14 +539,15 @@ def custom_validate_result(result):
 
 ```python
 def run_multiple_benchmarks():
+    from benchbox.core.tpch.official_benchmark import TPCHOfficialBenchmarkConfig
     scale_factors = [0.1, 0.5, 1.0]
     results = []
 
     for sf in scale_factors:
         benchmark = TPCH(scale_factor=sf)
+        config = TPCHOfficialBenchmarkConfig(num_streams=2)
         result = benchmark.run_official_benchmark(
-            connection_factory=connection_factory,
-            num_streams=2
+            connection_factory, config, adapter=adapter
         )
         results.append(result)
 
@@ -597,13 +560,13 @@ def run_multiple_benchmarks():
 
 ```python
 class TPCH:
-    def __init__(self, scale_factor=1.0, output_dir=None, verbose=False, parallel=1):
+    def __init__(self, scale_factor=1.0, output_dir=None, **kwargs):
         pass
 
-    def generate_data(self) -> List[Path]:
+    def generate_data(self) -> list:
         pass
 
-    def run_official_benchmark(self, connection_factory, num_streams=2, **kwargs) -> TPCHOfficialBenchmarkResult:
+    def run_official_benchmark(self, connection_factory, config=None, *, adapter=None) -> TPCHOfficialBenchmarkResult:
         pass
 
     def get_query(self, query_id, **kwargs) -> str:
@@ -614,10 +577,10 @@ class TPCH:
 
 ```python
 class TPCHOfficialBenchmark:
-    def __init__(self, benchmark, connection_factory, num_streams=2, **kwargs):
+    def __init__(self, scale_factor=1.0, output_dir=None, verbose=False, **kwargs):
         pass
 
-    def run_official_benchmark(self) -> TPCHOfficialBenchmarkResult:
+    def run_official_benchmark(self, connection_factory, config=None, *, adapter=None) -> TPCHOfficialBenchmarkResult:
         pass
 ```
 
@@ -640,6 +603,6 @@ class TPCHReportGenerator:
 
 ## Conclusion
 
-The TPC-H official benchmark implementation provides a complete, certification-ready solution for TPC-H benchmarking. It includes all required test phases, Power@Size and Throughput@Size reporting, systematic reporting, and validation capabilities.
+The TPC-H official benchmark implementation coordinates all three test phases with Power@Size and Throughput@Size reporting, systematic reporting, and validation capabilities. Read the deviation note at the top before planning a certification submission.
 
-For more information, examples, and updates, visit the [BenchBox GitHub repository](https://github.com/joeharris76/benchbox).
+For more information, examples, and updates, visit the [BenchBox GitHub repository](https://github.com/BenchBox-dev/BenchBox).

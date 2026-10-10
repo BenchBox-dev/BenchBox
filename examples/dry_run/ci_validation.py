@@ -11,8 +11,8 @@ from pathlib import Path
 
 def validate_benchmark_changes():
     critical_benchmarks = [
-        {"name": "tpch", "scale": 0.001},
-        {"name": "ssb", "scale": 0.001},
+        {"name": "tpch", "scale": 0.01},
+        {"name": "ssb", "scale": 0.01},
     ]
 
     print("=" * 60)
@@ -45,26 +45,25 @@ def validate_benchmark_changes():
                 check=True,
             )
 
-            summary_file = Path(dry_run_dir) / "summary.json"
-            if not summary_file.exists():
+            candidates = sorted(Path(dry_run_dir).glob("*.json"))
+            if not candidates:
                 print("  ❌ Summary file not found")
                 validation_results.append({"benchmark": benchmark["name"], "passed": False})
                 continue
+            summary_file = candidates[0]
 
             with open(summary_file, encoding="utf-8") as f:
                 summary = json.load(f)
 
             queries = summary.get("queries", {})
-            schema_info = summary.get("schema_info", {})
+            schema_sql = summary.get("schema_sql", "")
 
-            validation_passed = (
-                len(queries) > 0 and len(schema_info.get("tables", {})) > 0 and "resource_estimates" in summary
-            )
+            validation_passed = len(queries) > 0 and len(schema_sql) > 0 and "estimated_resources" in summary
 
             validation_results.append({"benchmark": benchmark["name"], "passed": validation_passed})
 
             status = "✅" if validation_passed else "❌"
-            print(f"  {status} {len(queries)} queries, {len(schema_info.get('tables', {}))} tables")
+            print(f"  {status} {len(queries)} queries")
 
         except subprocess.CalledProcessError as e:
             validation_results.append({"benchmark": benchmark["name"], "passed": False})

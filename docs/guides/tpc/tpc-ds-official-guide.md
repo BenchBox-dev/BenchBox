@@ -9,7 +9,7 @@ This guide provides systematic documentation for the TPC-DS official benchmark i
 
 ## Overview
 
-The TPC-DS official benchmark implementation provides a complete, certification-ready TPC-DS benchmark that meets all official TPC-DS specification requirements. It includes:
+The TPC-DS official benchmark implementation coordinates all three test phases and reports Power@Size and Throughput@Size. It does not export the composite QphDS@Size (see below). It includes:
 
 - **Complete benchmark execution** with all three phases
 - **Power@Size and Throughput@Size** (no composite QphDS@Size; see below)
@@ -19,7 +19,7 @@ The TPC-DS official benchmark implementation provides a complete, certification-
 
 ### Key Features
 
-- **TPC-DS Compliant**: Follows official TPC-DS specification
+- **TPC-DS Metrics**: Reports Power@Size and Throughput@Size (see the deviation note above)
 - **Complete Implementation**: Power, Throughput, and Maintenance Tests
 - **Metrics**: Power@Size and Throughput@Size (`Q = 99 × S`)
 - **Multi-format Reporting**: Text, JSON, CSV, HTML reports
@@ -30,43 +30,23 @@ The TPC-DS official benchmark implementation provides a complete, certification-
 
 ## Quick Start
 
-### Basic Usage
+Run the official TPC-DS benchmark with the CLI (this SF1 DuckDB run completes in about a minute and reports a compliant `official` result):
 
-```python
-import duckdb
-
-from benchbox.tpcds import TPCDSBenchmark
-
-benchmark = TPCDSBenchmark(scale_factor=1.0, verbose=True)
-connection = duckdb.connect("tpcds.duckdb")
-
-result = benchmark.run_official_benchmark(connection=connection, num_streams=2)
-
-print(f"Success: {result['success']}")
-print(f"Power@Size: {result['power_at_size']:.2f}")
-print(f"Throughput@Size: {result['throughput_at_size']:.2f}")
-print(result["errors"])
+```bash
+benchbox run --official --platform duckdb --benchmark tpcds --scale 1 --seed 42 --output ./official_data
 ```
 
-`run_official_benchmark` returns a dictionary, not an object with attributes.
-It reuses the one connection you pass for every throughput stream, so the
-streams share a session. This path scores a throughput test only when every
-stream completes every query: if any stream fails, `throughput_at_size` stays
-`0.0`, `success` is `False` and `errors` says the metric was withheld. The
-stream timing window starts after the connection is obtained. The phase
-drivers used by `benchbox run` (`--phases power,throughput`) are the
-supported route for published numbers; later sections of this guide that show
-attribute access such as `result.power_size` describe an object model that
-`run_official_benchmark` does not return.
+### Programmatic Usage
+
+`TPCDSBenchmark.run_official_benchmark` is deprecated: it warns and delegates to the same throughput driver that `benchbox run` uses. For supported runs use `benchbox run --phases power,throughput` (or `PlatformAdapter.run_benchmark` with the throughput phase). The legacy call requires `adapter=` whenever the throughput test runs and returns a dictionary with `success`, `power_at_size`, `throughput_at_size`, and `errors` keys.
 
 ### Installation Requirements
 
 ```bash
-uv add benchbox[tpcds]
+uv add benchbox
 
-git clone https://github.com/your-repo/benchbox
-cd benchbox
-uv pip install -e .[tpcds]
+git clone https://github.com/BenchBox-dev/BenchBox
+cd BenchBox
 ```
 
 ## TPC-DS Specification
@@ -139,90 +119,54 @@ dialect; `dialect=` applies to the power and maintenance phases only. For suppor
 
 ### Complete Benchmark
 
-```python
-from benchbox.tpcds import TPCDSBenchmark
-
-benchmark = TPCDSBenchmark(
-    scale_factor=10.0,
-    output_dir="/path/to/results",
-    verbose=True,
-    parallel=4
-)
-
-result = benchmark.run_official_benchmark(
-    connection,
-    adapter=adapter,
-    num_streams=4,
-    power_test=True,
-    throughput_test=True,
-    maintenance_test=True,
-    result_validation=True,
-    dialect="postgres"
-)
+```bash
+benchbox run --official --platform duckdb --benchmark tpcds --scale 10 --seed 42 --streams 4 --output ./official_data
 ```
 
 ### Individual Phases
 
-The first call runs the Power Test only. The second runs the Throughput Test only.
+The first command runs the Power Test only. The second runs the Throughput Test only.
 
-```python
-result = benchmark.run_official_benchmark(
-    connection_string="your_connection",
-    power_test=True,
-    throughput_test=False,
-    maintenance_test=False
-)
+```bash
+benchbox run --official --platform duckdb --benchmark tpcds --scale 10 --seed 42 --phases power --output ./official_data
 
-result = benchmark.run_official_benchmark(
-    connection_string="your_connection",
-    num_streams=8,
-    power_test=False,
-    throughput_test=True,
-    maintenance_test=False
-)
+benchbox run --official --platform duckdb --benchmark tpcds --scale 10 --seed 42 --phases throughput --streams 8 --output ./official_data
 ```
 
 ### Custom Configuration
 
 This example uses advanced-level configuration:
 
-```python
-result = benchmark.run_official_benchmark(
-    connection_string="your_connection",
-    num_streams=6,
-    refresh_functions=["RF1", "RF2"],
-    data_maintenance=True,
-    result_validation=True,
-    dialect="mysql",
-    output_dir="/custom/output/path"
-)
+```bash
+benchbox run --official --platform duckdb --benchmark tpcds --scale 10 --seed 42 \
+  --phases power,throughput --streams 6 --validation full --output ./official_data
 ```
 
 ## Configuration
 
 ### Benchmark Parameters
 
-| Parameter      | Type     | Default     | Description              |
-| -------------- | -------- | ----------- | ------------------------ |
-| `scale_factor` | float    | 1.0         | Scale factor (1.0 ≈ 1GB) |
-| `output_dir`   | str/Path | current dir | Output directory         |
-| `verbose`      | bool     | False       | Enable verbose logging   |
-| `parallel`     | int      | 1           | Parallel data generation |
+| CLI flag       | Default | Description                        |
+| -------------- | ------- | ---------------------------------- |
+| `--scale`      | 0.01    | Scale factor (1.0 ≈ 1GB)           |
+| `--output`     | —       | Directory for generated data       |
+| `--seed`       | —       | Random seed for reproducibility    |
+| `--phases`     | power   | Comma-separated phases to run      |
+| `--streams`    | 2       | Concurrent throughput streams      |
+| `--validation` | —       | Validation mode for the run        |
 
-### Official Benchmark Parameters
+### Programmatic Parameters
 
-| Parameter           | Type     | Default        | Description          |
-| ------------------- | -------- | -------------- | -------------------- |
-| `connection_string` | str      | Required       | Database connection  |
-| `num_streams`       | int      | 2              | Concurrent streams   |
-| `power_test`        | bool     | True           | Run Power Test       |
-| `throughput_test`   | bool     | True           | Run Throughput Test  |
-| `maintenance_test`  | bool     | True           | Run Maintenance Test |
-| `refresh_functions` | list     | ["RF1", "RF2"] | Refresh functions    |
-| `data_maintenance`  | bool     | True           | Data maintenance ops |
-| `result_validation` | bool     | True           | Result validation    |
-| `dialect`           | str      | "standard"     | SQL dialect          |
-| `output_dir`        | str/Path | None           | Custom output path   |
+`TPCDSBenchmark.run_official_benchmark` is deprecated (see above). Its legacy keyword parameters map to the CLI flags as follows:
+
+| Legacy parameter    | CLI flag        | Default        |
+| ------------------- | --------------- | -------------- |
+| `num_streams`       | `--streams`     | 2              |
+| `power_test`        | `--phases`      | True           |
+| `throughput_test`   | `--phases`      | True           |
+| `maintenance_test`  | `--phases`      | True           |
+| `result_validation` | `--validation`  | True           |
+| `output_dir`        | `--output`      | None           |
 
 ## Benchmark Phases
 
@@ -230,13 +174,11 @@ result = benchmark.run_official_benchmark(
 
 The Power Test measures single-stream query processing power by executing all 99 TPC-DS queries sequentially.
 
-```python
-power_result = benchmark._run_power_test(connection_string, dialect)
-
-print(f"Execution Time: {power_result.execution_time:.2f}s")
-print(f"Successful Queries: {len([q for q in power_result.queries if q.success])}")
-print(f"Power@Size: {result.power_size:.2f}")
+```bash
+benchbox run --official --platform duckdb --benchmark tpcds --scale 1 --seed 42 --phases power --output ./official_data
 ```
+
+Read `Power@Size` from the result file's `summary.tpc_metrics` (see [Understanding Results](../../tutorials/understanding-results.md)).
 
 **Characteristics:**
 - Sequential execution of all 99 queries
@@ -248,13 +190,11 @@ print(f"Power@Size: {result.power_size:.2f}")
 
 The Throughput Test measures concurrent query processing capability by executing multiple streams of queries simultaneously.
 
-```python
-throughput_result = benchmark._run_throughput_test(connection_string, num_streams, dialect)
-
-print(f"Concurrent Streams: {num_streams}")
-print(f"Total Queries: {len(throughput_result.queries)}")
-print(f"Throughput@Size: {result.throughput_size:.2f}")
+```bash
+benchbox run --official --platform duckdb --benchmark tpcds --scale 1 --seed 42 --phases throughput --streams 2 --output ./official_data
 ```
+
+Read `Throughput@Size` from the result file's `summary.tpc_metrics`.
 
 **Characteristics:**
 - Multiple concurrent streams (default: 2)
@@ -301,26 +241,7 @@ The Maintenance Test targets the following sales and inventory tables:
 
 #### Data Volumes Modified
 
-The amount of data modified depends on the scale factor and number of operations:
-
-**Per-Operation Row Counts:**
-
-| Operation Type | Rows Modified per SF | Example at SF=1 | Example at SF=10 |
-| -------------- | -------------------- | --------------- | ---------------- |
-| INSERT         | ~1,000               | ~1,000 rows     | ~10,000 rows     |
-| UPDATE         | ~500                 | ~500 rows       | ~5,000 rows      |
-| DELETE         | ~200                 | ~200 rows       | ~2,000 rows      |
-
-**Default Configuration (4 operations):**
-
-| Scale Factor | Total Rows Modified | INSERT Ops | UPDATE Ops | DELETE Ops |
-| ------------ | ------------------- | ---------- | ---------- | ---------- |
-| 0.1          | ~340 rows           | 2 ops      | 1 op       | 1 op       |
-| 1.0          | ~3,400 rows         | 2 ops      | 1 op       | 1 op       |
-| 10.0         | ~34,000 rows        | 2 ops      | 1 op       | 1 op       |
-| 100.0        | ~340,000 rows       | 2 ops      | 1 op       | 1 op       |
-
-*Note: The default configuration runs 4 operations that rotate through INSERT → UPDATE → DELETE → INSERT, affecting different tables in each operation.*
+The maintenance test runs a small rotation of INSERT, UPDATE, and DELETE operations across the sales tables (a few thousand rows at SF1, scaling with the scale factor). Every operation commits permanently.
 
 #### Why Database Reload Is Required
 
@@ -413,23 +334,7 @@ benchbox run \
 
 #### Access Maintenance Test Results
 
-```python
-maintenance_result = adapter.run_benchmark(benchmark, test_execution_type="maintenance")
-
-print(f"Total operations: {maintenance_result.total_queries}")
-print(f"Total time: {maintenance_result.total_execution_time:.2f}s")
-print(f"Average operation time: {maintenance_result.average_query_time:.2f}s")
-
-for query_result in maintenance_result.query_results:
-    print(f"{query_result.query_id}: {query_result.execution_time:.3f}s")
-```
-
-**Characteristics:**
-- Executes INSERT, UPDATE, DELETE operations across 7 tables
-- Rotates through operation types (INSERT → UPDATE → DELETE)
-- Modifies ~1,700 rows per operation at SF=1 (average)
-- All operations are committed permanently
-- Required for complete TPC-DS compliance testing
+Maintenance results use the same result-file shape as power and throughput runs: per-query entries in `queries`, phase timing in `phases.maintenance`, and the run verdict in `summary.validation`.
 
 ## Metrics and Calculations
 
@@ -438,17 +343,19 @@ for query_result in maintenance_result.query_results:
 The implementation calculates Power@Size and Throughput@Size. It does not calculate the composite QphDS@Size (see [QphDS@Size (not exported)](#qphds-size-not-exported)):
 
 ```python
-result = benchmark.run_official_benchmark(connection_string)
+from benchbox.core.results.loader import load_result_file
 
-print(f"Power@Size: {result.power_size:.2f}")
-print(f"Throughput@Size: {result.throughput_size:.2f}")
+results, raw = load_result_file("<runs-root>/results/tpcds_sf1_duckdb_sql_<timestamp>_<id>.json")
+
+print(f"Power@Size: {results.power_at_size:.2f}")
+print(f"Throughput@Size: {results.throughput_at_size}")
 ```
 
 ### Calculation Details
 
 #### Power@Size
 ```
-Power@Size = (3600 × Scale_Factor) / Power_Test_Time
+Power@Size = (3600 × Scale_Factor) / geometric_mean(power query times in seconds)
 ```
 
 #### Throughput@Size
@@ -458,16 +365,14 @@ Throughput@Size = (99 × Num_Streams × 3600 × Scale_Factor) / Throughput_Test_
 
 ### Additional Metrics
 
-The implementation also provides detailed metrics for each phase:
+The result file also carries per-phase detail:
 
 ```python
-power_metrics = result.power_test.metrics
-print(f"Average Query Time: {power_metrics['avg_query_time']:.3f}s")
-print(f"Success Rate: {power_metrics['successful_queries'] / power_metrics['total_queries'] * 100:.1f}%")
-
-throughput_metrics = result.throughput_test.metrics
-print(f"Queries per Stream: {throughput_metrics['queries_per_stream']}")
-print(f"Concurrent Efficiency: {throughput_metrics.get('concurrent_efficiency', 'N/A')}")
+timing = raw["summary"]["timing"]
+print(f"Average Query Time: {timing['avg_ms']:.1f}ms")
+queries = raw["summary"]["queries"]
+print(f"Success Rate: {queries['passed']}/{queries['total']}")
+print(f"Geometric Mean: {timing['geometric_mean_ms']:.1f}ms")
 ```
 
 ## Reporting
@@ -518,48 +423,44 @@ The benchmark generates systematic reports in multiple formats automatically:
 
 ### Accessing Reports
 
-```python
-result = benchmark.run_official_benchmark(connection_string)
+Derive shareable artifacts from a result file with `benchbox export`:
 
-reports_dir = benchmark.output_dir / "reports"
-print(f"Reports generated in: {reports_dir}")
+```bash
+benchbox export <runs-root>/results/tpcds_sf1_duckdb_sql_<timestamp>_<id>.json --format csv --output-dir ./reports/
 
-for report_file in reports_dir.glob("*"):
-    print(f"  - {report_file.name}")
+benchbox export --last --format html --output-dir ./reports/
 ```
 
 ### Custom Reporting
 
+Pipeline embedders can generate the full report set programmatically:
+
 ```python
+from pathlib import Path
 from benchbox.core.tpcds.reporting import TPCDSReportGenerator
 
-generator = TPCDSReportGenerator(output_dir="/custom/path", verbose=True)
+generator = TPCDSReportGenerator(output_dir=Path("/custom/path"))
 
 reports = generator.generate_complete_report(result)
 ```
+
+`result` is the internal `BenchmarkResult` produced by the TPC-DS phase drivers; the returned dict maps report names (`executive_summary`, `detailed_analysis`, `query_analysis`, `json_report`, `csv_export`, `html_report`, `compliance_report`, `performance_summary`) to their files under `<output_dir>/reports/`.
 
 ## Validation and Compliance
 
 ### Built-in Validation
 
-The benchmark includes systematic validation to ensure TPC-DS compliance:
+The benchmark validates results against the TPC-DS specification. Request full validation and read the verdict from the result file:
+
+```bash
+benchbox run --official --platform duckdb --benchmark tpcds --scale 1 --seed 42 --validation full --output ./official_data
+```
 
 ```python
-result = benchmark.run_official_benchmark(
-    connection_string=connection_string,
-    result_validation=True
-)
+from benchbox.core.results.loader import load_result_file
 
-validation = result.validation_results
-print(f"Overall Valid: {validation['overall_valid']}")
-print(f"Power Test Valid: {validation['power_test_valid']}")
-print(f"Throughput Test Valid: {validation['throughput_test_valid']}")
-print(f"Maintenance Test Valid: {validation['maintenance_test_valid']}")
-
-if validation['issues']:
-    print("Validation Issues:")
-    for issue in validation['issues']:
-        print(f"  - {issue}")
+results, raw = load_result_file("<runs-root>/results/tpcds_sf1_duckdb_sql_<timestamp>_<id>.json")
+print(f"Validation: {raw['summary']['validation']}")
 ```
 
 ### Compliance Checklist
@@ -578,95 +479,50 @@ The validation framework checks:
 ### Manual Validation
 
 ```python
-for phase_name, phase_result in [
-    ("Power Test", result.power_test),
-    ("Throughput Test", result.throughput_test),
-    ("Maintenance Test", result.maintenance_test)
-]:
-    if phase_result:
-        success_rate = len([q for q in phase_result.queries if q.success]) / len(phase_result.queries)
-        print(f"{phase_name}: {success_rate:.1%} success rate")
+from benchbox.core.results.loader import load_result_file
+
+results, raw = load_result_file("<runs-root>/results/tpcds_sf1_duckdb_sql_<timestamp>_<id>.json")
+passed = raw["summary"]["queries"]["passed"]
+total = raw["summary"]["queries"]["total"]
+print(f"Success rate: {passed}/{total}")
+print(f"Validation: {raw['summary']['validation']}")
 ```
 
 ## Advanced-level Usage
 
 ### Custom Database Integration
 
-```python
-class CustomDatabaseBenchmark(TPCDSBenchmark):
-    def run_official_benchmark(self, **kwargs):
-        self.setup_custom_database()
-
-        result = super().run_official_benchmark(**kwargs)
-
-        self.cleanup_custom_database()
-
-        return result
-```
+Custom databases connect through platform adapters, not subclasses. Pick the adapter for the platform (for example `DuckDBAdapter`, `SnowflakeAdapter`), configure it with the platform's connection options, and run the benchmark phases with `benchbox run --platform <name>`. See the [platform guides](../../platforms/index.md) for per-platform setup.
 
 ### Performance Tuning
 
-For large scale factors, increase the number of parallel processes (`parallel=8`). For many streams, use high
-concurrency (`num_streams=16`). Skip the Maintenance Test if you do not need it.
+For large scale factors, add streams for throughput. Skip the Maintenance Test if you do not need it:
 
-```python
-benchmark = TPCDSBenchmark(
-    scale_factor=100.0,
-    parallel=8,
-    verbose=True
-)
-
-result = benchmark.run_official_benchmark(
-    connection_string=connection_string,
-    num_streams=16,
-    power_test=True,
-    throughput_test=True,
-    maintenance_test=False
-)
+```bash
+benchbox run --official --platform duckdb --benchmark tpcds --scale 100 --seed 42 \
+  --phases power,throughput --streams 16 --output ./official_data
 ```
 
 ### Integration with CI/CD
 
-The example fails the job when `qphds_size` drops below a minimum threshold. The value of 100 is an example.
+Fail the job when Throughput@Size drops below a minimum threshold (100 here is an example). `jq -e` exits non-zero when the check is false or the metric is missing:
 
-```python
-import sys
+```bash
+export BENCHBOX_OUTPUT_DIR=./ci_data
+benchbox run --official --platform duckdb --benchmark tpcds --scale 1 --seed 42 \
+  --phases throughput --streams 2 --output ./ci_data
 
-def run_benchmark_ci():
-    benchmark = TPCDSBenchmark(scale_factor=0.1, verbose=False)
-
-    try:
-        result = benchmark.run_official_benchmark(
-            connection_string=os.getenv("DATABASE_URL"),
-            num_streams=2,
-            result_validation=True
-        )
-
-        if result.throughput_size < 100:
-            print("Performance regression detected!")
-            sys.exit(1)
-
-        print(f"Benchmark passed: Throughput@Size = {result.throughput_size:.2f}")
-        return True
-
-    except Exception as e:
-        print(f"Benchmark failed: {e}")
-        sys.exit(1)
+jq -e '.summary.tpc_metrics.throughput_at_size > 100' ./ci_data/results/*.json
 ```
 
 ### Batch Processing
 
-```python
-scale_factors = [0.1, 1.0, 10.0]
-results = []
+```bash
+for sf in 0.1 1.0 10.0; do
+  benchbox run --official --platform duckdb --benchmark tpcds --scale $sf --seed 42 --output ./official_data
+done
 
-for sf in scale_factors:
-    benchmark = TPCDSBenchmark(scale_factor=sf)
-    result = benchmark.run_official_benchmark(connection_string)
-    results.append((sf, result.throughput_size))
-
-for sf, throughput in results:
-    print(f"Scale Factor {sf}: Throughput@Size = {throughput:.2f}")
+benchbox results --limit 3
 ```
 
 ## Troubleshooting
@@ -675,79 +531,71 @@ for sf, throughput in results:
 
 #### 1. Database Connection Issues
 
-If the connection fails, check the connection string format, verify that the database is running, and check the
-credentials.
+If the connection fails, check the platform setup, verify that the database is running, and check the
+credentials. See the [platform guides](../../platforms/index.md).
 
-```python
-try:
-    result = benchmark.run_official_benchmark(connection_string)
-except Exception as e:
-    print(f"Connection failed: {e}")
+```bash
+benchbox check-deps --platform duckdb
 ```
 
 #### 2. Memory Issues with Large Scale Factors
 
-For large scale factors, reduce the number of parallel processes (`parallel=1`) and monitor memory usage:
+For large scale factors, use fewer streams and monitor memory usage:
+
+```bash
+benchbox run --official --platform duckdb --benchmark tpcds --scale 100 --seed 42 \
+  --phases power --streams 2 --output ./official_data
+```
 
 ```python
-benchmark = TPCDSBenchmark(
-    scale_factor=100.0,
-    parallel=1,
-    verbose=True
-)
-
 import psutil
 print(f"Memory usage: {psutil.virtual_memory().percent}%")
 ```
 
 #### 3. Query Timeouts
 
-Increase the timeout for slow queries. The value is in seconds, so 7200 is 2 hours:
+Split the phases so a slow phase can be retried alone:
 
-```python
-benchmark.timeout_seconds = 7200
+```bash
+benchbox run --official --platform duckdb --benchmark tpcds --scale 10 --seed 42 \
+  --phases power --output ./official_data
+
+benchbox run --official --platform duckdb --benchmark tpcds --scale 10 --seed 42 \
+  --phases throughput --streams 2 --output ./official_data
 ```
 
 #### 4. Incomplete Results
 
 ```python
-if not result.power_test or not result.throughput_test:
-    print("Warning: Incomplete benchmark results")
+from benchbox.core.results.loader import load_result_file
 
-if result.validation_results.get('issues'):
-    print("Validation issues found:")
-    for issue in result.validation_results['issues']:
-        print(f"  - {issue}")
+results, raw = load_result_file("<runs-root>/results/tpcds_sf1_duckdb_sql_<timestamp>_<id>.json")
+if raw["summary"]["validation"] != "passed":
+    print("Warning: run did not validate")
+print(f"Success rate: {raw['summary']['queries']['passed']}/{raw['summary']['queries']['total']}")
 ```
 
 ### Debug Mode
 
-Enable debug logging and verbose benchmark execution:
+Enable verbose output:
 
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
-benchmark = TPCDSBenchmark(scale_factor=0.01, verbose=True)
-result = benchmark.run_official_benchmark(connection_string)
+```bash
+benchbox run --official --platform duckdb --benchmark tpcds --scale 0.01 --seed 42 -vv --output ./official_data
 ```
 
 ### Error Recovery
 
-This function retries a failed run, waiting 60 seconds between attempts:
+Retry a failed run from the shell, waiting 60 seconds between attempts:
 
-```python
-def robust_benchmark_run(connection_string, max_retries=3):
-    for attempt in range(max_retries):
-        try:
-            benchmark = TPCDSBenchmark(scale_factor=1.0, verbose=True)
-            result = benchmark.run_official_benchmark(connection_string)
-            return result
-        except Exception as e:
-            print(f"Attempt {attempt + 1} failed: {e}")
-            if attempt == max_retries - 1:
-                raise
-            time.sleep(60)
+```bash
+for attempt in 1 2 3; do
+  if benchbox run --official --platform duckdb --benchmark tpcds --scale 1 --seed 42 \
+    --output ./official_data; then
+    break
+  fi
+  echo "Attempt $attempt failed"
+  sleep 60
+done
 ```
 
 ## Best Practices
@@ -772,38 +620,18 @@ benchmark = TPCDSBenchmark(scale_factor=scale_factors["testing"])
 
 ### 2. Resource Management
 
-The context manager cleans up the temporary directory automatically, so the `finally` block has nothing to do:
+Point `--output` at a temporary directory for throwaway runs:
 
-```python
-with tempfile.TemporaryDirectory() as temp_dir:
-    benchmark = TPCDSBenchmark(
-        scale_factor=1.0,
-        output_dir=temp_dir,
-        verbose=True
-    )
-
-    try:
-        result = benchmark.run_official_benchmark(connection_string)
-    finally:
-        pass
+```bash
+benchbox run --official --platform duckdb --benchmark tpcds --scale 1 --seed 42 --output "$(mktemp -d)"
 ```
 
 ### 3. Performance Monitoring
 
-```python
-import time
-import psutil
-
-start_time = time.time()
-start_memory = psutil.virtual_memory().used
-
-result = benchmark.run_official_benchmark(connection_string)
-
-end_time = time.time()
-end_memory = psutil.virtual_memory().used
-
-print(f"Benchmark time: {end_time - start_time:.2f}s")
-print(f"Memory usage: {(end_memory - start_memory) / 1024 / 1024:.1f}MB")
+```bash
+START=$(date +%s)
+benchbox run --official --platform duckdb --benchmark tpcds --scale 1 --seed 42 --output ./official_data
+echo "Benchmark time: $(( $(date +%s) - START ))s"
 ```
 
 ### 4. Result Archival
@@ -811,43 +639,39 @@ print(f"Memory usage: {(end_memory - start_memory) / 1024 / 1024:.1f}MB")
 ```python
 import json
 from datetime import datetime
+from benchbox.core.results.loader import load_result_file
 
-def archive_results(result):
-    archive_data = {
-        "timestamp": datetime.now().isoformat(),
-        "power_size": result.power_size,
-        "throughput_size": result.throughput_size,
-        "scale_factor": result.scale_factor,
-        "configuration": result.configuration
-    }
+results, raw = load_result_file("<runs-root>/results/tpcds_sf1_duckdb_sql_<timestamp>_<id>.json")
+archive_data = {
+    "timestamp": datetime.now().isoformat(),
+    "power_at_size": results.power_at_size,
+    "throughput_at_size": results.throughput_at_size,
+    "scale_factor": raw["benchmark"]["scale_factor"],
+}
 
-    with open(f"benchmark_archive_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json", "w") as f:
-        json.dump(archive_data, f, indent=2)
+with open(f"benchmark_archive_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json", "w") as f:
+    json.dump(archive_data, f, indent=2)
 ```
 
 ### 5. Continuous Benchmarking
 
-The loop runs every hour (`time.sleep(3600)`) against your own baseline `qphds_size`, and alerts when the result falls
+The loop runs every hour (`sleep 3600`) against your own baseline power number, and alerts when the result falls
 more than 5% below it:
 
-```python
-def continuous_benchmark():
-    benchmark = TPCDSBenchmark(scale_factor=1.0, verbose=False)
-
-    baseline_throughput = 500.0
-
-    while True:
-        result = benchmark.run_official_benchmark(connection_string)
-
-        if result.throughput_size < baseline_throughput * 0.95:
-            alert_performance_regression(result)
-
-        time.sleep(3600)
+```bash
+while true; do
+  export BENCHBOX_OUTPUT_DIR=./ci_data
+  benchbox run --official --platform duckdb --benchmark tpcds --scale 1 --seed 42 \
+    --phases power --output ./ci_data
+  jq -e '.summary.tpc_metrics.power_at_size > 250000.0 * 0.95' ./ci_data/results/*.json \
+    || echo "ALERT: Power@Size regressed"
+  sleep 3600
+done
 ```
 
 ## Conclusion
 
-The TPC-DS official benchmark implementation provides a systematic, certification-ready solution for running TPC-DS benchmarks with Power@Size and Throughput@Size. The implementation follows TPC-DS specifications and includes extensive validation, reporting, and error handling capabilities.
+The TPC-DS official benchmark implementation coordinates the power, throughput, and maintenance phases with Power@Size and Throughput@Size reporting. It does not export the composite QphDS@Size. Read the deviation note at the top before planning a certification submission.
 
 For additional support:
 - Review the integration tests in `tests/integration/test_tpcds_official_benchmark.py`

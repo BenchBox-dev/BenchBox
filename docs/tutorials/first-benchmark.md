@@ -29,29 +29,25 @@ benchbox run --platform duckdb --benchmark tpch --scale 0.01
 
 This command:
 - Generates TPC-H data at scale factor 0.01 (~10MB)
-- Loads data into DuckDB (in-memory)
+- Loads data into DuckDB (stored in a database file inside the run output directory)
 - Executes all 22 TPC-H queries
 - Reports timing and validation results
 
-**Expected output:**
+**Example output (your numbers will differ):**
 ```
-BenchBox v1.1.0 - TPC-H Power Test
-
-Platform: DuckDB (in-memory)
-Benchmark: TPC-H
-Scale Factor: 0.01
-
-[1/4] Generating data... ━━━━━━━━━━━━━━━━━━━━ 100% 0:00:05
-[2/4] Loading tables... ━━━━━━━━━━━━━━━━━━━━ 100% 0:00:02
-[3/4] Running queries... ━━━━━━━━━━━━━━━━━━━━ 100% 0:00:08
-[4/4] Validating results... ━━━━━━━━━━━━━━━━━━━━ 100% 0:00:01
-
-✓ Benchmark complete!
-
-Summary:
-  Total Time: 16.2s
-  Queries: 22/22 passed
-  Validation: All row counts match expected
+Running TPC-H Power Test (Scale Factor: 0.01, Stream ID: 0)
+Warm-up runs: 1, Measurement runs: 3
+...
+✅ TPC-H Power Test completed
+  Queries executed: 22, Successful: 22
+...
+✅ Benchmark completed: PASSED
+...
+┌ TPC-H on DuckDB (SF 0.01) ────────┐
+│ Queries:  22                       │
+│ Best: Q6, Q11, Q17                 │
+│ Worst: Q10, Q8, Q21                │
+└────────────────────────────────────┘
 ```
 
 ## Step 3: View Results

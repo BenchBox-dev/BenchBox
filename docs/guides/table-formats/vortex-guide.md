@@ -193,13 +193,15 @@ For production benchmarks, we recommend Parquet. For exploration and DuckDB-spec
 
 ## BenchBox Usage
 
-### Installation
-
 ```bash
 uv add vortex-data
 ```
 
-This installs the Vortex Python library.
+This installs the Vortex Python library. Inside a BenchBox project, use the extra instead:
+
+```bash
+uv add benchbox --extra table-formats
+```
 
 ### Running Benchmarks
 

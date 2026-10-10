@@ -17,302 +17,134 @@ BenchBox produces structured, machine-readable results that enable:
 
 ## Result Schema Hierarchy
 
+Result files use schema v2 (`"result_schema_version": "2.2"`):
+
 ```
-BenchmarkResults
-├── Core Metadata (benchmark name, platform, scale factor, timestamp)
-├── Execution Phases
-│   ├── Setup Phase
-│   │   ├── Data Generation
-│   │   ├── Schema Creation
-│   │   ├── Data Loading
-│   │   └── Validation
-│   ├── Power Test Phase (optional)
-│   └── Throughput Test Phase (optional)
-├── Query Results (list of QueryResult objects)
-├── Query Definitions (SQL text and parameters)
-├── System Profile (hardware, software, configuration)
-├── Platform Info (driver versions, configuration)
-└── Validation Results (correctness checks)
+Result file
+├── run (id, timestamp, total_duration_ms, query_time_ms, iterations, streams)
+├── benchmark (id, name, scale_factor, test_type, compliance_class)
+├── platform (driver_package, driver versions, execution_mode, config)
+├── summary
+│   ├── queries (total, passed, failed)
+│   ├── timing (total_ms, avg_ms, geometric_mean_ms, p50/p90/p95/..., min/max)
+│   ├── validation ("passed", "failed", or "partial")
+│   └── tpc_metrics (power/throughput values, or suppression reason)
+├── queries (one entry per query execution)
+├── phases (data_generation, schema_creation, data_loading, power_test, ...)
+├── tables (row counts per table)
+├── config (full run configuration)
+└── environment (OS, CPU, memory, Python, machine metadata)
 ```
+
+Older files use schema v1; see [Result Schema v1 Reference](../reference/result-schema-v1.md).
 
 ## Core Data Structures
 
-### BenchmarkResults
+### Run Summary
 
-Top-level object containing complete benchmark execution information.
+Top-level timing and counts.
 
 **Key Fields**:
-```python
+- `run.total_duration_ms`: end-to-end wall-clock time.
+- `run.query_time_ms`: time spent executing queries.
+- `run.iterations` / `run.streams`: measurement iterations and concurrent streams.
+- `summary.timing.total_ms`, `avg_ms`, `geometric_mean_ms`: aggregate query timing.
+- `summary.queries.total/passed/failed`: execution counts across all iterations and streams.
+- `summary.validation`: `passed`, `failed`, or `partial`.
+- `benchmark.compliance_class`: for example `unofficial_subscale` below SF1.
+
+**Example** (trimmed from a real TPC-H SF0.01 DuckDB run):
+```json
 {
-    "benchmark_name": str,
-    "platform": str,
-    "execution_id": str,
-    "timestamp": datetime,
-
-    "scale_factor": float,
-    "test_execution_type": str,
-
-    "duration_seconds": float,
-    "total_execution_time": float,
-    "average_query_time": float,
-    "data_loading_time": float,
-    "schema_creation_time": float,
-
-    "total_queries": int,
-    "successful_queries": int,
-    "failed_queries": int,
-
-    "query_results": List[QueryResult],
-    "query_definitions": Dict[str, QueryDefinition],
-    "execution_phases": ExecutionPhases,
-
-    "validation_status": str,
-    "validation_details": dict,
-
-    "system_profile": dict,
-    "platform_info": dict,
-    "tunings_applied": dict,
+  "result_schema_version": "2.2",
+  "benchmark": {"id": "tpch", "name": "TPC-H", "scale_factor": 0.01},
+  "run": {"total_duration_ms": 2426, "query_time_ms": 966, "iterations": 3},
+  "summary": {
+    "queries": {"total": 66, "passed": 66, "failed": 0},
+    "timing": {"total_ms": 966.0, "avg_ms": 14.6, "geometric_mean_ms": 14.5},
+    "validation": "passed",
+    "tpc_metrics": {"suppressed": true, "reason": "compliance_class=unofficial_subscale"}
+  }
 }
 ```
 
 The fields fall into these groups:
 
-- **Identification**: `benchmark_name` (for example `"TPC-H"`, `"TPC-DS"` or `"ClickBench"`), `platform` (for example `"DuckDB"` or `"Snowflake"`), `execution_id` (a unique run identifier) and `timestamp` (an ISO 8601 timestamp).
-- **Configuration**: `scale_factor` (the data size multiplier) and `test_execution_type` (`"standard"`, `"power"` or `"throughput"`).
-- **Timing summary**: `duration_seconds` is the total execution time. `total_execution_time` covers query execution only. `average_query_time` is the mean query time. `data_loading_time` and `schema_creation_time` are the times to load data and create the schema.
-- **Query statistics**: `total_queries` counts queries attempted, `successful_queries` those that succeeded, and `failed_queries` those that failed.
-- **Validation**: `validation_status` is `"PASSED"`, `"FAILED"` or `"SKIPPED"`. `validation_details` holds the validation check results.
-- **System context**: `system_profile` holds hardware and software information, `platform_info` holds platform-specific metadata, and `tunings_applied` holds the performance tuning configuration.
+- **Identification**: `benchmark.id` (for example `"tpch"`, `"tpcds"` or `"clickbench"`), `platform.driver_package` (for example `"duckdb"` or `"snowflake"`), `run.id` (a unique run identifier) and `run.timestamp` (an ISO 8601 timestamp).
+- **Configuration**: `benchmark.scale_factor` (the data size multiplier) and `benchmark.test_type` (`"power"`, `"throughput"`, or similar).
+- **Timing summary**: `run.total_duration_ms` is the total execution time, `run.query_time_ms` covers query execution only, and `summary.timing` breaks down measured query time.
+- **Query statistics**: `summary.queries.total` counts executions attempted (22 queries × 3 measurement runs = 66 here), with `passed`/`failed` breakdowns.
+- **Validation**: `summary.validation` is `"passed"`, `"failed"` or `"partial"`.
+- **System context**: `environment` holds hardware and software information, `platform` holds driver versions and run configuration, and `config` holds the full run configuration.
 
-**Example**:
-```json
-{
-  "benchmark_name": "TPC-H",
-  "platform": "DuckDB",
-  "scale_factor": 1.0,
-  "execution_id": "tpch_1729613234",
-  "timestamp": "2025-10-12T10:30:34Z",
-  "duration_seconds": 47.3,
-  "total_execution_time": 45.2,
-  "average_query_time": 2.06,
-  "total_queries": 22,
-  "successful_queries": 22,
-  "failed_queries": 0,
-  "validation_status": "PASSED"
-}
-```
+See: [Result Formats](../reference/result-formats.md)
 
-See: [Result Schema v1 Reference](../reference/result-schema-v1.md)
+### Query Entries
 
-### QueryResult
-
-Individual query execution details.
+One entry per query execution (22 queries × (1 warm-up + 3 measurement) iterations = 88 entries here).
 
 **Structure**:
 ```python
 {
-    "query_id": str,
-    "stream_id": str,
-    "execution_time": float,
+    "id": str,
+    "ms": float,
+    "rows": int,
     "status": str,
-    "row_count": int,
-    "data_scanned_bytes": int,
-    "error_message": str | None,
-    "query_text": str,
-    "parameters": dict | None,
-    "start_time": datetime,
-    "end_time": datetime,
+    "stream": int,
+    "iter": int,
+    "run_type": str,
+    "test_type": str,
 }
 ```
+
+Field meanings: `id` is the query id (for example `"Q1"`); `ms` is execution time in milliseconds; `rows` is rows returned; `status` is SUCCESS, ERROR, or TIMEOUT; `run_type` is warmup or measurement; `test_type` is power or throughput.
 
 **Example**:
 ```json
 {
-  "query_id": "q1",
-  "stream_id": "stream_1",
-  "execution_time": 2.134,
+  "id": "Q1",
+  "ms": 14.6,
+  "rows": 4,
   "status": "SUCCESS",
-  "row_count": 4,
-  "data_scanned_bytes": 104857600,
-  "error_message": null,
-  "start_time": "2025-10-12T10:30:35Z",
-  "end_time": "2025-10-12T10:30:37Z"
+  "stream": 0,
+  "iter": 2,
+  "run_type": "measurement",
+  "test_type": "power"
 }
 ```
 
-### ExecutionPhases
 
-Detailed timing breakdown for benchmark phases.
+### Execution Phases
 
-**Structure**:
-```python
-{
-    "setup": SetupPhase,
-    "power_test": PowerTestPhase,
-    "throughput_test": ThroughputTestPhase,
-}
-```
+The `phases` object records per-phase timing with `duration_ms` and `status` entries for `data_generation`, `schema_creation`, `data_loading`, `power_test`, `throughput_test`, and `validation`. Per-table row counts live in `tables` (`{"lineitem": {"rows": 60175}, ...}`).
 
-#### SetupPhase
-
-```python
-{
-    "data_generation": {
-        "duration_ms": int,
-        "status": str,
-        "tables_generated": int,
-        "total_rows_generated": int,
-        "total_data_size_bytes": int,
-        "per_table_stats": dict,
-    },
-    "schema_creation": {
-        "duration_ms": int,
-        "status": str,
-        "tables_created": int,
-        "constraints_applied": int,
-        "indexes_created": int,
-    },
-    "data_loading": {
-        "duration_ms": int,
-        "status": str,
-        "total_rows_loaded": int,
-        "tables_loaded": int,
-        "per_table_stats": dict,
-    },
-    "validation": {
-        "duration_ms": int,
-        "row_count_validation": str,
-        "schema_validation": str,
-        "data_integrity_checks": str,
-    }
-}
-```
-
-#### PowerTestPhase
-
-```python
-{
-    "query_stream": List[QueryResult],
-    "start_time": datetime,
-    "end_time": datetime,
-    "geometric_mean": float,
-}
-```
-
-#### ThroughputTestPhase
-
-```python
-{
-    "streams": List[QueryStream],
-    "refresh_functions": List[RefreshFunction],
-    "start_time": datetime,
-    "end_time": datetime,
-    "measurement_interval_seconds": float,
-    "throughput_qph": float,
-}
-```
-
-### QueryDefinition
-
-SQL query template and parameters.
-
-**Structure**:
-```python
-{
-    "sql": str,
-    "parameters": dict | None,
-    "description": str | None,
-}
-```
-
-**Example**:
-```json
-{
-  "q1": {
-    "sql": "SELECT l_returnflag, l_linestatus, ...",
-    "parameters": {"date": "1998-09-02"},
-    "description": "Pricing Summary Report"
-  }
-}
-```
+Result files do not embed query SQL text. To inspect the SQL a run executes, preview it first with `benchbox run --dry-run <dir>`: the preview writes one `query_<id>.sql` file per query.
 
 ## System Profile
 
-Hardware and software context for reproducibility.
-
-```python
-{
-    "os": str,
-    "os_version": str,
-    "python_version": str,
-    "benchbox_version": str,
-    "cpu_model": str,
-    "cpu_cores": int,
-    "ram_gb": float,
-    "anonymous_machine_id": str,
-}
-```
+Hardware and software context for reproducibility lives in `environment` (`os`, `cpu_model`, `cpu_count`, `memory_gb`, `python`, plus machine metadata). The summary box on the console prints the same context (OS, Python, CPUs, memory, driver).
 
 ## Platform Info
 
-Platform-specific metadata.
+Platform-specific metadata lives in `platform`: `driver_package`, resolved and actual driver versions, `execution_mode` (`sql` or `dataframe`), and the effective `config` (connection mode, memory limit, thread limit, and any `--platform-option` values).
 
-```python
-{
-    "platform_name": str,
-    "driver_name": str,
-    "driver_version": str,
-    "configuration": dict,
-    "warehouse_size": str | None,
-    "cluster_id": str | None,
-}
-```
-
-**Example (Snowflake)**:
+**Example** (trimmed from a real DuckDB run):
 ```json
 {
-  "platform_name": "Snowflake",
-  "driver_name": "snowflake-connector-python",
-  "driver_version": "3.0.4",
-  "configuration": {
-    "account": "xy12345",
-    "warehouse": "COMPUTE_WH",
-    "warehouse_size": "LARGE",
-    "database": "BENCHBOX",
-    "schema": "TPCH_SF1"
+  "driver_package": "duckdb",
+  "driver_version_resolved": "1.5.5",
+  "driver_version_actual": "1.5.5",
+  "config": {
+    "connection_mode": "file",
+    "execution_mode": "sql",
+    "memory_limit": "8GB"
   }
 }
 ```
 
 ## Validation Results
 
-Correctness verification details.
-
-```python
-{
-    "validation_status": str,
-    "validation_mode": str,
-    "checks": {
-        "row_count": {
-            "status": str,
-            "expected": dict,
-            "actual": dict,
-            "mismatches": list,
-        },
-        "result_checksum": {
-            "status": str,
-            "expected": dict,
-            "actual": dict,
-            "mismatches": list,
-        },
-        "data_integrity": {
-            "status": str,
-            "checks_performed": list,
-            "failures": list,
-        }
-    }
-}
-```
+Correctness verification is the run-level `summary.validation` verdict (`passed`, `failed`, or `partial`), computed by comparing per-query row counts against expected values. Per-query entries carry the outcome as `status` (`SUCCESS`, `ERROR`, or `TIMEOUT`); a failed query includes an error message.
 
 ## Serialization Formats
 
@@ -327,15 +159,16 @@ Correctness verification details.
 
 **Example**:
 ```bash
-cat results.json | jq '.query_results[] | {query_id, execution_time}'
+cat results.json | jq '.queries[] | {id, ms}'
 ```
 
 ```python
+import json
 import pandas as pd
-df = pd.read_json("results.json")
+df = pd.DataFrame(json.load(open("results.json"))["queries"])
 ```
 
-The first command pretty-prints the query results with jq. The Python snippet loads the results into pandas.
+The first command pretty-prints the query entries with jq. The Python snippet loads the query entries into pandas.
 
 ### CSV (Export Format)
 
@@ -347,11 +180,11 @@ benchbox export results.json --format csv --output-dir ./
 
 This exports the query results to CSV.
 
-**CSV Columns**:
+**CSV Columns** (from a real export):
 ```
-query_id,execution_time,status,row_count
-q1,2.134,SUCCESS,4
-q2,3.421,SUCCESS,100
+query_id,execution_time_ms,rows_returned,status,error_message,iteration,stream
+14,21.4,1,SUCCESS,,0,0
+2,12.8,4,SUCCESS,,0,0
 ...
 ```
 
@@ -367,10 +200,10 @@ with open("results.json") as f:
     data = json.load(f)
 
 query_data = []
-for q in data["results"]["queries"]["details"]:
+for q in data["queries"]:
     query_data.append({
         "query_id": q["id"],
-        "execution_time_ms": q["timing"]["execution_ms"],
+        "execution_time_ms": q["ms"],
         "status": q["status"],
     })
 
@@ -390,34 +223,32 @@ This converts results to Parquet using pandas. It loads the JSON results, extrac
 ### Python API
 
 ```python
-from benchbox.core.results.models import BenchmarkResults
+from benchbox.core.results.loader import load_result_file
 
-results = BenchmarkResults.from_json_file("results.json")
+results, raw = load_result_file("results.json")
 
 print(f"Benchmark: {results.benchmark_name}")
 print(f"Duration: {results.duration_seconds:.2f}s")
 print(f"Success rate: {results.successful_queries}/{results.total_queries}")
 
 for qr in results.query_results:
-    if qr.status == "SUCCESS":
-        print(f"{qr.query_id}: {qr.execution_time:.3f}s")
-
-results.to_json_file("results_copy.json")
+    if qr["status"] == "SUCCESS":
+        print(f"{qr['query_id']}: {qr['execution_time_ms']:.1f}ms")
 ```
 
-The example loads results from JSON, accesses their fields, iterates through the query results, and saves the results to a file.
+The example loads results from JSON, accesses their fields, and iterates through the query results.
 
 ### Command-Line Tools
 
 ```bash
-jq '.query_results[] | select(.execution_time > 5)' results.json
+jq '.queries[] | select(.ms > 15)' results.json
 
-jq '{benchmark: .benchmark_name, total_time: .total_execution_time, avg_time: .average_query_time}' results.json
+jq '{benchmark: .benchmark.id, total_ms: .summary.timing.total_ms, avg_ms: .summary.timing.avg_ms}' results.json
 
 benchbox compare baseline.json current.json
 ```
 
-The first command selects query results slower than 5 seconds with jq. The second extracts a timing summary. The last compares two result files.
+The first command selects query entries slower than 15 milliseconds with jq. The second extracts a timing summary. The last compares two result files.
 
 ### Analysis Examples
 
@@ -426,19 +257,19 @@ The first command selects query results slower than 5 seconds with jq. The secon
 ```python
 import math
 
-query_times = [qr.execution_time for qr in results.query_results
-               if qr.status == "SUCCESS"]
+query_times = [qr["execution_time_ms"] for qr in results.query_results
+               if qr["status"] == "SUCCESS"]
 geomean = math.prod(query_times) ** (1.0 / len(query_times))
-print(f"Geometric mean: {geomean:.3f}s")
+print(f"Geometric mean: {geomean:.1f}ms")
 ```
 
 #### Detect Regressions
 
 ```python
 def compare_results(baseline, current, threshold=1.1):
-    baseline_times = {qr.query_id: qr.execution_time
+    baseline_times = {qr["query_id"]: qr["execution_time_ms"]
                       for qr in baseline.query_results}
-    current_times = {qr.query_id: qr.execution_time
+    current_times = {qr["query_id"]: qr["execution_time_ms"]
                      for qr in current.query_results}
 
     regressions = []
@@ -458,10 +289,10 @@ import pandas as pd
 
 df = pd.DataFrame([
     {
-        "query_id": qr.query_id,
-        "execution_time": qr.execution_time,
-        "status": qr.status,
-        "row_count": qr.row_count,
+        "query_id": qr["query_id"],
+        "execution_time_ms": qr["execution_time_ms"],
+        "status": qr["status"],
+        "rows_returned": qr["rows_returned"],
     }
     for qr in results.query_results
 ])
@@ -476,7 +307,7 @@ The code converts the results to a DataFrame, then analyzes them.
 
 BenchBox uses schema versioning to manage result format evolution.
 
-**Current Version**: v1 (result_schema_v1)
+**Current Version**: v2 (`result_schema_version: "2.2"`)
 
 **Schema Rules**:
 - New fields may be added (with defaults)
@@ -488,7 +319,7 @@ BenchBox uses schema versioning to manage result format evolution.
 ### Result Storage
 
 1. **Version Control**: Store result JSON files in git for history tracking
-2. **Naming Convention**: Use descriptive names: `{benchmark}_{sf}_{platform}_{timestamp}.json`
+2. **Naming Convention**: Result files are named `{benchmark}_sf{scale}_{platform}_{mode}_{timestamp}_{run-id}.json` (for example `tpch_sf001_duckdb_sql_20261009_230647_9bf6431b.json`); keep those names so `benchbox results` and `benchbox compare` resolve them
 3. **Archival**: Compress old results with gzip or convert to Parquet
 4. **Metadata**: Include git commit SHA in execution_id for traceability
 
@@ -496,8 +327,8 @@ BenchBox uses schema versioning to manage result format evolution.
 
 1. **Geometric Mean**: Use for TPC benchmark reporting (not arithmetic mean)
 2. **Outliers**: Investigate queries with >3x variance from baseline
-3. **Validation**: Always check validation_status before trusting results
-4. **Context**: Compare results with matching system_profile values
+3. **Validation**: Always check `summary.validation` before trusting results
+4. **Context**: Compare results with matching `environment` values
 
 ### Performance Monitoring
 
@@ -508,7 +339,7 @@ BenchBox uses schema versioning to manage result format evolution.
 
 ## Related Documentation
 
-- [Result Schema v1 Reference](../reference/result-schema-v1.md) - Complete field documentation
+- [Result Formats](../reference/result-formats.md) - Current schema v2 field documentation
 - [Architecture](architecture.md) - How results fit into system design
 - [Workflow](workflow.md) - Result collection in different workflows
 - [Performance Monitoring](../advanced/performance.md) - Analyzing results over time

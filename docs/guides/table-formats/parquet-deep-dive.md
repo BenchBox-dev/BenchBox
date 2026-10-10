@@ -72,7 +72,7 @@ lineitem.parquet
 
 **Statistics**: Parquet stores min/max values per column per row group. Queries with range filters can skip row groups entirely.
 
-**BenchBox default**: 1 million rows per row group (the Parquet default). This works well for most benchmark scenarios.
+**BenchBox default**: row group sizing is left at the writer default unless `row_group_size` is set in the write configuration. This works well for most benchmark scenarios.
 
 ### Column Chunks
 
@@ -114,11 +114,13 @@ Consider TPC-H's `lineitem` table:
 | l_orderkey | ~1.5M (at SF1) | No | Dictionary would be as large as the data |
 | l_comment | ~4.6M (at SF1) | No | Falls back to PLAIN encoding |
 
-When a column's dictionary grows too large (exceeds the page size threshold), PyArrow automatically falls back to PLAIN encoding for that column. This fallback is safe but adds write overhead for the failed dictionary attempt.
+When a column's dictionary grows too large (exceeds the page size threshold), the writer automatically falls back to PLAIN encoding for that column. This fallback is safe but adds write overhead for the failed dictionary attempt.
 
-BenchBox enables dictionary encoding by default (`use_dictionary=True`). For fine-grained control, the write configuration supports per-column overrides:
+BenchBox exposes dictionary control through `DataFrameWriteConfiguration`. For fine-grained control, the write configuration supports per-column overrides:
 
 ```python
+from benchbox.core.dataframe.tuning.write_config import DataFrameWriteConfiguration
+
 DataFrameWriteConfiguration(
     dictionary_columns=["l_returnflag", "l_shipmode"],
     skip_dictionary_columns=["l_comment", "l_orderkey"],
@@ -188,11 +190,11 @@ Zstd supports levels 1-22. Higher levels provide better compression at the cost 
 | Priority | Recommended | Reason |
 |----------|-------------|--------|
 | Storage cost | Zstd:9 | Smallest files |
-| Query speed | Snappy | Fastest decompression |
-| Balanced | Zstd:3 | BenchBox default |
+| Compatibility | Gzip:6 | Widely supported decoder |
+| Balanced | Zstd | BenchBox default |
 | Debugging | None | No decompression overhead |
 
-For most benchmarks, the default Zstd:3 works well. Higher compression levels (Zstd:9) save storage but add write time. Snappy trades ~20% larger files for faster decompression.
+For most benchmarks, the default Zstd works well. Higher compression levels (Zstd:9) save storage but add write time. Gzip is an alternative when downstream tools expect it.
 
 ### When to Adjust Compression
 
@@ -201,16 +203,16 @@ benchbox run --platform duckdb --benchmark tpch --scale 1
 
 benchbox run --platform duckdb --benchmark tpch --compression zstd:9
 
-benchbox run --platform duckdb --benchmark tpch --compression snappy
+benchbox run --platform duckdb --benchmark tpch --compression gzip:6
 
 benchbox run --platform duckdb --benchmark tpch --compression none
 ```
 
 The commands use, in order:
 
-- The default (Zstd level 3).
+- The default (Zstd).
 - Higher compression, which gives smaller files and slower writes.
-- Faster compression, which gives larger files and faster writes.
+- Gzip compression, for compatibility with tools that expect it.
 - No compression, for debugging and as a baseline.
 
 ## Row Group Tuning
@@ -227,7 +229,7 @@ The commands use, in order:
 - Running in memory-constrained environments
 - Debugging query execution patterns
 
-BenchBox uses the 1M row default, which works for most scenarios. Custom row group sizes require manual data generation with PyArrow.
+BenchBox leaves row group sizing at the writer default unless `row_group_size` is set in the write configuration. Custom row group sizes require manual data generation with PyArrow.
 
 ## Parquet Versions
 

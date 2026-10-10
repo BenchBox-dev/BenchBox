@@ -27,7 +27,7 @@ benchbox run --dry-run ./benchmark_runs/dryrun_previews --platform duckdb --benc
 
 benchbox run --dry-run ./tuned_preview --platform duckdb --benchmark tpcds --scale 0.01 --tuning tuned
 
-benchbox run --dry-run ./systematic_preview --platform duckdb --benchmark primitives --scale 0.001
+benchbox run --dry-run ./systematic_preview --platform duckdb --benchmark read_primitives --scale 0.01
 ```
 
 ### Seed Control in Dry Run
@@ -47,39 +47,27 @@ If a specific seed cannot generate all queries at a tiny scale, the CLI prefligh
 ### Programmatic Usage
 
 ```python
+from pathlib import Path
 from benchbox.cli.dryrun import DryRunExecutor
 from benchbox.cli.system import SystemProfiler
-from benchbox.cli.database import DatabaseConfig
 from benchbox.core.config import BenchmarkConfig
-from pathlib import Path
+from benchbox.core.schemas import DatabaseConfig
 
 output_dir = Path("./my_dry_run")
 dry_run = DryRunExecutor(output_dir)
 
-profiler = SystemProfiler()
-system_profile = profiler.get_system_profile()
-
-db_config = DatabaseConfig(
-    platform="duckdb",
-    connection_params={"database": ":memory:"},
-    dialect="duckdb"
-)
-
-benchmark_config = BenchmarkConfig(
-    name="tpch",
-    scale_factor=0.01,
-    platform="duckdb"
-)
+system_profile = SystemProfiler().get_system_profile()
+db_config = DatabaseConfig(type="duckdb", name="DuckDB")
+benchmark_config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01)
 
 result = dry_run.execute_dry_run(
     benchmark_config=benchmark_config,
     system_profile=system_profile,
-    database_config=db_config
+    database_config=db_config,
 )
 
 print(f"Extracted {len(result.queries)} queries")
-print(f"Generated schema with {len(result.schema_info.get('tables', {}))} tables")
-print(f"Memory estimate: {result.resource_estimates.estimated_memory_mb} MB")
+print(f"Estimated memory: {result.estimated_resources.get('estimated_memory_usage_mb')} MB")
 ```
 
 ## Output Structure
@@ -107,180 +95,102 @@ inside the JSON/YAML output, not separate files.
 
 ### Summary Files
 
-**`<prefix>_<timestamp>.json`** - Complete structured output (for example `tpch_duckdb_20250115_143022.json`):
+**`<prefix>_<timestamp>.json`** - Complete structured output (keys include `benchmark_config`, `database_config`, `system_profile`, `platform_config`, `queries`, `schema_sql`, `ddl_preview`, `post_load_statements`, `tuning_config`, `constraint_config`, `estimated_resources`, `query_preview`, `warnings`, and `timestamp`):
 ```json
 {
-  "timestamp": "2025-01-15T14:30:22.123456",
   "benchmark_config": {
     "name": "tpch",
-    "scale_factor": 0.1,
-    "platform": "duckdb"
+    "scale_factor": 0.01
   },
   "system_profile": {
-    "os": "Darwin 24.6.0",
+    "os_name": "Darwin",
     "architecture": "arm64",
-    "memory_gb": 36.0,
-    "cpu_cores": 12
-  },
-  "database_config": {
-    "platform": "duckdb",
-    "dialect": "duckdb",
-    "connection": ":memory:"
+    "memory_total_gb": 16.0,
+    "cpu_cores_physical": 10
   },
   "queries": {
     "1": "SELECT ... FROM lineitem WHERE ...",
     "2": "SELECT ... FROM supplier, nation ..."
   },
-  "schema_info": {
-    "tables": {
-      "lineitem": {"row_count": 600572, "columns": 16},
-      "orders": {"row_count": 150000, "columns": 9}
-    }
-  },
-  "resource_estimates": {
-    "estimated_memory_mb": 256,
-    "estimated_storage_mb": 100,
-    "estimated_runtime_minutes": 3.2
+  "estimated_resources": {
+    "estimated_data_size_mb": 8.0,
+    "estimated_memory_usage_mb": 20.0,
+    "estimated_runtime_minutes": 0.0
   }
 }
 ```
 
-**`<prefix>_<timestamp>.yaml`** - Human-readable format (truncated here; the file continues with the remaining sections):
-```yaml
-timestamp: 2025-01-15T14:30:22.123456
-benchmark_config:
-  name: tpch
-  scale_factor: 0.1
-  platform: duckdb
-system_profile:
-  os: Darwin 24.6.0
-  architecture: arm64
-  memory_gb: 36.0
-  cpu_cores: 12
-```
+**`<prefix>_<timestamp>.yaml`** - Human-readable format with the same sections.
 
 ### Query Files
 
-Individual SQL files are saved in the `<prefix>_queries_<timestamp>/` directory:
+Individual SQL files are saved in the `<prefix>_queries_<timestamp>/` directory. Files contain the generated SQL with no header comments:
 
-**`<prefix>_queries_<timestamp>/query_1.sql`:** The file begins with the header comments `TPC-H Query 1: Pricing Summary Report` and `This query reports the amount of business that was billed, shipped, and returned.`
+**`<prefix>_queries_<timestamp>/query_1.sql`:**
 ```sql
-
-SELECT
-    l_returnflag,
-    l_linestatus,
-    SUM(l_quantity) AS sum_qty,
-    SUM(l_extendedprice) AS sum_base_price,
-    SUM(l_extendedprice * (1 - l_discount)) AS sum_disc_price,
-    SUM(l_extendedprice * (1 - l_discount) * (1 + l_tax)) AS sum_charge,
-    AVG(l_quantity) AS avg_qty,
-    AVG(l_extendedprice) AS avg_price,
-    AVG(l_discount) AS avg_disc,
-    COUNT(*) AS count_order
-FROM
-    lineitem
-WHERE
-    l_shipdate <= DATE '1998-12-01' - INTERVAL '90' DAY
-GROUP BY
-    l_returnflag,
-    l_linestatus
-ORDER BY
-    l_returnflag,
-    l_linestatus;
+SELECT "l_returnflag", "l_linestatus", SUM("l_quantity") AS "sum_qty", ... FROM "lineitem" WHERE "l_shipdate" <= CAST('1998-12-01' AS DATE) - INTERVAL '90' DAY GROUP BY "l_returnflag", "l_linestatus" ORDER BY "l_returnflag", "l_linestatus"
 ```
 
 ### Schema File
 
-**schema.sql** - Complete database schema. It begins with the header comments `TPC-H Database Schema` and `Generated by BenchBox Dry Run`. The excerpt below is truncated: the file continues with all tables, and the index statements appear only if tuning is enabled.
+**`<prefix>_schema_<timestamp>.sql`** - Complete database schema (excerpt below is truncated; the file continues with all tables):
 ```sql
+CREATE TABLE region (
+    r_regionkey INTEGER NOT NULL,
+    r_name CHAR(25) NOT NULL,
+    r_comment VARCHAR(152)
+);
 
 CREATE TABLE nation (
-    n_nationkey  INTEGER,
-    n_name       CHAR(25),
-    n_regionkey  INTEGER,
-    n_comment    VARCHAR(152)
+    n_nationkey INTEGER NOT NULL,
+    n_name CHAR(25) NOT NULL,
+    n_regionkey INTEGER NOT NULL,
+    n_comment VARCHAR(152)
 );
-
-CREATE TABLE region (
-    r_regionkey  INTEGER,
-    r_name       CHAR(25),
-    r_comment    VARCHAR(152)
-);
-
-CREATE INDEX idx_lineitem_shipdate ON lineitem(l_shipdate);
-CREATE INDEX idx_orders_orderdate ON orders(o_orderdate);
 ```
 
 ## Console Output
 
-The dry run provides rich, formatted console output:
+The dry run prints a configuration summary, per-query previews, and the schema preview (excerpt):
 
 ```bash
 $ benchbox run --dry-run ./preview --platform duckdb --benchmark tpch --scale 0.1
 
-DRY RUN MODE - Preview Only (No Execution)
-Output Directory: ./preview
+╭────────────────────────────────────────────╮
+│ DRY RUN MODE - No queries will be executed │
+╰────────────────────────────────────────────╯
 
-┌─ System Profile ─┐
-│ Component     │ Value                    │
-├───────────────┼──────────────────────────┤
-│ OS            │ Darwin 24.6.0           │
-│ Architecture  │ arm64                   │
-│ CPU Cores     │ 12 physical, 12 logical │
-│ Memory        │ 36.0 GB total           │
-│ Python        │ 3.13.5                  │
-└───────────────┴──────────────────────────┘
+Configuration Summary
+┏━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃ Category   ┃ Setting      ┃ Value         ┃
+┡━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│ Benchmark  │ Name         │ tpch          │
+│            │ Scale Factor │ 0.1           │
+│ Database   │ Type         │ duckdb        │
+│ System     │ CPU Cores    │ 10            │
+│            │ Memory (GB)  │ 16.0          │
+└────────────┴──────────────┴───────────────┘
 
-┌─ Database Configuration ─┐
-│ Parameter     │ Value                    │
-├───────────────┼──────────────────────────┤
-│ Platform      │ duckdb                   │
-│ Connection    │ :memory:                 │
-│ Dialect       │ duckdb                   │
-│ OLAP Support  │ ✅                        │
-└───────────────┴──────────────────────────┘
+PowerTest Stream Execution Preview
 
-┌─ Benchmark Configuration ─┐
-│ Parameter          │ Value                    │
-├────────────────────┼──────────────────────────┤
-│ Name              │ TPC-H                    │
-│ Scale Factor      │ 0.1                      │
-│ Estimated Data    │ 100 MB                   │
-│ Query Count       │ 22                       │
-│ Complexity        │ Medium                   │
-└────────────────────┴──────────────────────────┘
+Query 1:
+╭─────────────────── Query 1 ───────────────────╮
+│ SELECT "l_returnflag", ...                    │
+╰───────────────────────────────────────────────╯
 
- Extracted 22 queries:
-  ✅ Query 1: Pricing Summary Report Query
-  ✅ Query 2: Minimum Cost Supplier Query
-  ✅ Query 3: Shipping Priority Query
-  ✅ Query 4: Order Priority Checking Query
-  ✅ Query 5: Local Supplier Volume Query
-  ... (truncated)
+... and 19 more queries
 
- Generated schema with 8 tables:
-  ✅ customer (150,000 rows, 8 columns)
-  ✅ lineitem (600,572 rows, 16 columns)
-  ✅ nation (25 rows, 4 columns)
-  ✅ orders (150,000 rows, 9 columns)
-  ✅ part (20,000 rows, 9 columns)
-  ✅ partsupp (80,000 rows, 5 columns)
-  ✅ region (5 rows, 3 columns)
-  ✅ supplier (1,000 rows, 7 columns)
-
- Resource Estimates:
-  • Memory Required: ~256 MB
-  • Storage Required: ~100 MB
-  • Estimated Runtime: 2-5 minutes
-  • Queries with Joins: 15/22
-  • Complex Queries: 8/22
-
- Saved complete preview to: ./preview/
-  ├── <prefix>_<timestamp>.json (configuration details, resource estimates embedded)
-  ├── <prefix>_<timestamp>.yaml (human-readable config)
-  ├── <prefix>_queries_<timestamp>/ (22 SQL files)
-  └── <prefix>_schema_<timestamp>.sql (table definitions)
+Schema Preview
+╭────────────── Database Schema ────────────────╮
+│ CREATE TABLE region ( ...                     │
+╰───────────────────────────────────────────────╯
 ```
+
+Saved preview files land in `./preview/`:
+  ├── `<prefix>_<timestamp>.json` (configuration details, resource estimates embedded)
+  ├── `<prefix>_<timestamp>.yaml` (human-readable config)
+  ├── `<prefix>_queries_<timestamp>/` (one `.sql` file per query)
+  └── `<prefix>_schema_<timestamp>.sql` (table definitions)
 
 ## Features
 
@@ -296,26 +206,29 @@ benchbox run --dry-run ./tuned_preview \
   --tuning tuned
 ```
 
-Additional output includes:
+Additional output includes a constraint table and per-table organization tunings (excerpt):
 
 ```
-┌─ Tuning Configuration ─┐
-│ Parameter              │ Value     │
-├────────────────────────┼───────────┤
-│ Tuning Enabled         │ ✅         │
-│ Primary Keys           │ ✅         │
-│ Foreign Keys           │ ✅         │
-│ Partitioning           │ Applied   │
-│ Clustering             │ Applied   │
-│ Distribution Keys      │ Applied   │
-│ Sort Keys              │ Applied   │
-└────────────────────────┴───────────┘
+Tuning Configuration
+┏━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Constraint Type ┃ Enabled ┃ Configuration                     ┃
+┡━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Primary Keys    │ True    │ Uniqueness: True, Nullable: False │
+│ Foreign Keys    │ True    │ Referential Integrity: True       │
+└─────────────────┴─────────┴───────────────────────────────────┘
 
- Applied Tunings:
-  ✅ lineitem: PARTITION BY (l_shipdate), CLUSTER BY (l_orderkey)
-  ✅ orders: PARTITION BY (o_orderdate), CLUSTER BY (o_custkey)
-  ✅ customer: DISTRIBUTE BY (c_nationkey)
-  ✅ supplier: DISTRIBUTE BY (s_nationkey)
+Table Organization Tunings
+┏━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Table    ┃ Tuning Type ┃ Columns                      ┃
+┡━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ LINEITEM │ Sorting     │ L_ORDERKEY (INTEGER), ...    │
+│ ORDERS   │ Sorting     │ O_ORDERKEY (INTEGER), ...    │
+└──────────┴─────────────┴────────────────────────────────┘
+
+DDL Preview (Tuning Clauses)
+
+Table: supplier
+  Tuning: Sort: ORDER BY S_SUPPKEY, S_NATIONKEY
 ```
 
 ### Cross-Platform Preview
@@ -344,7 +257,7 @@ for scale in 0.001 0.01 0.1 1.0; do
     --benchmark tpch \
     --scale ${scale}
 
-  cat ./scale_${scale}/*.json | jq '.resource_estimates.estimated_memory_mb'
+  cat ./scale_${scale}/*.json | jq '.estimated_resources.estimated_memory_usage_mb'
 done
 ```
 
@@ -363,7 +276,7 @@ if git diff --cached --name-only | grep -q "benchbox/"; then
     --platform duckdb --benchmark tpch --scale 0.001
 
   benchbox run --dry-run /tmp/validation_primitives \
-    --platform duckdb --benchmark primitives --scale 0.001
+    --platform duckdb --benchmark read_primitives --scale 0.01
 
   if [ $? -eq 0 ]; then
     echo "✅ Benchmark validation passed"
@@ -393,7 +306,7 @@ Generated from dry run analysis on $(date).
 ## Queries
 EOF
 
-for query in ./docs/tpcds_queries/queries/*.sql; do
+for query in ./docs/tpcds_queries/*_queries_*/*.sql; do
   echo "### $(basename $query .sql)" >> ./docs/tpcds_benchmark.md
   echo '```sql' >> ./docs/tpcds_benchmark.md
   head -20 "$query" >> ./docs/tpcds_benchmark.md
@@ -411,8 +324,8 @@ Test configurations across environments. Save the script below as `test_configur
 configurations=(
   "duckdb:tpch:0.01"
   "duckdb:tpcds:0.01"
-  "duckdb:primitives:0.001"
-  "sqlite:primitives:0.001"
+  "duckdb:read_primitives:0.01"
+  "sqlite:read_primitives:0.01"
 )
 
 for config in "${configurations[@]}"; do
@@ -438,14 +351,13 @@ done
 Validate extracted queries with external tools:
 
 ```python
-import subprocess
 from pathlib import Path
 
 def validate_queries(dry_run_dir: str, dialect: str = "duckdb"):
-
-    queries_dir = Path(dry_run_dir) / "queries"
-    if not queries_dir.exists():
+    candidates = sorted(Path(dry_run_dir).glob("*_queries_*"))
+    if not candidates:
         return
+    queries_dir = candidates[0]
 
     print(f"Validating queries for {dialect} dialect...")
 
@@ -499,7 +411,7 @@ benchbox run --dry-run ./debug \
   --benchmark complex_benchmark \
   --scale 1.0
 
-cat ./debug/*.json | jq '.errors // "No errors"'
+cat ./debug/*.json | jq '.warnings'
 ```
 
 **Query Issues:**
@@ -553,52 +465,58 @@ diff ./platform_test/*_queries_*/query_1.sql ./reference/duckdb_query_1.sql
 
 ### DryRunExecutor
 
-Primary class for executing dry runs. `output_dir` is the directory where dry run output is saved, and `execute_dry_run()` returns a `DryRunResult` with all preview information.
+Primary class for executing dry runs (`benchbox.cli.dryrun.DryRunExecutor`). `output_dir` is the directory where dry run output is saved, and `execute_dry_run()` returns a `DryRunResult` with all preview information.
 
 ```python
 class DryRunExecutor:
-    def __init__(self, output_dir: Optional[Path] = None):
+    def __init__(self, output_dir=None):
         pass
 
     def execute_dry_run(
         self,
         benchmark_config: BenchmarkConfig,
         system_profile: SystemProfile,
-        database_config: DatabaseConfig
+        database_config: DatabaseConfig | None,
     ) -> DryRunResult:
         pass
 ```
 
 ### DryRunResult
 
-Result object containing all dry run information.
+Result object containing all dry run information (`benchbox.core.schemas.DryRunResult`, a Pydantic model).
 
 ```python
-@dataclass
 class DryRunResult:
     timestamp: datetime
-    benchmark_config: Dict[str, Any]
-    system_profile: Dict[str, Any]
-    database_config: Dict[str, Any]
-    queries: Dict[str, str]
-    schema_info: Dict[str, Any]
-    resource_estimates: ResourceEstimates
-    tuning_config: Optional[Dict[str, Any]]
+    benchmark_config: dict
+    system_profile: dict
+    database_config: dict
+    platform_config: dict
+    queries: dict[str, str]
+    execution_mode: str
+    schema_sql: str | None
+    ddl_preview: dict | None
+    post_load_statements: dict | None
+    tuning_config: dict | None
+    constraint_config: dict | None
+    estimated_resources: dict | None
+    query_preview: dict | None
+    warnings: list
 ```
 
-### ResourceEstimates
+### estimated_resources
 
-Resource requirement estimates.
+Resource requirement estimates (a plain dict, keys include):
 
 ```python
-@dataclass
-class ResourceEstimates:
-    estimated_memory_mb: int
-    estimated_storage_mb: int
-    estimated_runtime_minutes: float
-    complexity_score: int
-    join_count: int
-    subquery_count: int
+{
+    "scale_factor": float,
+    "estimated_data_size_mb": float,
+    "estimated_memory_usage_mb": float,
+    "estimated_runtime_minutes": float,
+    "cpu_cores_available": int,
+    "memory_gb_available": float,
+}
 ```
 
 The dry run feature is a powerful tool for development, testing, and production planning. Use it extensively to validate configurations, understand resource requirements, and ensure successful benchmark execution.

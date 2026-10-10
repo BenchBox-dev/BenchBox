@@ -1120,7 +1120,11 @@ ProgrammingError: syntax error at or near "LIMIT"
 
 **Solutions**:
 ```python
-translated_query = benchmark.translate_query(query_id, dialect='postgres')
+from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
+
+benchmark = TPCDIBenchmark(scale_factor=0.01)
+query_sql = benchmark.get_query("V1")
+translated = benchmark.translate_query_text(query_sql, "postgres")
 
 import logging
 logging.basicConfig(level=logging.DEBUG)
@@ -1130,30 +1134,29 @@ Translate the query to the correct SQL dialect, then enable debug logging to che
 
 ### Debug Mode
 
-The debug run uses a small scale factor of 0.01, and setting `TPCDI_DEBUG` and `TPCDI_VERBOSE` enables all debug features.
+The debug run uses a small scale factor of 0.01 with Python logging at DEBUG level:
 
 ```python
 import logging
-import os
-from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
+import sqlite3
+from pathlib import Path
+from benchbox import TPCDI
 
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
-benchmark = TPCDIBenchmark(
+benchmark = TPCDI(
     scale_factor=0.01,
     output_dir=Path('/tmp/tpcdi_debug')
 )
 
-os.environ['TPCDI_DEBUG'] = 'true'
-os.environ['TPCDI_VERBOSE'] = 'true'
-
 try:
-    result = benchmark.run_etl_pipeline(conn, validate_data=True)
-    print(f"Debug run completed: {result}")
-except Exception as e:
+    with sqlite3.connect(':memory:') as conn:
+        result = benchmark.run_etl_pipeline(conn, validate_data=True)
+    print(f"Debug run completed: {result['success']}")
+except Exception:
     logging.exception("Debug run failed")
     raise
 ```

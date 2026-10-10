@@ -22,49 +22,55 @@ benchbox export --last --format json --output-dir ./results
 
 ## Key Metrics
 
-### Power Test Timing
+### Run Timing
 
-| Metric | Description |
-|--------|-------------|
-| `total_time` | End-to-end benchmark duration |
-| `data_generation_time` | Time to generate TPC data |
-| `load_time` | Time to load data into tables |
-| `query_time` | Total query execution time |
+The `run` object carries end-to-end numbers:
+
+| Field | Meaning |
+|-------|---------|
+| `run.total_duration_ms` | End-to-end benchmark duration in milliseconds |
+| `run.query_time_ms` | Total query execution time in milliseconds |
+| `summary.timing.total_ms` | Sum of measured query times in milliseconds |
+| `summary.timing.geometric_mean_ms` | Geometric mean query time (drives Power@Size) |
+| `summary.validation` | `passed`, `failed`, or `partial` |
+| `summary.queries` | `total`, `passed`, and `failed` execution counts |
 
 ### Per-Query Metrics
 
-Each query result includes:
+Each entry in `queries` looks like this:
 
 ```json
 {
-  "query_id": "Q1",
-  "execution_time_ms": 156.4,
-  "rows_returned": 4,
+  "id": "Q1",
+  "ms": 14.6,
+  "rows": 4,
   "status": "SUCCESS",
-  "validation": {
-    "expected_rows": 4,
-    "actual_rows": 4,
-    "status": "PASS"
-  }
+  "stream": 0,
+  "iter": 2,
+  "run_type": "measurement",
+  "test_type": "power"
 }
 ```
 
 | Field | Meaning |
 |-------|---------|
-| `execution_time_ms` | Query runtime in milliseconds |
-| `rows_returned` | Number of result rows |
-| `status` | SUCCESS, FAILED, or TIMEOUT |
-| `validation.status` | PASS if row count matches expected |
+| `ms` | Query runtime in milliseconds |
+| `rows` | Number of result rows |
+| `status` | SUCCESS, ERROR, or TIMEOUT |
+| `stream` / `iter` / `run_type` | Which stream, iteration, and phase produced the row |
 
 ## Understanding Validation
 
-BenchBox validates query correctness by comparing row counts:
+BenchBox validates query correctness by comparing row counts. The run-level
+verdict is `summary.validation`:
 
-| Status | Meaning | Action |
-|--------|---------|--------|
-| `PASS` | Row count matches expected | No action needed |
-| `FAIL` | Row count differs from expected | Check query translation |
-| `SKIP` | No expected value available | Normal for some queries |
+| Value | Meaning | Action |
+|-------|---------|--------|
+| `passed` | Every check matched expected | No action needed |
+| `failed` | A check differed from expected | Check query translation |
+| `partial` | Some queries failed to run | Inspect the `ERROR` entries |
+
+A failed query carries an `ERROR` status and an error message instead of timing data.
 
 ## TPC Metrics
 
@@ -95,11 +101,11 @@ Price/Performance = (Platform Cost) / Throughput@Size
 ## Comparing Results
 
 ```bash
-benchbox run --platform duckdb --benchmark tpch --output duckdb.json
-benchbox run --platform sqlite --benchmark tpch --output sqlite.json
-
-benchbox compare duckdb.json sqlite.json
+benchbox run --platform duckdb --benchmark tpch --output ./benchmark_runs
+benchbox run --platform sqlite --benchmark tpch --output ./benchmark_runs
 ```
+
+Find the two result files with `benchbox results --limit 2` and pass them to `benchbox compare`.
 
 The comparison shows:
 - Per-query timing differences
@@ -108,21 +114,23 @@ The comparison shows:
 
 ## Result File Locations
 
-BenchBox stores results in:
+BenchBox stores results in the runs root: `BENCHBOX_OUTPUT_DIR` when set, otherwise `benchmark_runs/` next to your checkout:
 
 ```
 benchmark_runs/
-├── results/                    # JSON result files
-│   ├── tpch_duckdb_sf0.01_*.json
-│   └── tpch_sqlite_sf0.01_*.json
-├── datagen/                    # Generated data
-│   └── tpch_sf0.01/
-│       ├── lineitem.csv
-│       ├── orders.csv
-│       └── ...
-└── manifests/                  # Data generation metadata
-    └── tpch_sf0.01_manifest.json
+├── results/                                  # JSON result files
+│   └── tpch_sf001_duckdb_sql_<timestamp>_<id>.json
+├── databases/                                # Platform database files
+│   └── tpch_sf001/
+│       └── tpch_sf001_notuning_noconstraints.duckdb
+└── datagen/                                  # Generated data (default location)
+    └── tpch_sf001/
+        ├── lineitem.tbl.zst
+        ├── orders.tbl.zst
+        └── _datagen_manifest.json
 ```
+
+`--output DIR` redirects generated data to `DIR/<benchmark>_<scale>/` (for example `/tmp/bb-truth/tpch_sf001/` with `--output /tmp/bb-truth`); result files and databases stay in the runs root.
 
 ## Interpreting Slow Queries
 
@@ -137,7 +145,7 @@ If a query is unexpectedly slow:
 benchbox run --dry-run ./analysis --platform duckdb --benchmark tpch
 ```
 
-This exports the query SQL to `./analysis/queries/`.
+This exports the query SQL as `query_<id>.sql` files under `./analysis/<benchmark>_<platform>_queries_<timestamp>/`, alongside the dry-run JSON/YAML, schema, and DDL preview.
 
 ## Next Steps
 

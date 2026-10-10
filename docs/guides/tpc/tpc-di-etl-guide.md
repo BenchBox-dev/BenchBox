@@ -63,7 +63,6 @@ from benchbox import TPCDI
 tpcdi = TPCDI(
     scale_factor=1.0,
     output_dir="tpcdi_etl",
-    etl_mode=True,
     verbose=True
 )
 
@@ -75,27 +74,25 @@ print(f"Batch types: {etl_status['batch_types']}")
 
 ### Backwards Compatibility
 
-The ETL mode is fully backwards compatible with existing TPC-DI usage. Traditional mode (the default, `etl_mode=False`) generates warehouse tables directly. ETL mode provides the full ETL pipeline capabilities:
+The ETL capabilities are always on and fully backwards compatible with existing TPC-DI usage: `generate_data()` produces warehouse tables directly, while `generate_source_data()` produces the multi-format source files the ETL pipeline consumes:
 
 ```python
-tpcdi_traditional = TPCDI(scale_factor=1.0, etl_mode=False)
-data_files = tpcdi_traditional.generate_data()
+tpcdi = TPCDI(scale_factor=1.0)
+data_files = tpcdi.generate_data()
 
-tpcdi_etl = TPCDI(scale_factor=1.0, etl_mode=True)
-source_files = tpcdi_etl.generate_source_data()
+source_files = tpcdi.generate_source_data()
 ```
 
 ## ETL Mode Configuration
 
 ### Configuration Options
 
-`scale_factor` sets the data volume, `output_dir` is the base directory for all artifacts, `etl_mode=True` enables ETL mode, and `verbose=True` enables detailed logging. The remaining options are ETL-specific configuration reserved for future extensions: `batch_size` is the number of records per batch for loading, `parallel_workers` is the number of parallel processing workers, and `validate_on_load` runs validation after each load.
+`scale_factor` sets the data volume, `output_dir` is the base directory for all artifacts, and `verbose=True` enables detailed logging. The remaining options are ETL-specific configuration reserved for future extensions: `batch_size` is the number of records per batch for loading, `parallel_workers` is the number of parallel processing workers, and `validate_on_load` runs validation after each load.
 
 ```python
 tpcdi = TPCDI(
     scale_factor=1.0,
     output_dir="tpcdi_data",
-    etl_mode=True,
     verbose=True,
 
     batch_size=10000,
@@ -121,14 +118,12 @@ The development configuration uses a small scale factor. The production-like con
 tpcdi_dev = TPCDI(
     scale_factor=0.05,
     output_dir="dev_etl",
-    etl_mode=True,
     verbose=True
 )
 
 tpcdi_prod = TPCDI(
     scale_factor=3.0,
     output_dir="prod_etl",
-    etl_mode=True,
     verbose=False
 )
 ```
@@ -228,6 +223,8 @@ scd_files = tpcdi.generate_source_data(
 ### Multi-Format Generation Example
 
 ```python
+from pathlib import Path
+
 all_source_files = tpcdi.generate_source_data(
     formats=['csv', 'xml', 'fixed_width', 'json'],
     batch_types=['historical', 'incremental', 'scd']
@@ -249,7 +246,7 @@ for format_type, files in all_source_files.items():
 import sqlite3
 from benchbox import TPCDI
 
-tpcdi = TPCDI(scale_factor=0.1, output_dir="tpcdi_pipeline", etl_mode=True)
+tpcdi = TPCDI(scale_factor=0.1, output_dir="tpcdi_pipeline")
 
 conn = sqlite3.connect("warehouse.db")
 
@@ -814,7 +811,7 @@ from datetime import datetime, timedelta
 from benchbox import TPCDI
 
 def extract_source_data(**context):
-    tpcdi = TPCDI(scale_factor=1.0, etl_mode=True, output_dir=f"/data/tpcdi/{context['ds']}")
+    tpcdi = TPCDI(scale_factor=1.0, output_dir=f"/data/tpcdi/{context['ds']}")
 
     source_files = tpcdi.generate_source_data(
         formats=['csv', 'xml', 'json'],
@@ -832,7 +829,7 @@ def transform_and_load(**context):
     ti = context['ti']
     extract_output = ti.xcom_pull(task_ids='extract_source_data')
 
-    tpcdi = TPCDI(scale_factor=1.0, etl_mode=True, output_dir=f"/data/tpcdi/{context['ds']}")
+    tpcdi = TPCDI(scale_factor=1.0, output_dir=f"/data/tpcdi/{context['ds']}")
     conn = duckdb.connect(f"/data/warehouse/tpcdi_{context['ds_nodash']}.duckdb")
 
     schema_sql = tpcdi.get_create_tables_sql()
@@ -861,7 +858,7 @@ def transform_and_load(**context):
 def validate_data_quality(**context):
     import duckdb
 
-    tpcdi = TPCDI(scale_factor=1.0, etl_mode=True)
+    tpcdi = TPCDI(scale_factor=1.0)
     conn = duckdb.connect(f"/data/warehouse/tpcdi_{context['ds_nodash']}.duckdb")
 
     validation_results = tpcdi.validate_etl_results(conn)
@@ -931,7 +928,7 @@ from benchbox import TPCDI
 
 @task(cache_key_fn=task_input_hash, cache_expiration=timedelta(hours=1))
 def extract_tpcdi_data(scale_factor: float, batch_type: str):
-    tpcdi = TPCDI(scale_factor=scale_factor, etl_mode=True, output_dir=f"prefect_etl_{batch_type}")
+    tpcdi = TPCDI(scale_factor=scale_factor, output_dir=f"prefect_etl_{batch_type}")
 
     source_files = tpcdi.generate_source_data(
         formats=['csv', 'xml', 'json'],
@@ -1176,15 +1173,17 @@ sources:
 
 ### Common Issues and Solutions
 
-#### 1. ETL Mode Not Enabled Error
+#### 1. Missing Connection Error
 
-**Error**: `ValueError: ETL mode must be enabled to generate source data`
+**Error**: `TypeError: TPCDI.run_etl_pipeline() missing 1 required positional argument: 'connection'`
 
-**Solution**: the first line below is incorrect because ETL mode is not enabled (`etl_mode` is `False` by default). The second line is correct.
+**Solution**: always pass a connection. The first call below is incorrect because it omits it; the second is correct.
 ```python
 tpcdi = TPCDI(scale_factor=1.0)
 
-tpcdi = TPCDI(scale_factor=1.0, etl_mode=True)
+tpcdi.run_etl_pipeline()
+
+tpcdi.run_etl_pipeline(connection=conn)
 ```
 
 #### 2. Database Connection Errors
@@ -1210,7 +1209,7 @@ else:
 
 **Solutions**: (1) reduce the scale factor, for example to 0.1 instead of 1.0 or more; (2) use an in-memory database for testing; (3) process in smaller batches by splitting a large batch into several smaller incremental batches.
 ```python
-tpcdi = TPCDI(scale_factor=0.1, etl_mode=True)
+tpcdi = TPCDI(scale_factor=0.1)
 
 conn = duckdb.connect(':memory:')
 
@@ -1277,7 +1276,7 @@ logging.basicConfig(
     ]
 )
 
-tpcdi = TPCDI(scale_factor=0.1, etl_mode=True, verbose=True)
+tpcdi = TPCDI(scale_factor=0.1, verbose=True)
 ```
 
 #### Inspect Generated Source Files
@@ -1380,7 +1379,6 @@ Use a minimal scale factor for fast iteration, verbose logging, and an in-memory
 tpcdi_dev = TPCDI(
     scale_factor=0.01,
     output_dir="dev_etl",
-    etl_mode=True,
     verbose=True
 )
 
@@ -1393,7 +1391,6 @@ Use a reasonable data size, reduce log noise with `verbose=False`, and use a per
 tpcdi_test = TPCDI(
     scale_factor=0.1,
     output_dir="test_etl",
-    etl_mode=True,
     verbose=False
 )
 
@@ -1406,7 +1403,6 @@ Use the full scale factor and a production database connection.
 tpcdi_prod = TPCDI(
     scale_factor=1.0,
     output_dir="/data/etl/tpcdi",
-    etl_mode=True,
     verbose=False
 )
 
@@ -1721,7 +1717,6 @@ class TPCDIETLTestSuite(unittest.TestCase):
         self.tpcdi = TPCDI(
             scale_factor=0.01,
             output_dir=self.temp_dir,
-            etl_mode=True,
             verbose=False
         )
 
@@ -1864,14 +1859,12 @@ class TPCDIETLTestSuite(unittest.TestCase):
         bad_conn = duckdb.connect(':memory:')
         bad_conn.close()
 
-        pipeline_result = self.tpcdi.run_etl_pipeline(
-            connection=bad_conn,
-            batch_type='historical',
-            validate_data=False
-        )
-
-        self.assertFalse(pipeline_result['success'])
-        self.assertIn('error', pipeline_result)
+        with self.assertRaises(Exception):
+            self.tpcdi.run_etl_pipeline(
+                connection=bad_conn,
+                batch_type='historical',
+                validate_data=False
+            )
 
     def test_performance_within_limits(self):
         import time
