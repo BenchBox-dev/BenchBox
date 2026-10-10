@@ -412,7 +412,8 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 "staging_root": self.staging_root,
                 "iam_role": self.iam_role,
                 "iam_role_configured": bool(self.iam_role),
-                "cluster_identifier": self.cluster_identifier or identifier,
+                "cluster_identifier": self.cluster_identifier
+                or (identifier if deployment_type != "serverless" else None),
                 "compupdate": getattr(self, "compupdate", None),
                 "result_cache_enabled": not self.disable_result_cache,
                 "wlm_query_slot_count": self.wlm_query_slot_count,
