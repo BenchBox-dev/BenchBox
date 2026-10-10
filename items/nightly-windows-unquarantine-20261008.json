@@ -4,7 +4,7 @@
     "continue-on-error and the quarantine suffix are removed from those two legs, with workflow tests updated",
     "Issues #2569 and #2570 are closed with run evidence, or each leg that stayed quarantined has its own tracker item"
   ],
-  "context": "Run 37967682464 proves only that scheduled-workflow-liveness and Windows integration-smoke steps passed; the Windows test legs remain quarantined, with 38 Windows 3.12 failures and a 3.11 timeout. Follow-up nightly-windows-verification-run-20261009 owns the next develop-headed evidence before any quarantine removal PR or issue closure.\n\n2026-10-09 tracker review: narrowed to the integration-smoke and liveness legs. The Windows test legs and issue #2568 moved to nightly-v2-windows-unit-leg-20261009. Needs cleared: nightly-mcp-capacity-lease-race-20261008 and nightly-liveness-diagnose-harden-20261008 are done, and the three Windows fix items (utf8-reads, path-quoting, teardown-and-singles) only affect the test legs. The liveness job also runs in nightly-v2 (PR #2835) until dlv2-70 removes nightly.yml.",
+  "context": "2026-10-10: quarantine removal implemented and verified in worktree ../BenchBox.wt-unquarantine on branch fix/nightly-windows-unquarantine, commit bbcaa9a (2 insertions, 6 deletions in .github/workflows/nightly.yml only; Windows test legs untouched). Focused tests pass: tests/unit/scripts/test_scheduled_workflow_liveness.py 33 passed; no unit test asserts the old quarantine names. Evidence revalidated live: run 37967682464 shows every step success in both scheduled-workflow-liveness and integration-smoke (windows-latest, 3.12). Branch pushed. PR not opened: make pr-open refuses while develop is red (trunk.yml run 37995649876 failed in dist-artifact with 'Release artifact admission failed: wrong producer repository', unrelated to this change). Commit kept; will open/arm/monitor once trunk is green. Resumption notes: branch tracks origin/fix/nightly-windows-unquarantine; HEAD bbcaa9a.",
   "description": "Two legs of .github/workflows/nightly.yml are still non-blocking and now pass: the Windows integration-smoke leg (#2569) and scheduled-workflow-liveness (#2570). In every completed nightly.yml run from 2026-10-03 to 2026-10-09, all steps of both legs passed (for example run 37967682464). Judge each leg by step results, not job conclusion, because continue-on-error reports a failed job as success.\n\nFor each leg, remove continue-on-error and the quarantine suffix from its name, update any workflow tests that assert them, and close its issue with a comment linking the run and the fix. If a leg fails in a fresh dispatched run, it keeps its quarantine and gets a tracker item with the failing step.\n\nOut of scope: the Windows 'test' legs (#2568). Leave their quarantine in nightly.yml until dlv2-70 retires nightly.yml. Their coverage and the closing of #2568 moved to nightly-v2-windows-unit-leg-20261009.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/issues/2569",
@@ -50,6 +50,14 @@
       "generation": "f39a1c84f3804e0a94c924f6a52ed825",
       "op": "take",
       "op_id": "ce6ccad89eed44498329e04b35308108",
+      "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
+    },
+    {
+      "actor": "mcp:omp-coding-agent:joe@joe-mac-mini.local:8d0fa0e2ef22aacc5284a44c",
+      "at": "2026-10-10T01:17:32Z",
+      "client": "omp-coding-agent",
+      "op": "update",
+      "op_id": "49f0a4e77f6d4a798401f258e34c82c9",
       "session_id": "3e7fe4d5d9904fa9a6d58ca7e8a7216f"
     }
   ]
