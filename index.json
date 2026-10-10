@@ -15214,7 +15214,7 @@
         "todo-db-runtime-schema3-batch-capability"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "dropped",
       "title": "Verify the complete PR process against incident replays and live operating targets"
     },
     "pr-review-followups-2026-08-20": {

@@ -308,6 +308,14 @@
       "op": "update",
       "op_id": "66e366692f2f4bf6adf2140513111cb4",
       "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-10T00:06:22Z",
+      "client": "claude-code",
+      "op": "drop",
+      "op_id": "3458edf8d20a4863b75a8b2f99abf27e",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
     }
   ]
 }
