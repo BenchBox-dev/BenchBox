@@ -464,14 +464,11 @@ firebolt|url|Firebolt Core endpoint URL (default: http://localhost:3473)|{'defau
 firebolt|client_id|Firebolt Cloud OAuth client ID|{}
 firebolt|client_secret|Firebolt Cloud OAuth client secret|{}
 firebolt|account_name|Firebolt Cloud account name|{}
-firebolt|engine_name|Firebolt Cloud engine name|{}
 firebolt|api_endpoint|Firebolt Cloud API endpoint|{'default': 'api.app.firebolt.io'}
 firebolt|database|Firebolt database name|{}
 firebolt|region|Firebolt Cloud region when known|{'aliases': ('cloud_region',)}
 firebolt|cloud_provider|Firebolt Cloud provider when known|{}
 firebolt|engine_type|Firebolt Cloud engine type when known|{}
-firebolt|engine_size|Firebolt Cloud requested engine size when known|{}
-firebolt|compute_size|Firebolt Cloud requested compute size alias for engine size|{}
 firebolt|s3_staging_url|S3 URL for Firebolt Cloud data staging|{}
 firebolt|s3_region|AWS region for Firebolt S3 staging|{}
 firebolt|disable_result_cache|Disable Firebolt Cloud result cache during benchmark execution|{'parser': 'parse_bool', 'default': True}
@@ -602,8 +599,7 @@ synapse|resource_class|Workload resource class (e.g., staticrc20, staticrc30)|{'
 synapse|staging_root|Azure staging path, including the storage account (e.g., abfss://container@account.dfs.core.windows.net/path)|{}
 fabric_dw|server|Fabric warehouse endpoint (e.g., workspace-guid.datawarehouse.fabric.microsoft.com)|{}
 fabric_dw|workspace|Fabric workspace name or GUID|{}
-fabric_dw|warehouse|Fabric warehouse name|{}
-fabric_dw|database|Database/warehouse name (alias for --warehouse)|{}
+fabric_dw|database|Database/warehouse name|{'aliases': ('warehouse',)}
 fabric_dw|auth_method|Authentication method: service_principal, default_credential, or interactive|{'default': 'default_credential'}
 fabric_dw|tenant_id|Azure tenant ID for service principal auth|{}
 fabric_dw|client_id|Service principal client ID|{}
@@ -614,17 +610,14 @@ quanton|s3_staging_dir|S3 path for data staging (e.g., s3://bucket/path)|{}
 quanton|region|AWS region for cluster deployment|{'default': 'us-east-1'}
 quanton|database|Database name for benchmarks|{'default': 'benchbox'}
 quanton|table_format|Table format: iceberg, hudi, or delta|{'choices': ('iceberg', 'hudi', 'delta'), 'default': 'iceberg'}
-quanton|cluster_size|Cluster size: small, medium, large, xlarge|{'choices': ('small', 'medium', 'large', 'xlarge'), 'default': 'small'}
 clickhouse-cloud|host|ClickHouse Cloud hostname (e.g., abc123.us-east-2.aws.clickhouse.cloud)|{}
 clickhouse-cloud|password|ClickHouse Cloud password (or set CLICKHOUSE_CLOUD_PASSWORD env var)|{}
 clickhouse-cloud|username|Username (default: 'default')|{'default': 'default'}
 clickhouse-cloud|database|Database name|{'default': 'default'}
 clickhouse-cloud|region|ClickHouse Cloud service region when it cannot be inferred from the host|{}
 clickhouse-cloud|cloud_provider|ClickHouse Cloud provider when it cannot be inferred from the host|{}
-clickhouse-cloud|service_id|ClickHouse Cloud service identifier for result metadata|{}
 clickhouse-cloud|service_name|ClickHouse Cloud service display name for result metadata|{}
 clickhouse-cloud|service_tier|ClickHouse Cloud service tier for result metadata|{}
-clickhouse-cloud|compute_size|ClickHouse Cloud requested compute size for result metadata|{}
 clickhouse-cloud|oauth_token|OAuth token for keyless authentication (alternative to password)|{}
 clickhouse-cloud|s3_staging_url|S3 URL for bulk data loading (e.g., s3://my-bucket/benchbox-staging/)|{}
 clickhouse-cloud|s3_region|AWS region for the S3 staging bucket|{'default': 'us-east-1'}
@@ -644,7 +637,6 @@ databend|username|Databend username (default: benchbox)|{'default': 'benchbox'}
 databend|password|Databend password (or set DATABEND_PASSWORD env var)|{}
 databend|database|Database name (default: benchbox)|{'default': 'benchbox'}
 databend|dsn|Full Databend DSN (overrides individual connection params)|{}
-databend|warehouse|Databend Cloud warehouse name|{}
 databend|ssl|Enable SSL/TLS for Databend connections|{'parser': 'parse_bool', 'default': True}
 databend|disable_result_cache|Disable Databend query result cache during benchmark execution|{'parser': 'parse_bool', 'default': True}
 doris|host|Doris FE node hostname|{'default': 'localhost'}
@@ -727,6 +719,10 @@ velox|lakehouse_jars|Comma-separated connector jars for delta/iceberg/hudi reads
             _register_specs(platform, (name, help_text, _spec_kwargs(kwargs_text)))
 
     _register_spec_rows(_OPTION_SPEC_ROWS)
+
+    from benchbox.core.compute_resource import register_compute_specs
+
+    register_compute_specs()
 
     PlatformHookRegistry.register_config_builder(
         "motherduck", _make_lazy_config_builder(".motherduck", "_build_motherduck_config")

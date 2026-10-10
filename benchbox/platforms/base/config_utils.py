@@ -73,6 +73,10 @@ def build_platform_config(
     merged_options.update(explicit_options)
     merged_options.update(overrides)
 
+    from benchbox.core.compute_resource import normalize_compute_options
+
+    merged_options = normalize_compute_options(platform_type, merged_options)
+
     name = info.display_name if info else default_display_name
     driver_package = info.driver_package if info else default_driver_package
 
@@ -199,6 +203,9 @@ def build_adapter_config(
     fields: Iterable[str] = (),
     include_none: bool = True,
 ) -> dict[str, Any]:
+    from benchbox.core.compute_resource import normalize_compute_options
+
+    config = normalize_compute_options(platform, config)
     adapter_config: dict[str, Any] = {}
     if generated_key:
         if config.get(generated_key):

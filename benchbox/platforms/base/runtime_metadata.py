@@ -108,7 +108,7 @@ def build_default_normalized_result_metadata(
     cloud = _cloud_metadata(platform_key, info, config)
     if cloud:
         metadata["platform_cloud"] = cloud
-    compute = _compute_metadata(info, config)
+    compute = _compute_metadata(platform_key, info, config)
     if compute:
         metadata["platform_compute"] = compute
     storage = _storage_metadata(info, config)
@@ -319,9 +319,21 @@ def _cloud_metadata(platform_key: str, info: Mapping[str, Any], config: Mapping[
     ).to_dict()
 
 
-def _compute_metadata(info: Mapping[str, Any], config: Mapping[str, Any]) -> dict[str, Any]:
+def _canonical_compute_fields(platform_key: str, merged: Mapping[str, Any]) -> dict[str, Any]:
+    from benchbox.core.compute_resource import compute_size_keys, compute_value_keys, resolve_resource_kind
+
+    resource = _first_present(merged, compute_value_keys(platform_key))
+    size = _first_present(merged, compute_size_keys(platform_key))
+    kind = resolve_resource_kind(platform_key, merged)
+    if resource is None and size is None:
+        return {"resource": None, "resource_kind": None, "size": None}
+    return {"resource": resource, "resource_kind": kind, "size": size}
+
+
+def _compute_metadata(platform_key: str, info: Mapping[str, Any], config: Mapping[str, Any]) -> dict[str, Any]:
     compute = _mapping_value(info.get("compute_configuration")) or {}
     merged = {**config, **compute}
+    canonical = _canonical_compute_fields(platform_key, merged)
     payload = PlatformComputeMetadata(
         warehouse=_first_present(merged, ("warehouse_name", "warehouse", "warehouse_id")),
         warehouse_size=_first_present(merged, ("warehouse_size", "cluster_size")),
@@ -336,6 +348,9 @@ def _compute_metadata(info: Mapping[str, Any], config: Mapping[str, Any]) -> dic
         driver_shape=_first_present(merged, ("driver_shape", "driver_node_type")),
         cache_enabled=_first_bool(merged, ("cache_enabled", "query_cache_enabled")),
         result_cache_enabled=_first_bool(merged, ("result_cache_enabled",)),
+        resource=canonical["resource"],
+        resource_kind=canonical["resource_kind"],
+        size=canonical["size"],
         source="observed" if compute else "requested",
         collection_status="partial",
     ).to_dict()

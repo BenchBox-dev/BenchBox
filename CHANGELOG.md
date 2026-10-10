@@ -14,6 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Fields are omitted until producers supply them. Legacy engine requests map on read
   without changing legacy variant identity; explicit requests survive JSON re-export.
   Publication drops compute resource names and hashes gateway hosts.
+- Platforms declare a `compute_resource` and, where the vendor bills a size,
+  a `compute_size` setting. Vendor names (`warehouse`, `engine_name`,
+  `workgroup`, `cluster_id`, `spark_pool_name`, `service_id`,
+  `application_id`, `cluster_identifier`, `cluster_name`, `warehouse_id`,
+  `engine_size`, `cluster_size` and others) keep working as deprecated
+  aliases with a once-per-run warning and are removed in 0.6.0. Results
+  record the canonical resource kind and size alongside the legacy fields;
+  publication drops the resource name. Fabric Data Warehouse uses `database`
+  as the canonical name with `warehouse` as a deprecated alias, and Athena
+  Spark uses `runtime_version` with `engine_version` as a deprecated alias.
 
 - Result bundles now record the factory-resolved deployment as
   `platform.deployment.selected` with `selected_class`, and non-default
@@ -32,6 +42,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   working. The aliases are removed in 0.6.0.
 
 ### Before you upgrade
+- Vendor compute names now warn once per run; move saved configurations and
+  credential profiles to `compute_resource` and `compute_size` (Fabric Data
+  Warehouse: `database`; Athena Spark: `runtime_version`). The old names stop
+  working in 0.6.0. When both spellings disagree, the canonical name wins,
+  except Databricks, where a `compute_resource` that disagrees with the
+  warehouse implied by `http_path` fails the run naming both values.
 
 - Result bundles now use additive schema 2.3. Readers must accept this version.
   Older bundles remain readable and published bundles and IDs are unchanged.

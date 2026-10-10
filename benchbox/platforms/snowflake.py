@@ -60,7 +60,7 @@ class SnowflakeAdapter(PlatformAdapter):
         self._dialect = "snowflake"
 
         self.account = config.get("account")
-        self.warehouse = config.get("warehouse") or "COMPUTE_WH"
+        self.warehouse = config.get("compute_resource") or config.get("warehouse") or "COMPUTE_WH"
         self.database = config.get("database") or "BENCHBOX"
         self.schema = config.get("schema") or "PUBLIC"
         self.username = config.get("username")
@@ -72,7 +72,7 @@ class SnowflakeAdapter(PlatformAdapter):
         self.private_key_path = config.get("private_key_path")
         self.private_key_passphrase = config.get("private_key_passphrase")
 
-        self.warehouse_size = config.get("warehouse_size") or "MEDIUM"
+        self.warehouse_size = config.get("compute_size") or config.get("warehouse_size") or "MEDIUM"
         self.auto_suspend = config.get("auto_suspend") if config.get("auto_suspend") is not None else 300
         self.auto_resume = config.get("auto_resume") if config.get("auto_resume") is not None else True
         self.multi_cluster_warehouse = (
@@ -191,6 +191,7 @@ class SnowflakeAdapter(PlatformAdapter):
             fields=[
                 "account",
                 "warehouse",
+                "compute_resource",
                 "schema",
                 "username",
                 "password",
@@ -201,6 +202,7 @@ class SnowflakeAdapter(PlatformAdapter):
                 "private_key_passphrase",
                 "warehouse_size",
                 "auto_suspend",
+                "compute_size",
                 "auto_resume",
                 "multi_cluster_warehouse",
                 "query_tag",
@@ -397,12 +399,19 @@ class SnowflakeAdapter(PlatformAdapter):
         )
         collection_error = compute.get("collection_error_class")
         collection_status = "available" if observed else "partial"
-        if collection_error and not (config.get("warehouse") or config.get("warehouse_size")):
+        if collection_error and not (
+            config.get("compute_resource")
+            or config.get("warehouse")
+            or config.get("compute_size")
+            or config.get("warehouse_size")
+        ):
             collection_status = "unavailable"
 
         payload = {
-            "warehouse": compute.get("warehouse_name") or config.get("warehouse"),
-            "warehouse_size": compute.get("warehouse_size") or config.get("warehouse_size"),
+            "warehouse": compute.get("warehouse_name") or config.get("compute_resource") or config.get("warehouse"),
+            "warehouse_size": compute.get("warehouse_size")
+            or config.get("compute_size")
+            or config.get("warehouse_size"),
             "warehouse_type": compute.get("warehouse_type"),
             "warehouse_state": compute.get("warehouse_state"),
             "min_cluster_count": compute.get("min_cluster_count"),

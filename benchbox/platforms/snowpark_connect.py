@@ -433,18 +433,21 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> SnowparkConnectAdapter:
+        from benchbox.core.compute_resource import normalize_compute_options
+
+        config = normalize_compute_options("snowpark-connect", config)
         params = {
             "account": config.get("account"),
             "user": config.get("user"),
             "password": config.get("password"),
-            "warehouse": config.get("warehouse", "COMPUTE_WH"),
+            "warehouse": config.get("compute_resource") or config.get("warehouse") or "COMPUTE_WH",
             "database": config.get("database", "BENCHBOX"),
             "schema": config.get("schema", "PUBLIC"),
             "role": config.get("role"),
             "authenticator": config.get("authenticator"),
             "private_key_path": config.get("private_key_path"),
             "private_key_passphrase": config.get("private_key_passphrase"),
-            "warehouse_size": config.get("warehouse_size", "MEDIUM"),
+            "warehouse_size": config.get("compute_size") or config.get("warehouse_size") or "MEDIUM",
         }
 
         for key in [
