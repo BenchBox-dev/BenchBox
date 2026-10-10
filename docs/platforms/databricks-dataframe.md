@@ -53,12 +53,10 @@ variables or `--platform-option`:
 | `DATABRICKS_TOKEN`      | Personal access token                                |
 | `DATABRICKS_HTTP_PATH`  | SQL Warehouse HTTP path (used for the load phase)    |
 
-The DataFrame adapter itself accepts `cluster_id`, but BenchBox does not yet
-surface that field through the shared Databricks config builder or
-`--platform-option`. Select the target cluster in your external Databricks
-Connect / Spark Connect configuration instead. `DATABRICKS_HTTP_PATH` remains
-required for the load phase, which uses the SQL connector regardless of
-execution mode.
+The DataFrame adapter selects its cluster through `compute_resource`
+(`--platform-option compute_resource=<cluster-id>`, deprecated alias
+`cluster_id`). `DATABRICKS_HTTP_PATH` remains required for the load phase,
+which uses the SQL connector regardless of execution mode.
 
 ## Usage
 

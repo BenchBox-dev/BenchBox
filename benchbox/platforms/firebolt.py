@@ -151,14 +151,16 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         self.database = config.get("database") or os.environ.get("FIREBOLT_DATABASE") or "benchbox"
 
         self.account_name = config.get("account_name") or os.environ.get("FIREBOLT_ACCOUNT_NAME")
-        self.engine_name = config.get("engine_name") or os.environ.get("FIREBOLT_ENGINE_NAME")
+        self.engine_name = (
+            config.get("compute_resource") or config.get("engine_name") or os.environ.get("FIREBOLT_ENGINE_NAME")
+        )
         self.api_endpoint = (
             config.get("api_endpoint") or os.environ.get("FIREBOLT_API_ENDPOINT") or "api.app.firebolt.io"
         )
         self.region = config.get("region") or config.get("cloud_region") or os.environ.get("FIREBOLT_REGION")
         self.cloud_provider = config.get("cloud_provider") or os.environ.get("FIREBOLT_CLOUD_PROVIDER")
         self.engine_type = config.get("engine_type")
-        self.engine_size = config.get("engine_size") or config.get("compute_size")
+        self.engine_size = config.get("compute_size") or config.get("engine_size")
 
         _validate_firebolt_mode_config(self)
 
@@ -270,6 +272,7 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 "client_secret",
                 "account_name",
                 "engine_name",
+                "compute_resource",
                 "api_endpoint",
                 "region",
                 "cloud_region",
@@ -482,8 +485,10 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             is_cloud
             and (
                 observed
+                or config.get("compute_resource")
                 or config.get("engine_name")
                 or config.get("engine_type")
+                or config.get("compute_size")
                 or config.get("engine_size")
                 or config.get("result_cache_enabled") is not None
                 or compute.get("engine_metadata_collection_status")
@@ -492,9 +497,9 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return _compact_metadata(
             {
                 "service_model": "managed" if is_cloud else "core",
-                "engine": compute.get("engine_name") or config.get("engine_name"),
+                "engine": compute.get("engine_name") or config.get("compute_resource") or config.get("engine_name"),
                 "engine_type": compute.get("engine_type") or config.get("engine_type"),
-                "engine_size": config.get("engine_size"),
+                "engine_size": config.get("compute_size") or config.get("engine_size"),
                 "engine_status": compute.get("engine_status"),
                 "result_cache_enabled": config.get("result_cache_enabled") if is_cloud else None,
                 "engine_metadata_collection_status": compute.get("engine_metadata_collection_status"),

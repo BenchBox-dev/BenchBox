@@ -439,13 +439,16 @@ class QuantonAdapter(
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> QuantonAdapter:
+        from benchbox.core.compute_resource import normalize_compute_options
+
+        config = normalize_compute_options("quanton", config)
         params = {
             "api_key": config.get("api_key") or config.get("onehouse_api_key"),
             "s3_staging_dir": config.get("s3_staging_dir"),
             "region": config.get("region", "us-east-1"),
             "database": config.get("database", "benchbox"),
             "table_format": config.get("table_format", "iceberg"),
-            "cluster_size": config.get("cluster_size", "small"),
+            "cluster_size": config.get("compute_size") or config.get("cluster_size", "small"),
             "timeout_minutes": config.get("timeout_minutes", 60),
             "api_endpoint": config.get("api_endpoint"),
             "record_key": config.get("record_key"),

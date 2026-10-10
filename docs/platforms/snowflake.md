@@ -56,7 +56,7 @@ benchbox run --platform snowflake --benchmark tpch --scale 1.0 \
   --platform-option account=your_account \
   --platform-option user=your_user \
   --platform-option password=your_password \
-  --platform-option warehouse=COMPUTE_WH \
+  --platform-option compute_resource=COMPUTE_WH \
   --platform-option database=BENCHBOX
 ```
 
@@ -67,7 +67,7 @@ benchbox run --platform snowflake --benchmark tpch --scale 1.0 \
 | `account` | (env) | Snowflake account identifier |
 | `user` | (env) | Username for authentication |
 | `password` | (env) | Password for authentication |
-| `warehouse` | (env) | Virtual warehouse name |
+| `compute_resource` | (env) | Named compute resource (Snowflake warehouse). Deprecated alias: `warehouse` (removed in 0.6.0) |
 | `database` | (auto) | Database name |
 | `schema` | PUBLIC | Schema name |
 | `role` | (default) | Snowflake role |
@@ -84,7 +84,7 @@ benchbox run --platform snowflake --benchmark tpch \
   --platform-option driver_version=3.12.0 \
   --platform-option driver_auto_install=true \
   --platform-option account=xy12345.us-east-1 \
-  --platform-option warehouse=COMPUTE_WH
+  --platform-option compute_resource=COMPUTE_WH
 ```
 
 The driver package for Snowflake is `snowflake-connector-python`.
@@ -158,7 +158,7 @@ adapter = SnowflakeAdapter(
     account="xy12345.us-east-1",
     user="benchbox_user",
     password="secure_password",
-    warehouse="COMPUTE_WH",
+    compute_resource="COMPUTE_WH",
     database="BENCHBOX",
 )
 

@@ -52,27 +52,27 @@ configuration, and a dry run that previews queries.
 
 ```bash
 benchbox run --platform athena-spark --benchmark tpch --scale 1.0 \
-  --platform-option workgroup=my-spark-workgroup \
+  --platform-option compute_resource=my-spark-workgroup \
   --platform-option s3_staging_dir=s3://my-bucket/benchbox
 
 benchbox run --platform athena-spark --benchmark tpch --scale 1.0 \
-  --platform-option workgroup=my-spark-workgroup \
+  --platform-option compute_resource=my-spark-workgroup \
   --platform-option s3_staging_dir=s3://my-bucket/benchbox \
   --platform-option region=eu-west-1
 
 benchbox run --platform athena-spark --benchmark tpch --scale 1.0 \
-  --platform-option workgroup=my-spark-workgroup \
+  --platform-option compute_resource=my-spark-workgroup \
   --platform-option s3_staging_dir=s3://my-bucket/benchbox \
-  --platform-option "engine_version=PySpark engine version 3"
+  --platform-option "runtime_version=PySpark engine version 3"
 
 benchbox run --platform athena-spark --benchmark tpch --scale 1.0 \
-  --platform-option workgroup=my-spark-workgroup \
+  --platform-option compute_resource=my-spark-workgroup \
   --platform-option s3_staging_dir=s3://my-bucket/benchbox \
   --platform-option coordinator_dpu_size=2 \
   --platform-option max_concurrent_dpus=40
 
 benchbox run --platform athena-spark --benchmark tpch --dry-run ./preview \
-  --platform-option workgroup=my-spark-workgroup \
+  --platform-option compute_resource=my-spark-workgroup \
   --platform-option s3_staging_dir=s3://my-bucket/benchbox
 ```
 
@@ -99,7 +99,7 @@ benchbox run --platform athena-spark --benchmark tpch --dry-run ./preview \
 benchbox run --platform athena-spark --benchmark tpch \
   --platform-option driver_version=3.0.0 \
   --platform-option driver_auto_install=true \
-  --platform-option workgroup=my-spark-workgroup \
+  --platform-option compute_resource=my-spark-workgroup \
   --platform-option s3_staging_dir=s3://my-bucket/benchbox
 ```
 
@@ -117,7 +117,7 @@ data to S3 and creates tables, executes a query via the session, and finally ter
 from benchbox.platforms.aws import AthenaSparkAdapter
 
 adapter = AthenaSparkAdapter(
-    workgroup="my-spark-workgroup",
+    compute_resource="my-spark-workgroup",
     s3_staging_dir="s3://my-bucket/benchbox",
     region="us-east-1",
 )

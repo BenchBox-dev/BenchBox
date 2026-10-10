@@ -114,7 +114,7 @@ benchbox run --platform redshift --benchmark tpch \
 
 ```bash
 benchbox run --platform redshift --benchmark tpch \
-  --platform-option workgroup_name=default \
+  --platform-option compute_resource=default \
   --platform-option database=dev
 ```
 
@@ -187,7 +187,7 @@ Use serverless for variable workloads:
 
 ```bash
 benchbox run --platform redshift --benchmark tpch \
-  --platform-option workgroup_name=benchbox-wg
+  --platform-option compute_resource=benchbox-wg
 ```
 
 ## Performance Features
@@ -293,7 +293,7 @@ Set a maximum RPU to control costs:
 
 ```bash
 benchbox run --platform redshift --benchmark tpch \
-  --platform-option workgroup_name=benchbox \
+  --platform-option compute_resource=benchbox \
   --platform-option max_rpu=128
 ```
 

@@ -299,7 +299,7 @@ adapter = SnowflakeAdapter(
     account="xy12345.us-east-1",
     username="benchbox_user",
     password="secure_password_123",
-    warehouse="COMPUTE_WH",
+    compute_resource="COMPUTE_WH",
     database="BENCHBOX",
     schema="PUBLIC"
 )
@@ -512,8 +512,8 @@ adapter = BigQueryAdapter(
 
 from benchbox.platforms.snowflake import SnowflakeAdapter
 adapter = SnowflakeAdapter(
-    warehouse="LARGE_WH",
-    warehouse_size="LARGE"
+    compute_resource="LARGE_WH",
+    compute_size="LARGE"
 )
 ```
 
@@ -684,7 +684,7 @@ Set cost controls. The 5000000000 limit is 5 GB, `BATCH` priority lowers cost, `
 from benchbox.platforms.snowflake import SnowflakeAdapter
 
 adapter = SnowflakeAdapter(
-    warehouse="COMPUTE_WH",
+    compute_resource="COMPUTE_WH",
     auto_resume=True,
     auto_suspend=300
 )
