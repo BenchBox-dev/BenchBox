@@ -23,8 +23,8 @@ Docker integration tests execute real queries against real database engines runn
 
 | Platform | Docker Image | Ports | Protocol |
 |----------|-------------|-------|----------|
-| ClickHouse | `clickhouse/clickhouse-server:25.8` | 9000, 8123 | Native TCP / HTTP |
-| Trino | `trinodb/trino:480` | 18080 -> 8080 | HTTP (DBAPI) |
+| ClickHouse | `clickhouse/clickhouse-server:25.8@sha256:0152dd511befe6a2c2ef53e930726179669b08116da78500b37c51c96ff5ee77` | 9000, 8123 | Native TCP / HTTP |
+| Trino | `trinodb/trino:480@sha256:1565e8cac299a32dd9177a4da2d748da4ceb9f1560a9c409d1d18fd72ea5253e` | 18080 -> 8080 | HTTP (DBAPI) |
 | Presto | `prestodb/presto:0.297` | 18081 -> 8080 | HTTP (DBAPI) |
 | PostgreSQL | `public.ecr.aws/docker/library/postgres:18` | 5432 | PostgreSQL wire |
 | StarRocks | `starrocks/allin1-ubuntu:3.5.16` | 19030 -> 9030, 18040 -> 8040 | MySQL / HTTP Stream Load |
@@ -36,18 +36,21 @@ Docker integration tests execute real queries against real database engines runn
 
 PostgreSQL compose pulls the official image from Amazon ECR Public; the
 nightly PostgreSQL service uses the same registry with its existing version 17.
-Nightly T3 and Docker integration jobs pull ClickHouse and Trino from
-`ghcr.io/benchbox-dev/clickhouse:25.8` and `ghcr.io/benchbox-dev/trino:480`.
+Nightly T3 and Docker integration jobs pull the manifest-list digests pinned in
+compose from `ghcr.io/benchbox-dev/clickhouse:25.8@sha256:0152dd511befe6a2c2ef53e930726179669b08116da78500b37c51c96ff5ee77`
+and `ghcr.io/benchbox-dev/trino:480@sha256:1565e8cac299a32dd9177a4da2d748da4ceb9f1560a9c409d1d18fd72ea5253e`.
 The nightly CedarDB throughput job uses `ghcr.io/benchbox-dev/cedardb` with the
 unchanged SHA-256 digest from its compose file.
 
-These jobs wait for `mirror-ci-images.yml`, which reads the source version
-from compose, copies an absent image from Docker Hub using host-installed
-Skopeo, and preserves all architectures and manifest digests. Existing mirror
-versions are reused instead of contacting Docker Hub on every run. A new
-version still needs one successful upstream copy; an upstream rate limit
-during that first copy fails the mirror job rather than falling back in the
-consumer. No Docker Hub credentials are required.
+These jobs wait for `mirror-ci-images.yml`, which requires digest-pinned source
+references and checks GHCR by that digest on every run. A successful check
+records the pinned digest in the run summary without querying Docker Hub.
+Only a `MANIFEST_UNKNOWN` response triggers a Skopeo copy from the same pinned
+Docker Hub digest; all other registry errors fail closed. Copies preserve all
+architectures and manifest digests, then the workflow verifies the GHCR
+manifest. A missing mirror needs one successful upstream copy; a rate limit
+during that copy fails the mirror job rather than falling back in the consumer.
+No Docker Hub credentials are required.
 
 The mirror job uses `GITHUB_TOKEN` with `packages: write`. Consumers log into
 GHCR with `packages: read`, so newly created private packages can be pulled
@@ -57,9 +60,12 @@ publication happens only when a calling workflow runs.
 
 Local vendor stacks retain their upstream defaults. `CLICKHOUSE_IMAGE`,
 `TRINO_IMAGE`, and `CEDARDB_IMAGE` override the full image reference when a
-different registry is needed. When changing a compose version, update the
-corresponding CI override too; keep CedarDB's digest unchanged across registries.
-Other compose stacks are not migrated by this CI configuration.
+different registry is needed. The workflow contract tests compare ClickHouse
+and Trino CI overrides in both consumers with the complete compose `tag@digest`
+references. When an upstream version or digest changes, update the compose
+reference and corresponding CI overrides together; keep CedarDB's digest
+unchanged across registries. Other compose stacks are not migrated by this CI
+configuration.
 
 CI and Documentation spellcheck install `codespell[toml]==2.4.3` with `uvx`
 instead of building a Docker action. This matches the version in the replaced
