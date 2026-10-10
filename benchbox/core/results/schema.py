@@ -528,8 +528,9 @@ def _requested_execution_engine(result: BenchmarkResults, engine_block: Mapping[
     requested = run_config.get("execution_engine") if isinstance(run_config, Mapping) else None
     if requested:
         return str(requested)
-    if result.execution_engine and result.execution_engine.get("requested"):
-        return str(result.execution_engine["requested"])
+    execution_engine = getattr(result, "execution_engine", None)
+    if isinstance(execution_engine, Mapping) and execution_engine.get("requested"):
+        return str(execution_engine["requested"])
     platform_info = result.platform_info if isinstance(result.platform_info, Mapping) else {}
     requested = _platform_info_entry(platform_info, "engine_requested")
     return str(requested) if requested else DEFAULT_EXECUTION_ENGINE
